@@ -8,3 +8,6 @@ edition = "2018"
 version = "0.13"
 default-features = false
 features = ["pancurses-backend"]
+
+[dependencies]
+rand = "0.7.0"

@@ -9,14 +9,13 @@ const DISPLAY_HEIGHT: usize = 32;
 
 type Screen = [[bool; DISPLAY_HEIGHT]; DISPLAY_WIDTH];
 
-struct ScreenView {
-    screen: Screen,
+pub struct ScreenView {
+    pub screen: Screen,
 }
 
 impl View for ScreenView {
     fn draw(&self, printer: &Printer) {
         let style = ColorStyle::new(Color::from_256colors(255), Color::from_256colors(0));
-
         for (x, row) in self.screen.iter().enumerate() {
             for (y, _) in row.iter().enumerate() {           
                 printer.with_color(style, |printer| {
@@ -27,10 +26,6 @@ impl View for ScreenView {
             }
         }
     }
-}
-
-pub fn update_screen_view(siv: &mut Cursive, x: usize, y: usize, val: bool) {
-     siv.call_on_id("display", |view : &mut ScreenView |{view.screen[x][y] = val;});
 }
 
 pub fn create_display() -> Cursive {
@@ -53,5 +48,6 @@ pub fn create_display() -> Cursive {
             
     );
     siv.set_theme(theme);
+    siv.set_fps(120);
     siv
 }
