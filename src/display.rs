@@ -21,7 +21,7 @@ impl View for ScreenView {
                 printer.with_color(style, |printer| {
                     if self.screen[x][y] {
                         printer.print((x, y), "*");
-                    } else {printer.print((x, y), " ")};
+                    } else {printer.print((x, y), "*")};
                 });
             }
         }

@@ -10,6 +10,8 @@ mod cpu;
 mod screen;
 mod cursive_screen;
 mod utils;
+mod display_sdl;
+mod sdl_screen;
 
 fn read_rom(file_name: &String) -> Vec<u8> {
     let mut rom = Vec::new();
@@ -64,9 +66,10 @@ fn main() {
    let args: Vec<String> = env::args().collect();
    let filename = &args[1];
    let rom = read_rom(filename);
-
-   let mut display = display::create_display();
-   let screen_controller = cursive_screen::CursiveScreenController::new(display.cb_sink().clone());
+   //let mut display = display::create_display();
+   let display = display_sdl::DisplaySdl::new();
+   
+   let screen_controller = sdl_screen::SdlScreenController::new(display.tx.clone());
    thread::spawn(move || {
         cpu_thread(&rom, &screen_controller);
    });
