@@ -2,16 +2,14 @@ use std::thread;
 use std::fs::{File};
 use std::env;
 use std::io::prelude::*;
+use std::sync::mpsc::{Sender, Receiver, channel};
 
-
-mod display;
 mod memory;
 mod cpu;
 mod screen;
-mod cursive_screen;
 mod utils;
 mod display_sdl;
-mod sdl_screen;
+mod keyboard;
 
 fn read_rom(file_name: &String) -> Vec<u8> {
     let mut rom = Vec::new();
@@ -40,25 +38,20 @@ fn load_sprites(ram: & mut memory::RAM) {
     ];
 
     for (i, sprite) in sprites.iter().enumerate() {
-        println!("Loading  sprite {}",i);
         ram.store_bytes( (5*i) as u16, sprite);
     }
-
 }
 
-
-fn cpu_thread(rom : &Vec<u8>, screen: & dyn screen::ScreenController)
+fn cpu_thread(rom : &Vec<u8>, screen_tx: Sender<screen::Screen>, keyboard_rx :Receiver::<keyboard::KeyEvent> )
 {
    let ins_count = rom.len() as u16;
    let mut ram = memory::RAM::new();
    ram.store_bytes(0x200, rom);
    load_sprites(& mut ram);
 
-   let mut cpu = cpu::CPU::new(&mut ram, screen);
+   let mut cpu = cpu::CPU::new(&mut ram, screen_tx, keyboard_rx);
 
    cpu.run(ins_count);
-
-   println!("{}", rom[0]);
 }
 
 fn main() {
@@ -66,12 +59,13 @@ fn main() {
    let args: Vec<String> = env::args().collect();
    let filename = &args[1];
    let rom = read_rom(filename);
-   //let mut display = display::create_display();
-   let display = display_sdl::DisplaySdl::new();
+
+   let (keyboard_tx, keyboard_rx) : (Sender<keyboard::KeyEvent>, Receiver<keyboard::KeyEvent>) = channel();
+   let (screen_tx,   screen_rx)   : (Sender<screen::Screen>, Receiver<screen::Screen>) = channel();
+   let display = display_sdl::DisplaySdl::new(screen_rx, keyboard_tx);
    
-   let screen_controller = sdl_screen::SdlScreenController::new(display.tx.clone());
    thread::spawn(move || {
-        cpu_thread(&rom, &screen_controller);
+        cpu_thread(&rom, screen_tx, keyboard_rx);
    });
-  display.run();
+   display.run();
 }

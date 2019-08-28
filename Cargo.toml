@@ -4,11 +4,6 @@ version = "0.1.0"
 authors = ["Przemyslaw Koziol <przemkoz85@gmail.com>"]
 edition = "2018"
 
-[dependencies.cursive]
-version = "0.13"
-default-features = false
-features = ["pancurses-backend"]
-
 [dependencies]
 rand = "0.7.0"
 sdl2 = {version = "0.32.2", features = ["gfx"] }

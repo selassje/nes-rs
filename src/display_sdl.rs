@@ -1,33 +1,57 @@
 extern crate sdl2;
 
 use crate::screen::{Screen,DISPLAY_HEIGHT,DISPLAY_WIDTH};
+use crate::keyboard::{KeyEvent};
+
 
 use sdl2::event::Event;
 use sdl2::pixels;
 use sdl2::keyboard::Keycode;
+use sdl2::keyboard::Scancode;
 use sdl2::gfx::primitives::DrawRenderer;
 
-use std::sync::mpsc::{Sender,Receiver, channel};
-
+use std::iter::FromIterator; 
+use std::collections::HashMap;
+use std::sync::mpsc::{Sender,Receiver};
 
 pub struct DisplaySdl{
-        rx : Receiver<Screen>,
-   pub  tx : Sender<Screen>,
-}
+        screen_rx   : Receiver<Screen>,
+        keyboard_tx : Sender<KeyEvent>,
+}       
 
 impl DisplaySdl
 {
-    pub fn new() -> DisplaySdl {
-        let (tx, rx) : (Sender<Screen>,Receiver<Screen>) = channel();
+    pub fn new(screen_rx : Receiver<Screen>, keyboard_tx : Sender<KeyEvent>) -> DisplaySdl {
         DisplaySdl
         {
-            tx : tx,
-            rx : rx,
+            screen_rx,
+            keyboard_tx,
         } 
     }
-
     pub fn run(&self)
     {
+        let key_mappings : HashMap<Keycode, u8> = HashMap::from_iter(vec!(
+            (Keycode::NumLockClear, 1),
+            (Keycode::KpDivide,2),
+            (Keycode::KpMultiply,3),
+            (Keycode::KpBackspace,0xC),
+            (Keycode::Backspace, 0xC),
+            (Keycode::Kp7,4),
+            (Keycode::Kp8,5),
+            (Keycode::Kp9,6),
+            (Keycode::KpMinus,0xD),
+            (Keycode::Kp4,7),
+            (Keycode::Kp5,8),
+            (Keycode::Kp6,9),
+            (Keycode::KpPlus,0xE),
+            (Keycode::Kp1,0xA),
+            (Keycode::Kp2,0),
+            (Keycode::Kp3,0xB),
+            (Keycode::KpEnter,0xF))
+        );
+
+
+
         const DISPLAY_SCALING : i16 = 20;
 
         let sdl_context = sdl2::init().unwrap();
@@ -41,15 +65,42 @@ impl DisplaySdl
         let mut canvas = window.into_canvas().build().map_err(|e| e.to_string()).unwrap();
 
         canvas.set_draw_color(pixels::Color::RGB(0, 0, 0));
-        canvas.clear();
         canvas.present();
 
         let mut events = sdl_context.event_pump().unwrap();
+        let mut keys_state : HashMap<Scancode,bool> = HashMap::from_iter(events.keyboard_state().scancodes());
         let mut screen : Screen = [[false; DISPLAY_HEIGHT]; DISPLAY_WIDTH];
-        loop {
-            for _ in events.poll_iter() { }
+
+        'main: loop {
+            for event in events.poll_iter() {
+                match event {
+                    Event::Quit {..} => break 'main,
+                    Event::KeyDown {keycode: Some(keycode), ..} => {
+                        if keycode == Keycode::Escape {
+                            break 'main
+                        } 
+                    }
+                    _ => {}
+                }   
+            }
+
+            let keys_state_new : HashMap<Scancode,bool> = HashMap::from_iter(events.keyboard_state().scancodes());
+            for (k, v) in key_mappings.iter() {
+                let old_state = keys_state[&Scancode::from_keycode(*k).unwrap()];
+                let new_state = keys_state_new[&Scancode::from_keycode(*k).unwrap()];
+                if  old_state != new_state {
+                    if new_state {
+                        self.keyboard_tx.send(KeyEvent::KeyDown(*v)).unwrap();
+                    }
+                    else {
+                        self.keyboard_tx.send(KeyEvent::KeyUp(*v)).unwrap();
+                    }
+                }
+            }
+            keys_state = keys_state_new;
+            
             canvas.clear();
-            if let Ok(ret) = self.rx.try_recv() {
+            if let Ok(ret) = self.screen_rx.try_recv() {
                 screen = ret;
             } 
             for (x, col) in screen.iter().enumerate() {
@@ -65,69 +116,9 @@ impl DisplaySdl
                 }
             }
             canvas.present();
+
+
         }
 
     }
-}
-
-
-fn main() -> Result<(), String> {
-    //std::sync::mspc::Sender<S
-    let (tx, rx) : (Sender<Screen>,Receiver<Screen>) = channel();
-    
-    let sdl_context = sdl2::init()?;
-    let video_subsys = sdl_context.video()?;
-    let window = video_subsys.window("rust-sdl2_gfx: draw line & FPSManager", 100, 200)
-        .position_centered()
-        .opengl()
-        .build()
-        .map_err(|e| e.to_string())?;
-
-    let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
-
-    canvas.set_draw_color(pixels::Color::RGB(0, 0, 0));
-    canvas.clear();
-    canvas.present();
-
-    let mut lastx = 0;
-    let mut lasty = 0;
-
-    let mut events = sdl_context.event_pump()?;
-
-    'main: loop {
-        for event in events.poll_iter() {
-
-            match event {
-
-                Event::Quit {..} => break 'main,
-
-                Event::KeyDown {keycode: Some(keycode), ..} => {
-                    if keycode == Keycode::Escape {
-                        break 'main
-                    } else if keycode == Keycode::Space {
-                        println!("space down");
-                        for i in 0..400 {
-                            canvas.pixel(i as i16, i as i16, 0xFF000FFu32)?;
-                        }
-                        canvas.present();
-                    }
-                }
-
-                Event::MouseButtonDown {x, y, ..} => {
-                    let color = pixels::Color::RGB(x as u8, y as u8, 255);
-                    let white= pixels::Color::RGB(255, 255, 255);
-                    let _ = canvas.line(lastx, lasty, x as i16, y as i16, color);
-                    let _ = canvas.box_(320, 100, 330, 110, white);
-                    lastx = x as i16;
-                    lasty = y as i16;
-                    println!("mouse btn down at ({},{})", x, y);
-                    canvas.present();
-                }
-
-                _ => {}
-            }
-        }
-    }
-
-    Ok(())
 }

@@ -1,11 +1,17 @@
 use crate::memory::{RAM};
-use crate::screen::{Screen, ScreenController, DISPLAY_HEIGHT, DISPLAY_WIDTH};
+use crate::screen::{Screen, DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use std::collections::LinkedList;
 use crate::utils::*;
 use rand::rngs::{ThreadRng};
 use rand::{Rng, thread_rng};
 use std::time::{Duration, Instant};
 use std::thread::sleep;
+use crate::keyboard::{KeyEvent};
+use std::sync::mpsc::{Sender, Receiver};
+
+pub const MILLISECONDS_PER_CYCLE : u64 = 500 /  60 ;
+
+type Keyboard = [bool; 16];
 
 pub struct CPU<'a>
 {
@@ -16,39 +22,38 @@ pub struct CPU<'a>
    d_reg        : u8,
    t_reg        : u8,
    ram          : &'a mut RAM,
-   screen_ctrl  : &'a dyn ScreenController,
+   screen_tx    : Sender<Screen>,
    screen       : Screen,
    rand         : ThreadRng,
-
+   keyboard     : Keyboard,
+   keyboard_rx  : Receiver<KeyEvent>,
 }
 
 impl<'a> CPU<'a>
 {
-    pub fn new(ram : &'a mut RAM, screen_ctrl: &'a dyn ScreenController) -> CPU<'a>
+    pub fn new(ram : &'a mut RAM, screen_tx: Sender<Screen>, keyboard_rx: Receiver<KeyEvent>) -> CPU<'a>
     {
         CPU
         {
-            v_regs : [0;16],
-            i_reg  : 0,
-            pc     : 0x200,
-            stack  : LinkedList::<u16>::new(),
-            d_reg  : 0,
-            t_reg  : 0,
-            ram    : ram,
-            screen_ctrl : screen_ctrl,
-            screen : [[false; DISPLAY_HEIGHT]; DISPLAY_WIDTH],
-            rand   : thread_rng(),
+            v_regs      : [0;16],
+            i_reg       : 0,
+            pc          : 0x200,
+            stack       : LinkedList::<u16>::new(),
+            d_reg       : 0,
+            t_reg       : 0,
+            ram         : ram,
+            screen_tx   : screen_tx,
+            screen      : [[false; DISPLAY_HEIGHT]; DISPLAY_WIDTH],
+            rand        : thread_rng(),
+            keyboard    : [false; 16],
+            keyboard_rx : keyboard_rx,
         }
     }
 
     pub fn run(&mut self, ins_count : u16) {
 
-        let milli_seconds_per_cycle : u64 = 1000 /  60 ;
-       
-        //let test_disp = [0xD,0,0,5u8];
         println!("PC start location {} end location {}", self.pc, self.pc +  (ins_count - 1));
 
-       // self.execute_instruction(test_disp);
         while self.pc - 0x200  < (ins_count - 1) {
             let now = Instant::now();
 
@@ -64,20 +69,30 @@ impl<'a> CPU<'a>
 
             self.execute_instruction(ins);
             self.pc += 2;
+    
+            while let Ok(key_event) = self.keyboard_rx.try_recv() { 
+                match key_event {
+                    KeyEvent::KeyDown(key) => {
+                        self.keyboard[key as usize] = true;
+                    },
+                    KeyEvent::KeyUp(key) => {
+                        self.keyboard[key as usize] = false;
+                    } 
+                }
+            }
 
             if self.d_reg > 0 { self.d_reg -= 1; }
 
             if self.t_reg > 0 {
-                println!("BEEEP"); 
+               // println!("BEEEP"); 
                 self.t_reg -= 1; 
             }
 
             let elapsed_milliseconds  = now.elapsed().as_millis() as u64;
-            if milli_seconds_per_cycle > elapsed_milliseconds {
-                sleep(Duration::from_millis(milli_seconds_per_cycle - elapsed_milliseconds));
+            if MILLISECONDS_PER_CYCLE > elapsed_milliseconds {
+               sleep(Duration::from_millis(MILLISECONDS_PER_CYCLE - elapsed_milliseconds));
             }
         }
-
         println!("CPU Stopped execution")
     }
 
@@ -126,8 +141,9 @@ impl<'a> CPU<'a>
 00E0 - CLS
 Clear the display. */
     fn clear_screen(&mut self) {
-        println!("Clear display");
-        self.screen_ctrl.clear();
+        //println!("Clear display");
+        self.screen =  [[false; DISPLAY_HEIGHT]; DISPLAY_WIDTH];
+        self.screen_tx.send(self.screen).unwrap();
     }
 /*
 00EE - RET
@@ -136,7 +152,7 @@ Return from a subroutine.
 The interpreter sets the program counter to the address at the top of the stack, then subtracts 1 from the stack pointer.
 */
     fn ret(&mut self) {
-         println!("return");
+        // println!("return");
          self.pc = self.stack.pop_back().unwrap();
     }
 /*1nnn - JP addr
@@ -146,7 +162,7 @@ The interpreter sets the program counter to nnn.
 */
 
     fn jump(&mut self, n1: u8, n2: u8, n3:u8 ) {
-        println!("jump {} {} {} ", n1 ,n2 ,n3);
+        //println!("jump {} {} {} ", n1 ,n2 ,n3);
         self.pc = convert_3n_to_u16(n1, n2, n3);
         self.pc -= 2;
     }
@@ -156,7 +172,7 @@ Jump to location nnn + V0.
 The program counter is set to nnn plus the value of V0.*/
 
     fn jump_v0(&mut self, n1: u8, n2: u8, n3:u8 ) {
-        println!("jump v0");
+        //println!("jump v0");
         self.jump(n1, n2, n3);
         self.pc += self.v_regs[0x0] as u16;
     }
@@ -171,7 +187,7 @@ The interpreter increments the stack pointer, then puts the current PC on the to
         self.stack.push_back(self.pc);
         self.pc = convert_3n_to_u16(n1, n2, n3);
         self.pc -= 2;
-        println!("call");
+       // println!("call");
     }
 /*
     Skip next instruction if Vx = kk.
@@ -194,7 +210,7 @@ The interpreter increments the stack pointer, then puts the current PC on the to
         if self.v_regs[x as usize] != convert_2n_to_u8(k1, k2) {
             self.pc += 2;
         }
-        println!("skip_ifnot");
+       // println!("skip_ifnot");
     }
 /* 
     Skip next instruction if Vx = Vy.
@@ -202,7 +218,7 @@ The interpreter increments the stack pointer, then puts the current PC on the to
     The interpreter compares register Vx to register Vy, and if they are equal, increments the program counter by 2.
 */
     fn skip_ifregs(&mut self, x: u8, y: u8) {
-        println!("skip_ifregs");
+        //println!("skip_ifregs");
         if self.v_regs[x as usize] == self.v_regs[y as usize] {
             self.pc += 2;
         }
@@ -211,26 +227,59 @@ The interpreter increments the stack pointer, then puts the current PC on the to
 /* 
     Skip next instruction if Vx != Vy.
 
-    The interpreter compares register Vx to register Vy, and if they are not equal, increments the program counter by 2.
+    The interpreter compares register Vx to register Vy, and if they are not equal, increments the program counter by 2.1
 */
     fn skip_ifnotregs(&mut self, x: u8, y: u8) {
-        println!("skip_ifnotregs");
+        //println!("skip_ifnotregs");
         if self.v_regs[x as usize] != self.v_regs[y as usize] {
             self.pc += 2;
         }
     }
+/*Ex9E - SKP Vx
+Skip next instruction if key with the value of Vx is pressed.
 
+Checks the keyboard, and if the key corresponding to the value of Vx is currently in the down position, PC is increased by 2.*/    
     fn skip_ifkey(&mut self, x: u8) {
-        println!("skip_ifkey");
-    }
-    
-    fn skip_ifnotkey(&mut self, x: u8) {
-        println!("skip_ifnotkey");
-        self.pc += 2;
+        let vx = self.v_regs[x as usize];
+        assert!(vx < 16);
+        if self.keyboard[vx as usize] {
+            self.pc += 2;
+        }
     }
 
+/*
+ExA1 - SKNP Vx
+Skip next instruction if key with the value of Vx is not pressed.
+
+Checks the keyboard, and if the key corresponding to the value of Vx is currently in the up position, PC is increased by 2.
+*/
+    fn skip_ifnotkey(&mut self, x: u8) {
+        let vx = self.v_regs[x as usize];
+        assert!(vx < 16);
+        if !self.keyboard[vx as usize] {
+            self.pc += 2;
+        }
+    }
+
+/*
+x0A - LD Vx, K
+Wait for a key press, store the value of the key in Vx.
+
+All execution stops until a key is pressed, then the value of that key is stored in Vx.
+*/
     fn wait_for_key(&mut self, x: u8) {
-        panic!("wait_for_key");
+        println!("wait for key");
+        let key_down : u8;
+        'wait: loop {
+            if let Ok(key_event) = self.keyboard_rx.try_recv() {
+                match key_event {
+                    KeyEvent::KeyDown(key) => {self.keyboard[key as usize] = true; key_down = key; break 'wait},
+                    KeyEvent::KeyUp(key) =>  self.keyboard[key as usize] = false
+                }
+            }
+        }
+        self.v_regs[x as usize] = key_down;
+        println!("wait_for finished");
     }
 
 /*
@@ -241,7 +290,7 @@ The interpreter puts the value kk into register Vx.
     fn load(&mut self, x: u8, k1: u8, k2: u8) {
         let byte = convert_2n_to_u8(k1, k2);
         self.v_regs[x as usize] = byte;
-        println!("load {} to v{}", byte,x);
+        //println!("load {} to v{}", byte,x);
     }
 /*
 x65 - LD Vx, [I]
@@ -251,7 +300,7 @@ The interpreter reads values from memory starting at location I into registers V
 */
 
     fn load_registers_at_i(&mut self, x: u8) {
-        println!("load_registers_at_i up to v{} from {:#06x}",x, self.i_reg);
+        //println!("load_registers_at_i up to v{} from {:#06x}",x, self.i_reg);
         for i in 0..(x+1) {
             self.v_regs[i as usize] = self.ram.get_byte(self.i_reg + (i as u16));
         }
@@ -266,7 +315,7 @@ The interpreter reads values from memory starting at location I into registers V
         let vx = self.v_regs[x as usize];
         let byte = convert_2n_to_u8(k1, k2);
         self.v_regs[x as usize] = ((byte as u16) + (vx as u16)) as u8;
-        println!("add {}({} {}) to v({}){}; result {}", byte,k1,k2,x,vx,self.v_regs[x as usize]);
+        //println!("add {}({} {}) to v({}){}; result {}", byte,k1,k2,x,vx,self.v_regs[x as usize]);
     }
 /*
     Fx1E - ADD I, Vx
@@ -276,7 +325,7 @@ The interpreter reads values from memory starting at location I into registers V
 */
 
     fn add_i(&mut self, x: u8) {
-        println!("add_i");
+        //println!("add_i");
         self.i_reg += self.v_regs[x as usize] as u16;
     }
 /*
@@ -285,7 +334,7 @@ Set Vx = Vx + Vy, set VF = carry.
 The values of Vx and Vy are added together. If the result is greater than 8 bits (i.e., > 255,) VF is set to 1, otherwise 0. Only the lowest 8 bits of the result are kept, and stored in Vx.
 */
     fn add_with_carry(&mut self, x: u8, y: u8) {
-        println!("add_with_carry");
+        //println!("add_with_carry");
         let result : u16 = (self.v_regs[x as usize] as u16) + (self.v_regs[y as usize] as u16);
         if result > 255 {
             self.v_regs[0xF] = 1;
@@ -301,7 +350,7 @@ Set Vx = Vy.
 Stores the value of register Vy in register Vx.
 */
     fn store(&mut self, x: u8, y: u8) {
-        println!("store");
+        //println!("store");
         self.v_regs[x as usize] = self.v_regs[y as usize];
     }
 /*
@@ -310,7 +359,7 @@ Set Vx = Vx OR Vy.
 Performs a bitwise OR on the values of Vx and Vy, then stores the result in Vx. A bitwise OR compares the corrseponding bits from two values, and if either bit is 1, then the same bit in the result is also 1. Otherwise, it is 0. 
 */
     fn store_or(&mut self, x: u8, y: u8) {
-        println!("store_or");
+        //println!("store_or");
         self.v_regs[x as usize] |= self.v_regs[y as usize];
     }
 /*
@@ -320,7 +369,7 @@ Performs a bitwise AND on the values of Vx and Vy, then stores the result in Vx.
 */
 
     fn store_and(&mut self, x: u8, y: u8) {
-        println!("store_and");
+        //println!("store_and");
         self.v_regs[x as usize] &= self.v_regs[y as usize];
     }
 /*
@@ -329,7 +378,7 @@ Set Vx = Vx XOR Vy.
 Performs a bitwise exclusive OR on the values of Vx and Vy, then stores the result in Vx. An exclusive OR compares the corrseponding bits from two values, and if the bits are not both the same, then the corresponding bit in the result is set to 1. Otherwise, it is 0. 
 */
     fn store_xor(&mut self, x: u8, y: u8) {
-        println!("store_xor");
+        //println!("store_xor");
         self.v_regs[x as usize] ^= self.v_regs[y as usize];
     }
 
@@ -352,7 +401,7 @@ The interpreter takes the decimal value of Vx, and places the hundreds digit in 
         self.ram.store_byte(self.i_reg + 1, tens);
         self.ram.store_byte(self.i_reg + 2 , ones);
 
-        println!("store_digits {} {} {} of v{}({}) at {:#06x}",hundreds,tens, ones,x,self.v_regs[x as usize],self.i_reg);
+        //println!("store_digits {} {} {} of v{}({}) at {:#06x}",hundreds,tens, ones,x,self.v_regs[x as usize],self.i_reg);
     }
 /*
 Fx55 - LD [I], Vx
@@ -361,7 +410,7 @@ Store registers V0 through Vx in memory starting at location I.
 The interpreter copies the values of registers V0 through Vx into memory, starting at the address in I.
 */
     fn store_registers_at_i(&mut self, x: u8) {
-        println!("store_registers_at_i up to v{} at {:#06x}",x, self.i_reg);
+        //println!("store_registers_at_i up to v{} at {:#06x}",x, self.i_reg);
         for i in 0..(x + 1) {
             let address : u16 = self.i_reg + (i as u16);
             self.ram.store_byte(address , self.v_regs[i as usize]);
@@ -375,7 +424,7 @@ Set Vx = Vx - Vy, set VF = NOT borrow.
 If Vx > Vy, then VF is set to 1, otherwise 0. Then Vy is subtracted from Vx, and the results stored in Vx.
 */
     fn sub(&mut self, x: u8, y: u8) {
-        println!("sub");
+        //println!("sub");
         if self.v_regs[x as usize] > self.v_regs[y as usize] {
             self.v_regs[x as usize] -= self.v_regs[y as usize];
             self.v_regs[0xF] = 1;
@@ -393,7 +442,7 @@ If Vy > Vx, then VF is set to 1, otherwise 0. Then Vx is subtracted from Vy, and
 */
 
     fn subn(&mut self, x: u8, y: u8) {
-        println!("subn");
+        //println!("subn");
         self.sub(x,y);
     }
 
@@ -403,7 +452,7 @@ Set Vx = Vx SHR 1.
 If the least-significant bit of Vx is 1, then VF is set to 1, otherwise 0. Then Vx is divided by 2.
 */
     fn shr(&mut self, x: u8) {
-        println!("shr");
+        //println!("shr");
         self.v_regs[0xF] = self.v_regs[ x as usize ] & 0x1;
         self.v_regs[x as usize] >>= 1;
     }
@@ -415,7 +464,7 @@ Set Vx = Vx SHL 1.
 If the most-significant bit of Vx is 1, then VF is set to 1, otherwise to 0. Then Vx is multiplied by 2.
 */
     fn shl(&mut self, x: u8) {
-        println!("shl");
+        //println!("shl");
         self.v_regs[0xF] = self.v_regs[ x as usize ] & 0x80;
         self.v_regs[x as usize] <<= 1;
     }
@@ -429,7 +478,7 @@ The value of register I is set to nnn.
     fn set_i(&mut self, n1: u8, n2: u8, n3: u8 ) {
         
         self.i_reg = convert_3n_to_u16(n1, n2, n3);
-        println!("set_i {:#06x} ", self.i_reg);
+        //println!("set_i {:#06x} ", self.i_reg);
     }
 /*
 Fx29 - LD F, Vx
@@ -439,7 +488,7 @@ The value of I is set to the location for the hexadecimal sprite corresponding t
 */
     fn set_i_sprite(&mut self, x: u8 ) {
         self.i_reg = (self.v_regs[x as usize] * 5) as u16;
-        println!("set_i_sprite v{}({}) i {:#06x}",x, self.v_regs[x as usize], self.i_reg);
+        //println!("set_i_sprite v{}({}) i {:#06x}",x, self.v_regs[x as usize], self.i_reg);
     }
 
 /*
@@ -449,7 +498,7 @@ Set delay timer = Vx.
 DT is set equal to the value of Vx.
 */
     fn set_dt(&mut self, x: u8) {
-       println!("set_dt {} ", self.v_regs[x as usize]);
+       //println!("set_dt {} ", self.v_regs[x as usize]);
         self.d_reg = self.v_regs[x as usize];
     }
 /*
@@ -461,7 +510,7 @@ The value of DT is placed into Vx.
 
     fn load_dt(&mut self, x: u8) {
         self.v_regs[x as usize] = self.d_reg;
-         println!("load_dt {} to v{}",self.d_reg, x);
+        // println!("load_dt {} to v{}",self.d_reg, x);
     }
 
 /*
@@ -471,7 +520,7 @@ Set sound timer = Vx.
 ST is set equal to the value of Vx.
 */
     fn set_st(&mut self, x: u8) {
-        println!("set_st");
+        //println!("set_st");
         self.t_reg = self.v_regs[x as usize];
     }
 
@@ -483,7 +532,7 @@ The interpreter generates a random number from 0 to 255, which is then ANDed wit
 */
 
     fn rand_and(&mut self, x: u8, k1: u8, k2: u8) {
-        println!("random_and");
+        //println!("random_and");
         let r = self.rand.gen_range(0, 256) as u8;
         let kk = convert_2n_to_u8(k1, k2);
         self.v_regs[x as usize] = kk & r;
@@ -499,31 +548,18 @@ The interpreter reads n bytes from memory, starting at the address stored in I. 
         self.v_regs[0xF] = 0;
         let org_x  = self.v_regs[x as usize] as usize; 
         let org_y  = self.v_regs[y as usize] as usize;
-       
-        //if  n == 1 
-      //  {
-          println!("disp ({} {}) n {}", org_x, org_y, n);
-      //  }
         for i in 0..n {
             let byte = self.ram.get_byte(self.i_reg + (i as u16));      
             let disp_y = (org_y + (i as usize) ) % DISPLAY_HEIGHT;
             for b in 0 .. 8{
                 let bit = get_bit(byte, 7 - b as u8);
-               // println!("disp byte {:#x} bit({}) = {} ", byte,b, bit);
                 let disp_x = (org_x + (b as usize) ) % DISPLAY_WIDTH;
                 if  self.screen[disp_x][disp_y] && bit {
-                  //  if  n == 1 
-                    {
-                    println!("Display conflict");
-                    }
-                } //else 
-                {
-                    self.screen[disp_x][disp_y] = ! (bit == self.screen[disp_x][disp_y]);
+                    self.v_regs[0xF] = 1;
                 } 
+                self.screen[disp_x][disp_y] = ! (bit == self.screen[disp_x][disp_y]);
             }
         }
-        self.screen_ctrl.draw(self.screen);
+        self.screen_tx.send(self.screen).unwrap();
     }
-
-
 }
