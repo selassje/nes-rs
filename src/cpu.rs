@@ -9,7 +9,7 @@ use std::thread::sleep;
 use crate::keyboard::{KeyEvent};
 use std::sync::mpsc::{Sender, Receiver};
 
-pub const MILLISECONDS_PER_CYCLE : u64 = 500 /  60 ;
+pub const MILLISECONDS_PER_CYCLE : u64 = 200 /  60 ;
 
 type Keyboard = [bool; 16];
 
@@ -27,11 +27,15 @@ pub struct CPU<'a>
    rand         : ThreadRng,
    keyboard     : Keyboard,
    keyboard_rx  : Receiver<KeyEvent>,
+   audio_tx     : Sender<bool>,
 }
 
 impl<'a> CPU<'a>
 {
-    pub fn new(ram : &'a mut RAM, screen_tx: Sender<Screen>, keyboard_rx: Receiver<KeyEvent>) -> CPU<'a>
+    pub fn new(ram : &'a mut RAM, 
+               screen_tx: Sender<Screen>, 
+               keyboard_rx: Receiver<KeyEvent>,
+               audio_tx: Sender<bool>) -> CPU<'a>
     {
         CPU
         {
@@ -47,6 +51,7 @@ impl<'a> CPU<'a>
             rand        : thread_rng(),
             keyboard    : [false; 16],
             keyboard_rx : keyboard_rx,
+            audio_tx    : audio_tx,
         }
     }
 
@@ -80,12 +85,13 @@ impl<'a> CPU<'a>
                     } 
                 }
             }
-
             if self.d_reg > 0 { self.d_reg -= 1; }
 
             if self.t_reg > 0 {
-               // println!("BEEEP"); 
                 self.t_reg -= 1; 
+                if self.t_reg == 0 {
+                      self.audio_tx.send(true).unwrap(); 
+                }
             }
 
             let elapsed_milliseconds  = now.elapsed().as_millis() as u64;

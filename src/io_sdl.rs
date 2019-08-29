@@ -2,7 +2,7 @@ extern crate sdl2;
 
 use crate::screen::{Screen,DISPLAY_HEIGHT,DISPLAY_WIDTH};
 use crate::keyboard::{KeyEvent};
-
+use crate::audio::{Audio};
 
 use sdl2::event::Event;
 use sdl2::pixels;
@@ -14,18 +14,22 @@ use std::iter::FromIterator;
 use std::collections::HashMap;
 use std::sync::mpsc::{Sender,Receiver};
 
-pub struct DisplaySdl{
+pub struct IOSdl{
         screen_rx   : Receiver<Screen>,
         keyboard_tx : Sender<KeyEvent>,
+        audio_rx    : Receiver<bool>,
 }       
 
-impl DisplaySdl
+impl IOSdl
 {
-    pub fn new(screen_rx : Receiver<Screen>, keyboard_tx : Sender<KeyEvent>) -> DisplaySdl {
-        DisplaySdl
+    pub fn new(screen_rx   : Receiver<Screen>, 
+               keyboard_tx : Sender<KeyEvent>, 
+               audio_rx    : Receiver<bool>) -> IOSdl {
+        IOSdl
         {
             screen_rx,
             keyboard_tx,
+            audio_rx,
         } 
     }
     pub fn run(&self)
@@ -50,11 +54,11 @@ impl DisplaySdl
             (Keycode::KpEnter,0xF))
         );
 
-
-
         const DISPLAY_SCALING : i16 = 20;
 
         let sdl_context = sdl2::init().unwrap();
+        let audio = Audio{ass: sdl_context.audio().unwrap()};
+
         let video_subsys = sdl_context.video().unwrap();
         let window = video_subsys.window("chip-8", (DISPLAY_WIDTH as u32)*(DISPLAY_SCALING as u32), (DISPLAY_HEIGHT as u32)*(DISPLAY_SCALING as u32))
         .position_centered()
@@ -115,9 +119,11 @@ impl DisplaySdl
                     }
                 }
             }
+
+            if let Ok(_) = self.audio_rx.try_recv() {
+                audio.beep();
+            }
             canvas.present();
-
-
         }
 
     }

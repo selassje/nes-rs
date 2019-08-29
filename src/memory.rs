@@ -24,5 +24,4 @@ impl RAM
             memory : [0 ; 4096]
         }
     }
-
 }

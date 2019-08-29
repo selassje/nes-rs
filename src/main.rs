@@ -8,8 +8,9 @@ mod memory;
 mod cpu;
 mod screen;
 mod utils;
-mod display_sdl;
+mod io_sdl;
 mod keyboard;
+mod audio;
 
 fn read_rom(file_name: &String) -> Vec<u8> {
     let mut rom = Vec::new();
@@ -42,14 +43,14 @@ fn load_sprites(ram: & mut memory::RAM) {
     }
 }
 
-fn cpu_thread(rom : &Vec<u8>, screen_tx: Sender<screen::Screen>, keyboard_rx :Receiver::<keyboard::KeyEvent> )
+fn cpu_thread(rom : &Vec<u8>, screen_tx: Sender<screen::Screen>, keyboard_rx :Receiver::<keyboard::KeyEvent>, audio_tx: Sender::<bool> )
 {
    let ins_count = rom.len() as u16;
    let mut ram = memory::RAM::new();
    ram.store_bytes(0x200, rom);
    load_sprites(& mut ram);
 
-   let mut cpu = cpu::CPU::new(&mut ram, screen_tx, keyboard_rx);
+   let mut cpu = cpu::CPU::new(&mut ram, screen_tx, keyboard_rx, audio_tx);
 
    cpu.run(ins_count);
 }
@@ -62,10 +63,11 @@ fn main() {
 
    let (keyboard_tx, keyboard_rx) : (Sender<keyboard::KeyEvent>, Receiver<keyboard::KeyEvent>) = channel();
    let (screen_tx,   screen_rx)   : (Sender<screen::Screen>, Receiver<screen::Screen>) = channel();
-   let display = display_sdl::DisplaySdl::new(screen_rx, keyboard_tx);
-   
+   let (audio_tx,   audio_rx)     : (Sender<bool>, Receiver<bool>) = channel();
+   let io =                         io_sdl::IOSdl::new(screen_rx, keyboard_tx, audio_rx);
+
    thread::spawn(move || {
-        cpu_thread(&rom, screen_tx, keyboard_rx);
+        cpu_thread(&rom, screen_tx, keyboard_rx, audio_tx);
    });
-   display.run();
+   io.run();
 }
