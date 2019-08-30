@@ -23,26 +23,34 @@ impl AudioCallback for SquareWave {
 }
 
 pub struct Audio {
-    pub ass : sdl2::AudioSubsystem
+    device  : sdl2::audio::AudioDevice<SquareWave>
 }
 
 impl Audio {
-    pub fn beep(&self) {
 
-    let desired_spec = AudioSpecDesired {
+    pub fn new(audio_subsystem: &sdl2::AudioSubsystem) -> Self
+    {
+        let desired_spec = AudioSpecDesired {
         freq: Some(44100),
         channels: Some(1),  
         samples: None
-    };
+        };
 
-    let device = self.ass.open_playback(None, &desired_spec, |spec| {
-        SquareWave {
-            phase_inc: 440.0 / spec.freq as f32,
-            phase: 0.0,
-            volume: 0.25
-    }}).unwrap();
+        let device = audio_subsystem.open_playback(None, &desired_spec, |spec| {
+            SquareWave {
+                phase_inc: 440.0 / spec.freq as f32,
+                phase: 0.0,
+                volume: 0.25
+            }}).unwrap();
 
-    device.resume();
-    std::thread::sleep(Duration::from_millis(10));
+        Audio {
+          device: device,
+        }
+    }
+
+    pub fn beep(&self) {
+    self.device.resume();
+    std::thread::sleep(Duration::from_millis(100));
+    self.device.pause();
     }
 }

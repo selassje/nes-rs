@@ -59,7 +59,7 @@ impl IOSdl
         const DISPLAY_SCALING : i16 = 20;
 
         let sdl_context = sdl2::init().unwrap();
-        let audio = Audio{ass: sdl_context.audio().unwrap()};
+        let audio = Audio::new(&sdl_context.audio().unwrap());
 
         let video_subsys = sdl_context.video().unwrap();
         let window = video_subsys.window( &format!("chip-8: {}", self.title) , (DISPLAY_WIDTH as u32)*(DISPLAY_SCALING as u32), (DISPLAY_HEIGHT as u32)*(DISPLAY_SCALING as u32))
