@@ -64,7 +64,7 @@ fn main() {
    let (keyboard_tx, keyboard_rx) : (Sender<keyboard::KeyEvent>, Receiver<keyboard::KeyEvent>) = channel();
    let (screen_tx,   screen_rx)   : (Sender<screen::Screen>, Receiver<screen::Screen>) = channel();
    let (audio_tx,   audio_rx)     : (Sender<bool>, Receiver<bool>) = channel();
-   let io =                         io_sdl::IOSdl::new(screen_rx, keyboard_tx, audio_rx);
+   let io =                         io_sdl::IOSdl::new(filename.clone(), screen_rx, keyboard_tx, audio_rx);
 
    thread::spawn(move || {
         cpu_thread(&rom, screen_tx, keyboard_rx, audio_tx);

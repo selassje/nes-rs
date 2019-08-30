@@ -15,6 +15,7 @@ use std::collections::HashMap;
 use std::sync::mpsc::{Sender,Receiver};
 
 pub struct IOSdl{
+        title       : String,
         screen_rx   : Receiver<Screen>,
         keyboard_tx : Sender<KeyEvent>,
         audio_rx    : Receiver<bool>,
@@ -22,11 +23,13 @@ pub struct IOSdl{
 
 impl IOSdl
 {
-    pub fn new(screen_rx   : Receiver<Screen>, 
+    pub fn new(title       : String,
+               screen_rx   : Receiver<Screen>, 
                keyboard_tx : Sender<KeyEvent>, 
                audio_rx    : Receiver<bool>) -> IOSdl {
         IOSdl
         {
+            title,
             screen_rx,
             keyboard_tx,
             audio_rx,
@@ -35,23 +38,22 @@ impl IOSdl
     pub fn run(&self)
     {
         let key_mappings : HashMap<Keycode, u8> = HashMap::from_iter(vec!(
-            (Keycode::NumLockClear, 1),
-            (Keycode::KpDivide,2),
-            (Keycode::KpMultiply,3),
-            (Keycode::KpBackspace,0xC),
-            (Keycode::Backspace, 0xC),
-            (Keycode::Kp7,4),
-            (Keycode::Kp8,5),
-            (Keycode::Kp9,6),
-            (Keycode::KpMinus,0xD),
-            (Keycode::Kp4,7),
-            (Keycode::Kp5,8),
-            (Keycode::Kp6,9),
-            (Keycode::KpPlus,0xE),
-            (Keycode::Kp1,0xA),
-            (Keycode::Kp2,0),
-            (Keycode::Kp3,0xB),
-            (Keycode::KpEnter,0xF))
+            (Keycode::Num1,1),
+            (Keycode::Num2,2),
+            (Keycode::Num3,3),
+            (Keycode::Num4,0xC),
+            (Keycode::Q,4),
+            (Keycode::W,5),
+            (Keycode::E,6),
+            (Keycode::R,0xD),
+            (Keycode::A,7),
+            (Keycode::S,8),
+            (Keycode::D,9),
+            (Keycode::F,0xE),
+            (Keycode::Z,0xA),
+            (Keycode::X,0),
+            (Keycode::C,0xB),
+            (Keycode::V,0xF))
         );
 
         const DISPLAY_SCALING : i16 = 20;
@@ -60,7 +62,7 @@ impl IOSdl
         let audio = Audio{ass: sdl_context.audio().unwrap()};
 
         let video_subsys = sdl_context.video().unwrap();
-        let window = video_subsys.window("chip-8", (DISPLAY_WIDTH as u32)*(DISPLAY_SCALING as u32), (DISPLAY_HEIGHT as u32)*(DISPLAY_SCALING as u32))
+        let window = video_subsys.window( &format!("chip-8: {}", self.title) , (DISPLAY_WIDTH as u32)*(DISPLAY_SCALING as u32), (DISPLAY_HEIGHT as u32)*(DISPLAY_SCALING as u32))
         .position_centered()
         .opengl()
         .build()

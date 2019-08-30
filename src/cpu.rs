@@ -61,11 +61,7 @@ impl<'a> CPU<'a>
 
         while self.pc - 0x200  < (ins_count - 1) {
             let now = Instant::now();
-
-            if self.pc % 2 == 1 {
-                panic!("PC ar wrong location {}", self.pc);
-            }
-
+            
             let mut ins = [0 as u8;4];
             ins[0] = self.ram.get_byte(self.pc) >> 4;
             ins[1] = self.ram.get_byte(self.pc) & 0x0F;
