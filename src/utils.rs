@@ -1,3 +1,7 @@
+pub fn convert_2u8_to_u16(b1 :u8 ,b2: u8) -> u16 {
+     (b1 as u16) +  ((b2 << 4) as u16)
+}  
+
 pub fn convert_3n_to_u16(n1 :u8 ,n2: u8, n3: u8) -> u16 {
     let hi_nibble  = (n1 as u16) << 8;
     let mid_nibble = (n2 as u16) << 4;
@@ -12,3 +16,4 @@ pub fn convert_2n_to_u8(n1 :u8 ,n2: u8) -> u8 {
 pub fn get_bit(byte: u8, bit: u8) -> bool {
         byte & (1 << bit) != 0
 }  
+

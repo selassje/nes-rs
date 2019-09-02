@@ -1,5 +1,5 @@
 pub struct RAM {
-    memory : [u8; 4096]
+    memory : [u8; 65536]
 }
 
 impl RAM 
@@ -21,7 +21,7 @@ impl RAM
 
     pub fn new() -> RAM {
         RAM {
-            memory : [0 ; 4096]
+            memory : [0 ; 65536]
         }
     }
 }
