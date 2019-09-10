@@ -12,48 +12,25 @@ mod io_sdl;
 mod keyboard;
 mod audio;
 mod nes_format_reader;
+mod mapper;
 
-fn read_rom(file_name: &String) -> Vec<u8> {
+use memory::Memory;
+
+fn read_rom(file_name: &String) -> nes_format_reader::NesFile {
     let mut rom = Vec::new();
     let mut file = File::open(&file_name).expect("Unable to open ROM");
     file.read_to_end(&mut rom).expect("Unable to read ROM");
-    let nes_file = nes_format_reader::NesFile::new(&rom);
-    rom
+    nes_format_reader::NesFile::new(&rom)
 }
 
-fn load_sprites(ram: & mut memory::RAM) {
-    let sprites : [Vec<u8>;16] = [vec!(0xF0, 0x90, 0x90, 0x90, 0xF0), // 0
-                                  vec!(0x20, 0x60, 0x20, 0x20, 0x70), // 1
-                                  vec!(0xF0, 0x10, 0xF0, 0x80, 0xF0), // 2
-                                  vec!(0xF0, 0x10, 0xF0, 0x10, 0xF0), // 3
-                                  vec!(0x90, 0x90, 0xF0, 0x10, 0x10), // 4
-                                  vec!(0xF0, 0x80, 0xF0, 0x10, 0xF0), // 5
-                                  vec!(0xF0, 0x80, 0xF0, 0x90, 0xF0), // 6
-                                  vec!(0xF0, 0x10, 0x20, 0x40, 0x40), // 7
-                                  vec!(0xF0, 0x90, 0xF0, 0x90, 0xF0), // 8
-                                  vec!(0xF0, 0x90, 0xF0, 0x10, 0xF0), // 9
-                                  vec!(0xF0, 0x90, 0xF0, 0x90, 0x90), // A
-                                  vec!(0xE0, 0x90, 0xE0, 0x90, 0xE0), // B 
-                                  vec!(0xF0, 0x80, 0x80, 0x80, 0xF0), // C 
-                                  vec!(0xE0, 0x90, 0x90, 0x90, 0xE0), // D
-                                  vec!(0xF0, 0x80, 0xF0, 0x80, 0xF0), // E 
-                                  vec!(0xF0, 0x80, 0xF0, 0x80, 0x80), // F 
-    ];
 
-    for (i, sprite) in sprites.iter().enumerate() {
-        ram.store_bytes( (5*i) as u16, sprite);
-    }
-}
-
-fn cpu_thread(rom : &Vec<u8>, screen_tx: Sender<screen::Screen>, keyboard_rx :Receiver::<keyboard::KeyEvent>, audio_tx: Sender::<bool> )
+fn cpu_thread(nes_file : &nes_format_reader::NesFile, screen_tx: Sender<screen::Screen>, keyboard_rx :Receiver::<keyboard::KeyEvent>, audio_tx: Sender::<bool> )
 {
-   let rom_size = rom.len() as u16;
-   let mut ram = memory::RAM::new();
-   ram.store_bytes(cpu::PC_START, rom);
+   let mut mapper = nes_file.create_mapper();
    
-   let mut cpu = cpu::CPU::new(&mut ram, screen_tx, keyboard_rx, audio_tx);
+   let mut cpu = cpu::CPU::new(&mut mapper, screen_tx, keyboard_rx, audio_tx);
 
-   cpu.run(rom_size);
+   cpu.run();
 }
 
 fn main() {

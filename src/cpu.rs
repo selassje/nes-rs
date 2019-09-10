@@ -1,4 +1,4 @@
-use crate::memory::{RAM};
+use crate::memory::{Memory,RAM};
 use crate::screen::{Screen, DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use std::collections::LinkedList;
 use crate::utils::*;
@@ -7,11 +7,12 @@ use rand::{Rng, thread_rng};
 use std::time::{Duration, Instant};
 use std::thread::sleep;
 use crate::keyboard::{KeyEvent};
+use crate::mapper::{Mapper};
 use std::sync::mpsc::{Sender, Receiver};
 
 const NTSC_FREQ_MHZ          : f32 = 1.79;
 const NANOS_PER_CYCLE : u128 =  ((1.0/NTSC_FREQ_MHZ) * 1000.0) as u128;
-pub const PC_START : u16 = 0x0100;
+
 
 type Keyboard = [bool; 16];
 
@@ -58,7 +59,7 @@ pub struct CPU<'a>
    x            : u8,
    y            : u8,
    stack        : LinkedList<u16>,
-   ram          : &'a mut RAM,
+   ram          : &'a mut Box<dyn Mapper>,
    screen_tx    : Sender<Screen>,
    screen       : Screen,
    rand         : ThreadRng,
@@ -69,14 +70,14 @@ pub struct CPU<'a>
 
 impl<'a> CPU<'a>
 {
-    pub fn new(ram : &'a mut RAM, 
+    pub fn new(ram : &'a mut Box<dyn Mapper>,
                screen_tx: Sender<Screen>, 
                keyboard_rx: Receiver<KeyEvent>,
                audio_tx: Sender<bool>) -> CPU<'a>
     {
         CPU
         {
-            pc           : PC_START,
+            pc           : ram.get_rom_start(),
             sp           : 0,
             ps           : 0,
             a            : 0,
@@ -120,20 +121,22 @@ impl<'a> CPU<'a>
     }
 
  
-    pub fn run(&mut self, rom_size : u16) {
+    pub fn run(&mut self) {
+        let rom_size = self.ram.get_rom_size();
+        let pc_start = self.ram.get_rom_start();
 
         println!("PC start location {} end location {}", self.pc, self.pc +  (rom_size - 1));
 
-        while self.pc - PC_START  < rom_size - 1 {
+        while self.pc - pc_start  < rom_size - 1 {
             let now = Instant::now();
             
             let op = self.ram.get_byte(self.pc);
             let mut b0 = 0;
             let mut b1 = 0;
-            if  self.pc - PC_START + 1  < rom_size - 1 {
+            if  self.pc - pc_start + 1  < rom_size - 1 {
                 b0 = self.ram.get_byte(self.pc + 1);
             }
-            if  self.pc - PC_START + 2  < rom_size - 1 {
+            if  self.pc - pc_start + 2  < rom_size - 1 {
                 b1 = self.ram.get_byte(self.pc + 2);
             }
 
