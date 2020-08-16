@@ -14,8 +14,6 @@ mod audio;
 mod nes_format_reader;
 mod mapper;
 
-use memory::Memory;
-
 fn read_rom(file_name: &String) -> nes_format_reader::NesFile {
     let mut rom = Vec::new();
     let mut file = File::open(&file_name).expect("Unable to open ROM");
@@ -42,8 +40,6 @@ fn main() {
    let args: Vec<String> = env::args().collect();
    let filename = &args[1];
    let rom = read_rom(filename);
-
-
 
    let (keyboard_tx, keyboard_rx) : (Sender<keyboard::KeyEvent>, Receiver<keyboard::KeyEvent>) = channel();
    let (screen_tx,   screen_rx)   : (Sender<screen::Screen>, Receiver<screen::Screen>) = channel();

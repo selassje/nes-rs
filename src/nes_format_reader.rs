@@ -1,4 +1,4 @@
-use std::mem::size_of;
+
 use crate::mapper::{Mapper,Mapper0};
 
 #[derive(PartialEq, Debug)]
@@ -31,7 +31,7 @@ enum HeaderFlag10 {
     BusConflictPresent  = 0b00100000,
 }
 
-
+#[derive(Debug)]
 struct NesHeader {
     prg_rom_units      : u8,
     chr_rom_units      : u8,
@@ -49,7 +49,6 @@ type PrgRomUnit = [u8;16384];
 type ChrRomUnit = [u8;8192];
 
 pub const PrgRamUnitSize : u32 = 8192;
-
 
 type PlayChoiceInstRom = [u8; 8192];
 type PlayChoiceDecryptData = [u8;16];
@@ -75,24 +74,10 @@ fn read_to_array(array: &mut [u8], in_bytes: &[u8]) -> usize {
     array.copy_from_slice(&in_bytes[0..unit_size]);
     unit_size
 }
-/*
-fn read_to_array_vector<T>(v: &mut Vec<T>, array_count: usize, in_bytes: &[u8]) -> usize {
-    let unit_size = size_of::<T>();
-    let mut total_size : usize = 0;
-    for _ in 0..array_count {
-        let mut array : [u8;size_of::<T>()] = unsafe {
-                std::mem::MaybeUninit::uninit().assume_init()
-        };
-        total_size += read_to_array(&mut array, &in_bytes[total_size..]);
-        v.push(array);
-    }
-    total_size
-}
-*/
+
 
 impl NesFile {
-
-    
+  
     pub fn create_mapper(&self) -> Box<dyn Mapper> {
         let mut prg_rom = Vec::<u8>::new();
         for prg_rom_chunk in &self.prg_rom {
@@ -105,8 +90,25 @@ impl NesFile {
         }
     }
 
+    fn get_format(header : &Vec<u8>) -> NesFormat {
+        let mut is_ines_format = false;
+        let mut is_nes2_format = false;
+        if header[0] == 'N' as u8 && header[1] == 'E' as u8 && header[2]== 'S' as u8 && header[3] == 0x1A {
+            is_ines_format = true;
+        }
+
+        if is_ines_format && (header[7] & 0x0C == 0x08) {
+            is_nes2_format = true;
+        }
+
+        if is_nes2_format {NesFormat::Nes2_0}
+        else if is_ines_format {NesFormat::INes}
+        else {panic!("Unknown format file")}
+    }
+
     pub fn new(in_bytes : &Vec<u8>) -> NesFile {
         let format = Self::get_format(in_bytes);
+        println!("Format {:?}",format);
         assert!(format == NesFormat::INes);
 
         let mut read_index = 4;
@@ -122,7 +124,8 @@ impl NesFile {
                                     flag_10: in_bytes[read_index + 6],
         };
 
-        read_index = 7;
+        println!("Header {:?}", header);
+        read_index = 16;
         let mut trainer = Option::None; 
         if header.flag_6 & (HeaderFlag6::TrainerPresent as u8) == 1 {
             let mut trainer_data : Trainer = unsafe {
@@ -134,9 +137,7 @@ impl NesFile {
 
         let mut prg_rom = Vec::<PrgRomUnit>::new();
         for _ in 0..header.prg_rom_units {
-            let mut prg_rom_unit : PrgRomUnit = unsafe {
-                std::mem::MaybeUninit::uninit().assume_init()
-            };
+            let mut prg_rom_unit : PrgRomUnit = [0;16384];
             read_index += read_to_array(&mut prg_rom_unit, &in_bytes[read_index..]);
             prg_rom.push(prg_rom_unit);
         }
@@ -179,8 +180,7 @@ impl NesFile {
               println!("PGR RAM present {}", prg_ram_size);
          }
 
-
-        let mapper_number = (header.ho_n_mapper_number << 4  + header.lo_n_mapper_number) as u32;
+        let mapper_number = (header.ho_n_mapper_number<< 4  + header.lo_n_mapper_number) as u32;
 
         NesFile{trainer,
                 prg_rom,
@@ -188,22 +188,6 @@ impl NesFile {
                 play_choice_rom,
                 prg_ram_size,
                 mapper_number}
-    }
-
-    fn get_format(header : &Vec<u8>) -> NesFormat {
-        let mut is_ines_format = false;
-        let mut is_nes2_format = false;
-        if header[0] == 'N' as u8 && header[1] == 'E' as u8 && header[2]== 'S' as u8 && header[3] == 0x1A {
-            is_ines_format = true;
-        }
-
-        if is_ines_format && (header[7] & 0x0C == 0x1A) {
-            is_nes2_format = true;
-        }
-
-        if is_nes2_format {NesFormat::Nes2_0}
-        else if is_ines_format {NesFormat::INes}
-        else {panic!("Unknown format file")}
     }
 
 }

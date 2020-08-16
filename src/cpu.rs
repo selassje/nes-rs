@@ -1,9 +1,6 @@
 use crate::memory::{Memory,RAM};
 use crate::screen::{Screen, DISPLAY_HEIGHT, DISPLAY_WIDTH};
-use std::collections::LinkedList;
 use crate::utils::*;
-use rand::rngs::{ThreadRng};
-use rand::{Rng, thread_rng};
 use std::time::{Duration, Instant};
 use std::thread::sleep;
 use crate::keyboard::{KeyEvent};
@@ -33,6 +30,7 @@ enum AddressingMode {
     IndirectIndexed,
 }
 
+#[derive(Debug)]
 enum Address {
     Accumulator,
     Immediate(u8),
@@ -50,7 +48,7 @@ enum ProcessorFlag {
     NegativeFlag        = 0b01000000,
 }
 
-pub struct CPU<'a>
+pub struct CPU
 {
    pc           : u16,
    sp           : u8,
@@ -58,39 +56,42 @@ pub struct CPU<'a>
    a            : u8,
    x            : u8,
    y            : u8,
-   stack        : LinkedList<u16>,
-   ram          : &'a mut Box<dyn Mapper>,
+   stack        : Vec<u16>,
+   ram          : RAM,
    screen_tx    : Sender<Screen>,
    screen       : Screen,
-   rand         : ThreadRng,
    keyboard     : Keyboard,
    keyboard_rx  : Receiver<KeyEvent>,
    audio_tx     : Sender<bool>,
+   code_segment : (u16,u16)
 }
 
-impl<'a> CPU<'a>
+impl<'a> CPU
 {
-    pub fn new(ram : &'a mut Box<dyn Mapper>,
+    pub fn new(mapper : &'a mut Box<dyn Mapper>,
                screen_tx: Sender<Screen>, 
                keyboard_rx: Receiver<KeyEvent>,
-               audio_tx: Sender<bool>) -> CPU<'a>
+               audio_tx: Sender<bool>) -> CPU
     {
+        let mut ram = RAM::new();
+        ram.store_bytes(mapper.get_rom_start(), &mapper.get_pgr_rom().to_vec());
+        println!("Mapper0 pgr_rome_len {} rom_start {}", mapper.get_pgr_rom().len(),mapper.get_rom_start());
         CPU
         {
-            pc           : ram.get_rom_start(),
+            pc           : ram.get_2_bytes(0xFFFC),
             sp           : 0,
             ps           : 0,
             a            : 0,
             x            : 0,
             y            : 0,
-            stack       : LinkedList::<u16>::new(),
-            ram         : ram,
-            screen_tx   : screen_tx,
-            screen      : [[false; DISPLAY_HEIGHT]; DISPLAY_WIDTH],
-            rand        : thread_rng(),
-            keyboard    : [false; 16],
-            keyboard_rx : keyboard_rx,
-            audio_tx    : audio_tx,
+            stack        : Vec::<u16>::new(),
+            ram          : ram,
+            screen_tx    : screen_tx,
+            screen       : [[false; DISPLAY_HEIGHT]; DISPLAY_WIDTH],
+            keyboard     : [false; 16],
+            keyboard_rx  : keyboard_rx,
+            audio_tx     : audio_tx,
+            code_segment : (mapper.get_rom_start(), mapper.get_rom_start() - 1 + mapper.get_pgr_rom().len() as u16)
         }
     }
 
@@ -122,21 +123,20 @@ impl<'a> CPU<'a>
 
  
     pub fn run(&mut self) {
-        let rom_size = self.ram.get_rom_size();
-        let pc_start = self.ram.get_rom_start();
+        let (code_segment_start, code_segment_end) = self.code_segment;
+  
+        println!("PC int location {:#X} ROM Start {:#X}  ROM End {:#X}", self.pc, code_segment_start, code_segment_end);
 
-        println!("PC start location {} end location {}", self.pc, self.pc +  (rom_size - 1));
-
-        while self.pc - pc_start  < rom_size - 1 {
+        while self.pc >= code_segment_start &&  self.pc <= code_segment_end {
             let now = Instant::now();
             
             let op = self.ram.get_byte(self.pc);
             let mut b0 = 0;
             let mut b1 = 0;
-            if  self.pc - pc_start + 1  < rom_size - 1 {
+            if  self.pc + 1 <= code_segment_end {
                 b0 = self.ram.get_byte(self.pc + 1);
             }
-            if  self.pc - pc_start + 2  < rom_size - 1 {
+            if  self.pc + 2 <= code_segment_end {
                 b1 = self.ram.get_byte(self.pc + 2);
             }
 
@@ -189,9 +189,10 @@ impl<'a> CPU<'a>
             0x4E => (3, 6 + self.lsr(b0, b1, AddressingMode::Absolute)),
             0x5E => (3, 7 + self.lsr(b0, b1, AddressingMode::AbsoluteX)),
 
+            0x20 => (3, 6 + self.jsr(b0, b1, AddressingMode::Absolute)),
+
             0x1A  => (1, 2),
         
-
             _    => panic!("Unknown instruction {:#04x}", op)
               
         }        
@@ -212,14 +213,14 @@ impl<'a> CPU<'a>
             AddressingMode::ZeroPage    => (Address::RAM(b0_u16),0),
             AddressingMode::ZeroPageX   => (Address::RAM(zero_page_x),0),
             AddressingMode::ZeroPageY   => (Address::RAM(zero_page_y),0),
-            AddressingMode::Absolute    => (Address::RAM(b0_u16 + (b1_u16 << 4)),0),
+            AddressingMode::Absolute    => (Address::RAM(convert_2u8_to_u16(b1,b0)),0),
             AddressingMode::AbsoluteX   => {
                 if b0_u16 + x_u16 > 0xFF {add_cycles = 1} 
-                (Address::RAM(b0_u16 + x_u16 + (b1_u16 << 4)),add_cycles)
+                (Address::RAM(b0_u16 + x_u16 + (b1_u16<< 4)),add_cycles)
             }
             AddressingMode::AbsoluteY   => {
                 if b0_u16 + y_u16 > 0xFF {add_cycles = 1} 
-                (Address::RAM(b0_u16 + y_u16 + (b1_u16 << 4)),add_cycles)
+                (Address::RAM(b0_u16 + y_u16 + (b1_u16<< 4)),add_cycles)
             }
             AddressingMode::IndexedIndirect   => {
                 if zero_page_x == 0xFF {panic!("Invalid ZeroPageX address!")}
@@ -244,6 +245,13 @@ impl<'a> CPU<'a>
             Address::Accumulator => self.a, 
             Address::Immediate(i) => *i, 
             Address::RAM(address) => self.ram.get_byte(*address)
+        }
+    }
+
+    fn get_ram_address(&self, address : &Address) -> u16 {
+        match address {
+            Address::RAM(address) => *address,
+            _ => panic!("Invalid address type {:?}",address),
         }
     }
 
@@ -323,5 +331,15 @@ impl<'a> CPU<'a>
         self.set_or_reset_flag(ProcessorFlag::NegativeFlag, (m as i8) < 0);
         cycles        
     }
+
+    fn jsr(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        self.stack.push(self.pc + 3);
+        let raw_address = self.get_ram_address(&m_address);
+        println!("jsr raw {:?} b0 {} b1 {}", raw_address,b0,b1);
+        self.pc = self.get_ram_address(&m_address) - 2;
+        cycles        
+    }
+
 }
 

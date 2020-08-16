@@ -1,5 +1,5 @@
-pub fn convert_2u8_to_u16(b1 :u8 ,b2: u8) -> u16 {
-     (b1 as u16) +  ((b2 << 4) as u16)
+pub fn convert_2u8_to_u16(b0 :u8 ,b1: u8) -> u16 {
+     (b0 as u16) +  ((b1 as u16)<<8)
 }  
 
 pub fn convert_3n_to_u16(n1 :u8 ,n2: u8, n3: u8) -> u16 {
