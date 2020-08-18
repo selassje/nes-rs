@@ -26,15 +26,17 @@ enum AddressingMode {
     AbsoluteX,
     AbsoluteY,
     Indirect,
-    IndexedIndirect,
-    IndirectIndexed,
+    IndexedIndirectX,
+    IndirectIndexedY,
 }
 
 #[derive(Debug)]
 enum Address {
+    Implicit,
     Accumulator,
     Immediate(u8),
     RAM(u16),
+    Relative(u16),
 }
 
 
@@ -141,8 +143,8 @@ impl<'a> CPU
             }
 
             let (bytes, cycles) = self.execute_instruction(op, b0, b1);
-            println!("Executed instruction {:#0x} bytes {} cycles {}",op, bytes, cycles);
             self.pc += bytes as u16;
+            println!("Executed instruction {:#0x} bytes {} cycles {} pc {:X}",op, bytes, cycles, self.pc);
             let elapsed_time_ns  = now.elapsed().as_nanos();
             let required_time_ns = (cycles as u128) * NANOS_PER_CYCLE;
             if required_time_ns > elapsed_time_ns {
@@ -161,8 +163,8 @@ impl<'a> CPU
             0x6D => (3, 4 + self.add_with_carry(b0, b1, AddressingMode::Absolute)),
             0x7D => (3, 4 + self.add_with_carry(b0, b1, AddressingMode::AbsoluteX)),
             0x79 => (3, 4 + self.add_with_carry(b0, b1, AddressingMode::AbsoluteY)),
-            0x61 => (2, 6 + self.add_with_carry(b0, b1, AddressingMode::IndexedIndirect)),
-            0x71 => (2, 5 + self.add_with_carry(b0, b1, AddressingMode::IndirectIndexed)),
+            0x61 => (2, 6 + self.add_with_carry(b0, b1, AddressingMode::IndexedIndirectX)),
+            0x71 => (2, 5 + self.add_with_carry(b0, b1, AddressingMode::IndirectIndexedY)),
 
             0x29 => (2, 2 + self.and(b0, b1, AddressingMode::Immediate)),
             0x25 => (2, 3 + self.and(b0, b1, AddressingMode::ZeroPage)),
@@ -170,8 +172,8 @@ impl<'a> CPU
             0x2D => (3, 4 + self.and(b0, b1, AddressingMode::Absolute)),
             0x3D => (3, 4 + self.and(b0, b1, AddressingMode::AbsoluteX)),
             0x39 => (3, 4 + self.and(b0, b1, AddressingMode::AbsoluteY)),
-            0x21 => (2, 6 + self.and(b0, b1, AddressingMode::IndexedIndirect)),
-            0x31 => (2, 5 + self.and(b0, b1, AddressingMode::IndirectIndexed)),
+            0x21 => (2, 6 + self.and(b0, b1, AddressingMode::IndexedIndirectX)),
+            0x31 => (2, 5 + self.and(b0, b1, AddressingMode::IndirectIndexedY)),
 
             0x09 => (2, 2 + self.or(b0, b1, AddressingMode::Immediate)),
             0x05 => (2, 3 + self.or(b0, b1, AddressingMode::ZeroPage)),
@@ -179,8 +181,8 @@ impl<'a> CPU
             0x0D => (3, 4 + self.or(b0, b1, AddressingMode::Absolute)),
             0x1D => (3, 4 + self.or(b0, b1, AddressingMode::AbsoluteX)),
             0x19 => (3, 4 + self.or(b0, b1, AddressingMode::AbsoluteY)),
-            0x01 => (2, 6 + self.or(b0, b1, AddressingMode::IndexedIndirect)),
-            0x11 => (2, 5 + self.or(b0, b1, AddressingMode::IndirectIndexed)),
+            0x01 => (2, 6 + self.or(b0, b1, AddressingMode::IndexedIndirectX)),
+            0x11 => (2, 5 + self.or(b0, b1, AddressingMode::IndirectIndexedY)),
 
 
             0x4A => (1, 2 + self.lsr(b0, b1, AddressingMode::Accumulator)),
@@ -190,6 +192,44 @@ impl<'a> CPU
             0x5E => (3, 7 + self.lsr(b0, b1, AddressingMode::AbsoluteX)),
 
             0x20 => (3, 6 + self.jsr(b0, b1, AddressingMode::Absolute)),
+
+            0x78 => (1, 2 + self.sei(b0, b1, AddressingMode::Implicit)),
+
+            0xD8 => (1, 2 + self.cld(b0, b1, AddressingMode::Implicit)),
+
+            0xA9 => (2, 2 + self.lda(b0, b1, AddressingMode::Immediate)),
+            0xA5 => (2, 3 + self.lda(b0, b1, AddressingMode::ZeroPage)),
+            0xB5 => (2, 4 + self.lda(b0, b1, AddressingMode::ZeroPageX)),
+            0xAD => (3, 4 + self.lda(b0, b1, AddressingMode::Absolute)),
+            0xBD => (3, 4 + self.lda(b0, b1, AddressingMode::AbsoluteX)),
+            0xB9 => (3, 4 + self.lda(b0, b1, AddressingMode::AbsoluteY)),
+            0xA1 => (2, 6 + self.lda(b0, b1, AddressingMode::IndexedIndirectX)),
+            0xB1 => (2, 5 + self.lda(b0, b1, AddressingMode::IndirectIndexedY)),
+
+            0xC9 => (2, 2 + self.cmp(b0, b1, AddressingMode::Immediate)),
+            0xC5 => (2, 3 + self.cmp(b0, b1, AddressingMode::ZeroPage)),
+            0xD5 => (2, 4 + self.cmp(b0, b1, AddressingMode::ZeroPageX)),
+            0xCD => (3, 4 + self.cmp(b0, b1, AddressingMode::Absolute)),
+            0xDD => (3, 4 + self.cmp(b0, b1, AddressingMode::AbsoluteX)),
+            0xD9 => (3, 4 + self.cmp(b0, b1, AddressingMode::AbsoluteY)),
+            0xC1 => (2, 6 + self.cmp(b0, b1, AddressingMode::IndexedIndirectX)),
+            0xD1 => (2, 5 + self.cmp(b0, b1, AddressingMode::IndirectIndexedY)),
+
+            0x85 => (2, 3 + self.sta(b0, b1, AddressingMode::ZeroPage)),
+            0x95 => (2, 4 + self.sta(b0, b1, AddressingMode::ZeroPageX)),
+            0x8D => (3, 4 + self.sta(b0, b1, AddressingMode::Absolute)),
+            0x9D => (3, 5 + self.sta(b0, b1, AddressingMode::AbsoluteX)),
+            0x99 => (3, 5 + self.sta(b0, b1, AddressingMode::AbsoluteY)),
+            0x81 => (2, 6 + self.sta(b0, b1, AddressingMode::IndexedIndirectX)),
+            0x91 => (2, 6 + self.sta(b0, b1, AddressingMode::IndirectIndexedY)),
+
+            0xA2 => (2, 2 + self.ldx(b0, b1, AddressingMode::Immediate)),
+
+            0x9A => (1, 2 + self.txs(b0, b1, AddressingMode::Implicit)),
+
+            0xF0 => (2, 2 + self.beq(b0, b1, AddressingMode::Relative)),
+            0xD0 => (2, 2 + self.ben(b0, b1, AddressingMode::Relative)),
+
 
             0x1A  => (1, 2),
         
@@ -207,7 +247,8 @@ impl<'a> CPU
         let zero_page_y = (b0_u16 + y_u16) & 0xFF;
         let mut add_cycles = 0;
     
-         match mode {
+        match mode {
+            AddressingMode::Implicit    => (Address::Implicit, 0),
             AddressingMode::Accumulator => (Address::Accumulator, 0),
             AddressingMode::Immediate   => (Address::Immediate(b0), 0),
             AddressingMode::ZeroPage    => (Address::RAM(b0_u16),0),
@@ -222,13 +263,13 @@ impl<'a> CPU
                 if b0_u16 + y_u16 > 0xFF {add_cycles = 1} 
                 (Address::RAM(b0_u16 + y_u16 + (b1_u16<< 4)),add_cycles)
             }
-            AddressingMode::IndexedIndirect   => {
+            AddressingMode::IndexedIndirectX   => {
                 if zero_page_x == 0xFF {panic!("Invalid ZeroPageX address!")}
                 let ind = convert_2u8_to_u16(self.ram.get_byte(zero_page_x),
                                              self.ram.get_byte(zero_page_x + 1));
                 (Address::RAM(ind),0)
             }
-            AddressingMode::IndirectIndexed   =>  {
+            AddressingMode::IndirectIndexedY   =>  {
                 let ind = self.ram.get_byte(b0_u16) as u16 + y_u16;
                 if ind & 0xFF00 != 0 {add_cycles = 1}
 
@@ -236,15 +277,23 @@ impl<'a> CPU
                                              self.ram.get_byte(ind + 1));
                 (Address::RAM(ind), add_cycles)
             }
+            AddressingMode::Relative   =>  {
+                println!("Relative adressing signed offset {}", b0 as i8 as i16 );
+                let new_pc = (self.pc as i16 + (b0 as i8 as i16)) as u16;
+                if new_pc & 0xFF00 != self.pc & 0xFF00 {add_cycles = 1}
+                (Address::Relative(new_pc), add_cycles)
+            }
             _ => panic!("Invalid addresing mode {}",mode as u8),
         }
     }
 
     fn load_from_address(&self, address : &Address) -> u8 {
         match address {
+            Address::Implicit => panic!("load_from_address can't be used for implicit mode"), 
             Address::Accumulator => self.a, 
             Address::Immediate(i) => *i, 
-            Address::RAM(address) => self.ram.get_byte(*address)
+            Address::RAM(address) => self.ram.get_byte(*address),
+            Address::Relative(_)  => panic!("load_from_address can't be used for the Relative mode"), 
         }
     }
 
@@ -257,9 +306,11 @@ impl<'a> CPU
 
     fn store_to_address(&mut self, address : &Address, byte : u8) {
         match address {
+            Address::Implicit     => panic!("store_to_address can't be used for implicit mode"), 
             Address::Accumulator  => self.a = byte, 
-            Address::Immediate(i) => panic!("Not possible to store in Immediate addressing"), 
-            Address::RAM(address) => self.ram.store_byte(*address, byte)
+            Address::Immediate(_) => panic!("Not possible to store in Immediate addressing"), 
+            Address::RAM(address) => self.ram.store_byte(*address, byte),
+            Address::Relative(_)  => panic!("store_to_address can't be used for the Relative mode"), 
         }
     }
 
@@ -301,7 +352,7 @@ impl<'a> CPU
     }
 
     fn and(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        println!("and");
+        println!("and {:?}", mode);
         let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         let m = self.load_from_address(&m_address);
         self.a &= m;
@@ -341,5 +392,93 @@ impl<'a> CPU
         cycles        
     }
 
+    fn sei(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        self.set_flag(ProcessorFlag::InterruptDisable);
+        println!("sei");
+        cycles        
+    }
+
+    fn cld(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        self.reset_flag(ProcessorFlag::DecimalMode);
+        println!("cld");
+        cycles        
+    }
+
+    fn lda(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        println!("lda {:?}", mode);
+        let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        let  m = self.load_from_address(&m_address);
+        self.a = m;
+        cycles
+    }
+
+    fn ldx(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        println!("ldx {:?}", mode);
+        let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        let  m = self.load_from_address(&m_address);
+        self.x = m;
+        cycles
+    }
+
+    fn sta(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        println!("sta {:?}", mode);
+        let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        self.store_to_address(&m_address,self.a);
+        cycles
+    }
+
+    fn txs(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        println!("txs {:?}", mode);
+        let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        self.sp = self.x;
+        cycles
+    }
+
+    fn beq(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        println!("beq {:?}", mode);
+        if self.get_flag(ProcessorFlag::ZeroFlag) {
+            println!("Performing branch");
+            let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
+            let new_pc = match m_address {
+                Address::Relative(new_pc) => new_pc,
+                _  => panic!("Unexpected address type in beq.")
+            };
+            self.pc = new_pc;
+            return cycles + 1;
+        }
+        0
+    }
+
+    fn ben(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        println!("ben {:?}", mode);
+        if !self.get_flag(ProcessorFlag::ZeroFlag) {
+            let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
+            let new_pc = match m_address {
+                Address::Relative(new_pc) => new_pc,
+                _  => panic!("Unexpected address type in beq.")
+            };
+            self.pc = new_pc;
+            return cycles + 1;
+        }
+        0
+    }
+
+    fn cmp(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        println!("cmp {:?}", mode);
+        let (address, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        let  m = self.load_from_address(&address);
+        if self.a == m {
+            self.set_flag(ProcessorFlag::ZeroFlag)
+        }
+        if self.a >= m {
+            self.set_flag(ProcessorFlag::CarryFlag)
+        }
+        if self.a < m {
+            self.set_flag(ProcessorFlag::NegativeFlag)
+        }
+        cycles
+    }
 }
 
