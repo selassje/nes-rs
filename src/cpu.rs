@@ -1,11 +1,12 @@
 use crate::memory::{Memory,RAM};
 use crate::screen::{Screen, DISPLAY_HEIGHT, DISPLAY_WIDTH};
-use crate::utils::*;
+use crate::common::*;
 use std::time::{Duration, Instant};
 use std::thread::sleep;
 use crate::keyboard::{KeyEvent};
 use crate::mapper::{Mapper};
 use std::sync::mpsc::{Sender, Receiver};
+use crate::ppu::*;
 
 const NTSC_FREQ_MHZ          : f32 = 1.79;
 const NANOS_PER_CYCLE : u128 =  ((1.0/NTSC_FREQ_MHZ) * 1000.0) as u128;
@@ -60,8 +61,7 @@ pub struct CPU
    y            : u8,
    stack        : Vec<u16>,
    ram          : RAM,
-   screen_tx    : Sender<Screen>,
-   screen       : Screen,
+   ppu          : PPU,
    keyboard     : Keyboard,
    keyboard_rx  : Receiver<KeyEvent>,
    audio_tx     : Sender<bool>,
@@ -77,7 +77,6 @@ impl<'a> CPU
     {
         let mut ram = RAM::new();
         ram.store_bytes(mapper.get_rom_start(), &mapper.get_pgr_rom().to_vec());
-        println!("Mapper0 pgr_rome_len {} rom_start {}", mapper.get_pgr_rom().len(),mapper.get_rom_start());
         CPU
         {
             pc           : ram.get_2_bytes(0xFFFC),
@@ -88,8 +87,7 @@ impl<'a> CPU
             y            : 0,
             stack        : Vec::<u16>::new(),
             ram          : ram,
-            screen_tx    : screen_tx,
-            screen       : [[false; DISPLAY_HEIGHT]; DISPLAY_WIDTH],
+            ppu          : PPU::new(screen_tx, mapper.get_chr_rom().to_vec()),
             keyboard     : [false; 16],
             keyboard_rx  : keyboard_rx,
             audio_tx     : audio_tx,
@@ -150,6 +148,7 @@ impl<'a> CPU
             if required_time_ns > elapsed_time_ns {
                sleep(Duration::from_nanos((required_time_ns - elapsed_time_ns) as u64));
             }
+            self.ppu.render_frame();
         }
         println!("CPU Stopped execution")
     }

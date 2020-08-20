@@ -14,6 +14,9 @@ use std::iter::FromIterator;
 use std::collections::HashMap;
 use std::sync::mpsc::{Sender,Receiver};
 
+pub static mut SCREEN : Screen = [[(255,255,255); DISPLAY_HEIGHT]; DISPLAY_WIDTH];
+
+
 pub struct IOSdl{
         title       : String,
         screen_rx   : Receiver<Screen>,
@@ -56,7 +59,7 @@ impl IOSdl
             (Keycode::V,0xF))
         );
 
-        const DISPLAY_SCALING : i16 = 20;
+        const DISPLAY_SCALING : i16 = 5;
 
         let sdl_context = sdl2::init().unwrap();
         let audio = Audio::new(&sdl_context.audio().unwrap());
@@ -75,8 +78,7 @@ impl IOSdl
 
         let mut events = sdl_context.event_pump().unwrap();
         let mut keys_state : HashMap<Scancode,bool> = HashMap::from_iter(events.keyboard_state().scancodes());
-        let mut screen : Screen = [[false; DISPLAY_HEIGHT]; DISPLAY_WIDTH];
-
+     
         'main: loop {
             for event in events.poll_iter() {
                 match event {
@@ -106,21 +108,16 @@ impl IOSdl
             keys_state = keys_state_new;
             
             canvas.clear();
-            if let Ok(ret) = self.screen_rx.try_recv() {
-                screen = ret;
-            } 
-            for (x, col) in screen.iter().enumerate() {
-                for (y, b) in col.iter().enumerate() {
+            unsafe {
+            for (x, col) in SCREEN.iter().enumerate() {
+                for (y, color) in col.iter().enumerate() {
                     let x : i16 = (x*(DISPLAY_SCALING as usize)) as i16;
                     let y : i16 = (y*(DISPLAY_SCALING as usize)) as i16;
-                    if *b {
-                        let _ = canvas.box_(x, y, x + DISPLAY_SCALING, y + DISPLAY_SCALING, pixels::Color::RGB(255, 255, 255));          
-                    } else
-                    {
-                        let _ = canvas.box_(x, y, x + DISPLAY_SCALING, y + DISPLAY_SCALING, pixels::Color::RGB(0, 0, 0));       
-                    }
+                    let (r, g, b) = *color;
+                    let _ = canvas.box_(x, y, x + DISPLAY_SCALING - 1, y + DISPLAY_SCALING - 1, pixels::Color::RGB(r, g, b));                         
                 }
             }
+        }
 
             if let Ok(_) = self.audio_rx.try_recv() {
                 audio.beep();

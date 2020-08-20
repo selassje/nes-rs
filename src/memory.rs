@@ -1,4 +1,4 @@
-use crate::utils;
+use crate::common;
 
 pub trait Memory {
     fn get_byte(&self, addr : u16) -> u8;
@@ -30,7 +30,7 @@ impl Memory for RAM
     }
 
     fn get_2_bytes(&self, addr : u16) -> u16 {     
-        utils::convert_2u8_to_u16(self.memory[addr as usize], self.memory[addr as usize + 1])
+        common::convert_2u8_to_u16(self.memory[addr as usize], self.memory[addr as usize + 1])
     }
 
     fn store_byte(&mut self, addr : u16, byte : u8){
@@ -44,4 +44,3 @@ impl Memory for RAM
         }
     }
 }
-

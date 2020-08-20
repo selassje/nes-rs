@@ -1,5 +1,6 @@
 
 use crate::mapper::{Mapper,Mapper0};
+use crate::common;
 
 #[derive(PartialEq, Debug)]
 enum NesFormat {
@@ -44,11 +45,13 @@ struct NesHeader {
     flag_10            : u8,
 }
 
-type Trainer = [u8;512];
-type PrgRomUnit = [u8;16384];
-type ChrRomUnit = [u8;8192];
 
-pub const PrgRamUnitSize : u32 = 8192;
+
+type Trainer = [u8;512];
+type PrgRomUnit = [u8;common::PRG_ROM_UNIT_SIZE];
+type ChrRomUnit = [u8;common::CHR_ROM_UNIT_SIZE];
+
+
 
 type PlayChoiceInstRom = [u8; 8192];
 type PlayChoiceDecryptData = [u8;16];
@@ -84,8 +87,14 @@ impl NesFile {
             prg_rom.extend_from_slice(prg_rom_chunk);
         }
 
+        let mut chr_rom = Vec::<u8>::new();
+        for chr_rom_chunk in &self.chr_rom {
+            chr_rom.extend_from_slice(chr_rom_chunk);
+        }
+
+        println!("CHROM in NES File : first byte {:X}",chr_rom[1]);
         match self.mapper_number {
-            0 => Box::new(Mapper0::new(prg_rom,self.prg_ram_size)),
+            0 => Box::new(Mapper0::new(prg_rom, chr_rom)),
             _ => panic!("Unsupported mapper {}", self.mapper_number),
         }
     }
@@ -143,6 +152,7 @@ impl NesFile {
         }
 
         let mut chr_rom = Vec::<ChrRomUnit>::new();
+        println!("CHROM in NES File : first byte {:X}",in_bytes[read_index + 1]);
         for _ in 0..header.chr_rom_units {
             let mut chr_rom_unit : ChrRomUnit = unsafe {
                 std::mem::MaybeUninit::uninit().assume_init()
@@ -150,6 +160,7 @@ impl NesFile {
             read_index += read_to_array(&mut chr_rom_unit, &in_bytes[read_index..]);
             chr_rom.push(chr_rom_unit);
         }
+        println!("CHROM in NES File : first byte {:X}",chr_rom[0][1]);
         let mut play_choice_rom = Option::None;
 
         if header.flag_7 & (HeaderFlag7::PlayChoice10 as u8) == 1 {
@@ -173,9 +184,9 @@ impl NesFile {
 
         let mut prg_ram_size : u32 = 0;
         if header.flag_10 & (HeaderFlag10::PrgRAMPresent as u8) == 0 {
-              prg_ram_size = PrgRamUnitSize * (header.prg_ram_units as u32);
+              prg_ram_size = common::PRG_RAM_UNIT_SIZE as u32 * (header.prg_ram_units as u32);
               if prg_ram_size == 0 {
-                  prg_ram_size = PrgRamUnitSize;
+                  prg_ram_size = common::PRG_RAM_UNIT_SIZE as u32;
               }
               println!("PGR RAM present {}", prg_ram_size);
          }

@@ -6,8 +6,9 @@ use std::sync::mpsc::{Sender, Receiver, channel};
 
 mod memory;
 mod cpu;
+mod ppu;
 mod screen;
-mod utils;
+mod common;
 mod io_sdl;
 mod keyboard;
 mod audio;
