@@ -3,6 +3,9 @@ use std::fs::{File};
 use std::env;
 use std::io::prelude::*;
 use std::sync::mpsc::{Sender, Receiver, channel};
+use crate::ppu::*;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 mod memory;
 mod cpu;
@@ -26,8 +29,8 @@ fn read_rom(file_name: &String) -> nes_format_reader::NesFile {
 fn cpu_thread(nes_file : &nes_format_reader::NesFile, screen_tx: Sender<screen::Screen>, keyboard_rx :Receiver::<keyboard::KeyEvent>, audio_tx: Sender::<bool> )
 {
    let mut mapper = nes_file.create_mapper();
-   
-   let mut cpu = cpu::CPU::new(&mut mapper, screen_tx, keyboard_rx, audio_tx);
+   let ppu = RefCell::new(PPU::new(screen_tx.clone(), mapper.get_chr_rom().to_vec()));
+   let mut cpu = cpu::CPU::new(&mut mapper, &ppu, screen_tx, keyboard_rx, audio_tx);
 
    cpu.run();
 }
