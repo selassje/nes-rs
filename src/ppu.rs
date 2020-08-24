@@ -90,7 +90,7 @@ impl ControlRegister {
     }
 
     fn get_vram_increment(&self) -> u16 {
-        if self.value & ControlRegisterFlag::VramIncrement as u8 == 1 {
+        if self.value & ControlRegisterFlag::VramIncrement as u8 == 0 {
             1
         } else {
             32
@@ -113,11 +113,11 @@ impl ControlRegister {
     }
 
     fn is_read_backdrop_color_from_ext_enabled(&self) -> bool {
-        (self.value & ControlRegisterFlag::PpuMasterSlaveSelect as u8) == 1
+        (self.value & ControlRegisterFlag::PpuMasterSlaveSelect as u8) != 0
     }
 
     fn is_generate_nmi_enabled(&self) -> bool {
-        (self.value & ControlRegisterFlag::GenerateNMI as u8) == 1
+        (self.value & ControlRegisterFlag::GenerateNMI as u8) !=0
     }
 
 } 
@@ -139,7 +139,7 @@ struct MaskRegister {
 
 impl MaskRegister {
     fn is_flag_enabled(&self, flag: MaskRegisterFlag) -> bool {
-        (self.value & flag as u8) == 1
+        (self.value & flag as u8) != 0
     }
 }
 
@@ -248,7 +248,7 @@ impl PPU
             mask_reg     : MaskRegister{value: 0},
             status_reg   : StatusRegister{value: 0},
             scroll_reg   : ScrollRegister{x: 0, y: 0, next_read_is_x : true },
-            vram_address : VRAMAddress{address: 0x2000, next_ppuaddr_write_is_hi : true},
+            vram_address : VRAMAddress{address: 0, next_ppuaddr_write_is_hi : true},
             oam_address  : 0,
             oam          : OAM{data:[0;256]},
             ppu_cycles   : 0,
@@ -301,16 +301,19 @@ impl PPU
                 self.scanline = PRE_RENDER_SCANLINE;
                 self.status_reg.set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
             } else if self.scanline == POST_RENDER_SCANLINE {
-                //panic!("About to render frame");
-                println!("About to render frame");
+                //println!("About to render frame");
+              
                 if self.mask_reg.is_flag_enabled(MaskRegisterFlag::ShowBackground) {
+                    //println!("About to render background");
                     self.render_background_frame();
                 }
                 if self.mask_reg.is_flag_enabled(MaskRegisterFlag::ShowSprites) {
                     self.render_sprites_frame();
                 }
-                nmi_triggered = self.control_reg.is_generate_nmi_enabled();
+               
             } else if self.scanline == VBLANK_START_SCANLINE {
+               // println!("Sending NMI {} {}",self.control_reg.value & ControlRegisterFlag::GenerateNMI as u8, self.control_reg.value);
+                nmi_triggered = self.control_reg.is_generate_nmi_enabled();
                 self.status_reg.set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
             }
         }
@@ -323,8 +326,14 @@ impl WritePpuRegisters for PPU {
     fn write(&mut self, register : WriteAccessRegister, value: u8) -> () {
         
         match register {
-            WriteAccessRegister::PpuCtrl => self.control_reg.value = value,
-            WriteAccessRegister::PpuMask => self.mask_reg.value = value,
+            WriteAccessRegister::PpuCtrl =>  { 
+                //println!("Control register updated {:X}",value);  
+                self.control_reg.value = value;
+            }
+            WriteAccessRegister::PpuMask => { 
+                //println!("Mask register updated {:X}",value);  
+                self.mask_reg.value = value;
+            }
             WriteAccessRegister::PpuScroll => {
                 if self.scroll_reg.next_read_is_x {
                     self.scroll_reg.x = value;
@@ -338,6 +347,7 @@ impl WritePpuRegisters for PPU {
                 self.oam_address += 1
             }
             WriteAccessRegister::PpuAddr => {
+                //println!("Setting VRAM address {:X}", value);
                 if self.vram_address.next_ppuaddr_write_is_hi {
                     self.vram_address.address = (value as u16)<<8 | (self.vram_address.address & 0x00FF);
                 } else {
@@ -347,6 +357,7 @@ impl WritePpuRegisters for PPU {
             } 
             WriteAccessRegister::PpuData => {
                 self.ram.store_byte(self.vram_address.address, value);
+                //println!("VRAM address {:X} inc {}", self.vram_address.address, self.control_reg.get_vram_increment());
                 self.vram_address.address += self.control_reg.get_vram_increment();
             }
             _         => panic!("Unrecognised register {:?} in WritePpuRegisters", register)

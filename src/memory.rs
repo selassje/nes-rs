@@ -97,7 +97,7 @@ impl<'a> Memory for CpuRAM<'a>
             //panic!("Reading from PPU!");
             self.ppu_access.borrow_mut().read(*reg)
         } else if self.ppu_write_reg_map.contains_key(&addr) {
-            panic!("Attempting to write to a read Ppu register");   
+            panic!("Attempting to read from a Ppu write access register {:#X}",addr);   
         } else { 
             self.memory[addr as usize]
         }
@@ -136,7 +136,7 @@ impl<'a> Memory for CpuRAM<'a>
 
     fn store_2_bytes_as_u16(&mut self, addr : u16, bytes : u16 ) {
         self.memory[addr as usize]     = (bytes & 0x00FF) as u8;
-        self.memory[addr as usize + 1] = (bytes & 0xFF00) as u8;
+        self.memory[addr as usize + 1] = ((bytes & 0xFF00) >>8) as u8;
     }
 
 
