@@ -1,5 +1,6 @@
-use crate::memory::{Memory,RAM,CpuRAM};
-use crate::screen::{Screen, DISPLAY_HEIGHT, DISPLAY_WIDTH};
+use crate::memory::{Memory};
+use crate::cpu_ram::{CpuRAM};
+use crate::screen::{Screen};
 use crate::common::*;
 use std::time::{Duration, Instant};
 use std::thread::sleep;

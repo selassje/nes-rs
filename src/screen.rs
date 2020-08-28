@@ -1,5 +1,8 @@
-pub const DISPLAY_WIDTH: usize  = 128;
-pub const DISPLAY_HEIGHT: usize = 128;
+pub const DISPLAY_WIDTH: usize  = 256;
+pub const DISPLAY_HEIGHT: usize = 240;
+
+//pub const DISPLAY_WIDTH: usize  = 128;
+//pub const DISPLAY_HEIGHT: usize = 128;
 
 pub type RGB = (u8,u8,u8);
 

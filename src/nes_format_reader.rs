@@ -69,6 +69,7 @@ pub struct NesFile {
     play_choice_rom : Option<PlayChoiceRom>,
     prg_ram_size    : u32,
     mapper_number   : u32,
+    mirroring       : common::Mirroring
 }
 
 
@@ -115,6 +116,10 @@ impl NesFile {
         else {panic!("Unknown format file")}
     }
 
+    pub fn get_mirroring(&self) -> common::Mirroring {
+        self.mirroring
+    }
+
     pub fn new(in_bytes : &Vec<u8>) -> NesFile {
         let format = Self::get_format(in_bytes);
         println!("Format {:?}",format);
@@ -132,6 +137,8 @@ impl NesFile {
                                     flag_9: in_bytes[read_index + 5],
                                     flag_10: in_bytes[read_index + 6],
         };
+
+        let mirroring = if header.flag_6 & HeaderFlag6::MirroringVertical as u8 != 0 {common::Mirroring::VERTICAL  } else {common::Mirroring::HORIZONTAL};
 
         println!("Header {:?}", header);
         read_index = 16;
@@ -198,7 +205,8 @@ impl NesFile {
                 chr_rom,
                 play_choice_rom,
                 prg_ram_size,
-                mapper_number}
+                mapper_number,
+                mirroring}
     }
 
 }

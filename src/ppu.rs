@@ -1,66 +1,14 @@
-use crate::memory::{Memory, RAM};
+use crate::io_sdl::{SCREEN};
+use crate::common::{Mirroring};
+use crate::cpu_ppu::*;
+use crate::memory::{Memory};
+use crate::vram::{VRAM};
 use crate::screen::{Screen,DISPLAY_HEIGHT,DISPLAY_WIDTH};
+use crate::colors::{RgbColor, ColorMapper, DefaultColorMapper};
+use std::thread::park;
+
 use std::sync::mpsc::{Sender};
 use std::default::{Default};
-use crate::io_sdl::{SCREEN};
-use std::slice::Iter;
-use self::WriteAccessRegister::*;
-use self::ReadAccessRegister::*;
-
-type RgbColor = (u8,u8,u8);
-
-#[derive(Copy,Clone,Debug)]
-pub enum WriteAccessRegister {
-    PpuCtrl   = 0x2000,
-    PpuMask   = 0x2001,
-    OamAddr   = 0x2003,
-    OamData   = 0x2004,
-    PpuScroll = 0x2005,
-    PpuAddr   = 0x2006,
-    PpuData   = 0x2007,
-}
-
-impl WriteAccessRegister {
-    pub fn iterator() -> Iter<'static, WriteAccessRegister> {
-        static REGISTERS: [WriteAccessRegister; 7] = [PpuCtrl, PpuMask, OamAddr, WriteAccessRegister::OamData, PpuScroll, PpuAddr, WriteAccessRegister::PpuData];
-        REGISTERS.iter()
-    }
-}
-
-
-pub enum DmaWriteAccessRegister {
-    OamDma  = 0x4014
-}
-
-#[derive(Copy,Clone)]
-pub enum ReadAccessRegister {
-    PpuStatus = 0x2002,
-    OamData   = 0x2004,
-    PpuData   = 0x2007,
-}
-
-impl ReadAccessRegister {
-    pub fn iterator() -> Iter<'static, ReadAccessRegister> {
-        static REGISTERS: [ReadAccessRegister; 3] = [PpuStatus, ReadAccessRegister::OamData, ReadAccessRegister::PpuData];
-        REGISTERS.iter()
-    }
-}
-
-pub trait WritePpuRegisters {
-    fn write(&mut self , register : WriteAccessRegister, value : u8) -> ();
-}
-
-pub trait ReadPpuRegisters {
-    fn read(&mut self, register : ReadAccessRegister) -> u8;
-}
-
-pub trait WriteOamDma {
-    fn writeOamDma(&mut self , data: [u8;256]) -> ();
-}
-
-pub trait PpuRegisterAccess : WritePpuRegisters + WriteOamDma + ReadPpuRegisters {
-
-}
 
 enum ControlRegisterFlag {
     BaseNametableAddress          = 0b00000011,
@@ -73,10 +21,10 @@ enum ControlRegisterFlag {
 }
 
 static  PPU_CYCLES_PER_SCANLINE : u16 = 341;
-static  PRE_RENDER_SCANLINE : i16 = -1;
-static  POST_RENDER_SCANLINE : i16 = 240;
-static  VBLANK_START_SCANLINE : i16 = 241;
-static  VBLANK_END_SCANLINE : i16 = 260;
+static  PRE_RENDER_SCANLINE     : i16 = -1;
+static  POST_RENDER_SCANLINE    : i16 = 240;
+static  VBLANK_START_SCANLINE   : i16 = 241;
+
 
 struct ControlRegister {
     value : u8
@@ -84,9 +32,8 @@ struct ControlRegister {
 
 impl ControlRegister {
 
-    fn get_base_nametable_address(&self) -> u16 {
-        let table_index = (self.value & ControlRegisterFlag::BaseNametableAddress as u8) as u16;
-        0x2000 + table_index * 0x400
+    fn get_base_nametable_index(&self) -> u8 {
+        self.value & ControlRegisterFlag::BaseNametableAddress as u8
     }
 
     fn get_vram_increment(&self) -> u16 {
@@ -102,9 +49,8 @@ impl ControlRegister {
         table_index * 0x1000
     }
 
-    fn get_backround_pattern_table_address(&self) -> u16 {
-        let table_index = (self.value & ControlRegisterFlag::BackgroundPatternTableAddress as u8) as u16;
-        table_index * 0x1000
+    fn get_background_pattern_table_index(&self) -> u8 {
+        (self.value & ControlRegisterFlag::BackgroundPatternTableAddress as u8) >> 4
     }
 
     fn get_sprite_size_height(&self) -> u8 {
@@ -185,6 +131,8 @@ impl Tile {
     } 
 }
 
+
+
 struct PatternTable {
     tiles: [Tile;256]
 }
@@ -195,20 +143,22 @@ impl Default for PatternTable {
     }
 }
 
-struct Palette {
-    colors : [RgbColor;4]
-}
-
-impl Default for Palette {
-    fn default() -> Self {
-        Palette {colors : [
-            (0,0,0),
-            (255,0,0),
-            (0,255,0),
-            (0,0,255)
-        ]}
+impl PatternTable {
+    fn new(vram : &VRAM, table_index : u8) -> Self {
+        let mut pattern_table : PatternTable = Default::default();
+        for i in 0.. pattern_table.tiles.len() {
+            pattern_table.tiles[i] = Tile {
+                data : vram.get_pattern_table_tile_data(table_index, i as u8)
+            }            
+        }
+        pattern_table   
     }
+
 }
+type Palette = [RgbColor;4];
+
+
+type Palettes = [Palette; 4];
 
 struct OAM {
     data: [u8;256]
@@ -221,55 +171,102 @@ struct VRAMAddress {
 
 pub struct PPU
 {
-   ram          : RAM,
-   screen_tx    : Sender<Screen>,
-   screen       : Screen,
-   control_reg  : ControlRegister,
-   mask_reg     : MaskRegister,
-   status_reg   : StatusRegister,
-   scroll_reg   : ScrollRegister,
-   vram_address : VRAMAddress,
-   oam_address  : u8,
-   oam          : OAM,
-   ppu_cycles   : u16,
-   scanline     : i16
+   ram            : VRAM,
+   screen_tx      : Sender<Screen>,
+   screen         : Screen,
+   control_reg    : ControlRegister,
+   mask_reg       : MaskRegister,
+   status_reg     : StatusRegister,
+   scroll_reg     : ScrollRegister,
+   vram_address   : VRAMAddress,
+   oam_address    : u8,
+   oam            : OAM,
+   pattern_tables : [PatternTable;2],
+   ppu_cycles     : u16,
+   scanline       : i16,
+   color_mapper   : Box::<dyn ColorMapper>,
 }
 
 impl PPU
 {
-    pub fn new(screen_tx: Sender<Screen>, chr_rom: Vec::<u8>) -> PPU {
-        let mut ram = RAM::new();
-        ram.store_bytes(0x00, &chr_rom);
+    pub fn new(screen_tx: Sender<Screen>, chr_rom: Vec::<u8>, mirroring: Mirroring) -> PPU {
+        let ram = VRAM::new(&chr_rom, mirroring);
+        let pattern_tables = [PatternTable::new(&ram, 0), PatternTable::new(&ram, 1)];
         PPU {
-            ram          : ram,
-            screen_tx    : screen_tx,
-            screen       : [[(255,255,255); DISPLAY_HEIGHT]; DISPLAY_WIDTH],
-            control_reg  : ControlRegister{value: 0},
-            mask_reg     : MaskRegister{value: 0},
-            status_reg   : StatusRegister{value: 0},
-            scroll_reg   : ScrollRegister{x: 0, y: 0, next_read_is_x : true },
-            vram_address : VRAMAddress{address: 0, next_ppuaddr_write_is_hi : true},
-            oam_address  : 0,
-            oam          : OAM{data:[0;256]},
-            ppu_cycles   : 0,
-            scanline    : -1
+            ram            : ram,
+            screen_tx      : screen_tx,
+            screen         : [[(255,255,255); DISPLAY_HEIGHT]; DISPLAY_WIDTH],
+            control_reg    : ControlRegister{value: 0},
+            mask_reg       : MaskRegister{value: 0},
+            status_reg     : StatusRegister{value: 0},
+            scroll_reg     : ScrollRegister{x: 0, y: 0, next_read_is_x : true },
+            vram_address   : VRAMAddress{address: 0, next_ppuaddr_write_is_hi : true},
+            oam_address    : 0,
+            oam            : OAM{data:[0;256]},
+            pattern_tables : pattern_tables,
+            ppu_cycles     : 0,
+            scanline       : -1,
+            color_mapper   : Box::new(DefaultColorMapper{})
         }
     }
 
-    fn render_background_frame(&self) {
-        let pallete : Palette =  Default::default();
-        
+    //fn get_pattern_table()
 
-        let mut pattern_table : PatternTable = Default::default();
-        for i in 0.. pattern_table.tiles.len() {
-            let mut tile_data = [0 as u8;16];
-            for j in 0..16 {
-                tile_data[j] = self.ram.get_byte(i as u16 * 16 + j as u16) ;
+    fn displayTileInfo(&self, tile_x : u8, tile_y :u8) {
+        let name_table_index    = self.control_reg.get_base_nametable_index();
+        let tile_index = self.ram.get_nametable_tile_index(name_table_index, tile_x, tile_y);
+        let pattern_table_index = self.control_reg.get_background_pattern_table_index();
+        println!("Tile Info");
+        println!("X={} Y={} TileIndex {:#2X} PatternTable {}", tile_x, tile_y, tile_index,pattern_table_index);
+        println!("Nametable {} Mirroring {:?}",name_table_index, self.ram.get_mirroring());
+
+    }
+
+    fn default_palette()-> Palette {
+        [ (0,0,0),
+          (255,0,0),
+          (0,255,0),
+          (0,0,255)    
+        ]
+    }
+
+    fn render_background_frame(&self) {
+        let palettes            = self.get_background_palettes();
+        
+        let name_table_index    = self.control_reg.get_base_nametable_index();
+        let pattern_table_index = self.control_reg.get_background_pattern_table_index();
+        let pattern_table       = &self.pattern_tables[pattern_table_index as usize];
+
+       // self.displayTileInfo(13,22);
+        //self.render_chr_data();
+        //park();
+        //panic!("");
+
+        for y in 0..DISPLAY_HEIGHT {
+            for x in 0..DISPLAY_WIDTH {
+                let tile_y = (y / 8) as u8;
+                let tile_x = (x / 8) as u8;
+                let color_tile_y = (y / 16) as u8;
+                let color_tile_x = (x / 16) as u8;
+                let tile_index = self.ram.get_nametable_tile_index(name_table_index, tile_x, tile_y);
+                let tile = pattern_table.tiles[tile_index as usize];
+                let color_index = tile.get_color_index(x % 8, y % 8);
+                let palette_index  = self.ram.get_pallete_index(name_table_index, color_tile_x, color_tile_y);
+                let palette = palettes[palette_index as usize];
+                //let palette = Self::default_palette();
+                let color = palette[color_index];
+                unsafe {
+                    SCREEN[x][y] = color;
+                }
             }
-            pattern_table.tiles[i] = Tile {
-                data : tile_data
-            }            
         }
+        //park();
+    }
+    
+    fn render_chr_data(&self) {
+        let palette = Self::default_palette();
+        let pattern_table_index = self.control_reg.get_background_pattern_table_index();
+        let pattern_table       = &self.pattern_tables[pattern_table_index as usize];
 
         for y in 0..DISPLAY_HEIGHT {
             for x in 0..DISPLAY_WIDTH {
@@ -278,14 +275,14 @@ impl PPU
                 //println!("tile_x {} tile_y {}",tile_x,tile_y);
                 let tile = pattern_table.tiles[16 * tile_y + tile_x];
                 let color_index = tile.get_color_index(x % 8, y % 8);
-                let color = pallete.colors[color_index];
+                let color = palette[color_index];
                 unsafe {
                     SCREEN[x][y] = color;
                 }
             }
         }
     }
-    
+
     fn render_sprites_frame(&self) {
 
     }
@@ -318,6 +315,19 @@ impl PPU
             }
         }
         return nmi_triggered;
+    }
+
+    fn get_background_palettes(&self) -> Palettes {
+            let mut palletes : Palettes =  Default::default();
+            let raw_universal_bckg_color = self.ram.get_universal_background_color();
+            for (i, p) in palletes.iter_mut().enumerate() {
+                let raw_colors = self.ram.get_background_palette(i as u8);
+                *p = [self.color_mapper.map_nes_color(raw_universal_bckg_color), 
+                      self.color_mapper.map_nes_color(raw_colors[0]), 
+                      self.color_mapper.map_nes_color(raw_colors[1]), 
+                      self.color_mapper.map_nes_color(raw_colors[2])];
+            }
+            palletes
     }
     
 }

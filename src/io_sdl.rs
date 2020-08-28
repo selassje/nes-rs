@@ -16,7 +16,6 @@ use std::sync::mpsc::{Sender,Receiver};
 
 pub static mut SCREEN : Screen = [[(255,255,255); DISPLAY_HEIGHT]; DISPLAY_WIDTH];
 
-
 pub struct IOSdl{
         title       : String,
         screen_rx   : Receiver<Screen>,
@@ -59,7 +58,7 @@ impl IOSdl
             (Keycode::V,0xF))
         );
 
-        const DISPLAY_SCALING : i16 = 5;
+        const DISPLAY_SCALING : i16 = 2;
 
         let sdl_context = sdl2::init().unwrap();
         let audio = Audio::new(&sdl_context.audio().unwrap());
