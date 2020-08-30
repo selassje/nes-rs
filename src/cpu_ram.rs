@@ -42,7 +42,6 @@ impl<'a> Memory for CpuRAM<'a>
     fn get_byte(&self, addr : u16) -> u8 {
         if self.ppu_read_reg_map.contains_key(&addr) {
             let reg = self.ppu_read_reg_map.get(&addr).expect("store_byte: missing read register entry");
-            //panic!("Reading from PPU!");
             self.ppu_access.borrow_mut().read(*reg)
         } else if self.ppu_write_reg_map.contains_key(&addr) {
             panic!("Attempting to read from a Ppu write access register {:#X}",addr);   
@@ -58,7 +57,6 @@ impl<'a> Memory for CpuRAM<'a>
     fn store_byte(&mut self, addr : u16, byte : u8) {
        if self.ppu_write_reg_map.contains_key(&addr) {
             let reg = self.ppu_write_reg_map.get(&addr).expect("store_byte: missing write register entry");
-            //panic!("writing to PPU {:?}",*reg);
             self.ppu_access.borrow_mut().write(*reg, byte);
        } else if addr == DmaWriteAccessRegister::OamDma as u16 {
             let mut dma_data = [0;256];
@@ -67,7 +65,7 @@ impl<'a> Memory for CpuRAM<'a>
                 *e = self.get_byte(page_adress + i as u16);
             }
             self.memory[DmaWriteAccessRegister::OamDma as usize] = byte;
-            self.ppu_access.borrow_mut().writeOamDma(dma_data);
+            self.ppu_access.borrow_mut().write_oam_dma(dma_data);
        } else if self.ppu_read_reg_map.contains_key(&addr) {
             panic!("Attempting to write to a read Ppu register");   
        } else {

@@ -19,10 +19,10 @@ enum ControlRegisterFlag {
     GenerateNMI                   = 0b10000000,
 }
 
-static  PPU_CYCLES_PER_SCANLINE : u16 = 341;
-static  PRE_RENDER_SCANLINE     : i16 = -1;
-static  POST_RENDER_SCANLINE    : i16 = 240;
-static  VBLANK_START_SCANLINE   : i16 = 241;
+const  PPU_CYCLES_PER_SCANLINE : u16 = 341;
+const  PRE_RENDER_SCANLINE     : i16 = -1;
+const  POST_RENDER_SCANLINE    : i16 = 240;
+const  VBLANK_START_SCANLINE   : i16 = 241;
 
 
 struct ControlRegister {
@@ -436,7 +436,7 @@ impl WritePpuRegisters for PPU {
 }
 
 impl WriteOamDma for PPU {
-    fn writeOamDma(&mut self , data: [u8;256]) -> () {
+    fn write_oam_dma(&mut self , data: [u8;256]) -> () {
         let write_len  = 256 - self.oam_address as usize;
         self.oam[self.oam_address as usize ..].copy_from_slice(&data[..write_len as usize])
     }

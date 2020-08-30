@@ -47,7 +47,7 @@ pub trait ReadPpuRegisters {
 }
 
 pub trait WriteOamDma {
-    fn writeOamDma(&mut self , data: [u8;256]) -> ();
+    fn write_oam_dma(&mut self , data: [u8;256]) -> ();
 }
 
 pub trait PpuRegisterAccess : WritePpuRegisters + WriteOamDma + ReadPpuRegisters {
