@@ -44,9 +44,8 @@ impl ControlRegister {
         }
     }
 
-    fn get_sprite_pattern_table_for_8x8_mode(&self) -> u16 {
-        let table_index = (self.value & ControlRegisterFlag::SpritePattern8x8 as u8) as u16;
-        table_index * 0x1000
+    fn get_sprite_pattern_table_index_for_8x8_mode(&self) -> u8 {
+        (self.value & ControlRegisterFlag::SpritePattern8x8 as u8) >> 4
     }
 
     fn get_background_pattern_table_index(&self) -> u8 {
@@ -54,7 +53,7 @@ impl ControlRegister {
     }
 
     fn get_sprite_size_height(&self) -> u8 {
-        let bit = self.value & ControlRegisterFlag::SpriteSize as u8;
+        let bit = (self.value & ControlRegisterFlag::SpriteSize as u8) >> 5;
         (1 + bit) * 8
     }
 
@@ -115,7 +114,6 @@ struct ScrollRegister {
     next_read_is_x : bool
 }
 
-
 #[derive(Copy,Clone,Default)]
 struct Tile {
    data: [u8;16]
@@ -130,8 +128,6 @@ impl Tile {
         (2*hi_bit + lo_bit) as usize
     } 
 }
-
-
 
 struct PatternTable {
     tiles: [Tile;256]
@@ -155,14 +151,57 @@ impl PatternTable {
     }
 
 }
-type Palette = [RgbColor;4];
-
-
+type Palette  = [RgbColor;4];
 type Palettes = [Palette; 4];
 
-struct OAM {
-    data: [u8;256]
+#[derive(Copy,Clone,Default)]
+struct Sprite {
+    oam_index : u8,
+    data      : [u8;4]
 }
+
+type Sprites = Vec<Sprite>;
+
+impl Sprite {
+    fn get_y(&self) -> u8 {
+        self.data[0] 
+    }
+
+    fn get_x(&self) -> u8 {
+        self.data[3]
+    }
+
+    fn get_tile_index(&self, is_8x16_mode: bool) -> u8 {
+        if is_8x16_mode {
+            self.data[1] >> 1
+        } else {
+            self.data[1]
+        }
+    }
+
+    fn get_pattern_table_index_for_8x16_mode(&self) -> u8 {
+        self.data[1] & 1
+    }
+
+    fn get_palette_index(&self) -> u8 {
+        self.data[2] & 0b00000011
+    }
+
+    fn if_draw_in_front(&self) -> bool {
+        self.data[2] & 0b00100000 == 0
+    }
+
+    fn if_flip_horizontally(&self) -> bool {
+        self.data[2] & self.data[2] & 0b01000000 != 0
+    }
+
+    fn if_flip_vertically(&self) -> bool {
+        self.data[2] & self.data[2] & 0b10000000 != 0
+    }
+
+}
+
+type OAM =  [u8;256];
 
 struct VRAMAddress {
     address : u16,
@@ -202,7 +241,7 @@ impl PPU
             scroll_reg     : ScrollRegister{x: 0, y: 0, next_read_is_x : true },
             vram_address   : VRAMAddress{address: 0, next_ppuaddr_write_is_hi : true},
             oam_address    : 0,
-            oam            : OAM{data:[0;256]},
+            oam            : [0;256],
             pattern_tables : pattern_tables,
             ppu_cycles     : 0,
             scanline       : -1,
@@ -230,8 +269,10 @@ impl PPU
         ]
     }
 
-    fn render_background_frame(&self) {
-        let palettes            = self.get_background_palettes();
+    fn render_background_frame(&mut self) {
+        let background_palettes = self.get_palettes(true);
+        let sprite_palettes     = self.get_palettes(false);
+
         
         let name_table_index    = self.control_reg.get_base_nametable_index();
         let pattern_table_index = self.control_reg.get_background_pattern_table_index();
@@ -243,6 +284,8 @@ impl PPU
         //panic!("");
 
         for y in 0..DISPLAY_HEIGHT {
+            let (sprites, is_overflow_detected) = self.get_sprites_for_scanline_and_check_for_overflow(y as u8);
+            self.status_reg.set_flag(StatusRegisterFlag::SpriteOverflow, is_overflow_detected);
             for x in 0..DISPLAY_WIDTH {
                 let tile_y = (y / 8) as u8;
                 let tile_x = (x / 8) as u8;
@@ -250,32 +293,108 @@ impl PPU
                 let color_tile_x = (x / 16) as u8;
                 let tile_index = self.ram.get_nametable_tile_index(name_table_index, tile_x, tile_y);
                 let tile = pattern_table.tiles[tile_index as usize];
-                let color_index = tile.get_color_index(x % 8, y % 8);
-                let palette_index  = self.ram.get_pallete_index(name_table_index, color_tile_x, color_tile_y);
-                let palette = palettes[palette_index as usize];
-                //let palette = Self::default_palette();
-                let color = palette[color_index];
+                let bg_color_index = tile.get_color_index(x % 8, y % 8);
+                let (sprite_color_index, sprite) = self.get_sprite_color_index(&sprites, x as u8, y as u8);
+                let bg_palette_index  = self.ram.get_background_pallete_index(name_table_index, color_tile_x, color_tile_y);
+                let color = self.determine_pixel_color(bg_color_index as u8, 
+                                                      sprite_color_index, 
+                                                      &sprite, 
+                                                      &background_palettes[bg_palette_index as usize], 
+                                                      &sprite_palettes);
                 unsafe {
                     SCREEN[x][y] = color;
                 }
             }
         }
+       // self.oam = [0;256];
         //park();
     }
     
-    fn render_chr_data(&self) {
+    fn determine_pixel_color(&self, bg_color_index: u8, 
+                                    sprite_color_index : u8, 
+                                    sprite : &Sprite,
+                                    bg_pallete : &Palette,
+                                    sprite_palletes : &Palettes) -> RgbColor
+    {
+            let bg_color        =  bg_pallete[bg_color_index as usize];
+            let sprite_color    =  sprite_palletes[sprite.get_palette_index() as usize][sprite_color_index as usize];
+            let universal_color =  bg_pallete[0];
+            if bg_color_index == 0 && sprite_color_index == 0 {
+                universal_color
+            } else if bg_color_index != 0 && sprite_color_index == 0 {
+                bg_color
+            } else if bg_color_index == 0 && sprite_color_index != 0 {
+                sprite_color
+            } else {
+                if sprite.if_draw_in_front() {
+                    sprite_color
+                }else {
+                    bg_color
+                }
+            }
+    }  
+
+    fn get_sprite_color_index(&self, sprites : &Sprites, x :u8, y:u8) -> (u8,Sprite) {
+        let is_sprite_mode_8x16 = self.control_reg.get_sprite_size_height() == 16;
+        for sprite in sprites {
+            if x >= sprite.get_x() && (x as u16) < sprite.get_x() as u16 + 8 {
+                let pattern_table_index =   if is_sprite_mode_8x16 {sprite.get_pattern_table_index_for_8x16_mode()} 
+                                            else {self.control_reg.get_sprite_pattern_table_index_for_8x8_mode()};
+                let pattern_table = &self.pattern_tables[pattern_table_index as usize];
+                let mut tile_index = sprite.get_tile_index(is_sprite_mode_8x16);
+                if is_sprite_mode_8x16 {
+                    if sprite.if_flip_vertically() {
+                        if y <= sprite.get_y() + 7 {
+                            tile_index += 1;
+                        }
+                        else {
+                            tile_index -= 1;
+                        }
+                    }
+                }
+                let mut x = x - sprite.get_x();
+                let mut y = y - sprite.get_y();     
+                if sprite.if_flip_horizontally() {
+                    x = 7 - x;
+                }
+                if sprite.if_flip_vertically() {
+                    y = 7 - y;
+                }
+                let tile = pattern_table.tiles[tile_index as usize];
+                let color_index = tile.get_color_index(x as usize, y as usize);
+                if color_index != 0 {
+                    return (color_index as u8, *sprite);
+                }
+            }            
+        }
+        (0, Default::default())
+    }
+
+    fn get_sprites_for_scanline_and_check_for_overflow(&self, y: u8) -> (Sprites, bool) {
+        let sprites = self.oam.chunks(4).enumerate().map(|(i,s)|
+            Sprite {oam_index: i as u8, data: [s[0],s[1],s[2],s[3]]}    
+        );
+        let sprites = sprites.filter(|sprite| y >= sprite.get_y() && y < sprite.get_y() + self.control_reg.get_sprite_size_height());
+        let if_overflow = sprites.clone().count() > 8;
+        (sprites.take(8).collect(), if_overflow)   
+    }
+
+    fn render_chr_data(&mut self) {
         let palette = Self::default_palette();
         let pattern_table_index = self.control_reg.get_background_pattern_table_index();
         let pattern_table       = &self.pattern_tables[pattern_table_index as usize];
 
         for y in 0..DISPLAY_HEIGHT {
+            let (sprites, is_overflow_detected) = self.get_sprites_for_scanline_and_check_for_overflow(y as u8);
+            self.status_reg.set_flag(StatusRegisterFlag::SpriteOverflow, is_overflow_detected);
             for x in 0..DISPLAY_WIDTH {
                 let tile_y = y / 8;
                 let tile_x = x / 8;
                 //println!("tile_x {} tile_y {}",tile_x,tile_y);
                 let tile = pattern_table.tiles[16 * tile_y + tile_x];
-                let color_index = tile.get_color_index(x % 8, y % 8);
-                let color = palette[color_index];
+                let bg_color_index = tile.get_color_index(x % 8, y % 8);
+                let sprite_color_index = 0;
+                let color = palette[bg_color_index];
                 unsafe {
                     SCREEN[x][y] = color;
                 }
@@ -289,14 +408,18 @@ impl PPU
 
     pub fn process_cpu_cycles(&mut self, cpu_cycles: u8) -> bool {
         let mut nmi_triggered = false;
+        
+              
         self.ppu_cycles += 3 * cpu_cycles as u16;
         //println!("PPU Cycles {} Scanline {}",self.ppu_cycles,self.scanline);
         if self.ppu_cycles > PPU_CYCLES_PER_SCANLINE {
             self.scanline +=1;
             self.ppu_cycles %= PPU_CYCLES_PER_SCANLINE;
+           // println!("process_cpu_cycles scanline {}",self.scanline);
             if self.scanline == 262 {
                 self.scanline = PRE_RENDER_SCANLINE;
                 self.status_reg.set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
+                self.status_reg.set_flag(StatusRegisterFlag::SpriteOverflow, false);
             } else if self.scanline == POST_RENDER_SCANLINE {
                 //println!("About to render frame");
               
@@ -317,11 +440,11 @@ impl PPU
         return nmi_triggered;
     }
 
-    fn get_background_palettes(&self) -> Palettes {
+    fn get_palettes(&self, for_background : bool) -> Palettes {
             let mut palletes : Palettes =  Default::default();
             let raw_universal_bckg_color = self.ram.get_universal_background_color();
             for (i, p) in palletes.iter_mut().enumerate() {
-                let raw_colors = self.ram.get_background_palette(i as u8);
+                let raw_colors = if for_background {self.ram.get_background_palette(i as u8)} else {self.ram.get_sprite_palette(i as u8)} ;
                 *p = [self.color_mapper.map_nes_color(raw_universal_bckg_color), 
                       self.color_mapper.map_nes_color(raw_colors[0]), 
                       self.color_mapper.map_nes_color(raw_colors[1]), 
@@ -353,7 +476,7 @@ impl WritePpuRegisters for PPU {
             } 
             WriteAccessRegister::OamAddr => self.oam_address = value,
             WriteAccessRegister::OamData => {
-                self.oam.data[self.oam_address as usize % 256] = value;
+                self.oam[self.oam_address as usize % 256] = value;
                 self.oam_address += 1
             }
             WriteAccessRegister::PpuAddr => {
@@ -379,10 +502,9 @@ impl WritePpuRegisters for PPU {
 impl WriteOamDma for PPU {
     fn writeOamDma(&mut self , data: [u8;256]) -> () {
         let write_len  = 256 - self.oam_address as usize;
-        self.oam.data[self.oam_address as usize ..].copy_from_slice(&data[..write_len as usize])
+        self.oam[self.oam_address as usize ..].copy_from_slice(&data[..write_len as usize])
     }
 }
-
 
 impl ReadPpuRegisters for PPU {
     fn read(&mut self, register : ReadAccessRegister) -> u8 {
@@ -394,7 +516,7 @@ impl ReadPpuRegisters for PPU {
                 val
             }
             ReadAccessRegister::OamData  => {
-                let val = self.oam.data[self.oam_address as usize];
+                let val = self.oam[self.oam_address as usize];
                 self.oam_address += 1;
                 val
             }

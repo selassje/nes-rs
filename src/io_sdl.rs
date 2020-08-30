@@ -6,15 +6,19 @@ use crate::audio::{Audio};
 
 use sdl2::event::Event;
 use sdl2::pixels;
+use sdl2::rect::Rect;
 use sdl2::keyboard::Keycode;
 use sdl2::keyboard::Scancode;
-use sdl2::gfx::primitives::DrawRenderer;
+
 
 use std::iter::FromIterator; 
 use std::collections::HashMap;
 use std::sync::mpsc::{Sender,Receiver};
 
+
 pub static mut SCREEN : Screen = [[(255,255,255); DISPLAY_HEIGHT]; DISPLAY_WIDTH];
+const SCREEN_FPS : u32 = 60;
+const SCREEN_MS_PER_FRAME : u32 = 1000 / SCREEN_FPS;
 
 pub struct IOSdl{
         title       : String,
@@ -62,15 +66,14 @@ impl IOSdl
 
         let sdl_context = sdl2::init().unwrap();
         let audio = Audio::new(&sdl_context.audio().unwrap());
-
         let video_subsys = sdl_context.video().unwrap();
-        let window = video_subsys.window( &format!("chip-8: {}", self.title) , (DISPLAY_WIDTH as u32)*(DISPLAY_SCALING as u32), (DISPLAY_HEIGHT as u32)*(DISPLAY_SCALING as u32))
+        let window = video_subsys.window( &format!("nes-rs: {}", self.title) , (DISPLAY_WIDTH as u32)*(DISPLAY_SCALING as u32), (DISPLAY_HEIGHT as u32)*(DISPLAY_SCALING as u32))
         .position_centered()
         .opengl()
         .build()
         .map_err(|e| e.to_string()).unwrap();
 
-        let mut canvas = window.into_canvas().build().map_err(|e| e.to_string()).unwrap();
+        let mut canvas = window.into_canvas().present_vsync().build().map_err(|e| e.to_string()).unwrap();
 
         canvas.set_draw_color(pixels::Color::RGB(0, 0, 0));
         canvas.present();
@@ -107,20 +110,18 @@ impl IOSdl
             keys_state = keys_state_new;
             
             canvas.clear();
+        
             unsafe {
             for (x, col) in SCREEN.iter().enumerate() {
                 for (y, color) in col.iter().enumerate() {
-                    let x : i16 = (x*(DISPLAY_SCALING as usize)) as i16;
-                    let y : i16 = (y*(DISPLAY_SCALING as usize)) as i16;
-                    let (r, g, b) = *color;
-                    let _ = canvas.box_(x, y, x + DISPLAY_SCALING - 1, y + DISPLAY_SCALING - 1, pixels::Color::RGB(r, g, b));                         
+                    let x  = (x*(DISPLAY_SCALING as usize)) as i32;
+                    let y  = (y*(DISPLAY_SCALING as usize)) as i32;
+                    let rect = Rect::new(x,y,DISPLAY_SCALING as u32, DISPLAY_SCALING as u32);
+                    let _ = canvas.set_draw_color(*color);   
+                    let _ = canvas.draw_rect(rect);                      
                 }
-            }
-        }
-
-            if let Ok(_) = self.audio_rx.try_recv() {
-                audio.beep();
-            }
+                }   
+            } 
             canvas.present();
         }
 

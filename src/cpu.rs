@@ -3,7 +3,7 @@ use crate::cpu_ram::{CpuRAM};
 use crate::screen::{Screen};
 use crate::common::*;
 use std::time::{Duration, Instant};
-use std::thread::sleep;
+use spin_sleep::{SpinSleeper};
 use crate::keyboard::{KeyEvent};
 use crate::mapper::{Mapper};
 use std::sync::mpsc::{Sender, Receiver};
@@ -11,8 +11,7 @@ use crate::ppu::*;
 use std::cell::RefCell;
 use std::fmt::{Display,Formatter,Result};
 
-const NTSC_FREQ_MHZ   : f32  = 1.79;
-const NANOS_PER_CYCLE : u128 =  ((1.0/NTSC_FREQ_MHZ) * 1000.0) as u128;
+const NANOS_PER_CPU_CYCLE : u128 = 559;
 
 const DEBUG : bool = false;
 
@@ -90,7 +89,6 @@ pub struct CPU<'a>
    a            : u8,
    x            : u8,
    y            : u8,
-   stack2        : Vec<u16>,
    ram          : CpuRAM<'a>,
    ppu          : &'a RefCell::<PPU>,
    keyboard     : Keyboard,
@@ -117,7 +115,6 @@ impl<'a> CPU<'a>
             a            : 0,
             x            : 0,
             y            : 0,
-            stack2        : Vec::<u16>::new(),
             ram          : ram,
             ppu          : ppu,
             keyboard     : [false; 16],
@@ -176,7 +173,7 @@ impl<'a> CPU<'a>
         let (code_segment_start, code_segment_end) = self.code_segment;
   
         println!("PC int location {:#X} ROM Start {:#X}  ROM End {:#X}", self.pc, code_segment_start, code_segment_end);
-
+        let sleeper = SpinSleeper::default();
         while self.pc >= code_segment_start &&  self.pc <= code_segment_end {
             let now = Instant::now();
             
@@ -194,14 +191,16 @@ impl<'a> CPU<'a>
             self.pc += bytes as u16;
             //println!("Executed instruction {:#0x} bytes {} cycles {} pc {:X}  op2 {:#X} {:#x}",op, bytes, cycles, self.pc, self.ram.get_byte(0xC7BE),self.ram.get_2_bytes_as_u16(0x00));
             
+            let mut cycles = cycles;
             if self.ppu.borrow_mut().process_cpu_cycles(cycles) {
                 self.nmi();
             }
             
             let elapsed_time_ns  = now.elapsed().as_nanos();
-            let required_time_ns = (cycles as u128) * NANOS_PER_CYCLE;
+            let required_time_ns = ((cycles as u128) * NANOS_PER_CPU_CYCLE * 2) / 3;
             if required_time_ns > elapsed_time_ns {
-             //  sleep(Duration::from_nanos((required_time_ns - elapsed_time_ns) as u64));
+                let dur = Duration::from_nanos((required_time_ns - elapsed_time_ns) as u64);
+                sleeper.sleep(dur);
             }
            
         }
@@ -885,11 +884,12 @@ impl<'a> CPU<'a>
         cycles
     }
 
-    fn nmi(&mut self) {
+    fn nmi(&mut self) -> u8 {
         //println!("Handling NMI!");
         self.push_u16(self.pc);
         self.push_u8(self.ps);
-        self.pc = self.ram.get_2_bytes_as_u16(0xFFFA);    
+        self.pc = self.ram.get_2_bytes_as_u16(0xFFFA); 
+        7   
     }
 
     fn pha(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {

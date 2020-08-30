@@ -114,7 +114,7 @@ impl VRAM {
         attribute_table
     }
 
-    pub fn get_pallete_index(&self, table_index: u8, color_tile_x: u8, color_tile_y: u8) -> u8 {
+    pub fn get_background_pallete_index(&self, table_index: u8, color_tile_x: u8, color_tile_y: u8) -> u8 {
         let attribute_table = self.get_attribute_table(table_index);
         let attribute_index = (color_tile_y / 2) * 8 + color_tile_x / 2;
         let attribute_data  = attribute_table[attribute_index as usize];
