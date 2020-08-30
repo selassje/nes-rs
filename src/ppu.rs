@@ -3,11 +3,10 @@ use crate::common::{Mirroring};
 use crate::cpu_ppu::*;
 use crate::memory::{Memory};
 use crate::vram::{VRAM};
-use crate::screen::{Screen,DISPLAY_HEIGHT,DISPLAY_WIDTH};
+use crate::screen::{DISPLAY_HEIGHT,DISPLAY_WIDTH};
 use crate::colors::{RgbColor, ColorMapper, DefaultColorMapper};
-use std::thread::park;
 
-use std::sync::mpsc::{Sender};
+
 use std::default::{Default};
 
 enum ControlRegisterFlag {
@@ -210,9 +209,7 @@ struct VRAMAddress {
 
 pub struct PPU
 {
-   ram            : VRAM,
-   screen_tx      : Sender<Screen>,
-   screen         : Screen,
+   vram           : VRAM,
    control_reg    : ControlRegister,
    mask_reg       : MaskRegister,
    status_reg     : StatusRegister,
@@ -228,13 +225,11 @@ pub struct PPU
 
 impl PPU
 {
-    pub fn new(screen_tx: Sender<Screen>, chr_rom: Vec::<u8>, mirroring: Mirroring) -> PPU {
-        let ram = VRAM::new(&chr_rom, mirroring);
-        let pattern_tables = [PatternTable::new(&ram, 0), PatternTable::new(&ram, 1)];
+    pub fn new(chr_rom: Vec::<u8>, mirroring: Mirroring) -> PPU {
+        let vram = VRAM::new(&chr_rom, mirroring);
+        let pattern_tables = [PatternTable::new(&vram, 0), PatternTable::new(&vram, 1)];
         PPU {
-            ram            : ram,
-            screen_tx      : screen_tx,
-            screen         : [[(255,255,255); DISPLAY_HEIGHT]; DISPLAY_WIDTH],
+            vram           : vram,
             control_reg    : ControlRegister{value: 0},
             mask_reg       : MaskRegister{value: 0},
             status_reg     : StatusRegister{value: 0},
@@ -249,65 +244,35 @@ impl PPU
         }
     }
 
-    //fn get_pattern_table()
 
-    fn displayTileInfo(&self, tile_x : u8, tile_y :u8) {
-        let name_table_index    = self.control_reg.get_base_nametable_index();
-        let tile_index = self.ram.get_nametable_tile_index(name_table_index, tile_x, tile_y);
-        let pattern_table_index = self.control_reg.get_background_pattern_table_index();
-        println!("Tile Info");
-        println!("X={} Y={} TileIndex {:#2X} PatternTable {}", tile_x, tile_y, tile_index,pattern_table_index);
-        println!("Nametable {} Mirroring {:?}",name_table_index, self.ram.get_mirroring());
-
-    }
-
-    fn default_palette()-> Palette {
-        [ (0,0,0),
-          (255,0,0),
-          (0,255,0),
-          (0,0,255)    
-        ]
-    }
-
-    fn render_background_frame(&mut self) {
+    fn render_frame(&mut self) {
         let background_palettes = self.get_palettes(true);
         let sprite_palettes     = self.get_palettes(false);
-
-        
-        let name_table_index    = self.control_reg.get_base_nametable_index();
-        let pattern_table_index = self.control_reg.get_background_pattern_table_index();
-        let pattern_table       = &self.pattern_tables[pattern_table_index as usize];
-
-       // self.displayTileInfo(13,22);
-        //self.render_chr_data();
-        //park();
-        //panic!("");
 
         for y in 0..DISPLAY_HEIGHT {
             let (sprites, is_overflow_detected) = self.get_sprites_for_scanline_and_check_for_overflow(y as u8);
             self.status_reg.set_flag(StatusRegisterFlag::SpriteOverflow, is_overflow_detected);
             for x in 0..DISPLAY_WIDTH {
-                let tile_y = (y / 8) as u8;
-                let tile_x = (x / 8) as u8;
-                let color_tile_y = (y / 16) as u8;
-                let color_tile_x = (x / 16) as u8;
-                let tile_index = self.ram.get_nametable_tile_index(name_table_index, tile_x, tile_y);
-                let tile = pattern_table.tiles[tile_index as usize];
-                let bg_color_index = tile.get_color_index(x % 8, y % 8);
-                let (sprite_color_index, sprite) = self.get_sprite_color_index(&sprites, x as u8, y as u8);
-                let bg_palette_index  = self.ram.get_background_pallete_index(name_table_index, color_tile_x, color_tile_y);
+                let (mut bg_color_index, bg_palette_index)  = self.get_background_color_index(x ,y);
+                if  !self.mask_reg.is_flag_enabled(MaskRegisterFlag::ShowBackground) {
+                    bg_color_index = 0;
+                }
+
+                let (mut sprite_color_index, sprite) = self.get_sprite_color_index(&sprites, x as u8, y as u8);
+                if  !self.mask_reg.is_flag_enabled(MaskRegisterFlag::ShowSprites) {
+                    sprite_color_index = 0;
+                }
+
                 let color = self.determine_pixel_color(bg_color_index as u8, 
-                                                      sprite_color_index, 
-                                                      &sprite, 
-                                                      &background_palettes[bg_palette_index as usize], 
-                                                      &sprite_palettes);
+                                                       sprite_color_index, 
+                                                       &sprite, 
+                                                       &background_palettes[bg_palette_index as usize], 
+                                                       &sprite_palettes);
                 unsafe {
                     SCREEN[x][y] = color;
                 }
             }
         }
-       // self.oam = [0;256];
-        //park();
     }
     
     fn determine_pixel_color(&self, bg_color_index: u8, 
@@ -328,13 +293,30 @@ impl PPU
             } else {
                 if sprite.if_draw_in_front() {
                     sprite_color
-                }else {
+                } else {
                     bg_color
                 }
             }
     }  
 
-    fn get_sprite_color_index(&self, sprites : &Sprites, x :u8, y:u8) -> (u8,Sprite) {
+    fn get_background_color_index(&self, x :usize, y:usize) -> (u8, u8) {
+        let name_table_index       =  self.control_reg.get_base_nametable_index();
+        let bg_pattern_table_index =  self.control_reg.get_background_pattern_table_index();
+        let bg_pattern_table       = &self.pattern_tables[bg_pattern_table_index as usize];
+        let bg_color_tile_y = (y / 16) as u8;
+        let bg_color_tile_x = (x / 16) as u8;
+        let bg_palette_index  = self.vram.get_background_pallete_index(name_table_index, bg_color_tile_x, bg_color_tile_y);
+        
+        let bg_tile_y = (y / 8) as u8;
+        let bg_tile_x = (x / 8) as u8;
+        let bg_tile_index = self.vram.get_nametable_tile_index(name_table_index, bg_tile_x, bg_tile_y);
+        let bg_tile = bg_pattern_table.tiles[bg_tile_index as usize];
+        let bg_color_index = bg_tile.get_color_index(x % 8, y % 8);
+     
+        (bg_color_index as u8, bg_palette_index)
+    }
+
+    fn get_sprite_color_index(&self, sprites : &Sprites, x :u8, y:u8) -> (u8, Sprite) {
         let is_sprite_mode_8x16 = self.control_reg.get_sprite_size_height() == 16;
         for sprite in sprites {
             if x >= sprite.get_x() && (x as u16) < sprite.get_x() as u16 + 8 {
@@ -379,60 +361,19 @@ impl PPU
         (sprites.take(8).collect(), if_overflow)   
     }
 
-    fn render_chr_data(&mut self) {
-        let palette = Self::default_palette();
-        let pattern_table_index = self.control_reg.get_background_pattern_table_index();
-        let pattern_table       = &self.pattern_tables[pattern_table_index as usize];
-
-        for y in 0..DISPLAY_HEIGHT {
-            let (sprites, is_overflow_detected) = self.get_sprites_for_scanline_and_check_for_overflow(y as u8);
-            self.status_reg.set_flag(StatusRegisterFlag::SpriteOverflow, is_overflow_detected);
-            for x in 0..DISPLAY_WIDTH {
-                let tile_y = y / 8;
-                let tile_x = x / 8;
-                //println!("tile_x {} tile_y {}",tile_x,tile_y);
-                let tile = pattern_table.tiles[16 * tile_y + tile_x];
-                let bg_color_index = tile.get_color_index(x % 8, y % 8);
-                let sprite_color_index = 0;
-                let color = palette[bg_color_index];
-                unsafe {
-                    SCREEN[x][y] = color;
-                }
-            }
-        }
-    }
-
-    fn render_sprites_frame(&self) {
-
-    }
-
     pub fn process_cpu_cycles(&mut self, cpu_cycles: u8) -> bool {
-        let mut nmi_triggered = false;
-        
-              
+        let mut nmi_triggered = false;  
         self.ppu_cycles += 3 * cpu_cycles as u16;
-        //println!("PPU Cycles {} Scanline {}",self.ppu_cycles,self.scanline);
         if self.ppu_cycles > PPU_CYCLES_PER_SCANLINE {
             self.scanline +=1;
             self.ppu_cycles %= PPU_CYCLES_PER_SCANLINE;
-           // println!("process_cpu_cycles scanline {}",self.scanline);
             if self.scanline == 262 {
                 self.scanline = PRE_RENDER_SCANLINE;
                 self.status_reg.set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
                 self.status_reg.set_flag(StatusRegisterFlag::SpriteOverflow, false);
             } else if self.scanline == POST_RENDER_SCANLINE {
-                //println!("About to render frame");
-              
-                if self.mask_reg.is_flag_enabled(MaskRegisterFlag::ShowBackground) {
-                    //println!("About to render background");
-                    self.render_background_frame();
-                }
-                if self.mask_reg.is_flag_enabled(MaskRegisterFlag::ShowSprites) {
-                    self.render_sprites_frame();
-                }
-               
+                self.render_frame();        
             } else if self.scanline == VBLANK_START_SCANLINE {
-               // println!("Sending NMI {} {}",self.control_reg.value & ControlRegisterFlag::GenerateNMI as u8, self.control_reg.value);
                 nmi_triggered = self.control_reg.is_generate_nmi_enabled();
                 self.status_reg.set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
             }
@@ -442,9 +383,9 @@ impl PPU
 
     fn get_palettes(&self, for_background : bool) -> Palettes {
             let mut palletes : Palettes =  Default::default();
-            let raw_universal_bckg_color = self.ram.get_universal_background_color();
+            let raw_universal_bckg_color = self.vram.get_universal_background_color();
             for (i, p) in palletes.iter_mut().enumerate() {
-                let raw_colors = if for_background {self.ram.get_background_palette(i as u8)} else {self.ram.get_sprite_palette(i as u8)} ;
+                let raw_colors = if for_background {self.vram.get_background_palette(i as u8)} else {self.vram.get_sprite_palette(i as u8)} ;
                 *p = [self.color_mapper.map_nes_color(raw_universal_bckg_color), 
                       self.color_mapper.map_nes_color(raw_colors[0]), 
                       self.color_mapper.map_nes_color(raw_colors[1]), 
@@ -460,11 +401,9 @@ impl WritePpuRegisters for PPU {
         
         match register {
             WriteAccessRegister::PpuCtrl =>  { 
-                //println!("Control register updated {:X}",value);  
                 self.control_reg.value = value;
             }
             WriteAccessRegister::PpuMask => { 
-                //println!("Mask register updated {:X}",value);  
                 self.mask_reg.value = value;
             }
             WriteAccessRegister::PpuScroll => {
@@ -480,7 +419,6 @@ impl WritePpuRegisters for PPU {
                 self.oam_address += 1
             }
             WriteAccessRegister::PpuAddr => {
-                //println!("Setting VRAM address {:X}", value);
                 if self.vram_address.next_ppuaddr_write_is_hi {
                     self.vram_address.address = (value as u16)<<8 | (self.vram_address.address & 0x00FF);
                 } else {
@@ -489,11 +427,9 @@ impl WritePpuRegisters for PPU {
                 self.vram_address.next_ppuaddr_write_is_hi = !self.vram_address.next_ppuaddr_write_is_hi;
             } 
             WriteAccessRegister::PpuData => {
-                self.ram.store_byte(self.vram_address.address, value);
-                //println!("VRAM address {:X} inc {}", self.vram_address.address, self.control_reg.get_vram_increment());
+                self.vram.store_byte(self.vram_address.address, value);
                 self.vram_address.address += self.control_reg.get_vram_increment();
             }
-            _         => panic!("Unrecognised register {:?} in WritePpuRegisters", register)
         }
         ()
     }
@@ -511,7 +447,7 @@ impl ReadPpuRegisters for PPU {
         match register {
             ReadAccessRegister::PpuStatus => self.status_reg.value,
             ReadAccessRegister::PpuData   => {
-                let val = self.ram.get_byte(self.vram_address.address);
+                let val = self.vram.get_byte(self.vram_address.address);
                 self.vram_address.address += self.control_reg.get_vram_increment();
                 val
             }
@@ -520,7 +456,6 @@ impl ReadPpuRegisters for PPU {
                 self.oam_address += 1;
                 val
             }
-            _         => panic!("Unrecognised register in ReadPpuRegisters")
         }
     }
 }

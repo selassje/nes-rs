@@ -2,12 +2,13 @@ use crate::memory::{Memory};
 use crate::cpu_ram::{CpuRAM};
 use crate::screen::{Screen};
 use crate::common::*;
-use std::time::{Duration, Instant};
-use spin_sleep::{SpinSleeper};
 use crate::keyboard::{KeyEvent};
 use crate::mapper::{Mapper};
-use std::sync::mpsc::{Sender, Receiver};
 use crate::ppu::*;
+
+use std::time::{Duration, Instant};
+use spin_sleep::{SpinSleeper};
+use std::sync::mpsc::{Sender, Receiver};
 use std::cell::RefCell;
 use std::fmt::{Display,Formatter,Result};
 

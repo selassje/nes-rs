@@ -17,8 +17,7 @@ use std::sync::mpsc::{Sender,Receiver};
 
 
 pub static mut SCREEN : Screen = [[(255,255,255); DISPLAY_HEIGHT]; DISPLAY_WIDTH];
-const SCREEN_FPS : u32 = 60;
-const SCREEN_MS_PER_FRAME : u32 = 1000 / SCREEN_FPS;
+
 
 pub struct IOSdl{
         title       : String,

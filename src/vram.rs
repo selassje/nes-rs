@@ -103,10 +103,6 @@ impl Memory for VRAM
 
 impl VRAM {
 
-    pub fn get_mirroring(&self) -> Mirroring {
-        self.mirroring
-    }
-
     fn get_attribute_table(&self, table_index: u8) -> [u8; 64] {
         let mut attribute_table = [0;64];
         let attrib_table_addr = NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE + 960;
