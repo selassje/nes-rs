@@ -9,15 +9,31 @@ use sdl2::pixels;
 use sdl2::rect::Rect;
 use sdl2::keyboard::Keycode;
 use sdl2::keyboard::Scancode;
-
+use lazy_static::lazy_static;
 
 use std::iter::FromIterator; 
 use std::collections::HashMap;
 use std::sync::mpsc::{Sender,Receiver};
+use std::sync::Mutex;
 
 
 pub static mut SCREEN : Screen = [[(255,255,255); DISPLAY_HEIGHT]; DISPLAY_WIDTH];
 
+lazy_static! {
+    pub static ref KEYBOARD : Mutex<HashMap<Scancode, bool>> = Mutex::new(HashMap::new());
+}
+
+pub fn get_key_status(key : Scancode) -> bool {
+    if let Some(status) = KEYBOARD.lock().unwrap().get(&key) {
+        *status
+    } else {
+        false
+    }
+}
+
+pub fn set_key_status(key : Scancode, value: bool) {
+    KEYBOARD.lock().unwrap().insert(key, value);
+}
 
 pub struct IOSdl{
         title       : String,
@@ -93,21 +109,8 @@ impl IOSdl
                 }   
             }
 
-            let keys_state_new : HashMap<Scancode,bool> = HashMap::from_iter(events.keyboard_state().scancodes());
-            for (k, v) in key_mappings.iter() {
-                let old_state = keys_state[&Scancode::from_keycode(*k).unwrap()];
-                let new_state = keys_state_new[&Scancode::from_keycode(*k).unwrap()];
-                if  old_state != new_state {
-                    if new_state {
-                        self.keyboard_tx.send(KeyEvent::KeyDown(*v)).unwrap();
-                    }
-                    else {
-                        self.keyboard_tx.send(KeyEvent::KeyUp(*v)).unwrap();
-                    }
-                }
-            }
-            keys_state = keys_state_new;
-            
+            *KEYBOARD.lock().unwrap() = HashMap::from_iter(events.keyboard_state().scancodes());
+   
             canvas.clear();
         
             unsafe {

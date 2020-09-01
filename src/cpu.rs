@@ -5,12 +5,14 @@ use crate::mapper::Mapper;
 use crate::memory::Memory;
 use crate::ppu::*;
 use crate::screen::Screen;
+use crate::cpu_controllers::{ControllerPortsAccess};
 
 use spin_sleep::SpinSleeper;
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter, Result};
 use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
+
 
 const NANOS_PER_CPU_CYCLE: u128 = 559;
 
@@ -97,10 +99,11 @@ impl<'a> CPU<'a> {
         mapper: &'a mut Box<dyn Mapper>,
         ppu: &'a RefCell<PPU>,
         screen_tx: Sender<Screen>,
+        controller_access : &'a mut dyn ControllerPortsAccess,
         keyboard_rx: Receiver<KeyEvent>,
         audio_tx: Sender<bool>,
     ) -> CPU<'a> {
-        let mut ram = CpuRAM::new(ppu);
+        let mut ram = CpuRAM::new(ppu,controller_access);
         ram.store_bytes(mapper.get_rom_start(), &mapper.get_pgr_rom().to_vec());
         CPU {
             pc: ram.get_2_bytes_as_u16(0xFFFC),
@@ -245,6 +248,9 @@ impl<'a> CPU<'a> {
             0x30 => (2, 2 + self.bmi(b0, b1, AddressingMode::Relative)),
             0xD0 => (2, 2 + self.bne(b0, b1, AddressingMode::Relative)),
             0x10 => (2, 2 + self.bpl(b0, b1, AddressingMode::Relative)),
+
+            0x24 => (2, 3 + self.bit(b0, b1, AddressingMode::ZeroPage)),
+            0x2C => (3, 5 + self.bit(b0, b1, AddressingMode::Absolute)),
 
             0x18 => (1, 2 + self.clc(b0, b1, AddressingMode::Implicit)),
             0xD8 => (1, 2 + self.cld(b0, b1, AddressingMode::Implicit)),
@@ -814,6 +820,17 @@ impl<'a> CPU<'a> {
         }
         0
     }
+
+    fn bit(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        // println!("bit {:?}", mode);
+        let (address, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        let m = self.load_from_address(&address);
+        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a & m == 0);
+        self.set_or_reset_flag(ProcessorFlag::OverflowFlag, m & (1 << 6) != 0);
+        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, m & (1 << 7) != 0);
+        cycles
+    }
+
 
     fn cmp(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
         // println!("cmp {:?}", mode);
