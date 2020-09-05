@@ -11,6 +11,8 @@ mod cpu_ppu;
 mod cpu_controllers;
 mod cpu;
 mod ppu;
+mod apu;
+mod cpu_ram_apu;
 mod controllers;
 mod screen;
 mod common;
@@ -40,7 +42,8 @@ fn cpu_thread(nes_file : &nes_format_reader::NesFile, screen_tx: Sender<screen::
    let mut controllers = controllers::Controllers::new(Box::new(controller_1), Box::new(controller_2));
                                                 
    let ppu = RefCell::new(PPU::new(mapper.get_chr_rom().to_vec(),nes_file.get_mirroring()));
-   let mut cpu = cpu::CPU::new(&mut mapper, &ppu, screen_tx, &mut controllers, keyboard_rx, audio_tx);
+   let apu = RefCell::new(apu::APU::new());
+   let mut cpu = cpu::CPU::new(&mut mapper, &ppu, &apu, screen_tx, &mut controllers, keyboard_rx, audio_tx);
 
    cpu.run();
 }

@@ -2,7 +2,7 @@ extern crate sdl2;
 
 use crate::screen::{Screen,DISPLAY_HEIGHT,DISPLAY_WIDTH};
 use crate::keyboard::{KeyEvent};
-use crate::audio::{Audio};
+use sdl2::audio::{AudioSpecDesired,AudioQueue};
 
 use sdl2::event::Event;
 use sdl2::pixels;
@@ -15,12 +15,32 @@ use std::iter::FromIterator;
 use std::collections::HashMap;
 use std::sync::mpsc::{Sender,Receiver};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicI16, Ordering};
+use circular_queue::CircularQueue;
+use std::ops::{Deref, DerefMut};
 
 
-pub static mut SCREEN : Screen = [[(255,255,255); DISPLAY_HEIGHT]; DISPLAY_WIDTH];
+
+pub type SampleFormat = u8;
+
+pub static mut SCREEN  : Screen = [[(255,255,255); DISPLAY_HEIGHT]; DISPLAY_WIDTH];
+pub static PULSE_1_SAMPLE : AtomicI16 = AtomicI16::new(0);
+
+pub const SAMPLE_RATE : usize = 41000;
+pub const BUFFER_SIZE : usize = 1;
+
+pub struct SampleBuffer {
+    pub index  : usize,
+    pub buffer : [SampleFormat;BUFFER_SIZE]
+}
+
+
 
 lazy_static! {
     pub static ref KEYBOARD : Mutex<HashMap<Scancode, bool>> = Mutex::new(HashMap::new());
+    pub static ref SAMPLES_QUEUE : Mutex<CircularQueue<SampleFormat>> = Mutex::new(CircularQueue::with_capacity(BUFFER_SIZE));
+    pub static ref SAMPLE_BUFFER : Mutex<SampleBuffer> = Mutex::new(SampleBuffer{index :0, buffer : [0;BUFFER_SIZE]});
+
 }
 
 pub fn get_key_status(key : Scancode) -> bool {
@@ -31,9 +51,6 @@ pub fn get_key_status(key : Scancode) -> bool {
     }
 }
 
-pub fn set_key_status(key : Scancode, value: bool) {
-    KEYBOARD.lock().unwrap().insert(key, value);
-}
 
 pub struct IOSdl{
         title       : String,
@@ -58,29 +75,21 @@ impl IOSdl
     }
     pub fn run(&self)
     {
-        let key_mappings : HashMap<Keycode, u8> = HashMap::from_iter(vec!(
-            (Keycode::Num1,1),
-            (Keycode::Num2,2),
-            (Keycode::Num3,3),
-            (Keycode::Num4,0xC),
-            (Keycode::Q,4),
-            (Keycode::W,5),
-            (Keycode::E,6),
-            (Keycode::R,0xD),
-            (Keycode::A,7),
-            (Keycode::S,8),
-            (Keycode::D,9),
-            (Keycode::F,0xE),
-            (Keycode::Z,0xA),
-            (Keycode::X,0),
-            (Keycode::C,0xB),
-            (Keycode::V,0xF))
-        );
-
         const DISPLAY_SCALING : i16 = 2;
 
         let sdl_context = sdl2::init().unwrap();
-        let audio = Audio::new(&sdl_context.audio().unwrap());
+        let sdl_audio = sdl_context.audio().unwrap();
+
+        let desired_spec = AudioSpecDesired {
+            freq: Some(SAMPLE_RATE as i32),
+            channels: Some(1),  
+            samples: Some(BUFFER_SIZE as u16)
+            };
+    
+        let apu_audio: AudioQueue<SampleFormat> =  sdl_audio.open_queue(None, &desired_spec).unwrap();
+        //let apu_audio =  Audio::new(&sdl_audio).device;
+       
+
         let video_subsys = sdl_context.video().unwrap();
         let window = video_subsys.window( &format!("nes-rs: {}", self.title) , (DISPLAY_WIDTH as u32)*(DISPLAY_SCALING as u32), (DISPLAY_HEIGHT as u32)*(DISPLAY_SCALING as u32))
         .position_centered()
@@ -94,8 +103,7 @@ impl IOSdl
         canvas.present();
 
         let mut events = sdl_context.event_pump().unwrap();
-        let mut keys_state : HashMap<Scancode,bool> = HashMap::from_iter(events.keyboard_state().scancodes());
-     
+      
         'main: loop {
             for event in events.poll_iter() {
                 match event {
@@ -125,6 +133,27 @@ impl IOSdl
                 }   
             } 
             canvas.present();
+            //apu_audio.pause();
+            /*
+            let mut samples_queue = SAMPLES_QUEUE.lock().unwrap();
+            if samples_queue.is_full() {
+                let vec : Vec<_> = samples_queue.asc_iter().copied().collect();
+                apu_audio.queue(vec.as_slice());
+                apu_audio.resume();
+                samples_queue.clear();
+            }
+            */
+            let mut buffer = SAMPLE_BUFFER.lock().unwrap(); 
+
+            if buffer.index == BUFFER_SIZE {
+               // println!("About to play");
+                apu_audio.queue(&buffer.buffer);
+                apu_audio.resume();
+                buffer.index = 0;
+            }
+
+          //  audio_queue.queue(&[5,-5,6,7,8,9,10]);
+           // audio_queue.resume();
         }
 
     }

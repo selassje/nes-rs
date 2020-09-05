@@ -67,7 +67,6 @@ impl Memory for VRAM
                  } 
             };
             self.memory[mirror_address as usize] = byte;
-            // 3F10/$3F14/$3F18/$3F1C are mirrors of $3F00/$3F04/$3F08/$3F0C
         } else if PALETTES_RANGE.contains(&addr) {
             let maybe_mirror_address = match addr {
                 0x3F00 => Some(0x3F10),

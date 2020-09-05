@@ -4,6 +4,8 @@ use crate::keyboard::KeyEvent;
 use crate::mapper::Mapper;
 use crate::memory::Memory;
 use crate::ppu::*;
+use crate::cpu_ram_apu::{ApuRegisterAccess};
+use crate::apu::{APU};
 use crate::screen::Screen;
 use crate::cpu_controllers::{ControllerPortsAccess};
 
@@ -88,6 +90,7 @@ pub struct CPU<'a> {
     y: u8,
     ram: CpuRAM<'a>,
     ppu: &'a RefCell<PPU>,
+    apu: &'a RefCell<APU>,
     keyboard: Keyboard,
     keyboard_rx: Receiver<KeyEvent>,
     audio_tx: Sender<bool>,
@@ -98,12 +101,13 @@ impl<'a> CPU<'a> {
     pub fn new(
         mapper: &'a mut Box<dyn Mapper>,
         ppu: &'a RefCell<PPU>,
+        apu: &'a RefCell<APU>,
         screen_tx: Sender<Screen>,
         controller_access : &'a mut dyn ControllerPortsAccess,
         keyboard_rx: Receiver<KeyEvent>,
         audio_tx: Sender<bool>,
     ) -> CPU<'a> {
-        let mut ram = CpuRAM::new(ppu,controller_access);
+        let mut ram = CpuRAM::new(ppu,controller_access, apu);
         ram.store_bytes(mapper.get_rom_start(), &mapper.get_pgr_rom().to_vec());
         CPU {
             pc: ram.get_2_bytes_as_u16(0xFFFC),
@@ -114,6 +118,7 @@ impl<'a> CPU<'a> {
             y: 0,
             ram: ram,
             ppu: ppu,
+            apu: apu,
             keyboard: [false; 16],
             keyboard_rx: keyboard_rx,
             audio_tx: audio_tx,
@@ -182,9 +187,12 @@ impl<'a> CPU<'a> {
             self.pc, code_segment_start, code_segment_end
         );
         let sleeper = SpinSleeper::default();
+        let mut loops : u128 = 0;
+        let wait_1s = Instant::now();
         while self.pc >= code_segment_start && self.pc <= code_segment_end {
             let now = Instant::now();
-
+            //println!("Loops {}",loops);
+            loops+=1;
             let op = self.ram.get_byte(self.pc);
             let mut b0 = 0;
             let mut b1 = 0;
@@ -203,6 +211,11 @@ impl<'a> CPU<'a> {
             if self.ppu.borrow_mut().process_cpu_cycles(cycles) {
                 cycles += self.nmi();
             }
+            let wait_for_audio =  self.apu.borrow_mut().process_cpu_cycles(cycles);
+
+            if wait_1s.elapsed().as_secs() > 1 {
+               // panic!("After 1s {} samples were produced",loops);
+            }
 
             let elapsed_time_ns = now.elapsed().as_nanos();
             let required_time_ns = ((cycles as u128) * NANOS_PER_CPU_CYCLE * 3) / 3;
@@ -210,6 +223,12 @@ impl<'a> CPU<'a> {
                 let dur = Duration::from_nanos((required_time_ns - elapsed_time_ns) as u64);
                 sleeper.sleep(dur);
             }
+
+            if wait_for_audio {
+                // sleeper.sleep(Duration::from_millis(200));
+        }
+
+
         }
         println!("CPU Stopped execution")
     }

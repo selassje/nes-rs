@@ -1,29 +1,42 @@
 use sdl2::audio::{AudioCallback, AudioSpecDesired};
 use std::time::Duration;
+use crate::io_sdl::{SAMPLES_QUEUE, SampleFormat,SAMPLE_RATE, BUFFER_SIZE};
 
-struct SquareWave {
-    phase_inc: f32,
-    phase: f32,
-    volume: f32
+pub struct ApuOutput {
+ 
 }
 
-impl AudioCallback for SquareWave {
-    type Channel = f32;
+impl AudioCallback for ApuOutput {
+    type Channel = SampleFormat;
 
-    fn callback(&mut self, out: &mut [f32]) {
+    fn callback(&mut self, out: &mut [SampleFormat]) {
+        let scale = std::u8::MAX / 15;
+        let mut queue = SAMPLES_QUEUE.lock().unwrap();
+        println!("Numer of sample in queue {}", queue.len());
+      
+        let mut sample_iter = queue.asc_iter();
+        let mut requested_samples = 0;
         for x in out.iter_mut() {
-            if self.phase >= 0.0 && self.phase < 0.5 {
-                 *x = self.volume;
-            } else {
-                 *x = -self.volume;
-            }
-            self.phase = (self.phase + self.phase_inc) % 1.0;
+            requested_samples+= 1;
+         // *x = get_audio_samples() * scale;
+         if let Some(sample) = sample_iter.next() {
+             assert!(sample < &16);
+            *x = *sample;
+         }
+         else {
+          //   *x = 0;
+         }
+        
+          //*x = 30000;  
+          // println!("Sample is {}",*x);
         }
+       queue.clear();
+       //println!("Requested samples {}", requested_samples);
     }
 }
 
 pub struct Audio {
-    device  : sdl2::audio::AudioDevice<SquareWave>
+   pub device  : sdl2::audio::AudioDevice<ApuOutput>
 }
 
 impl Audio {
@@ -31,16 +44,13 @@ impl Audio {
     pub fn new(audio_subsystem: &sdl2::AudioSubsystem) -> Self
     {
         let desired_spec = AudioSpecDesired {
-        freq: Some(44100),
+        freq: Some(SAMPLE_RATE as i32),
         channels: Some(1),  
-        samples: None
+        samples: Some(BUFFER_SIZE as u16)
         };
 
         let device = audio_subsystem.open_playback(None, &desired_spec, |spec| {
-            SquareWave {
-                phase_inc: 440.0 / spec.freq as f32,
-                phase: 0.0,
-                volume: 0.25
+            ApuOutput {          
             }}).unwrap();
 
         Audio {

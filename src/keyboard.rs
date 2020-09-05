@@ -21,10 +21,10 @@ impl KeyboardController {
     pub fn get_default_keyboard_controller_player1() -> Self {
         KeyboardController {
             button_key_map: HashMap::from_iter(vec![
-                (Button::A, Keycode::Z),
-                (Button::B, Keycode::X),
+                (Button::A, Keycode::Q),
+                (Button::B, Keycode::E),
                 (Button::Select, Keycode::C),
-                (Button::Start, Keycode::V),
+                (Button::Start, Keycode::Space),
                 (Button::Up, Keycode::W),
                 (Button::Down, Keycode::S),
                 (Button::Left, Keycode::A),

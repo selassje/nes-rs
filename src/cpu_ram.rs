@@ -1,6 +1,7 @@
 use crate::common;
 use crate::cpu_controllers::*;
 use crate::cpu_ppu::*;
+use crate::cpu_ram_apu;
 use crate::memory::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -9,21 +10,27 @@ type CpuMemPpuWriteAccessRegisterMapping = HashMap<u16, WriteAccessRegister>;
 type CpuMemPpuReadAccessRegisterMapping = HashMap<u16, ReadAccessRegister>;
 type CpuMemControllerOutputPortsMapping = HashMap<u16, OutputPort>;
 type CpuMemControllerInputPortsMapping = HashMap<u16, InputPort>;
+type CpuMemApuWriteAccessRegisterMapping = HashMap<u16, cpu_ram_apu::WriteAccessRegister>;
+type CpuMemApuReadAccessRegisterMapping = HashMap<u16, cpu_ram_apu::ReadAccessRegister>;
 
 pub struct CpuRAM<'a> {
     memory: [u8; 65536],
     ppu_access: &'a RefCell<dyn PpuRegisterAccess>,
     controller_access: &'a mut dyn ControllerPortsAccess,
+    apu_access: &'a RefCell<dyn cpu_ram_apu::ApuRegisterAccess>,
     ppu_read_reg_map: CpuMemPpuReadAccessRegisterMapping,
     ppu_write_reg_map: CpuMemPpuWriteAccessRegisterMapping,
     controller_output_ports: CpuMemControllerOutputPortsMapping,
     controller_input_ports: CpuMemControllerInputPortsMapping,
+    apu_read_reg_map: CpuMemApuReadAccessRegisterMapping,
+    apu_write_reg_map: CpuMemApuWriteAccessRegisterMapping,
 }
 
 impl<'a> CpuRAM<'a> {
     pub fn new(
         ppu_access: &'a RefCell<dyn PpuRegisterAccess>,
         controller_access: &'a mut dyn ControllerPortsAccess,
+        apu_access: &'a RefCell<dyn cpu_ram_apu::ApuRegisterAccess>,
     ) -> CpuRAM<'a> {
         let mut ppu_read_reg_map: CpuMemPpuReadAccessRegisterMapping = HashMap::new();
         for read_reg in ReadAccessRegister::iterator() {
@@ -42,14 +49,26 @@ impl<'a> CpuRAM<'a> {
             controller_input_ports.insert(*input_port as u16, *input_port);
         }
 
+        let mut apu_read_reg_map: CpuMemApuReadAccessRegisterMapping = HashMap::new();
+        for read_reg in cpu_ram_apu::ReadAccessRegister::iterator() {
+            apu_read_reg_map.insert(*read_reg as u16, *read_reg);
+        }
+        let mut apu_write_reg_map: CpuMemApuWriteAccessRegisterMapping = HashMap::new();
+        for write_reg in cpu_ram_apu::WriteAccessRegister::iterator() {
+            apu_write_reg_map.insert(*write_reg as u16, *write_reg);
+        }
+
         CpuRAM {
             memory: [0; 65536],
             ppu_access: ppu_access,
             controller_access: controller_access,
+            apu_access,
             ppu_read_reg_map: ppu_read_reg_map,
             ppu_write_reg_map: ppu_write_reg_map,
             controller_output_ports,
             controller_input_ports,
+            apu_read_reg_map,
+            apu_write_reg_map,
         }
     }
 }
@@ -62,6 +81,12 @@ impl<'a> Memory for CpuRAM<'a> {
                 .get(&addr)
                 .expect("store_byte: missing read register entry");
             self.ppu_access.borrow_mut().read(*reg)
+        } else if self.apu_read_reg_map.contains_key(&addr) {
+            let reg = self
+                .apu_read_reg_map
+                .get(&addr)
+                .expect("store_byte: missing read register entry");
+            self.apu_access.borrow_mut().read(*reg)
         } else if self.controller_input_ports.contains_key(&addr) {
             let port = self
                 .controller_input_ports
@@ -76,6 +101,11 @@ impl<'a> Memory for CpuRAM<'a> {
         } else if self.controller_output_ports.contains_key(&addr) {
             panic!(
                 "Attempting to read from the controller output port {:#X}",
+                addr
+            );
+        } else if self.apu_write_reg_map.contains_key(&addr) {
+            panic!(
+                "Attempting to read from a Apu write access register {:#X}",
                 addr
             );
         } else {
@@ -108,10 +138,17 @@ impl<'a> Memory for CpuRAM<'a> {
                 .get(&addr)
                 .expect("store_byte: missing output port entry");
             self.controller_access.write(*port, byte);
+        } else if self.apu_write_reg_map.contains_key(&addr) {
+            let reg = self
+                .apu_write_reg_map
+                .get(&addr)
+                .expect("store_byte: missing apu write register entry");
+            self.apu_access.borrow_mut().write(*reg, byte);
         } else if self.controller_input_ports.contains_key(&addr) {
-            //panic!("Attempting to write to a an input controller port");
         } else if self.ppu_read_reg_map.contains_key(&addr) {
             panic!("Attempting to write to a read Ppu register");
+        } else if self.apu_read_reg_map.contains_key(&addr) {
+            panic!("Attempting to write to a read Apu register");
         } else {
             self.memory[addr as usize] = byte;
         }
