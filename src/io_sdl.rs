@@ -27,7 +27,7 @@ pub static mut SCREEN  : Screen = [[(255,255,255); DISPLAY_HEIGHT]; DISPLAY_WIDT
 pub static PULSE_1_SAMPLE : AtomicI16 = AtomicI16::new(0);
 
 pub const SAMPLE_RATE : usize = 41000;
-pub const BUFFER_SIZE : usize = 1;
+pub const BUFFER_SIZE : usize = 41000;
 
 pub struct SampleBuffer {
     pub index  : usize,
@@ -54,23 +54,15 @@ pub fn get_key_status(key : Scancode) -> bool {
 
 pub struct IOSdl{
         title       : String,
-        screen_rx   : Receiver<Screen>,
-        keyboard_tx : Sender<KeyEvent>,
-        audio_rx    : Receiver<bool>,
 }       
 
 impl IOSdl
 {
-    pub fn new(title       : String,
-               screen_rx   : Receiver<Screen>, 
-               keyboard_tx : Sender<KeyEvent>, 
-               audio_rx    : Receiver<bool>) -> IOSdl {
+    pub fn new(title       : String) -> IOSdl {
         IOSdl
         {
             title,
-            screen_rx,
-            keyboard_tx,
-            audio_rx,
+        
         } 
     }
     pub fn run(&self)

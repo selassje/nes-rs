@@ -33,7 +33,7 @@ fn read_rom(file_name: &String) -> nes_format_reader::NesFile {
 }
 
 
-fn cpu_thread(nes_file : &nes_format_reader::NesFile, screen_tx: Sender<screen::Screen>, keyboard_rx :Receiver::<keyboard::KeyEvent>, audio_tx: Sender::<bool> )
+fn cpu_thread(nes_file : &nes_format_reader::NesFile)
 {
    let mut mapper = nes_file.create_mapper();
    let controller_1 = keyboard::KeyboardController::get_default_keyboard_controller_player1();
@@ -43,7 +43,7 @@ fn cpu_thread(nes_file : &nes_format_reader::NesFile, screen_tx: Sender<screen::
                                                 
    let ppu = RefCell::new(PPU::new(mapper.get_chr_rom().to_vec(),nes_file.get_mirroring()));
    let apu = RefCell::new(apu::APU::new());
-   let mut cpu = cpu::CPU::new(&mut mapper, &ppu, &apu, screen_tx, &mut controllers, keyboard_rx, audio_tx);
+   let mut cpu = cpu::CPU::new(&mut mapper, &ppu, &apu, &mut controllers);
 
    cpu.run();
 }
@@ -58,13 +58,10 @@ fn main() {
    let filename = &args[1];
    let rom = read_rom(filename);
 
-   let (keyboard_tx, keyboard_rx) : (Sender<keyboard::KeyEvent>, Receiver<keyboard::KeyEvent>) = channel();
-   let (screen_tx,   screen_rx)   : (Sender<screen::Screen>, Receiver<screen::Screen>) = channel();
-   let (audio_tx,   audio_rx)     : (Sender<bool>, Receiver<bool>) = channel();
-   let io =                         io_sdl::IOSdl::new(filename.clone(), screen_rx, keyboard_tx, audio_rx);
+   let io = io_sdl::IOSdl::new(filename.clone());
 
    thread::spawn(move || {
-        cpu_thread(&rom, screen_tx, keyboard_rx, audio_tx);
+        cpu_thread(&rom);
    });
    io.run();
 }

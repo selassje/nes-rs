@@ -91,9 +91,6 @@ pub struct CPU<'a> {
     ram: CpuRAM<'a>,
     ppu: &'a RefCell<PPU>,
     apu: &'a RefCell<APU>,
-    keyboard: Keyboard,
-    keyboard_rx: Receiver<KeyEvent>,
-    audio_tx: Sender<bool>,
     code_segment: (u16, u16),
 }
 
@@ -102,10 +99,7 @@ impl<'a> CPU<'a> {
         mapper: &'a mut Box<dyn Mapper>,
         ppu: &'a RefCell<PPU>,
         apu: &'a RefCell<APU>,
-        screen_tx: Sender<Screen>,
         controller_access : &'a mut dyn ControllerPortsAccess,
-        keyboard_rx: Receiver<KeyEvent>,
-        audio_tx: Sender<bool>,
     ) -> CPU<'a> {
         let mut ram = CpuRAM::new(ppu,controller_access, apu);
         ram.store_bytes(mapper.get_rom_start(), &mapper.get_pgr_rom().to_vec());
@@ -119,9 +113,6 @@ impl<'a> CPU<'a> {
             ram: ram,
             ppu: ppu,
             apu: apu,
-            keyboard: [false; 16],
-            keyboard_rx: keyboard_rx,
-            audio_tx: audio_tx,
             code_segment: (
                 mapper.get_rom_start(),
                 mapper.get_rom_start() - 1 + mapper.get_pgr_rom().len() as u16,
