@@ -2,6 +2,7 @@ use crate::colors::{ColorMapper, DefaultColorMapper, RgbColor};
 use crate::common::Mirroring;
 use crate::cpu_ppu::*;
 use crate::io_sdl::SCREEN;
+use crate::io_sdl::SCREEN2;
 use crate::memory::Memory;
 use crate::screen::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
 use crate::vram::VRAM;
@@ -164,7 +165,7 @@ type Sprites = Vec<Sprite>;
 
 impl Sprite {
     fn get_y(&self) -> u8 {
-        self.data[0] + 1
+        self.data[0]
     }
 
     fn get_x(&self) -> u8 {
@@ -267,6 +268,7 @@ impl PPU {
                 self.render_scanline();
             } else if self.scanline == VBLANK_START_SCANLINE {
                 nmi_triggered = self.control_reg.is_generate_nmi_enabled();
+              
                 self.status_reg
                     .set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
             }
@@ -303,7 +305,11 @@ impl PPU {
                     .set_flag(StatusRegisterFlag::Sprite0Hit, true);
             }
             unsafe {
-                SCREEN[x][self.scanline as usize] = color;
+                let (r,g ,b) =  color;
+                let base_index = (self.scanline as usize  * DISPLAY_WIDTH as usize + x) * 3;
+                SCREEN2[base_index] = r;
+                SCREEN2[base_index + 1] = g;
+                SCREEN2[base_index + 2] = b;
             }
         }
 

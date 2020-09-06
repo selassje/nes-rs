@@ -1,8 +1,3 @@
-pub enum KeyEvent {
-    KeyDown(u8),
-    KeyUp(u8),
-}
-
 use crate::controllers::{Button, Controller};
 use crate::io_sdl::get_key_status;
 use sdl2::keyboard;

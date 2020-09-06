@@ -518,7 +518,7 @@ impl APU {
         let sample = self.pulse_1.get_sample_value();
         unsafe {
             if sample != last_p1_sample {
-                /*
+                
                 println!(
                     "PULSE 1 Sample {} duty {} duty_pos {} period {} length_counter {} halt_counter {} sweep_enabled {} sweep_shift {}, sweep_negate {} sweep_period {}",
                     sample,
@@ -532,11 +532,12 @@ impl APU {
                     self.pulse_1.is_sweep_negate_enabled(),
                     self.pulse_1.get_sweep_period(),
                 );
-*/
+
                 last_p1_sample = sample;
             }
         }
         let mut wait_for_audio = false; 
+        /*
         if self.sample_timer.elapsed().as_nanos() >  NS_PER_SAMPLE
         {
             loop {
@@ -554,6 +555,7 @@ impl APU {
                 //wait_for_audio =  true
             }
         }
+        */
         wait_for_audio
     }
 

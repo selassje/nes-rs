@@ -1,18 +1,15 @@
 use crate::common::*;
 use crate::cpu_ram::CpuRAM;
-use crate::keyboard::KeyEvent;
 use crate::mapper::Mapper;
 use crate::memory::Memory;
 use crate::ppu::*;
-use crate::cpu_ram_apu::{ApuRegisterAccess};
 use crate::apu::{APU};
-use crate::screen::Screen;
 use crate::cpu_controllers::{ControllerPortsAccess};
 
 use spin_sleep::SpinSleeper;
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::fmt::{Display, Formatter, Result};
-use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 
 
@@ -81,7 +78,7 @@ enum ProcessorFlag {
     NegativeFlag = 0b01000000,
 }
 
-pub struct CPU<'a> {
+pub struct CPU<'a>{
     pc: u16,
     sp: u8,
     ps: u8,
@@ -90,24 +87,19 @@ pub struct CPU<'a> {
     y: u8,
     ram: CpuRAM<'a>,
     ppu: &'a RefCell<PPU>,
-    apu: &'a RefCell<APU>,
-    keyboard: Keyboard,
-    keyboard_rx: Receiver<KeyEvent>,
-    audio_tx: Sender<bool>,
+    apu: Rc<RefCell<APU>>,
     code_segment: (u16, u16),
 }
 
 impl<'a> CPU<'a> {
     pub fn new(
-        mapper: &'a mut Box<dyn Mapper>,
+        mapper: Box<dyn Mapper>,
         ppu: &'a RefCell<PPU>,
-        apu: &'a RefCell<APU>,
-        screen_tx: Sender<Screen>,
-        controller_access : &'a mut dyn ControllerPortsAccess,
-        keyboard_rx: Receiver<KeyEvent>,
-        audio_tx: Sender<bool>,
+        apu: Rc<RefCell<APU>>,
+        controller_access : Rc<RefCell<dyn ControllerPortsAccess>>
+
     ) -> CPU<'a> {
-        let mut ram = CpuRAM::new(ppu,controller_access, apu);
+        let mut ram = CpuRAM::new(ppu, controller_access, apu.clone());
         ram.store_bytes(mapper.get_rom_start(), &mapper.get_pgr_rom().to_vec());
         CPU {
             pc: ram.get_2_bytes_as_u16(0xFFFC),
@@ -119,9 +111,6 @@ impl<'a> CPU<'a> {
             ram: ram,
             ppu: ppu,
             apu: apu,
-            keyboard: [false; 16],
-            keyboard_rx: keyboard_rx,
-            audio_tx: audio_tx,
             code_segment: (
                 mapper.get_rom_start(),
                 mapper.get_rom_start() - 1 + mapper.get_pgr_rom().len() as u16,
@@ -179,6 +168,57 @@ impl<'a> CPU<'a> {
         self.ram.get_2_bytes_as_u16(addr)
     }
 
+    pub fn run_next_instruction(&mut self) -> Option<bool> {
+        let (code_segment_start, code_segment_end) = self.code_segment;
+        let sleeper = SpinSleeper::default();
+        if  self.pc >= code_segment_start && self.pc <= code_segment_end
+        {
+            let now = Instant::now();
+
+            let op = self.ram.get_byte(self.pc);
+            let mut b0 = 0;
+            let mut b1 = 0;
+            if self.pc + 1 <= code_segment_end {
+                b0 = self.ram.get_byte(self.pc + 1);
+            }
+            if self.pc + 2 <= code_segment_end {
+                b1 = self.ram.get_byte(self.pc + 2);
+            }
+            let (bytes, mut cycles) = self.execute_instruction(op, b0, b1);
+            self.pc += bytes as u16;
+            let nmi =  self.ppu.borrow_mut().process_cpu_cycles(cycles);
+            if nmi {
+                  cycles += self.nmi();
+            }
+           // self.apu.borrow_mut().process_cpu_cycles(cycles);
+            const frame_time  : u128 = Duration::from_nanos(341 * NANOS_PER_CPU_CYCLE as u64  * 260).as_millis();
+            let elapsed_time_ns = now.elapsed().as_nanos();
+            let required_time_ns = ((cycles as u128) * NANOS_PER_CPU_CYCLE * 3) / 3;
+            //println!("Instruction took {} ns thread {:?} expected {} frametime {}",elapsed_time_ns, std::thread::current(),required_time_ns, frame_time);
+            if required_time_ns > elapsed_time_ns {
+                let dur = Duration::from_nanos((required_time_ns - elapsed_time_ns) as u64);
+              //  sleeper.sleep(dur);
+            }
+            Some(nmi)
+        } else {
+            None
+        }
+    }
+
+    pub fn run2(&mut self) {
+        let (code_segment_start, code_segment_end) = self.code_segment;
+        let sleeper = SpinSleeper::default();
+        while self.pc >= code_segment_start && self.pc <= code_segment_end {
+            let now = Instant::now();
+            let cycles = self.run_next_instruction().unwrap();
+            let elapsed_time_ns = now.elapsed().as_nanos();
+            let required_time_ns = ((cycles as u128) * NANOS_PER_CPU_CYCLE * 3) / 3;
+            if required_time_ns > elapsed_time_ns {
+                let dur = Duration::from_nanos((required_time_ns - elapsed_time_ns) as u64);
+               // sleeper.sleep(dur);
+            }
+        }
+    }
     pub fn run(&mut self) {
         let (code_segment_start, code_segment_end) = self.code_segment;
 
