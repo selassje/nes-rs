@@ -2,7 +2,6 @@ use std::thread;
 use std::fs::{File};
 use std::env;
 use std::io::prelude::*;
-use std::sync::mpsc::{Sender, Receiver, channel};
 use crate::ppu::*;
 use std::cell::RefCell;
 
@@ -18,7 +17,6 @@ mod screen;
 mod common;
 mod io_sdl;
 mod keyboard;
-mod audio;
 mod nes_format_reader;
 mod mapper;
 mod vram;

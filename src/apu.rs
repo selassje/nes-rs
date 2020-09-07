@@ -3,14 +3,17 @@ use crate::cpu_ram_apu::*;
 use std::default::Default;
 use std::time::{Duration, Instant};
 
-use crate::io_sdl::{SAMPLE_RATE, SAMPLE_BUFFER, SampleFormat, BUFFER_SIZE};
+use crate::io_sdl::{SampleFormat, BUFFER_SIZE, SAMPLE_BUFFER, SAMPLE_RATE};
 
-const NS_PER_SAMPLE : u128 = Duration::from_secs(1).as_nanos() / SAMPLE_RATE as u128;
+const NS_PER_SAMPLE: u128 = Duration::from_secs(1).as_nanos() / SAMPLE_RATE as u128;
+const CPU_CYCLES_PER_SECOND : u128 =  Duration::from_secs(1).as_nanos() / 559;
+const CPU_CYCLES_PER_SAMPLE : u128 =  CPU_CYCLES_PER_SECOND / SAMPLE_RATE as u128;
 
 const LENGTH_COUNTER_LOOKUP_TABLE: [u8; 32] = [
     10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 2, 16, 24, 18, 48, 20, 96, 22,
     192, 24, 72, 26, 16, 28, 32, 30,
 ];
+
 
 const DUTY_CYCLE_SEQUENCES: [[SampleFormat; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1],
@@ -151,12 +154,7 @@ impl SweepUnit {
     }
 
     fn update_muting_status(&mut self, target_period: u16, current_period: u16) {
-        let current_muting = self.is_muting;
         self.is_muting = target_period > 0x7FF || current_period < 8;
-        if self.is_muting != current_muting {
-      //      println!("Muting is now {} target {} current {}",self.is_muting, target_period, current_period);
-        }
-
     }
 
     fn clock(&mut self, sweep_enabled: bool, sweep_period: u8) -> bool {
@@ -233,10 +231,10 @@ impl PulseWave {
         self.data[2] as u16 + timer_hi
     }
 
-    fn reset(&mut self) {   
+    fn reset(&mut self) {
         self.sequencer_position = 0;
         self.current_period = self.get_raw_timer_period();
-        //self.timer_tick = self.get_raw_timer_period();
+        self.timer_tick = self.get_raw_timer_period();
         self.envelope.start_flag = true;
         self.sweep_unit.reload_flag = true;
     }
@@ -245,14 +243,16 @@ impl PulseWave {
         let total_elapsed_cycles = elapsed_cpu_cycles + self.left_over_cpu_cycles as u16;
         self.left_over_cpu_cycles = (total_elapsed_cycles % 2) as u8;
         let number_of_elapsed_ticks = (total_elapsed_cycles / 2) as u16;
-        if number_of_elapsed_ticks as u16 > self.timer_tick {
-            self.timer_tick = self.current_period - number_of_elapsed_ticks + 1;
+        if number_of_elapsed_ticks as u16 > self.timer_tick && self.current_period != 0 {
+           // println!("current_period {} number_of_elapsed_ticks {}",self.current_period, number_of_elapsed_ticks);
+            self.timer_tick = self.current_period + 1 - number_of_elapsed_ticks;
+          
             if self.sequencer_position > 0 {
                 self.sequencer_position -= 1;
             } else {
                 self.sequencer_position = 7;
             }
-        } else {
+        } else if  self.timer_tick >= number_of_elapsed_ticks {
             self.timer_tick -= number_of_elapsed_ticks;
         }
     }
@@ -260,10 +260,10 @@ impl PulseWave {
     fn get_volume(&self) -> u8 {
         //return 15;
         if self.length_counter == 0 {
-           if self.sweep_unit.is_muting {
-               // println!("muted by the sweep");
-           }
-           0
+            if self.sweep_unit.is_muting {
+                // println!("muted by the sweep");
+            }
+            0
         } else if self.is_constant_volume_set() {
             self.get_constant_volume_or_envelope_divider_reload_value()
         } else {
@@ -388,7 +388,6 @@ impl Noise {
     fn clock_envelope(&self) {}
 
     fn clock_length_counter_and_sweep_unit(&mut self) {
-
         if self.length_counter > 0 && !self.is_length_counter_halt_set() {
             self.length_counter -= 1;
         }
@@ -445,9 +444,12 @@ pub struct APU {
     noise: Noise,
     dmc: DMC,
     cpu_cycles: u16,
+    cpu_cycles_sample : u16,
     frame_interrupt: bool,
     dmc_interrupt: bool,
-    sample_timer : Instant,
+    sample_timer: Instant,
+    t_inc: f32,
+    t_phase: f32,
 }
 
 impl APU {
@@ -461,9 +463,12 @@ impl APU {
             noise: Noise::default(),
             dmc: DMC::default(),
             cpu_cycles: 0,
+            cpu_cycles_sample : 0,
             frame_interrupt: false,
             dmc_interrupt: false,
-            sample_timer : Instant::now()
+            sample_timer: Instant::now(),
+            t_inc: 440.0 / SAMPLE_RATE as f32,
+            t_phase: 0.0,
         }
     }
 
@@ -481,8 +486,7 @@ impl APU {
         self.noise.clock_envelope();
     }
 
-
-    pub fn process_cpu_cycles(&mut self, cpu_cycles: u8) -> bool {
+    pub fn process_cpu_cycles(&mut self, cpu_cycles: u8) {
         static mut last_p1_sample: SampleFormat = 0;
 
         let elapsed_cpu_cycles = cpu_cycles as u16;
@@ -512,57 +516,65 @@ impl APU {
             self.cpu_cycles = (self.cpu_cycles + elapsed_cpu_cycles)
                 % FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES;
         }
-        if self.pulse_1.get_sample_value() != 0 {
-            // println!("PULSE 1 Sample {}", self.pulse_1.get_sample_value());
-        }
-        let sample = self.pulse_1.get_sample_value();
+        let mut sample = Self::get_mixer_output(self.pulse_1.get_sample_value(),0,0,0,0);
         unsafe {
             if sample != last_p1_sample {
                 /*
-                println!(
-                    "PULSE 1 Sample {} duty {} duty_pos {} period {} length_counter {} halt_counter {} sweep_enabled {} sweep_shift {}, sweep_negate {} sweep_period {}",
-                    sample,
-                    self.pulse_1.get_duty_cycle(),
-                    self.pulse_1.sequencer_position,
-                    self.pulse_1.current_period,
-                    self.pulse_1.length_counter,
-                    self.pulse_1.is_length_counter_halt_envelope_loop_flag_set(),
-                    self.pulse_1.is_sweep_unit_enabled(),
-                    self.pulse_1.get_sweep_shift(),
-                    self.pulse_1.is_sweep_negate_enabled(),
-                    self.pulse_1.get_sweep_period(),
-                );
-*/
+                                println!(
+                                    "PULSE 1 Sample {} duty {} duty_pos {} period {} length_counter {} halt_counter {} sweep_enabled {} sweep_shift {}, sweep_negate {} sweep_period {}",
+                                    sample,
+                                    self.pulse_1.get_duty_cycle(),
+                                    self.pulse_1.sequencer_position,
+                                    self.pulse_1.current_period,
+                                    self.pulse_1.length_counter,
+                                    self.pulse_1.is_length_counter_halt_envelope_loop_flag_set(),
+                                    self.pulse_1.is_sweep_unit_enabled(),
+                                    self.pulse_1.get_sweep_shift(),
+                                    self.pulse_1.is_sweep_negate_enabled(),
+                                    self.pulse_1.get_sweep_period(),
+                                );
+                */
                 last_p1_sample = sample;
             }
         }
-        let mut wait_for_audio = false; 
-        if self.sample_timer.elapsed().as_nanos() >  NS_PER_SAMPLE
-        {
+
+        if self.cpu_cycles_sample + elapsed_cpu_cycles >= CPU_CYCLES_PER_SAMPLE as u16 {
             loop {
-                if  SAMPLE_BUFFER.lock().unwrap().index != BUFFER_SIZE {
+                if SAMPLE_BUFFER.lock().unwrap().index != BUFFER_SIZE {
                     break;
                 }
             }
+            if false {
+                if self.t_phase >= 0.0 && self.t_phase < 0.5 {
+                    sample = 15;
+                } else {
+                    sample = 0;
+                }
+            }
+            self.t_phase = (self.t_phase + self.t_inc) % 1.0;
+
             let mut sample_buffer = SAMPLE_BUFFER.lock().unwrap();
             let index = sample_buffer.index;
-            sample_buffer.buffer[index] = Self::get_mixer_output(self.pulse_1.get_sample_value(),0,0,0,0);
-
+            sample_buffer.buffer[index] = sample;
             sample_buffer.index += 1;
             self.sample_timer = Instant::now();
-            if sample_buffer.index == BUFFER_SIZE {
-                //wait_for_audio =  true
-            }
+   
         }
-        wait_for_audio
+        self.cpu_cycles_sample =  (self.cpu_cycles_sample + elapsed_cpu_cycles )  % CPU_CYCLES_PER_SAMPLE as u16; 
     }
 
-    fn get_mixer_output(pulse_1 : u8, pulse_2 : u8, triangle : u8, noise : u8, dmc : u8) -> SampleFormat {
+    fn get_mixer_output(
+        pulse_1: u8,
+        pulse_2: u8,
+        triangle: u8,
+        noise: u8,
+        dmc: u8,
+    ) -> SampleFormat {
         let mut n = (pulse_1 + pulse_2) as f32;
         let puls_out = 95.52 / (8128.0 / n + 100.0);
         n = (3 * triangle + 2 * noise + dmc) as f32;
         let tnd_out = 163.67 / (24329.0 / n + 100.0);
-        ((puls_out + tnd_out) * 100.0) as SampleFormat 
+        ((puls_out + tnd_out) * 100.0) as SampleFormat
     }
 
     fn is_half_frame_reached(&self, elapsed_cpu_cycles: u16) -> bool {
@@ -614,7 +626,10 @@ impl WriteAcessRegisters for APU {
             WriteAccessRegister::Pulse1_2 => self.pulse_1.data[2] = value,
             WriteAccessRegister::Pulse1_3 => {
                 self.pulse_1.data[3] = value;
-                if self.status.is_flag_enabled(StatusRegisterFlag::Pulse1Enabled) {
+                if self
+                    .status
+                    .is_flag_enabled(StatusRegisterFlag::Pulse1Enabled)
+                {
                     reload_length_counter(&mut self.pulse_1);
                 }
                 self.pulse_1.reset();
@@ -629,7 +644,6 @@ impl WriteAcessRegisters for APU {
             WriteAccessRegister::Pulse2_3 => {
                 self.pulse_2.data[3] = value;
                 self.pulse_2.reset();
-                // println!("P2 Timer {} t1 {:#X} t2 {:#X} ",self.pulse_2.get_timer(),self.pulse_2.data[2], self.pulse_2.data[3])
             }
 
             WriteAccessRegister::Triangle0 => self.triangle.data[0] = value,
@@ -649,12 +663,10 @@ impl WriteAcessRegisters for APU {
 
             WriteAccessRegister::Status => {
                 self.status.data = value;
-               
                 if !self
                     .status
                     .is_flag_enabled(StatusRegisterFlag::Pulse1Enabled)
                 {
-                    //println!("Resetting pulse1 length counter");
                     reset_length_counter(&mut self.pulse_1);
                 }
                 if !self
@@ -679,12 +691,11 @@ impl WriteAcessRegisters for APU {
                 }
                 self.frame_interrupt = false;
             }
-            WriteAccessRegister::FrameCounter =>  {
+            WriteAccessRegister::FrameCounter => {
                 self.frame_counter.data = value;
                 self.cpu_cycles = 0;
                 self.perform_half_frame_update();
                 self.perform_quarter_frame_update();
-                //println!("frame sequencer mode {}",self.frame_counter.get_sequencer_mode());
             }
         }
     }

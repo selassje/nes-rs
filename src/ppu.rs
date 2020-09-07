@@ -120,6 +120,7 @@ struct Tile {
 
 impl Tile {
     fn get_color_index(&self, x: usize, y: usize) -> usize {
+        assert!(y < 8);
         let shift = 7 - x;
         let mask = 1 << shift;
         let lo_bit = (mask & self.data[y]) >> shift;
@@ -164,7 +165,7 @@ type Sprites = Vec<Sprite>;
 
 impl Sprite {
     fn get_y(&self) -> u8 {
-        self.data[0] + 1
+        ((self.data[0] as u16 ) % 256) as u8
     }
 
     fn get_x(&self) -> u8 {
@@ -173,7 +174,7 @@ impl Sprite {
 
     fn get_tile_index(&self, is_8x16_mode: bool) -> u8 {
         if is_8x16_mode {
-            self.data[1] >> 1
+            self.data[1]
         } else {
             self.data[1]
         }
@@ -390,6 +391,10 @@ impl PPU {
                     };
                     let pattern_table = &self.pattern_tables[pattern_table_index as usize];
                     let mut tile_index = sprite.get_tile_index(is_sprite_mode_8x16);
+                    if y > sprite.get_y() + 7 {
+                        tile_index += 1;
+                    }   
+
                     if is_sprite_mode_8x16 {
                         if sprite.if_flip_vertically() {
                             if y <= sprite.get_y() + 7 {
@@ -400,13 +405,14 @@ impl PPU {
                         }
                     }
                     let mut x = x - sprite.get_x();
-                    let mut y = y - sprite.get_y();
+                    let mut y = (y - sprite.get_y()) % 8;
                     if sprite.if_flip_horizontally() {
                         x = 7 - x;
                     }
                     if sprite.if_flip_vertically() {
                         y = 7 - y;
                     }
+                  
                     let tile = pattern_table.tiles[tile_index as usize];
                     let color_index = tile.get_color_index(x as usize, y as usize);
                     if color_index != 0 {

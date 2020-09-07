@@ -1,18 +1,14 @@
 use crate::common::*;
 use crate::cpu_ram::CpuRAM;
-use crate::keyboard::KeyEvent;
 use crate::mapper::Mapper;
 use crate::memory::Memory;
 use crate::ppu::*;
-use crate::cpu_ram_apu::{ApuRegisterAccess};
 use crate::apu::{APU};
-use crate::screen::Screen;
 use crate::cpu_controllers::{ControllerPortsAccess};
 
 use spin_sleep::SpinSleeper;
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter, Result};
-use std::sync::mpsc::{Receiver, Sender};
 use std::time::{Duration, Instant};
 
 
@@ -31,7 +27,6 @@ macro_rules! debug_instruction {
     };
 }
 
-type Keyboard = [bool; 16];
 
 #[derive(Copy, Clone, Debug)]
 enum AddressingMode {
@@ -172,18 +167,8 @@ impl<'a> CPU<'a> {
 
     pub fn run(&mut self) {
         let (code_segment_start, code_segment_end) = self.code_segment;
-
-        println!(
-            "PC int location {:#X} ROM Start {:#X}  ROM End {:#X}",
-            self.pc, code_segment_start, code_segment_end
-        );
-        let sleeper = SpinSleeper::default();
-        let mut loops : u128 = 0;
-        let wait_1s = Instant::now();
         while self.pc >= code_segment_start && self.pc <= code_segment_end {
             let now = Instant::now();
-            //println!("Loops {}",loops);
-            loops+=1;
             let op = self.ram.get_byte(self.pc);
             let mut b0 = 0;
             let mut b1 = 0;
@@ -193,7 +178,7 @@ impl<'a> CPU<'a> {
             if self.pc + 2 <= code_segment_end {
                 b1 = self.ram.get_byte(self.pc + 2);
             }
-            //println!("{:X} ${:X}  op0 {:X}  op1 {:X} X={:X} Y={:X} SP={:X}",self.pc, op, b0,b1,self.x, self.y,self.sp);
+            //println!("{:X} ${:X}  op0 {:X}  op1 {:X} X={:X} Y={:X} A={:X} SP={:X} 14={:X}",self.pc, op, b0,b1,self.x, self.y, self.a,self.sp, self.ram.get_byte(0x14));
             let (bytes, cycles) = self.execute_instruction(op, b0, b1);
             self.pc += bytes as u16;
             //println!("Executed instruction {:#0x} bytes {} cycles {} pc {:X}  op2 {:#X} {:#x}",op, bytes, cycles, self.pc, self.ram.get_byte(0xC7BE),self.ram.get_2_bytes_as_u16(0x00));
@@ -202,24 +187,16 @@ impl<'a> CPU<'a> {
             if self.ppu.borrow_mut().process_cpu_cycles(cycles) {
                 cycles += self.nmi();
             }
-            let wait_for_audio =  self.apu.borrow_mut().process_cpu_cycles(cycles);
 
-            if wait_1s.elapsed().as_secs() > 1 {
-               // panic!("After 1s {} samples were produced",loops);
-            }
+            self.apu.borrow_mut().process_cpu_cycles(cycles);
+
 
             let elapsed_time_ns = now.elapsed().as_nanos();
-            let required_time_ns = ((cycles as u128) * NANOS_PER_CPU_CYCLE * 3) / 3;
+            let required_time_ns = ((cycles as u128) * NANOS_PER_CPU_CYCLE * 2) / 4;
             if required_time_ns > elapsed_time_ns {
-                let dur = Duration::from_nanos((required_time_ns - elapsed_time_ns) as u64);
-                sleeper.sleep(dur);
+               // let dur = Duration::from_nanos((required_time_ns - elapsed_time_ns) as u64);
+               //  sleeper.sleep(dur);
             }
-
-            if wait_for_audio {
-                // sleeper.sleep(Duration::from_millis(200));
-        }
-
-
         }
         println!("CPU Stopped execution")
     }
@@ -264,6 +241,8 @@ impl<'a> CPU<'a> {
 
             0x18 => (1, 2 + self.clc(b0, b1, AddressingMode::Implicit)),
             0xD8 => (1, 2 + self.cld(b0, b1, AddressingMode::Implicit)),
+            0x58 => (1, 2 + self.cli(b0, b1, AddressingMode::Implicit)),
+            0xB8 => (1, 2 + self.clv(b0, b1, AddressingMode::Implicit)),
 
             0xC9 => (2, 2 + self.cmp(b0, b1, AddressingMode::Immediate)),
             0xC5 => (2, 3 + self.cmp(b0, b1, AddressingMode::ZeroPage)),
@@ -338,6 +317,8 @@ impl<'a> CPU<'a> {
             0x56 => (2, 6 + self.lsr(b0, b1, AddressingMode::ZeroPageX)),
             0x4E => (3, 6 + self.lsr(b0, b1, AddressingMode::Absolute)),
             0x5E => (3, 7 + self.lsr(b0, b1, AddressingMode::AbsoluteX)),
+
+            0xEA => (1, 2 + self.nop(b0, b1, AddressingMode::Implicit)),
 
             0x09 => (2, 2 + self.ora(b0, b1, AddressingMode::Immediate)),
             0x05 => (2, 3 + self.ora(b0, b1, AddressingMode::ZeroPage)),
@@ -452,14 +433,17 @@ impl<'a> CPU<'a> {
                 (Address::RAM(indirect_indexed), add_cycles)
             }
             AddressingMode::Relative => {
-                //println!("Relative adressing signed offset {}", b0 as i8 as i16 );
                 let new_pc = (self.pc as i16 + (b0 as i8 as i16)) as u16;
                 if new_pc & 0xFF00 != self.pc & 0xFF00 {
                     add_cycles = 1
                 }
                 (Address::Relative(new_pc), add_cycles)
             }
-            _ => panic!("Invalid addresing mode {}", mode as u8),
+            AddressingMode::Indirect => {
+                let absolute = b0_u16 + (b1_u16 << 8);
+                let indirect = self.ram.get_2_bytes_as_u16(absolute);
+                (Address::RAM(indirect),0 )
+            }
         }
     }
 
@@ -606,16 +590,20 @@ impl<'a> CPU<'a> {
         cycles
     }
 
+    fn nop(&mut self, _b0: u8, _b1: u8, _mode: AddressingMode) -> u8 {
+        0
+    }
+
     fn jsr(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
         let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
-        self.push_u16(self.pc + 3);
+        self.push_u16(self.pc + 2);
         self.pc = self.get_ram_address(&m_address) - 3;
         cycles
     }
 
     fn rts(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
         let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
-        self.pc = self.pop_u16() - 1;
+        self.pc = self.pop_u16();
         cycles
     }
 
@@ -643,6 +631,18 @@ impl<'a> CPU<'a> {
         let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
         self.reset_flag(ProcessorFlag::DecimalMode);
         //println!("cld");
+        cycles
+    }
+
+    fn cli(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        self.reset_flag(ProcessorFlag::InterruptDisable);
+        cycles
+    }
+
+    fn clv(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        self.reset_flag(ProcessorFlag::OverflowFlag);
         cycles
     }
 

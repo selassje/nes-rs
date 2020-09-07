@@ -1,4 +1,3 @@
-use self::ReadAccessRegister::*;
 use self::WriteAccessRegister::*;
 use std::slice::Iter;
 
