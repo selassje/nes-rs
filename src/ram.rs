@@ -1,23 +1,25 @@
 use crate::common;
-use crate::cpu_controllers::*;
-use crate::cpu_ppu::*;
-use crate::cpu_ram_apu;
-use crate::memory::*;
+use crate::ram_apu;
+use crate::ram_controllers::*;
+use crate::ram_ppu::*;
+use crate::{mapper::Mapper, memory::*};
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 type CpuMemPpuWriteAccessRegisterMapping = HashMap<u16, WriteAccessRegister>;
 type CpuMemPpuReadAccessRegisterMapping = HashMap<u16, ReadAccessRegister>;
 type CpuMemControllerOutputPortsMapping = HashMap<u16, OutputPort>;
 type CpuMemControllerInputPortsMapping = HashMap<u16, InputPort>;
-type CpuMemApuWriteAccessRegisterMapping = HashMap<u16, cpu_ram_apu::WriteAccessRegister>;
-type CpuMemApuReadAccessRegisterMapping = HashMap<u16, cpu_ram_apu::ReadAccessRegister>;
+type CpuMemApuWriteAccessRegisterMapping = HashMap<u16, ram_apu::WriteAccessRegister>;
+type CpuMemApuReadAccessRegisterMapping = HashMap<u16, ram_apu::ReadAccessRegister>;
 
-pub struct CpuRAM<'a> {
+pub struct RAM {
     memory: [u8; 65536],
-    ppu_access: &'a RefCell<dyn PpuRegisterAccess>,
-    controller_access: &'a mut dyn ControllerPortsAccess,
-    apu_access: &'a RefCell<dyn cpu_ram_apu::ApuRegisterAccess>,
+    mapper: Option<Box<dyn Mapper>>,
+    ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>,
+    controller_access: Rc<RefCell<dyn ControllerPortsAccess>>,
+    apu_access: Rc<RefCell<dyn ram_apu::ApuRegisterAccess>>,
     ppu_read_reg_map: CpuMemPpuReadAccessRegisterMapping,
     ppu_write_reg_map: CpuMemPpuWriteAccessRegisterMapping,
     controller_output_ports: CpuMemControllerOutputPortsMapping,
@@ -26,12 +28,12 @@ pub struct CpuRAM<'a> {
     apu_write_reg_map: CpuMemApuWriteAccessRegisterMapping,
 }
 
-impl<'a> CpuRAM<'a> {
+impl RAM {
     pub fn new(
-        ppu_access: &'a RefCell<dyn PpuRegisterAccess>,
-        controller_access: &'a mut dyn ControllerPortsAccess,
-        apu_access: &'a RefCell<dyn cpu_ram_apu::ApuRegisterAccess>,
-    ) -> CpuRAM<'a> {
+        ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>,
+        controller_access: Rc<RefCell<dyn ControllerPortsAccess>>,
+        apu_access: Rc<RefCell<dyn ram_apu::ApuRegisterAccess>>,
+    ) -> RAM {
         let mut ppu_read_reg_map: CpuMemPpuReadAccessRegisterMapping = HashMap::new();
         for read_reg in ReadAccessRegister::iterator() {
             ppu_read_reg_map.insert(*read_reg as u16, *read_reg);
@@ -50,19 +52,20 @@ impl<'a> CpuRAM<'a> {
         }
 
         let mut apu_read_reg_map: CpuMemApuReadAccessRegisterMapping = HashMap::new();
-        for read_reg in cpu_ram_apu::ReadAccessRegister::iterator() {
+        for read_reg in ram_apu::ReadAccessRegister::iterator() {
             apu_read_reg_map.insert(*read_reg as u16, *read_reg);
         }
         let mut apu_write_reg_map: CpuMemApuWriteAccessRegisterMapping = HashMap::new();
-        for write_reg in cpu_ram_apu::WriteAccessRegister::iterator() {
+        for write_reg in ram_apu::WriteAccessRegister::iterator() {
             apu_write_reg_map.insert(*write_reg as u16, *write_reg);
         }
 
-        CpuRAM {
+        RAM {
             memory: [0; 65536],
+            mapper: None,
             ppu_access: ppu_access,
             controller_access: controller_access,
-            apu_access,
+            apu_access: apu_access,
             ppu_read_reg_map: ppu_read_reg_map,
             ppu_write_reg_map: ppu_write_reg_map,
             controller_output_ports,
@@ -71,9 +74,15 @@ impl<'a> CpuRAM<'a> {
             apu_write_reg_map,
         }
     }
+
+    pub fn load_mapper(&mut self, mapper: Box<dyn Mapper>) {
+        self.memory.iter_mut().for_each(|m| *m = 0);
+        self.store_bytes(mapper.get_rom_start(), &mapper.get_pgr_rom().to_vec());
+        self.mapper = Some(mapper);
+    }
 }
 
-impl<'a> Memory for CpuRAM<'a> {
+impl Memory for RAM {
     fn get_byte(&self, addr: u16) -> u8 {
         if self.ppu_read_reg_map.contains_key(&addr) {
             let reg = self
@@ -92,7 +101,7 @@ impl<'a> Memory for CpuRAM<'a> {
                 .controller_input_ports
                 .get(&addr)
                 .expect("store_byte: missing input port entry");
-            self.controller_access.read(*port)
+            self.controller_access.borrow_mut().read(*port)
         } else if self.ppu_write_reg_map.contains_key(&addr) {
             panic!(
                 "Attempting to read from a Ppu write access register {:#X}",
@@ -113,7 +122,7 @@ impl<'a> Memory for CpuRAM<'a> {
         }
     }
 
-    fn get_2_bytes_as_u16(&self, addr: u16) -> u16 {
+    fn get_word(&self, addr: u16) -> u16 {
         common::convert_2u8_to_u16(self.memory[addr as usize], self.memory[addr as usize + 1])
     }
 
@@ -137,7 +146,7 @@ impl<'a> Memory for CpuRAM<'a> {
                 .controller_output_ports
                 .get(&addr)
                 .expect("store_byte: missing output port entry");
-            self.controller_access.write(*port, byte);
+            self.controller_access.borrow_mut().write(*port, byte);
         } else if self.apu_write_reg_map.contains_key(&addr) {
             let reg = self
                 .apu_write_reg_map
@@ -160,8 +169,21 @@ impl<'a> Memory for CpuRAM<'a> {
         }
     }
 
-    fn store_2_bytes_as_u16(&mut self, addr: u16, bytes: u16) {
+    fn store_word(&mut self, addr: u16, bytes: u16) {
         self.memory[addr as usize] = (bytes & 0x00FF) as u8;
         self.memory[addr as usize + 1] = ((bytes & 0xFF00) >> 8) as u8;
+    }
+}
+
+impl CpuMemory for RAM {
+    fn get_code_segment(&self) -> (u16, u16) {
+        if let Some(ref mapper) = self.mapper {
+            return (
+                mapper.get_rom_start(),
+                mapper.get_rom_start() - 1 + mapper.get_pgr_rom().len() as u16,
+            );
+        } else {
+            (0, 0)
+        }
     }
 }

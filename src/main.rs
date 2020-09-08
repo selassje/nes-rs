@@ -2,16 +2,14 @@ use std::thread;
 use std::fs::{File};
 use std::env;
 use std::io::prelude::*;
-use crate::ppu::*;
-use std::cell::RefCell;
 
 mod memory;
-mod cpu_ppu;
-mod cpu_controllers;
+mod ram_ppu;
+mod ram_controllers;
 mod cpu;
 mod ppu;
 mod apu;
-mod cpu_ram_apu;
+mod ram_apu;
 mod controllers;
 mod screen;
 mod common;
@@ -20,8 +18,9 @@ mod keyboard;
 mod nes_format_reader;
 mod mapper;
 mod vram;
-mod cpu_ram;
+mod ram;
 mod colors;
+mod nes;
 
 fn read_rom(file_name: &String) -> nes_format_reader::NesFile {
     let mut rom = Vec::new();
@@ -31,27 +30,14 @@ fn read_rom(file_name: &String) -> nes_format_reader::NesFile {
 }
 
 
-fn cpu_thread(nes_file : &nes_format_reader::NesFile)
+fn nes_thread(nes_file : &nes_format_reader::NesFile)
 {
-   let mut mapper = nes_file.create_mapper();
-   let controller_1 = keyboard::KeyboardController::get_default_keyboard_controller_player1();
-   let controller_2 = keyboard::KeyboardController::get_default_keyboard_controller_player2();
-
-   let mut controllers = controllers::Controllers::new(Box::new(controller_1), Box::new(controller_2));
-                                                
-   let ppu = RefCell::new(PPU::new(mapper.get_chr_rom().to_vec(),nes_file.get_mirroring()));
-   let apu = RefCell::new(apu::APU::new());
-   let mut cpu = cpu::CPU::new(&mut mapper, &ppu, &apu, &mut controllers);
-
-   cpu.run();
+   let mut nes = nes::Nes::new();
+   nes.load(nes_file);
+   nes.run();
 }
 
 fn main() {
-
-   let u1 : i8 = (80u16 + 80u16) as i8;
-   
-   println!("{}", u1);
-
    let args: Vec<String> = env::args().collect();
    let filename = &args[1];
    let rom = read_rom(filename);
@@ -59,7 +45,7 @@ fn main() {
    let io = io_sdl::IOSdl::new(filename.clone());
 
    thread::spawn(move || {
-        cpu_thread(&rom);
+      nes_thread(&rom);
    });
    io.run();
 }

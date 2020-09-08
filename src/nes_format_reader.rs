@@ -95,7 +95,7 @@ impl NesFile {
 
         println!("CHROM in NES File : first byte {:X}",chr_rom[1]);
         match self.mapper_number {
-            0 => Box::new(Mapper0::new(prg_rom, chr_rom)),
+            0 => Box::new(Mapper0::new(prg_rom, chr_rom, self.mirroring)),
             _ => panic!("Unsupported mapper {}", self.mapper_number),
         }
     }

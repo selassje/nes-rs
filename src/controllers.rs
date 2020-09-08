@@ -1,5 +1,5 @@
 use self::Button::*;
-use crate::cpu_controllers::*;
+use crate::ram_controllers::*;
 use std::cell::Cell;
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]

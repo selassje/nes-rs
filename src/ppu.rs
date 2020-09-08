@@ -1,12 +1,11 @@
 use crate::colors::{ColorMapper, DefaultColorMapper, RgbColor};
-use crate::common::Mirroring;
-use crate::cpu_ppu::*;
+use crate::ram_ppu::*;
 use crate::io_sdl::SCREEN;
-use crate::memory::Memory;
-use crate::screen::{DISPLAY_HEIGHT, DISPLAY_WIDTH};
-use crate::vram::VRAM;
+use crate::memory::VideoMemory;
+use crate::screen::DISPLAY_WIDTH;
 
-use std::default::Default;
+
+use std::{cell::RefCell, default::Default, rc::Rc};
 
 enum ControlRegisterFlag {
     BaseNametableAddress = 0b00000011,
@@ -107,10 +106,11 @@ impl StatusRegister {
     }
 }
 
+#[derive(Copy, Clone, Default)]
 struct ScrollRegister {
     x: u8,
     y: u8,
-    next_read_is_x: bool,
+    next_read_is_y: bool,
 }
 
 #[derive(Copy, Clone, Default)]
@@ -142,7 +142,7 @@ impl Default for PatternTable {
 }
 
 impl PatternTable {
-    fn new(vram: &VRAM, table_index: u8) -> Self {
+    fn new(vram: &dyn VideoMemory, table_index: u8) -> Self {
         let mut pattern_table: PatternTable = Default::default();
         for i in 0..pattern_table.tiles.len() {
             pattern_table.tiles[i] = Tile {
@@ -165,7 +165,7 @@ type Sprites = Vec<Sprite>;
 
 impl Sprite {
     fn get_y(&self) -> u8 {
-        ((self.data[0] as u16 ) % 256) as u8
+        ((self.data[0] as u16) % 256) as u8
     }
 
     fn get_x(&self) -> u8 {
@@ -203,13 +203,14 @@ impl Sprite {
 
 type OAM = [u8; 256];
 
+#[derive(Copy, Clone, Default)]
 struct VRAMAddress {
     address: u16,
-    next_ppuaddr_write_is_hi: bool,
+    next_ppuaddr_write_is_lo: bool,
 }
 
 pub struct PPU {
-    vram: VRAM,
+    vram: Rc<RefCell<dyn VideoMemory>>,
     control_reg: ControlRegister,
     mask_reg: MaskRegister,
     status_reg: StatusRegister,
@@ -224,30 +225,37 @@ pub struct PPU {
 }
 
 impl PPU {
-    pub fn new(chr_rom: Vec<u8>, mirroring: Mirroring) -> PPU {
-        let vram = VRAM::new(&chr_rom, mirroring);
-        let pattern_tables = [PatternTable::new(&vram, 0), PatternTable::new(&vram, 1)];
+    pub fn new(vram: Rc<RefCell<dyn VideoMemory>>) -> PPU {
         PPU {
             vram: vram,
             control_reg: ControlRegister { value: 0 },
             mask_reg: MaskRegister { value: 0 },
             status_reg: StatusRegister { value: 0 },
-            scroll_reg: ScrollRegister {
-                x: 0,
-                y: 0,
-                next_read_is_x: true,
-            },
-            vram_address: VRAMAddress {
-                address: 0,
-                next_ppuaddr_write_is_hi: true,
-            },
+            scroll_reg: Default::default(),
+            vram_address: Default::default(),
             oam_address: 0,
             oam: [0; 256],
-            pattern_tables: pattern_tables,
+            pattern_tables: Default::default(),
             ppu_cycles: 0,
             scanline: -1,
             color_mapper: Box::new(DefaultColorMapper {}),
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.control_reg.value = 0;
+        self.mask_reg.value = 0;
+        self.status_reg.value = 0;
+        self.scroll_reg = Default::default();
+        self.vram_address = Default::default();
+        self.oam_address = 0;
+        self.oam = [0; 256];
+        self.pattern_tables = [
+            PatternTable::new(&*self.vram.borrow(), 0),
+            PatternTable::new(&*self.vram.borrow(), 1),
+        ];
+        self.ppu_cycles = 0;
+        self.scanline = -1;
     }
 
     pub fn process_cpu_cycles(&mut self, cpu_cycles: u8) -> bool {
@@ -283,7 +291,6 @@ impl PPU {
         for x in 0..DISPLAY_WIDTH {
             let (bg_color_index, bg_palette_index) =
                 self.get_background_color_index(x, self.scanline as usize);
-
             let (sprite_color_index, sprite) =
                 self.get_sprite_color_index(&sprites, x as u8, self.scanline as u8);
 
@@ -348,7 +355,7 @@ impl PPU {
         let bg_pattern_table = &self.pattern_tables[bg_pattern_table_index as usize];
         let bg_color_tile_y = (y / 16) as u8;
         let bg_color_tile_x = (x / 16) as u8;
-        let bg_palette_index = self.vram.get_background_pallete_index(
+        let bg_palette_index = self.vram.borrow().get_background_pallete_index(
             name_table_index,
             bg_color_tile_x,
             bg_color_tile_y,
@@ -366,6 +373,7 @@ impl PPU {
             let bg_tile_x = (x / 8) as u8;
             let bg_tile_index =
                 self.vram
+                    .borrow()
                     .get_nametable_tile_index(name_table_index, bg_tile_x, bg_tile_y);
             let bg_tile = bg_pattern_table.tiles[bg_tile_index as usize];
             bg_color_index = bg_tile.get_color_index(x % 8, y % 8);
@@ -393,7 +401,7 @@ impl PPU {
                     let mut tile_index = sprite.get_tile_index(is_sprite_mode_8x16);
                     if y > sprite.get_y() + 7 {
                         tile_index += 1;
-                    }   
+                    }
 
                     if is_sprite_mode_8x16 {
                         if sprite.if_flip_vertically() {
@@ -412,7 +420,7 @@ impl PPU {
                     if sprite.if_flip_vertically() {
                         y = 7 - y;
                     }
-                  
+
                     let tile = pattern_table.tiles[tile_index as usize];
                     let color_index = tile.get_color_index(x as usize, y as usize);
                     if color_index != 0 {
@@ -438,12 +446,12 @@ impl PPU {
 
     fn get_palettes(&self, for_background: bool) -> Palettes {
         let mut palletes: Palettes = Default::default();
-        let raw_universal_bckg_color = self.vram.get_universal_background_color();
+        let raw_universal_bckg_color = self.vram.borrow().get_universal_background_color();
         for (i, p) in palletes.iter_mut().enumerate() {
             let raw_colors = if for_background {
-                self.vram.get_background_palette(i as u8)
+                self.vram.borrow().get_background_palette(i as u8)
             } else {
-                self.vram.get_sprite_palette(i as u8)
+                self.vram.borrow().get_sprite_palette(i as u8)
             };
             *p = [
                 self.color_mapper.map_nes_color(raw_universal_bckg_color),
@@ -466,10 +474,10 @@ impl WritePpuRegisters for PPU {
                 self.mask_reg.value = value;
             }
             WriteAccessRegister::PpuScroll => {
-                if self.scroll_reg.next_read_is_x {
-                    self.scroll_reg.x = value;
-                } else {
+                if self.scroll_reg.next_read_is_y {
                     self.scroll_reg.y = value;
+                } else {
+                    self.scroll_reg.x = value;
                 }
             }
             WriteAccessRegister::OamAddr => self.oam_address = value,
@@ -478,18 +486,20 @@ impl WritePpuRegisters for PPU {
                 self.oam_address += 1
             }
             WriteAccessRegister::PpuAddr => {
-                if self.vram_address.next_ppuaddr_write_is_hi {
-                    self.vram_address.address =
-                        (value as u16) << 8 | (self.vram_address.address & 0x00FF);
-                } else {
+                if self.vram_address.next_ppuaddr_write_is_lo {
                     self.vram_address.address =
                         (value as u16) | (self.vram_address.address & 0xFF00);
+                } else {
+                    self.vram_address.address =
+                        (value as u16) << 8 | (self.vram_address.address & 0x00FF);
                 }
-                self.vram_address.next_ppuaddr_write_is_hi =
-                    !self.vram_address.next_ppuaddr_write_is_hi;
+                self.vram_address.next_ppuaddr_write_is_lo =
+                    !self.vram_address.next_ppuaddr_write_is_lo;
             }
             WriteAccessRegister::PpuData => {
-                self.vram.store_byte(self.vram_address.address, value);
+                self.vram
+                    .borrow_mut()
+                    .store_byte(self.vram_address.address, value);
                 self.vram_address.address += self.control_reg.get_vram_increment();
             }
         }
@@ -509,7 +519,7 @@ impl ReadPpuRegisters for PPU {
         match register {
             ReadAccessRegister::PpuStatus => self.status_reg.value,
             ReadAccessRegister::PpuData => {
-                let val = self.vram.get_byte(self.vram_address.address);
+                let val = self.vram.borrow().get_byte(self.vram_address.address);
                 self.vram_address.address += self.control_reg.get_vram_increment();
                 val
             }

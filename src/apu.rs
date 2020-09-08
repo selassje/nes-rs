@@ -1,11 +1,10 @@
 use self::StatusRegisterFlag::*;
-use crate::cpu_ram_apu::*;
+use crate::ram_apu::*;
 use std::default::Default;
 use std::time::{Duration, Instant};
 
 use crate::io_sdl::{SampleFormat, BUFFER_SIZE, SAMPLE_BUFFER, SAMPLE_RATE};
 
-const NS_PER_SAMPLE: u128 = Duration::from_secs(1).as_nanos() / SAMPLE_RATE as u128;
 const CPU_CYCLES_PER_SECOND : u128 =  Duration::from_secs(1).as_nanos() / 559;
 const CPU_CYCLES_PER_SAMPLE : u128 =  CPU_CYCLES_PER_SECOND / SAMPLE_RATE as u128;
 

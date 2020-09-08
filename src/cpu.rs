@@ -1,13 +1,8 @@
 use crate::common::*;
-use crate::cpu_ram::CpuRAM;
-use crate::mapper::Mapper;
-use crate::memory::Memory;
-use crate::ppu::*;
-use crate::apu::{APU};
-use crate::cpu_controllers::{ControllerPortsAccess};
-
+use crate::memory::{CpuMemory};
 use spin_sleep::SpinSleeper;
 use std::cell::RefCell;
+use std::rc::Rc;
 use std::fmt::{Display, Formatter, Result};
 use std::time::{Duration, Instant};
 
@@ -76,43 +71,45 @@ enum ProcessorFlag {
     NegativeFlag = 0b01000000,
 }
 
-pub struct CPU<'a> {
+pub struct CPU {
     pc: u16,
     sp: u8,
     ps: u8,
     a: u8,
     x: u8,
     y: u8,
-    ram: CpuRAM<'a>,
-    ppu: &'a RefCell<PPU>,
-    apu: &'a RefCell<APU>,
+    ram: Rc<RefCell<dyn CpuMemory>>,
     code_segment: (u16, u16),
 }
 
-impl<'a> CPU<'a> {
+impl CPU {
     pub fn new(
-        mapper: &'a mut Box<dyn Mapper>,
-        ppu: &'a RefCell<PPU>,
-        apu: &'a RefCell<APU>,
-        controller_access : &'a mut dyn ControllerPortsAccess,
-    ) -> CPU<'a> {
-        let mut ram = CpuRAM::new(ppu,controller_access, apu);
-        ram.store_bytes(mapper.get_rom_start(), &mapper.get_pgr_rom().to_vec());
+        ram: Rc<RefCell<dyn CpuMemory>>,
+    ) -> CPU {
         CPU {
-            pc: ram.get_2_bytes_as_u16(0xFFFC),
+            pc: 0,
             sp: 0xFF,
             ps: 0,
             a: 0,
             x: 0,
             y: 0,
             ram: ram,
-            ppu: ppu,
-            apu: apu,
             code_segment: (
-                mapper.get_rom_start(),
-                mapper.get_rom_start() - 1 + mapper.get_pgr_rom().len() as u16,
+                0,
+                0,
             ),
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.pc = self.ram.borrow().get_word(0xFFFC);
+        self.sp = 0xFF;
+        self.ps = 0;
+        self.a  = 0;
+        self.x =  0;
+        self.y =  0;
+        self.code_segment = self.ram.borrow().get_code_segment();
+
     }
 
     fn set_flag(&mut self, flag: ProcessorFlag) {
@@ -144,61 +141,45 @@ impl<'a> CPU<'a> {
     }
 
     fn push_u8(&mut self, val: u8) {
-        self.ram.store_byte(self.sp as u16 + STACK_PAGE, val);
+        self.ram.borrow_mut().store_byte(self.sp as u16 + STACK_PAGE, val);
         self.sp -= 1;
     }
 
     fn push_u16(&mut self, val: u16) {
         let addr = self.sp as u16 + STACK_PAGE - 1;
-        self.ram.store_2_bytes_as_u16(addr, val);
+        self.ram.borrow_mut().store_word(addr, val);
         self.sp -= 2;
     }
 
     fn pop_u8(&mut self) -> u8 {
         self.sp += 1;
-        self.ram.get_byte(self.sp as u16 + STACK_PAGE)
+        self.ram.borrow().get_byte(self.sp as u16 + STACK_PAGE)
     }
 
     fn pop_u16(&mut self) -> u16 {
         self.sp += 2;
         let addr = self.sp as u16 + STACK_PAGE - 1;
-        self.ram.get_2_bytes_as_u16(addr)
+        self.ram.borrow().get_word(addr)
     }
 
-    pub fn run(&mut self) {
+    pub fn run_single_instruction(&mut self) -> Option<u8> {
         let (code_segment_start, code_segment_end) = self.code_segment;
-        while self.pc >= code_segment_start && self.pc <= code_segment_end {
-            let now = Instant::now();
-            let op = self.ram.get_byte(self.pc);
+        if self.pc >= code_segment_start && self.pc <= code_segment_end {
+            let op = self.ram.borrow().get_byte(self.pc);
             let mut b0 = 0;
             let mut b1 = 0;
             if self.pc + 1 <= code_segment_end {
-                b0 = self.ram.get_byte(self.pc + 1);
+                b0 = self.ram.borrow().get_byte(self.pc + 1);
             }
             if self.pc + 2 <= code_segment_end {
-                b1 = self.ram.get_byte(self.pc + 2);
+                b1 = self.ram.borrow().get_byte(self.pc + 2);
             }
-            //println!("{:X} ${:X}  op0 {:X}  op1 {:X} X={:X} Y={:X} A={:X} SP={:X} 14={:X}",self.pc, op, b0,b1,self.x, self.y, self.a,self.sp, self.ram.get_byte(0x14));
             let (bytes, cycles) = self.execute_instruction(op, b0, b1);
             self.pc += bytes as u16;
-            //println!("Executed instruction {:#0x} bytes {} cycles {} pc {:X}  op2 {:#X} {:#x}",op, bytes, cycles, self.pc, self.ram.get_byte(0xC7BE),self.ram.get_2_bytes_as_u16(0x00));
-
-            let mut cycles = cycles;
-            if self.ppu.borrow_mut().process_cpu_cycles(cycles) {
-                cycles += self.nmi();
-            }
-
-            self.apu.borrow_mut().process_cpu_cycles(cycles);
-
-
-            let elapsed_time_ns = now.elapsed().as_nanos();
-            let required_time_ns = ((cycles as u128) * NANOS_PER_CPU_CYCLE * 2) / 4;
-            if required_time_ns > elapsed_time_ns {
-               // let dur = Duration::from_nanos((required_time_ns - elapsed_time_ns) as u64);
-               //  sleeper.sleep(dur);
-            }
+            Some(cycles)
+        } else {
+            None
         }
-        println!("CPU Stopped execution")
     }
 
     fn execute_instruction(&mut self, op: u8, b0: u8, b1: u8) -> (u8, u8) {
@@ -421,11 +402,11 @@ impl<'a> CPU<'a> {
                 if zero_page_x == 0xFF {
                     panic!("Invalid ZeroPageX address!")
                 }
-                let indexed_indirect = self.ram.get_2_bytes_as_u16(zero_page_x);
+                let indexed_indirect = self.ram.borrow().get_word(zero_page_x);
                 (Address::RAM(indexed_indirect), 0)
             }
             AddressingMode::IndirectIndexedY => {
-                let indirect = self.ram.get_2_bytes_as_u16(b0_u16);
+                let indirect = self.ram.borrow().get_word(b0_u16);
                 let indirect_indexed = indirect + y_u16;
                 if indirect_indexed & 0xFF00 > indirect & 0xFF00 {
                     add_cycles = 1;
@@ -441,7 +422,7 @@ impl<'a> CPU<'a> {
             }
             AddressingMode::Indirect => {
                 let absolute = b0_u16 + (b1_u16 << 8);
-                let indirect = self.ram.get_2_bytes_as_u16(absolute);
+                let indirect = self.ram.borrow().get_word(absolute);
                 (Address::RAM(indirect),0 )
             }
         }
@@ -452,7 +433,7 @@ impl<'a> CPU<'a> {
             Address::Implicit => panic!("load_from_address can't be used for implicit mode"),
             Address::Accumulator => self.a,
             Address::Immediate(i) => *i,
-            Address::RAM(address) => self.ram.get_byte(*address),
+            Address::RAM(address) => self.ram.borrow().get_byte(*address),
             Address::Relative(_) => panic!("load_from_address can't be used for the Relative mode"),
         }
     }
@@ -469,7 +450,7 @@ impl<'a> CPU<'a> {
             Address::Implicit => panic!("store_to_address can't be used for implicit mode"),
             Address::Accumulator => self.a = byte,
             Address::Immediate(_) => panic!("Not possible to store in Immediate addressing"),
-            Address::RAM(address) => self.ram.store_byte(*address, byte),
+            Address::RAM(address) => self.ram.borrow_mut().store_byte(*address, byte),
             Address::Relative(_) => panic!("store_to_address can't be used for the Relative mode"),
         }
     }
@@ -921,15 +902,15 @@ impl<'a> CPU<'a> {
         self.push_u16(self.pc + 1);
         self.push_u8(self.ps);
         self.set_flag(ProcessorFlag::BreakCommand);
-        self.pc = self.ram.get_2_bytes_as_u16(0xFFFE) - 1;
+        self.pc = self.ram.borrow().get_word(0xFFFE) - 1;
         cycles
     }
 
-    fn nmi(&mut self) -> u8 {
+    pub fn nmi(&mut self) -> u8 {
         //println!("Handling NMI!");
         self.push_u16(self.pc);
         self.push_u8(self.ps);
-        self.pc = self.ram.get_2_bytes_as_u16(0xFFFA);
+        self.pc = self.ram.borrow().get_word(0xFFFA);
         7
     }
 
