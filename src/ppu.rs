@@ -1,9 +1,8 @@
 use crate::colors::{ColorMapper, DefaultColorMapper, RgbColor};
-use crate::ram_ppu::*;
 use crate::io_sdl::SCREEN;
 use crate::memory::VideoMemory;
+use crate::ram_ppu::*;
 use crate::screen::DISPLAY_WIDTH;
-
 
 use std::{cell::RefCell, default::Default, rc::Rc};
 
@@ -107,12 +106,6 @@ impl StatusRegister {
 }
 
 #[derive(Copy, Clone, Default)]
-struct ScrollRegister {
-    x: u8,
-    y: u8,
-}
-
-#[derive(Copy, Clone, Default)]
 struct Tile {
     data: [u8; 16],
 }
@@ -202,9 +195,73 @@ impl Sprite {
 
 type OAM = [u8; 256];
 
+type VRAMAddressFlag = (u16, u16);
+const COARSE_X: VRAMAddressFlag = (0b00000000_00011111, 0);
+const COARSE_Y: VRAMAddressFlag = (0b00000011_11100000, 5);
+const NM_TABLE: VRAMAddressFlag = (0b00001100_00000000, 10);
+const NM_TABLE_X: VRAMAddressFlag = (0b00000100_00000000, 1);
+const NM_TABLE_Y: VRAMAddressFlag = (0b00001000_00000000, 1);
+const FINE_Y: VRAMAddressFlag = (0b01110000_00000000, 12);
+const BIT_14: VRAMAddressFlag = (0b01000000_00000000, 14);
+const BITS_8_13: VRAMAddressFlag = (0b00111111_00000000, 8);
+const LOW_BYTE: VRAMAddressFlag = (0b00000000_11111111, 0);
+
 #[derive(Copy, Clone, Default)]
 struct VRAMAddress {
     address: u16,
+}
+
+impl VRAMAddress {
+    fn get(&self, flag: VRAMAddressFlag) -> u16 {
+        let (mask, shift) = flag;
+        (self.address & mask) >> shift
+    }
+    fn set(&mut self, flag: VRAMAddressFlag, value: u16) {
+        let (mask, shift) = flag;
+        self.address &= !mask;
+        self.address |= value << shift;
+    }
+
+    fn toggle_x_name_table_index(&mut self) {
+        let (nm_table_mask, _) = NM_TABLE_X;
+        self.address ^= nm_table_mask;
+    }
+
+    fn toggle_y_name_table_index(&mut self) {
+        let (nm_table_mask, _) = NM_TABLE_Y;
+        self.address ^= nm_table_mask;
+    }
+
+    fn inc_coarse_x(&mut self) {
+        let mut coarse_x = self.get(COARSE_X);
+        if coarse_x < 31 {
+            coarse_x += 1;
+        } else {
+            coarse_x = 0;
+            self.toggle_x_name_table_index();
+        }
+        self.set(COARSE_X, coarse_x);
+    }
+
+    fn inc_y(&mut self) {
+        let mut fine_y = self.get(FINE_Y);
+        let mut coarse_y = self.get(COARSE_Y);
+        if fine_y < 7 {
+            fine_y += 1;
+        } else {
+            fine_y = 0;
+            if coarse_y == 29 {
+                coarse_y = 0;
+                self.toggle_y_name_table_index();
+            } else if coarse_y == 31 {
+                coarse_y = 0;
+            } else {
+                coarse_y += 1;
+            }
+        }
+        self.set(FINE_Y, fine_y);
+        self.set(COARSE_Y, coarse_y);
+    }
 }
 
 pub struct PPU {
@@ -212,17 +269,16 @@ pub struct PPU {
     control_reg: ControlRegister,
     mask_reg: MaskRegister,
     status_reg: StatusRegister,
-    scroll_reg: ScrollRegister,
     oam_address: u8,
     oam: OAM,
     pattern_tables: [PatternTable; 2],
     ppu_cycles: u16,
     scanline: i16,
     color_mapper: Box<dyn ColorMapper>,
-    write_toggle : bool,
+    write_toggle: bool,
     vram_address: VRAMAddress,
-    t_vram_address : VRAMAddress,
-    fine_x_scroll : u8,
+    t_vram_address: VRAMAddress,
+    fine_x_scroll: u8,
 }
 
 impl PPU {
@@ -232,7 +288,6 @@ impl PPU {
             control_reg: ControlRegister { value: 0 },
             mask_reg: MaskRegister { value: 0 },
             status_reg: StatusRegister { value: 0 },
-            scroll_reg: Default::default(),
             oam_address: 0,
             oam: [0; 256],
             pattern_tables: Default::default(),
@@ -240,9 +295,9 @@ impl PPU {
             scanline: -1,
             color_mapper: Box::new(DefaultColorMapper {}),
             vram_address: Default::default(),
-            t_vram_address : Default::default(),
-            fine_x_scroll : 0,
-            write_toggle : false,
+            t_vram_address: Default::default(),
+            fine_x_scroll: 0,
+            write_toggle: false,
         }
     }
 
@@ -250,7 +305,6 @@ impl PPU {
         self.control_reg.value = 0;
         self.mask_reg.value = 0;
         self.status_reg.value = 0;
-        self.scroll_reg = Default::default();
         self.oam_address = 0;
         self.oam = [0; 256];
         self.pattern_tables = [
@@ -288,6 +342,19 @@ impl PPU {
             }
         }
         return nmi_triggered;
+    }
+
+    fn inc_x(&mut self) {
+        if self.fine_x_scroll < 7 {
+            self.fine_x_scroll += 1;
+        } else {
+            self.fine_x_scroll = 0;
+            self.vram_address.inc_coarse_x();
+        }
+    }
+
+    fn inc_y(&mut self) {
+        self.vram_address.inc_y();
     }
 
     fn render_scanline(&mut self) {
@@ -476,15 +543,19 @@ impl WritePpuRegisters for PPU {
         match register {
             WriteAccessRegister::PpuCtrl => {
                 self.control_reg.value = value;
+                self.t_vram_address
+                    .set(NM_TABLE, self.control_reg.get_base_nametable_index() as u16);
             }
             WriteAccessRegister::PpuMask => {
                 self.mask_reg.value = value;
             }
             WriteAccessRegister::PpuScroll => {
                 if self.write_toggle {
-                    self.scroll_reg.y = value;
+                    self.t_vram_address.set(FINE_Y, (value & 3) as u16);
+                    self.t_vram_address.set(COARSE_Y, (value >> 3) as u16);
                 } else {
-                    self.scroll_reg.x = value;
+                    self.fine_x_scroll = value & 3;
+                    self.t_vram_address.set(COARSE_X, (value >> 3) as u16);
                 }
                 self.write_toggle = !self.write_toggle;
             }
@@ -495,11 +566,12 @@ impl WritePpuRegisters for PPU {
             }
             WriteAccessRegister::PpuAddr => {
                 if self.write_toggle {
-                    self.vram_address.address =
-                        (value as u16) | (self.vram_address.address & 0xFF00);
+                    self.t_vram_address.set(LOW_BYTE, value as u16);
+                    self.vram_address.address = self.t_vram_address.address;
                 } else {
-                    self.vram_address.address =
-                        (value as u16) << 8 | (self.vram_address.address & 0x00FF);
+                    self.t_vram_address
+                        .set(BITS_8_13, (value & 0b00111111) as u16);
+                    self.t_vram_address.set(BIT_14, 0);
                 }
                 self.write_toggle = !self.write_toggle;
             }
@@ -525,10 +597,11 @@ impl ReadPpuRegisters for PPU {
     fn read(&mut self, register: ReadAccessRegister) -> u8 {
         match register {
             ReadAccessRegister::PpuStatus => {
-                    let current_value = self.status_reg.value;
-                    self.write_toggle = false;
-                    self.status_reg.set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
-                    current_value
+                let current_value = self.status_reg.value;
+                self.write_toggle = false;
+                self.status_reg
+                    .set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
+                current_value
             }
             ReadAccessRegister::PpuData => {
                 let val = self.vram.borrow().get_byte(self.vram_address.address);
