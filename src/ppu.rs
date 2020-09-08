@@ -110,7 +110,6 @@ impl StatusRegister {
 struct ScrollRegister {
     x: u8,
     y: u8,
-    next_read_is_y: bool,
 }
 
 #[derive(Copy, Clone, Default)]
@@ -206,7 +205,6 @@ type OAM = [u8; 256];
 #[derive(Copy, Clone, Default)]
 struct VRAMAddress {
     address: u16,
-    next_ppuaddr_write_is_lo: bool,
 }
 
 pub struct PPU {
@@ -215,13 +213,16 @@ pub struct PPU {
     mask_reg: MaskRegister,
     status_reg: StatusRegister,
     scroll_reg: ScrollRegister,
-    vram_address: VRAMAddress,
     oam_address: u8,
     oam: OAM,
     pattern_tables: [PatternTable; 2],
     ppu_cycles: u16,
     scanline: i16,
     color_mapper: Box<dyn ColorMapper>,
+    write_toggle : bool,
+    vram_address: VRAMAddress,
+    t_vram_address : VRAMAddress,
+    fine_x_scroll : u8,
 }
 
 impl PPU {
@@ -232,13 +233,16 @@ impl PPU {
             mask_reg: MaskRegister { value: 0 },
             status_reg: StatusRegister { value: 0 },
             scroll_reg: Default::default(),
-            vram_address: Default::default(),
             oam_address: 0,
             oam: [0; 256],
             pattern_tables: Default::default(),
             ppu_cycles: 0,
             scanline: -1,
             color_mapper: Box::new(DefaultColorMapper {}),
+            vram_address: Default::default(),
+            t_vram_address : Default::default(),
+            fine_x_scroll : 0,
+            write_toggle : false,
         }
     }
 
@@ -247,7 +251,6 @@ impl PPU {
         self.mask_reg.value = 0;
         self.status_reg.value = 0;
         self.scroll_reg = Default::default();
-        self.vram_address = Default::default();
         self.oam_address = 0;
         self.oam = [0; 256];
         self.pattern_tables = [
@@ -256,6 +259,10 @@ impl PPU {
         ];
         self.ppu_cycles = 0;
         self.scanline = -1;
+        self.vram_address = Default::default();
+        self.t_vram_address = Default::default();
+        self.fine_x_scroll = 0;
+        self.write_toggle = false;
     }
 
     pub fn process_cpu_cycles(&mut self, cpu_cycles: u8) -> bool {
@@ -474,11 +481,12 @@ impl WritePpuRegisters for PPU {
                 self.mask_reg.value = value;
             }
             WriteAccessRegister::PpuScroll => {
-                if self.scroll_reg.next_read_is_y {
+                if self.write_toggle {
                     self.scroll_reg.y = value;
                 } else {
                     self.scroll_reg.x = value;
                 }
+                self.write_toggle = !self.write_toggle;
             }
             WriteAccessRegister::OamAddr => self.oam_address = value,
             WriteAccessRegister::OamData => {
@@ -486,15 +494,14 @@ impl WritePpuRegisters for PPU {
                 self.oam_address += 1
             }
             WriteAccessRegister::PpuAddr => {
-                if self.vram_address.next_ppuaddr_write_is_lo {
+                if self.write_toggle {
                     self.vram_address.address =
                         (value as u16) | (self.vram_address.address & 0xFF00);
                 } else {
                     self.vram_address.address =
                         (value as u16) << 8 | (self.vram_address.address & 0x00FF);
                 }
-                self.vram_address.next_ppuaddr_write_is_lo =
-                    !self.vram_address.next_ppuaddr_write_is_lo;
+                self.write_toggle = !self.write_toggle;
             }
             WriteAccessRegister::PpuData => {
                 self.vram
@@ -517,7 +524,12 @@ impl WriteOamDma for PPU {
 impl ReadPpuRegisters for PPU {
     fn read(&mut self, register: ReadAccessRegister) -> u8 {
         match register {
-            ReadAccessRegister::PpuStatus => self.status_reg.value,
+            ReadAccessRegister::PpuStatus => {
+                    let current_value = self.status_reg.value;
+                    self.write_toggle = false;
+                    self.status_reg.set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
+                    current_value
+            }
             ReadAccessRegister::PpuData => {
                 let val = self.vram.borrow().get_byte(self.vram_address.address);
                 self.vram_address.address += self.control_reg.get_vram_increment();
