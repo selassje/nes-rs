@@ -15,6 +15,9 @@ enum ControlRegisterFlag {
     PpuMasterSlaveSelect = 0b01000000,
     GenerateNMI = 0b10000000,
 }
+const TILE_SIDE_LENGTH: usize = 8;
+//const TILES_PER_SCANLINE : usize = DISPLAY_WIDTH / TILE_SIDE_LENGTH;
+//const TILES_PER_SCANLINE : usize = DISPLAY_WIDTH / TILE_SIDE_LENGTH;
 
 const PPU_CYCLES_PER_SCANLINE: u16 = 341;
 const PRE_RENDER_SCANLINE: i16 = -1;
@@ -157,7 +160,7 @@ type Sprites = Vec<Sprite>;
 
 impl Sprite {
     fn get_y(&self) -> u8 {
-        ((self.data[0] as u16) % 256) as u8
+        ((self.data[0] as u16 ) % 256) as u8
     }
 
     fn get_x(&self) -> u8 {
@@ -166,7 +169,7 @@ impl Sprite {
 
     fn get_tile_index(&self, is_8x16_mode: bool) -> u8 {
         if is_8x16_mode {
-            self.data[1]
+            (self.data[1] >> 1) << 1
         } else {
             self.data[1]
         }
@@ -333,12 +336,16 @@ impl PPU {
                     .set_flag(StatusRegisterFlag::SpriteOverflow, false);
                 self.status_reg
                     .set_flag(StatusRegisterFlag::Sprite0Hit, false);
+            
+                if self.is_rendering_enabled() {
+                    self.vram_address = self.t_vram_address;
+                }
             } else if self.scanline < POST_RENDER_SCANLINE {
                 self.render_scanline();
             } else if self.scanline == VBLANK_START_SCANLINE {
-                nmi_triggered = self.control_reg.is_generate_nmi_enabled();
                 self.status_reg
                     .set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
+                nmi_triggered = self.control_reg.is_generate_nmi_enabled();
             }
         }
         return nmi_triggered;
@@ -355,6 +362,16 @@ impl PPU {
 
     fn inc_y(&mut self) {
         self.vram_address.inc_y();
+    }
+
+    fn get_x(&self) -> usize {
+        self.fine_x_scroll as usize
+            + (self.vram_address.get(COARSE_X) * TILE_SIDE_LENGTH as u16) as usize
+    }
+
+    fn get_y(&self) -> usize {
+        self.vram_address.get(FINE_Y) as usize
+            + (self.vram_address.get(COARSE_Y) * TILE_SIDE_LENGTH as u16) as usize
     }
 
     fn render_scanline(&mut self) {
@@ -387,6 +404,13 @@ impl PPU {
             unsafe {
                 SCREEN[x][self.scanline as usize] = color;
             }
+        }
+
+        if self
+            .mask_reg
+            .is_flag_enabled(MaskRegisterFlag::ShowBackground)
+        {
+            self.inc_y();
         }
 
         if !self.status_reg.get_flag(StatusRegisterFlag::SpriteOverflow) && is_overflow_detected {
@@ -423,8 +447,8 @@ impl PPU {
         (final_color, sprite0_hit)
     }
 
-    fn get_background_color_index(&self, x: usize, y: usize) -> (u8, u8) {
-        let name_table_index = self.control_reg.get_base_nametable_index();
+    fn get_background_color_index(&mut self, x: usize, y: usize) -> (u8, u8) {
+        let name_table_index = self.vram_address.get(NM_TABLE) as u8;
         let bg_pattern_table_index = self.control_reg.get_background_pattern_table_index();
         let bg_pattern_table = &self.pattern_tables[bg_pattern_table_index as usize];
         let bg_color_tile_y = (y / 16) as u8;
@@ -438,11 +462,14 @@ impl PPU {
         if self
             .mask_reg
             .is_flag_enabled(MaskRegisterFlag::ShowBackground)
-            || (self
+            || (!self
                 .mask_reg
                 .is_flag_enabled(MaskRegisterFlag::ShowBackgroundInLeftMost8Pixels)
                 && x < 8)
         {
+            let x = self.get_x();
+            let y = self.get_y();
+
             let bg_tile_y = (y / 8) as u8;
             let bg_tile_x = (x / 8) as u8;
             let bg_tile_index =
@@ -451,7 +478,9 @@ impl PPU {
                     .get_nametable_tile_index(name_table_index, bg_tile_x, bg_tile_y);
             let bg_tile = bg_pattern_table.tiles[bg_tile_index as usize];
             bg_color_index = bg_tile.get_color_index(x % 8, y % 8);
+            self.inc_x();
         }
+
         (bg_color_index as u8, bg_palette_index)
     }
 
@@ -536,6 +565,12 @@ impl PPU {
         }
         palletes
     }
+
+    fn is_rendering_enabled(&self) -> bool {
+        self.mask_reg
+            .is_flag_enabled(MaskRegisterFlag::ShowBackground)
+            || self.mask_reg.is_flag_enabled(MaskRegisterFlag::ShowSprites)
+    }
 }
 
 impl WritePpuRegisters for PPU {
@@ -551,19 +586,15 @@ impl WritePpuRegisters for PPU {
             }
             WriteAccessRegister::PpuScroll => {
                 if self.write_toggle {
-                    self.t_vram_address.set(FINE_Y, (value & 3) as u16);
+                    self.t_vram_address.set(FINE_Y, (value & 7) as u16);
                     self.t_vram_address.set(COARSE_Y, (value >> 3) as u16);
                 } else {
-                    self.fine_x_scroll = value & 3;
+                    self.fine_x_scroll = value & 7;
                     self.t_vram_address.set(COARSE_X, (value >> 3) as u16);
                 }
                 self.write_toggle = !self.write_toggle;
             }
-            WriteAccessRegister::OamAddr => self.oam_address = value,
-            WriteAccessRegister::OamData => {
-                self.oam[self.oam_address as usize % 256] = value;
-                self.oam_address += 1
-            }
+
             WriteAccessRegister::PpuAddr => {
                 if self.write_toggle {
                     self.t_vram_address.set(LOW_BYTE, value as u16);
@@ -580,6 +611,12 @@ impl WritePpuRegisters for PPU {
                     .borrow_mut()
                     .store_byte(self.vram_address.address, value);
                 self.vram_address.address += self.control_reg.get_vram_increment();
+            }
+
+            WriteAccessRegister::OamAddr => self.oam_address = value,
+            WriteAccessRegister::OamData => {
+                self.oam[self.oam_address as usize % 256] = value;
+                self.oam_address += 1
             }
         }
         ()
