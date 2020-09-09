@@ -451,6 +451,8 @@ impl PPU {
         let name_table_index = self.vram_address.get(NM_TABLE) as u8;
         let bg_pattern_table_index = self.control_reg.get_background_pattern_table_index();
         let bg_pattern_table = &self.pattern_tables[bg_pattern_table_index as usize];
+        let x = self.get_x();
+        let y = self.get_y();
         let bg_color_tile_y = (y / 16) as u8;
         let bg_color_tile_x = (x / 16) as u8;
         let bg_palette_index = self.vram.borrow().get_background_pallete_index(
@@ -467,9 +469,7 @@ impl PPU {
                 .is_flag_enabled(MaskRegisterFlag::ShowBackgroundInLeftMost8Pixels)
                 && x < 8)
         {
-            let x = self.get_x();
-            let y = self.get_y();
-
+ 
             let bg_tile_y = (y / 8) as u8;
             let bg_tile_x = (x / 8) as u8;
             let bg_tile_index =
