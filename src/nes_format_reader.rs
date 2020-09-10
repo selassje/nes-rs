@@ -93,7 +93,6 @@ impl NesFile {
             chr_rom.extend_from_slice(chr_rom_chunk);
         }
 
-        println!("CHROM in NES File : first byte {:X}",chr_rom[1]);
         match self.mapper_number {
             0 => Box::new(Mapper0::new(prg_rom, chr_rom, self.mirroring)),
             _ => panic!("Unsupported mapper {}", self.mapper_number),
@@ -122,7 +121,6 @@ impl NesFile {
 
     pub fn new(in_bytes : &Vec<u8>) -> NesFile {
         let format = Self::get_format(in_bytes);
-        println!("Format {:?}",format);
         assert!(format == NesFormat::INes);
 
         let mut read_index = 4;
@@ -140,7 +138,6 @@ impl NesFile {
 
         let mirroring = if header.flag_6 & HeaderFlag6::MirroringVertical as u8 != 0 {common::Mirroring::VERTICAL  } else {common::Mirroring::HORIZONTAL};
 
-        println!("Header {:?}", header);
         read_index = 16;
         let mut trainer = Option::None; 
         if header.flag_6 & (HeaderFlag6::TrainerPresent as u8) == 1 {
@@ -159,7 +156,7 @@ impl NesFile {
         }
 
         let mut chr_rom = Vec::<ChrRomUnit>::new();
-        println!("CHROM in NES File : first byte {:X}",in_bytes[read_index + 1]);
+
         for _ in 0..header.chr_rom_units {
             let mut chr_rom_unit : ChrRomUnit = unsafe {
                 std::mem::MaybeUninit::uninit().assume_init()
@@ -167,7 +164,7 @@ impl NesFile {
             read_index += read_to_array(&mut chr_rom_unit, &in_bytes[read_index..]);
             chr_rom.push(chr_rom_unit);
         }
-        println!("CHROM in NES File : first byte {:X}",chr_rom[0][1]);
+      
         let mut play_choice_rom = Option::None;
 
         if header.flag_7 & (HeaderFlag7::PlayChoice10 as u8) == 1 {
@@ -195,7 +192,6 @@ impl NesFile {
               if prg_ram_size == 0 {
                   prg_ram_size = common::PRG_RAM_UNIT_SIZE as u32;
               }
-              println!("PGR RAM present {}", prg_ram_size);
          }
 
         let mapper_number = (header.ho_n_mapper_number<< 4  + header.lo_n_mapper_number) as u32;

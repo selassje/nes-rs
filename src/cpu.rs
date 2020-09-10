@@ -1,27 +1,16 @@
 use crate::common::*;
-use crate::memory::{CpuMemory};
+use crate::memory::CpuMemory;
 use spin_sleep::SpinSleeper;
 use std::cell::RefCell;
-use std::rc::Rc;
 use std::fmt::{Display, Formatter, Result};
+use std::rc::Rc;
 use std::time::{Duration, Instant};
-
 
 const NANOS_PER_CPU_CYCLE: u128 = 559;
 
 const DEBUG: bool = false;
 
 const STACK_PAGE: u16 = 0x0100;
-
-macro_rules! debug_instruction {
-    ($op:ident,$mode:expr, $b0:expr, $b1:expr) => {
-        if (DEBUG) {
-            let op_name: &str = stringify!($op);
-            println!("{} mode {:?} {:#X} {:#X}", op_name, $mode, $b0, $b1);
-        }
-    };
-}
-
 
 #[derive(Copy, Clone, Debug)]
 enum AddressingMode {
@@ -66,9 +55,10 @@ enum ProcessorFlag {
     ZeroFlag = 0b00000010,
     InterruptDisable = 0b00000100,
     DecimalMode = 0b00001000,
-    BreakCommand = 0b00010000,
-    OverflowFlag = 0b00100000,
-    NegativeFlag = 0b01000000,
+    BFlagBit4 = 0b00010000,
+    BFlagBit5 = 0b00100000,
+    OverflowFlag = 0b01000000,
+    NegativeFlag = 0b10000000,
 }
 
 pub struct CPU {
@@ -83,33 +73,28 @@ pub struct CPU {
 }
 
 impl CPU {
-    pub fn new(
-        ram: Rc<RefCell<dyn CpuMemory>>,
-    ) -> CPU {
+    pub fn new(ram: Rc<RefCell<dyn CpuMemory>>) -> CPU {
         CPU {
             pc: 0,
             sp: 0xFF,
-            ps: 0,
+            ps: 0x24,
             a: 0,
             x: 0,
             y: 0,
             ram: ram,
-            code_segment: (
-                0,
-                0,
-            ),
+            code_segment: (0, 0),
         }
     }
 
     pub fn reset(&mut self) {
         self.pc = self.ram.borrow().get_word(0xFFFC);
         self.sp = 0xFF;
-        self.ps = 0;
-        self.a  = 0;
-        self.x =  0;
-        self.y =  0;
+        self.ps = 0x24;
+        self.a = 0;
+        self.x = 0;
+        self.y = 0;
         self.code_segment = self.ram.borrow().get_code_segment();
-
+        self.code_segment = (0, 0xFFFF);
     }
 
     fn set_flag(&mut self, flag: ProcessorFlag) {
@@ -141,7 +126,9 @@ impl CPU {
     }
 
     fn push_u8(&mut self, val: u8) {
-        self.ram.borrow_mut().store_byte(self.sp as u16 + STACK_PAGE, val);
+        self.ram
+            .borrow_mut()
+            .store_byte(self.sp as u16 + STACK_PAGE, val);
         self.sp -= 1;
     }
 
@@ -174,10 +161,12 @@ impl CPU {
             if self.pc + 2 <= code_segment_end {
                 b1 = self.ram.borrow().get_byte(self.pc + 2);
             }
+            //println!("{:X} {:X} {:X} {:X} \t\tA:{:X} X:{:X} Y:{:X} P:{:X} SP={:X}",self.pc, op, b0,b1,self.a, self.x, self.y, self.ps, self.sp);
             let (bytes, cycles) = self.execute_instruction(op, b0, b1);
             self.pc += bytes as u16;
             Some(cycles)
         } else {
+            println!("CPU Stopped execution at {:X}", self.pc);
             None
         }
     }
@@ -216,6 +205,8 @@ impl CPU {
             0x30 => (2, 2 + self.bmi(b0, b1, AddressingMode::Relative)),
             0xD0 => (2, 2 + self.bne(b0, b1, AddressingMode::Relative)),
             0x10 => (2, 2 + self.bpl(b0, b1, AddressingMode::Relative)),
+            0x50 => (2, 2 + self.bvc(b0, b1, AddressingMode::Relative)),
+            0x70 => (2, 2 + self.bvs(b0, b1, AddressingMode::Relative)),
 
             0x24 => (2, 3 + self.bit(b0, b1, AddressingMode::ZeroPage)),
             0x2C => (3, 5 + self.bit(b0, b1, AddressingMode::Absolute)),
@@ -340,6 +331,7 @@ impl CPU {
             0xF1 => (2, 5 + self.sbc(b0, b1, AddressingMode::IndirectIndexedY)),
 
             0x38 => (1, 2 + self.sec(b0, b1, AddressingMode::Implicit)),
+            0xF8 => (1, 2 + self.sed(b0, b1, AddressingMode::Implicit)),
             0x78 => (1, 2 + self.sei(b0, b1, AddressingMode::Implicit)),
 
             0x85 => (2, 3 + self.sta(b0, b1, AddressingMode::ZeroPage)),
@@ -365,6 +357,100 @@ impl CPU {
             0x9A => (1, 2 + self.txs(b0, b1, AddressingMode::Implicit)),
             0x98 => (1, 2 + self.tya(b0, b1, AddressingMode::Implicit)),
 
+            /*ILLEGAL OPPCODES */
+            /*NOP*/
+            0x1A => (1, 2 + self.nop(b0, b1, AddressingMode::Immediate)),
+            0x3A => (1, 2 + self.nop(b0, b1, AddressingMode::Immediate)),
+            0x5A => (1, 2 + self.nop(b0, b1, AddressingMode::Immediate)),
+            0x7A => (1, 2 + self.nop(b0, b1, AddressingMode::Immediate)),
+            0xDA => (1, 2 + self.nop(b0, b1, AddressingMode::Immediate)),
+            0xFA => (1, 2 + self.nop(b0, b1, AddressingMode::Immediate)),
+            /*DOP*/
+            0x04 => (2, 3 + self.nop(b0, b1, AddressingMode::ZeroPage)),
+            0x14 => (2, 4 + self.nop(b0, b1, AddressingMode::ZeroPageX)),
+            0x34 => (2, 4 + self.nop(b0, b1, AddressingMode::ZeroPageX)),
+            0x44 => (2, 3 + self.nop(b0, b1, AddressingMode::ZeroPage)),
+            0x54 => (2, 4 + self.nop(b0, b1, AddressingMode::ZeroPageX)),
+            0x64 => (2, 3 + self.nop(b0, b1, AddressingMode::ZeroPage)),
+            0x74 => (2, 4 + self.nop(b0, b1, AddressingMode::ZeroPageX)),
+            0x80 => (2, 2 + self.nop(b0, b1, AddressingMode::Immediate)),
+            0x82 => (2, 2 + self.nop(b0, b1, AddressingMode::Immediate)),
+            0x89 => (2, 2 + self.nop(b0, b1, AddressingMode::Immediate)),
+            0xC2 => (2, 2 + self.nop(b0, b1, AddressingMode::Immediate)),
+            0xD4 => (2, 4 + self.nop(b0, b1, AddressingMode::ZeroPageX)),
+            0xE2 => (2, 2 + self.nop(b0, b1, AddressingMode::Immediate)),
+            0xF4 => (2, 3 + self.nop(b0, b1, AddressingMode::ZeroPageX)),
+            /*TOP*/
+            0x0C => (3, 4 + self.nop(b0, b1, AddressingMode::Absolute)),
+            0x1C => (3, 4 + self.nop(b0, b1, AddressingMode::AbsoluteX)),
+            0x3C => (3, 4 + self.nop(b0, b1, AddressingMode::AbsoluteX)),
+            0x5C => (3, 4 + self.nop(b0, b1, AddressingMode::AbsoluteX)),
+            0x7C => (3, 4 + self.nop(b0, b1, AddressingMode::AbsoluteX)),
+            0xDC => (3, 4 + self.nop(b0, b1, AddressingMode::AbsoluteX)),
+            0xFC => (3, 4 + self.nop(b0, b1, AddressingMode::AbsoluteX)),
+
+            0xA7 => (2, 3 + self.lax(b0, b1, AddressingMode::ZeroPage)),
+            0xB7 => (2, 4 + self.lax(b0, b1, AddressingMode::ZeroPageY)),
+            0xAF => (3, 4 + self.lax(b0, b1, AddressingMode::Absolute)),
+            0xBF => (3, 4 + self.lax(b0, b1, AddressingMode::AbsoluteY)),
+            0xA3 => (2, 6 + self.lax(b0, b1, AddressingMode::IndexedIndirectX)),
+            0xB3 => (2, 5 + self.lax(b0, b1, AddressingMode::IndirectIndexedY)),
+
+            0x87 => (2, 3 + self.aax(b0, b1, AddressingMode::ZeroPage)),
+            0x97 => (2, 4 + self.aax(b0, b1, AddressingMode::ZeroPageY)),
+            0x83 => (2, 6 + self.aax(b0, b1, AddressingMode::IndexedIndirectX)),
+            0x8F => (3, 4 + self.aax(b0, b1, AddressingMode::Absolute)),
+
+            0xEB => (2, 2 + self.sbc(b0, b1, AddressingMode::Immediate)),
+
+            0xC7 => (2, 5 + self.dcp(b0, b1, AddressingMode::ZeroPage)),
+            0xD7 => (2, 6 + self.dcp(b0, b1, AddressingMode::ZeroPageX)),
+            0xCF => (3, 6 + self.dcp(b0, b1, AddressingMode::Absolute)),
+            0xDF => (3, 7 + self.dcp(b0, b1, AddressingMode::AbsoluteX)),
+            0xDB => (3, 7 + self.dcp(b0, b1, AddressingMode::AbsoluteY)),
+            0xC3 => (2, 8 + self.dcp(b0, b1, AddressingMode::IndexedIndirectX)),
+            0xD3 => (2, 8 + self.dcp(b0, b1, AddressingMode::IndirectIndexedY)),
+
+            0xE7 => (2, 5 + self.isc(b0, b1, AddressingMode::ZeroPage)),
+            0xF7 => (2, 6 + self.isc(b0, b1, AddressingMode::ZeroPageX)),
+            0xEF => (3, 6 + self.isc(b0, b1, AddressingMode::Absolute)),
+            0xFF => (3, 7 + self.isc(b0, b1, AddressingMode::AbsoluteX)),
+            0xFB => (3, 7 + self.isc(b0, b1, AddressingMode::AbsoluteY)),
+            0xE3 => (2, 8 + self.isc(b0, b1, AddressingMode::IndexedIndirectX)),
+            0xF3 => (2, 8 + self.isc(b0, b1, AddressingMode::IndirectIndexedY)),
+
+            0x07 => (2, 5 + self.slo(b0, b1, AddressingMode::ZeroPage)),
+            0x17 => (2, 6 + self.slo(b0, b1, AddressingMode::ZeroPageX)),
+            0x0F => (3, 6 + self.slo(b0, b1, AddressingMode::Absolute)),
+            0x1F => (3, 7 + self.slo(b0, b1, AddressingMode::AbsoluteX)),
+            0x1B => (3, 7 + self.slo(b0, b1, AddressingMode::AbsoluteY)),
+            0x03 => (2, 8 + self.slo(b0, b1, AddressingMode::IndexedIndirectX)),
+            0x13 => (2, 8 + self.slo(b0, b1, AddressingMode::IndirectIndexedY)),
+
+            0x27 => (2, 5 + self.rla(b0, b1, AddressingMode::ZeroPage)),
+            0x37 => (2, 6 + self.rla(b0, b1, AddressingMode::ZeroPageX)),
+            0x2F => (3, 6 + self.rla(b0, b1, AddressingMode::Absolute)),
+            0x3F => (3, 7 + self.rla(b0, b1, AddressingMode::AbsoluteX)),
+            0x3B => (3, 7 + self.rla(b0, b1, AddressingMode::AbsoluteY)),
+            0x23 => (2, 8 + self.rla(b0, b1, AddressingMode::IndexedIndirectX)),
+            0x33 => (2, 8 + self.rla(b0, b1, AddressingMode::IndirectIndexedY)),
+
+            0x47 => (2, 5 + self.sre(b0, b1, AddressingMode::ZeroPage)),
+            0x57 => (2, 6 + self.sre(b0, b1, AddressingMode::ZeroPageX)),
+            0x4F => (3, 6 + self.sre(b0, b1, AddressingMode::Absolute)),
+            0x5F => (3, 7 + self.sre(b0, b1, AddressingMode::AbsoluteX)),
+            0x5B => (3, 7 + self.sre(b0, b1, AddressingMode::AbsoluteY)),
+            0x43 => (2, 8 + self.sre(b0, b1, AddressingMode::IndexedIndirectX)),
+            0x53 => (2, 8 + self.sre(b0, b1, AddressingMode::IndirectIndexedY)),
+
+            0x67 => (2, 5 + self.rra(b0, b1, AddressingMode::ZeroPage)),
+            0x77 => (2, 6 + self.rra(b0, b1, AddressingMode::ZeroPageX)),
+            0x6F => (3, 6 + self.rra(b0, b1, AddressingMode::Absolute)),
+            0x7F => (3, 7 + self.rra(b0, b1, AddressingMode::AbsoluteX)),
+            0x7B => (3, 7 + self.rra(b0, b1, AddressingMode::AbsoluteY)),
+            0x63 => (2, 8 + self.rra(b0, b1, AddressingMode::IndexedIndirectX)),
+            0x73 => (2, 8 + self.rra(b0, b1, AddressingMode::IndirectIndexedY)),
+
             _ => panic!("Unknown instruction {:#04x} at {:#X} ", op, self.pc),
         }
     }
@@ -375,6 +461,7 @@ impl CPU {
         let x_u16 = self.x as u16;
         let y_u16 = self.y as u16;
         let zero_page_x = (b0_u16 + x_u16) & 0xFF;
+        let zero_page_x_hi = (b0_u16 + x_u16 + 1) & 0xFF;
         let zero_page_y = (b0_u16 + y_u16) & 0xFF;
         let mut add_cycles = 0;
 
@@ -399,18 +486,22 @@ impl CPU {
                 (Address::RAM(b0_u16 + y_u16 + (b1_u16 << 8)), add_cycles)
             }
             AddressingMode::IndexedIndirectX => {
-                if zero_page_x == 0xFF {
-                    panic!("Invalid ZeroPageX address!")
-                }
-                let indexed_indirect = self.ram.borrow().get_word(zero_page_x);
+                let indexed_indirect = convert_2u8_to_u16(
+                    self.ram.borrow().get_byte(zero_page_x),
+                    self.ram.borrow().get_byte(zero_page_x_hi),
+                );
                 (Address::RAM(indexed_indirect), 0)
             }
             AddressingMode::IndirectIndexedY => {
-                let indirect = self.ram.borrow().get_word(b0_u16);
+                let indirect = convert_2u8_to_u16(
+                    self.ram.borrow().get_byte(b0_u16),
+                    self.ram.borrow().get_byte((b0_u16 + 1) & 0xFF),
+                );
                 let indirect_indexed = indirect + y_u16;
                 if indirect_indexed & 0xFF00 > indirect & 0xFF00 {
                     add_cycles = 1;
                 }
+
                 (Address::RAM(indirect_indexed), add_cycles)
             }
             AddressingMode::Relative => {
@@ -421,9 +512,18 @@ impl CPU {
                 (Address::Relative(new_pc), add_cycles)
             }
             AddressingMode::Indirect => {
-                let absolute = b0_u16 + (b1_u16 << 8);
-                let indirect = self.ram.borrow().get_word(absolute);
-                (Address::RAM(indirect),0 )
+                let indirect = if b0_u16 == 0xFF {
+                    convert_2u8_to_u16(
+                        self.ram.borrow().get_byte(b0_u16 + (b1_u16 << 8)),
+                        self.ram.borrow().get_byte(b1_u16 << 8),
+                    )
+                } else {
+                    convert_2u8_to_u16(
+                        self.ram.borrow().get_byte(b0_u16 + (b1_u16 << 8)),
+                        self.ram.borrow().get_byte(b0_u16 + (b1_u16 << 8) + 1),
+                    )
+                };
+                (Address::RAM(indirect), 0)
             }
         }
     }
@@ -455,11 +555,7 @@ impl CPU {
         }
     }
 
-    fn adc(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        debug_instruction!(add_with_carry, mode, b0, b1);
-        //println!("adc");
-        let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
-        let m = self.load_from_address(&m_address);
+    fn _adc(&mut self, m: u8) {
         let result = m as u16 + self.a as u16 + self.carry() as u16;
         self.set_or_reset_flag(
             ProcessorFlag::OverflowFlag,
@@ -469,41 +565,35 @@ impl CPU {
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         self.set_or_reset_flag(ProcessorFlag::NegativeFlag, (self.a as i8) < 0);
         self.set_or_reset_flag(ProcessorFlag::CarryFlag, result & 0xFF00 != 0);
+    }
+
+    fn adc(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        let m = self.load_from_address(&m_address);
+        self._adc(m);
         cycles
     }
 
     fn sbc(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        debug_instruction!(add_with_carry, mode, b0, b1);
-        //println!("adc");
         let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         let m = self.load_from_address(&m_address);
-        let result = self.a as u16 + (!m) as u16 + self.carry() as u16;
-        self.set_or_reset_flag(
-            ProcessorFlag::OverflowFlag,
-            m & 0x80 == self.a & 0x80 && result & 0x80 != m as u16 & 0x80,
-        );
-        self.a = (result & 0x00FF) as u8;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
-        self.set_or_reset_flag(ProcessorFlag::CarryFlag, result & 0xFF00 != 0);
+        self._adc(!m);
         cycles
     }
 
     fn asl(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        //println!("or");
         let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         let mut m = self.load_from_address(&m_address);
         let old_bit_7 = m & 0x80;
         m = m << 1;
         self.set_or_reset_flag(ProcessorFlag::CarryFlag, old_bit_7 != 0);
         self.set_or_reset_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, m == 0);
         self.store_to_address(&m_address, m);
+        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         cycles
     }
 
     fn and(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        // println!("and {:?}", mode);
         let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         let m = self.load_from_address(&m_address);
         self.a &= m;
@@ -513,7 +603,6 @@ impl CPU {
     }
 
     fn ora(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        //println!("or");
         let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         let m = self.load_from_address(&m_address);
         self.a |= m;
@@ -523,7 +612,6 @@ impl CPU {
     }
 
     fn eor(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        //println!("or");
         let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         let m = self.load_from_address(&m_address);
         self.a ^= m;
@@ -533,41 +621,38 @@ impl CPU {
     }
 
     fn ror(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        //println!("or");
         let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         let mut m = self.load_from_address(&m_address);
         let old_bit_0 = m & 0x1;
         m = m >> 1 | (self.carry() << 7);
         self.set_or_reset_flag(ProcessorFlag::CarryFlag, old_bit_0 == 1);
         self.set_or_reset_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, m == 0);
         self.store_to_address(&m_address, m);
+        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         cycles
     }
 
     fn rol(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        //println!("or");
         let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         let mut m = self.load_from_address(&m_address);
         let old_bit_7 = m & 0x80;
         m = m << 1 | self.carry();
-        self.set_or_reset_flag(ProcessorFlag::CarryFlag, old_bit_7 == 1);
+        self.set_or_reset_flag(ProcessorFlag::CarryFlag, old_bit_7 != 0);
         self.set_or_reset_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, m == 0);
         self.store_to_address(&m_address, m);
+        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         cycles
     }
 
     fn lsr(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        //println!("lsr {:?}", mode);
         let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         let mut m = self.load_from_address(&m_address);
         let old_bit_0 = m & 1;
         m >>= 1;
         self.set_or_reset_flag(ProcessorFlag::CarryFlag, old_bit_0 == 1);
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, m == 0);
         self.set_or_reset_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
         self.store_to_address(&m_address, m);
+        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         cycles
     }
 
@@ -590,7 +675,11 @@ impl CPU {
 
     fn rti(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
         let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        let b_flag_mask = ProcessorFlag::BFlagBit4 as u8 | ProcessorFlag::BFlagBit5 as u8;
+        let b_flag_bits = self.ps & b_flag_mask;
         self.ps = self.pop_u8();
+        self.ps &= !b_flag_mask;
+        self.ps |= b_flag_bits;
         self.pc = self.pop_u16() - 1;
         cycles
     }
@@ -604,14 +693,12 @@ impl CPU {
     fn sei(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
         let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
         self.set_flag(ProcessorFlag::InterruptDisable);
-        // println!("sei");
         cycles
     }
 
     fn cld(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
         let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
         self.reset_flag(ProcessorFlag::DecimalMode);
-        //println!("cld");
         cycles
     }
 
@@ -628,9 +715,7 @@ impl CPU {
     }
 
     fn lda(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        debug_instruction!(lda, mode, b0, b1);
         let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
-
         self.a = self.load_from_address(&m_address);
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
@@ -638,7 +723,6 @@ impl CPU {
     }
 
     fn ldx(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        //println!("ldx {:?}", mode);
         let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         self.x = self.load_from_address(&m_address);
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.x == 0);
@@ -647,7 +731,6 @@ impl CPU {
     }
 
     fn ldy(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        //println!("ldx {:?}", mode);
         let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         self.y = self.load_from_address(&m_address);
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.y == 0);
@@ -656,43 +739,38 @@ impl CPU {
     }
 
     fn sta(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        debug_instruction!(sta, mode, b0, b1);
         let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
-        //println!("sta address {} y {} bo {:X}", m_address,self.y,b0);
         self.store_to_address(&m_address, self.a);
         cycles
     }
 
     fn sty(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        //debug_instruction!(sta, mode, b0, b1);
         let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         self.store_to_address(&m_address, self.y);
         cycles
     }
 
     fn stx(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        //debug_instruction!(sta, mode, b0, b1);
         let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         self.store_to_address(&m_address, self.x);
         cycles
     }
 
     fn txs(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        // println!("txs {:?}", mode);
         let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
         self.sp = self.x;
         cycles
     }
 
     fn tsx(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        // println!("txs {:?}", mode);
         let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
         self.x = self.sp;
+        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.x == 0);
+        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
         cycles
     }
 
     fn txa(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        // println!("txs {:?}", mode);
         let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
         self.a = self.x;
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
@@ -701,7 +779,6 @@ impl CPU {
     }
 
     fn tax(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        // println!("txs {:?}", mode);
         let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
         self.x = self.a;
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.x == 0);
@@ -710,7 +787,6 @@ impl CPU {
     }
 
     fn tya(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        // println!("txs {:?}", mode);
         let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
         self.a = self.y;
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
@@ -719,7 +795,6 @@ impl CPU {
     }
 
     fn tay(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        // println!("txs {:?}", mode);
         let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
         self.y = self.a;
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.y == 0);
@@ -728,9 +803,7 @@ impl CPU {
     }
 
     fn beq(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        // println!("beq {:?}", mode);
         if self.get_flag(ProcessorFlag::ZeroFlag) {
-            // println!("Performing branch");
             let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
             let new_pc = match m_address {
                 Address::Relative(new_pc) => new_pc,
@@ -743,7 +816,6 @@ impl CPU {
     }
 
     fn bne(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        //println!("ben {:?}", mode);
         if !self.get_flag(ProcessorFlag::ZeroFlag) {
             let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
             let new_pc = match m_address {
@@ -757,7 +829,6 @@ impl CPU {
     }
 
     fn bpl(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        //println!("ben {:?}", mode);
         if !self.get_flag(ProcessorFlag::NegativeFlag) {
             let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
             let new_pc = match m_address {
@@ -770,8 +841,33 @@ impl CPU {
         0
     }
 
+    fn bvc(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        if !self.get_flag(ProcessorFlag::OverflowFlag) {
+            let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
+            let new_pc = match m_address {
+                Address::Relative(new_pc) => new_pc,
+                _ => panic!("Unexpected address type in beq."),
+            };
+            self.pc = new_pc;
+            return cycles + 1;
+        }
+        0
+    }
+
+    fn bvs(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        if self.get_flag(ProcessorFlag::OverflowFlag) {
+            let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
+            let new_pc = match m_address {
+                Address::Relative(new_pc) => new_pc,
+                _ => panic!("Unexpected address type in beq."),
+            };
+            self.pc = new_pc;
+            return cycles + 1;
+        }
+        0
+    }
+
     fn bmi(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        //println!("ben {:?}", mode);
         if self.get_flag(ProcessorFlag::NegativeFlag) {
             let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
             let new_pc = match m_address {
@@ -785,7 +881,6 @@ impl CPU {
     }
 
     fn bcc(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        //println!("ben {:?}", mode);
         if !self.get_flag(ProcessorFlag::CarryFlag) {
             let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
             let new_pc = match m_address {
@@ -799,7 +894,6 @@ impl CPU {
     }
 
     fn bcs(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        //println!("ben {:?}", mode);
         if self.get_flag(ProcessorFlag::CarryFlag) {
             let (m_address, cycles) = self.get_address_and_cycles(b0, b1, mode);
             let new_pc = match m_address {
@@ -813,7 +907,6 @@ impl CPU {
     }
 
     fn bit(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        // println!("bit {:?}", mode);
         let (address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         let m = self.load_from_address(&address);
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a & m == 0);
@@ -822,34 +915,33 @@ impl CPU {
         cycles
     }
 
-
     fn cmp(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        // println!("cmp {:?}", mode);
         let (address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         let m = self.load_from_address(&address);
+        let result = (self.a as u16 - m as u16) as u8;
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == m);
         self.set_or_reset_flag(ProcessorFlag::CarryFlag, self.a >= m);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.a < m);
+        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);
         cycles
     }
 
     fn cpx(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        // println!("cmp {:?}", mode);
         let (address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         let m = self.load_from_address(&address);
+        let result = (self.x as u16 - m as u16) as u8;
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.x == m);
         self.set_or_reset_flag(ProcessorFlag::CarryFlag, self.x >= m);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.x < m);
+        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);
         cycles
     }
 
     fn cpy(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
-        // println!("cmp {:?}", mode);
         let (address, cycles) = self.get_address_and_cycles(b0, b1, mode);
         let m = self.load_from_address(&address);
+        let result = (self.y as u16 - m as u16) as u8;
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.y == m);
         self.set_or_reset_flag(ProcessorFlag::CarryFlag, self.y >= m);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.y < m);
+        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);
         cycles
     }
 
@@ -875,11 +967,6 @@ impl CPU {
         }
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, m == 0);
         self.set_or_reset_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
-
-        if m & 0x80 == 1 {
-            // println!("n flag set in dec");
-        }
-
         self.store_to_address(&address, m);
         cycles
     }
@@ -898,18 +985,21 @@ impl CPU {
 
     fn brk(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
         let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
-        println!("break");
         self.push_u16(self.pc + 1);
-        self.push_u8(self.ps);
-        self.set_flag(ProcessorFlag::BreakCommand);
+        let mut ps = self.ps;
+        ps |= ProcessorFlag::BFlagBit4 as u8;
+        ps |= ProcessorFlag::BFlagBit5 as u8;
+        self.push_u8(ps);
         self.pc = self.ram.borrow().get_word(0xFFFE) - 1;
         cycles
     }
 
     pub fn nmi(&mut self) -> u8 {
-        //println!("Handling NMI!");
         self.push_u16(self.pc);
-        self.push_u8(self.ps);
+        let mut ps = self.ps;
+        ps &= !(ProcessorFlag::BFlagBit4 as u8);
+        ps |= ProcessorFlag::BFlagBit5 as u8;
+        self.push_u8(ps);
         self.pc = self.ram.borrow().get_word(0xFFFA);
         7
     }
@@ -922,19 +1012,28 @@ impl CPU {
 
     fn php(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
         let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
-        self.push_u8(self.ps);
+        let mut ps = self.ps;
+        ps |= ProcessorFlag::BFlagBit4 as u8;
+        ps |= ProcessorFlag::BFlagBit5 as u8;
+        self.push_u8(ps);
         cycles
     }
 
     fn pla(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
         let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
         self.a = self.pop_u8();
+        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
         cycles
     }
 
     fn plp(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
         let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        let b_flag_mask = ProcessorFlag::BFlagBit4 as u8 | ProcessorFlag::BFlagBit5 as u8;
+        let b_flag_bits = self.ps & b_flag_mask;
         self.ps = self.pop_u8();
+        self.ps &= !b_flag_mask;
+        self.ps |= b_flag_bits;
         cycles
     }
 
@@ -976,6 +1075,71 @@ impl CPU {
     fn sec(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
         let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
         self.set_flag(ProcessorFlag::CarryFlag);
+        cycles
+    }
+
+    fn sed(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        self.set_flag(ProcessorFlag::DecimalMode);
+        cycles
+    }
+
+    fn lax(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        let (address, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        let m = self.load_from_address(&address);
+        self.a = m;
+        self.x = m;
+        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, m == 0);
+        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
+        cycles
+    }
+
+    fn aax(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        let (address, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        let result = self.a & self.x;
+        self.store_to_address(&address, result);
+        cycles
+    }
+
+    fn dcp(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        self.dec(b0, b1, mode);
+        self.cmp(b0, b1, mode);
+        cycles
+    }
+
+    fn isc(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        self.inc(b0, b1, mode);
+        self.sbc(b0, b1, mode);
+        cycles
+    }
+
+    fn slo(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        self.asl(b0, b1, mode);
+        self.ora(b0, b1, mode);
+        cycles
+    }
+
+    fn rla(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        self.rol(b0, b1, mode);
+        self.and(b0, b1, mode);
+        cycles
+    }
+
+    fn sre(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        self.lsr(b0, b1, mode);
+        self.eor(b0, b1, mode);
+        cycles
+    }
+
+    fn rra(&mut self, b0: u8, b1: u8, mode: AddressingMode) -> u8 {
+        let (_, cycles) = self.get_address_and_cycles(b0, b1, mode);
+        self.ror(b0, b1, mode);
+        self.adc(b0, b1, mode);
         cycles
     }
 }
