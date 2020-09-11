@@ -515,7 +515,7 @@ impl APU {
             self.cpu_cycles = (self.cpu_cycles + elapsed_cpu_cycles)
                 % FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES;
         }
-        let mut sample = Self::get_mixer_output(self.pulse_1.get_sample_value(),0,0,0,0);
+        let mut sample = Self::get_mixer_output(self.pulse_1.get_sample_value(), self.pulse_2.get_sample_value(),0,0,0);
         unsafe {
             if sample != last_p1_sample {
                 /*

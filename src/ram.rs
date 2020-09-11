@@ -84,6 +84,7 @@ impl RAM {
 
 impl Memory for RAM {
     fn get_byte(&self, addr: u16) -> u8 {
+        //assert!(!(addr >= 0x2008 && addr < 0x4000));
         if self.ppu_read_reg_map.contains_key(&addr) {
             let reg = self
                 .ppu_read_reg_map
@@ -127,6 +128,7 @@ impl Memory for RAM {
     }
 
     fn store_byte(&mut self, addr: u16, byte: u8) {
+        assert!(!(addr >= 0x2008 && addr < 0x4000));
         if self.ppu_write_reg_map.contains_key(&addr) {
             let reg = self
                 .ppu_write_reg_map

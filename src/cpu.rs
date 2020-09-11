@@ -76,7 +76,7 @@ impl CPU {
     pub fn new(ram: Rc<RefCell<dyn CpuMemory>>) -> CPU {
         CPU {
             pc: 0,
-            sp: 0xFF,
+            sp: 0xFD,
             ps: 0x24,
             a: 0,
             x: 0,
