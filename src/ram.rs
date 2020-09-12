@@ -3,9 +3,27 @@ use crate::ram_apu;
 use crate::ram_controllers::*;
 use crate::ram_ppu::*;
 use crate::{mapper::Mapper, memory::*};
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::{cell::RefCell, ops::Range};
+
+const INTERNAL_START: u16 = 0x0000;
+const INTERNAL_END: u16 = 0x2000;
+const INTERNAL_MIRROR_SIZE: u16 = 0x0800;
+
+const INTERNAL_RAM_RANGE: Range<u16> = Range {
+    start: INTERNAL_START,
+    end: INTERNAL_END,
+};
+
+const PPU_REGISTERS_START: u16 = 0x2000;
+const PPU_REGISTERS_END: u16 = 0x4000;
+const PPU_REGISTERS_MIRROR_SIZE: u16 = 0x0008;
+
+const PPU_REGIGERS_RANGE: Range<u16> = Range {
+    start: PPU_REGISTERS_START,
+    end: PPU_REGISTERS_END,
+};
 
 type CpuMemPpuWriteAccessRegisterMapping = HashMap<u16, WriteAccessRegister>;
 type CpuMemPpuReadAccessRegisterMapping = HashMap<u16, ReadAccessRegister>;
@@ -84,7 +102,12 @@ impl RAM {
 
 impl Memory for RAM {
     fn get_byte(&self, addr: u16) -> u8 {
-        //assert!(!(addr >= 0x2008 && addr < 0x4000));
+        let addr = if PPU_REGIGERS_RANGE.contains(&addr) {
+            PPU_REGISTERS_START + addr % PPU_REGISTERS_MIRROR_SIZE
+        } else {
+            addr
+        };
+
         if self.ppu_read_reg_map.contains_key(&addr) {
             let reg = self
                 .ppu_read_reg_map
@@ -104,10 +127,11 @@ impl Memory for RAM {
                 .expect("store_byte: missing input port entry");
             self.controller_access.borrow_mut().read(*port)
         } else if self.ppu_write_reg_map.contains_key(&addr) {
-            panic!(
+            println!(
                 "Attempting to read from a Ppu write access register {:#X}",
                 addr
             );
+            0
         } else if self.controller_output_ports.contains_key(&addr) {
             panic!(
                 "Attempting to read from the controller output port {:#X}",
@@ -128,7 +152,11 @@ impl Memory for RAM {
     }
 
     fn store_byte(&mut self, addr: u16, byte: u8) {
-        assert!(!(addr >= 0x2008 && addr < 0x4000));
+        let addr = if PPU_REGIGERS_RANGE.contains(&addr) {
+            PPU_REGISTERS_START + addr % PPU_REGISTERS_MIRROR_SIZE
+        } else {
+            addr
+        };
         if self.ppu_write_reg_map.contains_key(&addr) {
             let reg = self
                 .ppu_write_reg_map
@@ -160,6 +188,11 @@ impl Memory for RAM {
             panic!("Attempting to write to a read Ppu register");
         } else if self.apu_read_reg_map.contains_key(&addr) {
             panic!("Attempting to write to a read Apu register");
+        } else if INTERNAL_RAM_RANGE.contains(&addr) {
+            let mirrors = common::get_mirrors(addr, INTERNAL_MIRROR_SIZE, INTERNAL_RAM_RANGE);
+            for m in mirrors {
+                self.memory[m as usize] = byte;
+            }
         } else {
             self.memory[addr as usize] = byte;
         }

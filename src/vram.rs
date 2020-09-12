@@ -1,17 +1,15 @@
 use self::AttributeDataQuadrantMask::*;
-use crate::common::{convert_2u8_to_u16, Mirroring};
-use crate::{
-    mapper::Mapper,
-    memory::{Memory, VideoMemory},
-};
+use crate::common::{self, Mirroring};
+use crate::{mapper::Mapper, memory::VideoMemory};
 
 use std::ops::Range;
 
 const ADDRESS_SPACE: usize = 0x10000;
 const PATTERN_TABLE_SIZE: u16 = 0x1000;
 const NAMETABLE_SIZE: u16 = 0x400;
+const NAMETABLE_MIRROR_SIZE: u16 = 0x1000;
 const NAMETABLES_START: u16 = 0x2000;
-const NAMETABLES_END: u16 = 0x3000;
+const NAMETABLES_END: u16 = 0x3F00;
 const NAMETABLES_RANGE: Range<u16> = Range {
     start: NAMETABLES_START,
     end: NAMETABLES_END,
@@ -79,14 +77,47 @@ impl VRAM {
         ]
     }
 
-    fn get_pallete_mirrors(&self, addr: u16) -> Vec<u16> {
-        let mut mirrors = Vec::new();
-        const MIRROR_SIZE : u16 = 0x20;
-        let offset = addr % MIRROR_SIZE;
-        for i in 0..8 {
-            mirrors.push(PALETTES_START + i *  MIRROR_SIZE + offset);
+    fn get_nametable_mirrors(&self, addr: u16) -> Vec<u16> {
+        let mut mirrors = common::get_mirrors(
+            addr,
+            NAMETABLE_MIRROR_SIZE,
+            Range {
+                start: NAMETABLES_START,
+                end: PALETTES_END,
+            },
+        );
+        assert!(mirrors.len() == 2);
+        let namespace_region_offset = addr % NAMETABLE_MIRROR_SIZE;
+        let internal_mirror_offset = match self.mirroring {
+            Mirroring::VERTICAL => match namespace_region_offset {
+                0x0000..=0x03FF => 0x0800,
+                0x0400..=0x07FF => 0x0C00,
+                0x0800..=0x0BFF => 0x0000,
+                0x0C00..=0x0FFF => 0x0400,
+                _ => panic!("Unexpected nametable offset {:X}", namespace_region_offset),
+            },
+            Mirroring::HORIZONTAL => match namespace_region_offset {
+                0x0000..=0x03FF => 0x0400,
+                0x0400..=0x07FF => 0x0000,
+                0x0800..=0x0BFF => 0x0C00 ,
+                0x0C00..=0x0FFF => 0x0800 ,
+                _ => panic!("Unexpected nametable offset {:X}", namespace_region_offset),
+            },
+        } +  namespace_region_offset % NAMETABLE_SIZE;
+        for i in 0..2 {
+            let m = NAMETABLES_START + i * NAMETABLE_MIRROR_SIZE + internal_mirror_offset;
+            if m < NAMETABLES_END {
+                mirrors.push(m);
+            }
         }
-        let maybe_offset_2 = match offset {
+        //assert!(mirrors.len() == 4 || mirrors.len() == 3);
+        mirrors
+    }
+
+    fn get_pallete_mirrors(&self, addr: u16) -> Vec<u16> {
+        const MIRROR_SIZE: u16 = 0x20;
+        let mut mirrors = common::get_mirrors(addr, MIRROR_SIZE, PALETTES_RANGE);
+        let maybe_offset = match addr % MIRROR_SIZE {
             0x00 => Some(0x10),
             0x10 => Some(0x00),
             0x04 => Some(0x14),
@@ -98,9 +129,9 @@ impl VRAM {
             _ => None,
         };
 
-        if let Some(offset_2) = maybe_offset_2 {
+        if let Some(offset) = maybe_offset {
             for i in 0..8 {
-                mirrors.push(PALETTES_START + i * MIRROR_SIZE + offset_2);
+                mirrors.push(PALETTES_START + i * MIRROR_SIZE + offset);
             }
         }
         mirrors
@@ -156,23 +187,14 @@ impl VideoMemory for VRAM {
 
     fn store_byte(&mut self, addr: u16, byte: u8) {
         if NAMETABLES_RANGE.contains(&addr) {
-            let mirror_address: u16 = match self.mirroring {
-                Mirroring::VERTICAL => match addr {
-                    0x2800..=0x2BFF => addr - 0x2800 + 0x2000,
-                    0x2C00..=0x2FFF => addr - 0x2C00 + 0x2400,
-                    _ => addr + 2 * NAMETABLE_SIZE,
-                },
-                Mirroring::HORIZONTAL => match addr {
-                    0x2400..=0x27FF => addr - NAMETABLE_SIZE,
-                    0x2C00..=0x2FFF => addr - NAMETABLE_SIZE,
-                    _ => addr + NAMETABLE_SIZE,
-                },
-            };
-            self.memory[mirror_address as usize] = byte;
+            let mirrors = self.get_nametable_mirrors(addr);
+            for m in mirrors {
+                self.memory[m as usize] = byte;
+            }
         } else if PALETTES_RANGE.contains(&addr) {
             let mirrors = self.get_pallete_mirrors(addr);
-            for a in mirrors {
-                self.memory[a as usize] = byte;
+            for m in mirrors {
+                self.memory[m as usize] = byte;
             }
         }
         self.memory[addr as usize] = byte;
