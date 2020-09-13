@@ -333,7 +333,7 @@ impl PPU {
         if self.ppu_cycles > PPU_CYCLES_PER_SCANLINE {
             self.scanline += 1;
             self.ppu_cycles %= PPU_CYCLES_PER_SCANLINE;
-            if self.scanline == 262 {
+            if self.scanline == 261 {
                 self.scanline = PRE_RENDER_SCANLINE;
                 self.status_reg
                     .set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
@@ -602,10 +602,10 @@ impl WritePpuRegisters for PPU {
                     self.t_vram_address.set(BIT_14, 0);
                 }
                 self.write_toggle = !self.write_toggle;
-                if self.is_rendering_in_progress() {
-                    println!("T {}",self.t_vram_address);
-                    println!("V {}",self.vram_address);
-                    println!("Fine X {}\n",self.fine_x_scroll);
+                if self.is_rendering_in_progress() && self.fine_x_scroll > 0 {
+                    //println!("T {}",self.t_vram_address);
+                    //println!("V {}",self.vram_address);
+                    //println!("Fine X {}\n",self.fine_x_scroll);
               }
             }
             WriteAccessRegister::PpuData => {

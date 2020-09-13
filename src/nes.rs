@@ -51,7 +51,8 @@ impl Nes {
         if let Some(mut cpu_cycles) = self.cpu.run_single_instruction() {
             let nmi = self.ppu.borrow_mut().process_cpu_cycles(cpu_cycles);
             if nmi {
-                cpu_cycles += self.cpu.nmi();
+                self.cpu.nmi();
+                cpu_cycles += 7;
             }
             self.apu.borrow_mut().process_cpu_cycles(cpu_cycles);
             true
