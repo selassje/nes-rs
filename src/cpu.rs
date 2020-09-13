@@ -2,7 +2,7 @@ mod opcodes;
 
 use crate::common::*;
 use crate::memory::CpuMemory;
-use opcodes::{get_opcodes, OpCode, OpCodes};
+use opcodes::{get_opcodes,OpCode,OpCodes};
 use spin_sleep::SpinSleeper;
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter, Result};
@@ -16,8 +16,9 @@ const DEBUG: bool = false;
 
 const STACK_PAGE: u16 = 0x0100;
 
+
 #[derive(Copy, Clone, Debug)]
-pub enum AddressingMode {
+enum AddressingMode {
     Implicit,
     Accumulator,
     Immediate,
@@ -182,7 +183,7 @@ impl CPU {
         let (code_segment_start, code_segment_end) = self.code_segment;
         if self.pc >= code_segment_start && self.pc <= code_segment_end {
             let op = self.ram.borrow().get_byte(self.pc);
-            if let Some(OpCode(instruction, addressing_mode, _, base_cycles)) =
+            if let Some(OpCode(instruction, addressing_mode,base_cycles)) =
                 self.opcodes[op as usize]
             {
                 let bytes = addressing_mode.get_bytes();
