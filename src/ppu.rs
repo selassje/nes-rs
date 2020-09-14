@@ -4,7 +4,7 @@ use crate::memory::VideoMemory;
 use crate::ram_ppu::*;
 use crate::screen::DISPLAY_WIDTH;
 
-use std::{cell::RefCell, default::Default, rc::Rc, fmt::Display};
+use std::{cell::RefCell, default::Default, fmt::Display, rc::Rc};
 
 enum ControlRegisterFlag {
     BaseNametableAddress = 0b00000011,
@@ -19,8 +19,13 @@ const TILE_SIDE_LENGTH: usize = 8;
 
 const PPU_CYCLES_PER_SCANLINE: u16 = 341;
 const PRE_RENDER_SCANLINE: i16 = -1;
+const FIRST_VISIBLE_SCANLINE: i16 = 0;
+const LAST_VISIBLE_SCANLINE: i16 = 239;
 const POST_RENDER_SCANLINE: i16 = 240;
 const VBLANK_START_SCANLINE: i16 = 241;
+
+const ACTIVE_PIXELS_START: u16 = 4;
+const ACTIVE_PIXELS_END: u16 = ACTIVE_PIXELS_START + DISPLAY_WIDTH as u16 - 1;
 
 struct ControlRegister {
     value: u8,
@@ -59,7 +64,6 @@ impl ControlRegister {
     fn is_generate_nmi_enabled(&self) -> bool {
         (self.value & ControlRegisterFlag::GenerateNMI as u8) != 0
     }
-
 }
 
 enum MaskRegisterFlag {
@@ -268,7 +272,13 @@ impl VRAMAddress {
 
 impl Display for VRAMAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f,"X {} Y({} {})",self.get(COARSE_X),self.get(COARSE_Y),self.get(FINE_Y))
+        write!(
+            f,
+            "X {} Y({} {})",
+            self.get(COARSE_X),
+            self.get(COARSE_Y),
+            self.get(FINE_Y)
+        )
     }
 }
 
@@ -282,6 +292,7 @@ pub struct PPU {
     pattern_tables: [PatternTable; 2],
     ppu_cycles: u16,
     scanline: i16,
+    frame: u128,
     color_mapper: Box<dyn ColorMapper>,
     write_toggle: bool,
     vram_address: VRAMAddress,
@@ -299,8 +310,9 @@ impl PPU {
             oam_address: 0,
             oam: [0; 256],
             pattern_tables: Default::default(),
-            ppu_cycles: 3 * 27,
+            ppu_cycles: 27,
             scanline: 0,
+            frame: 1,
             color_mapper: Box::new(DefaultColorMapper {}),
             vram_address: Default::default(),
             t_vram_address: Default::default(),
@@ -319,39 +331,125 @@ impl PPU {
             PatternTable::new(&*self.vram.borrow(), 0),
             PatternTable::new(&*self.vram.borrow(), 1),
         ];
-        self.ppu_cycles =  3 * 27;
-        self.scanline = 0;
+        self.ppu_cycles = 0;
+        self.scanline = -1;
+        self.frame = 1;
         self.vram_address = Default::default();
         self.t_vram_address = Default::default();
         self.fine_x_scroll = 0;
         self.write_toggle = false;
     }
 
-    pub fn process_cpu_cycles(&mut self, cpu_cycles: u8) -> bool {
+    fn render_pixel(&mut self) {
+        let background_palettes = self.get_palettes(true);
+        let sprite_palettes = self.get_palettes(false);
+        let (sprites, is_overflow_detected) =
+            self.get_sprites_for_scanline_and_check_for_overflow(self.scanline as u8);
+
+        let x = self.ppu_cycles - ACTIVE_PIXELS_START;
+        let (bg_color_index, bg_palette_index) =
+            self.get_background_color_index(x as usize, self.scanline as usize);
+        let (sprite_color_index, sprite) =
+            self.get_sprite_color_index(&sprites, x as u8, self.scanline as u8);
+
+        let (color, is_sprite0_hit_detected) = self
+            .determine_pixel_color_and_check_for_sprite0_hit(
+                bg_color_index as u8,
+                sprite_color_index,
+                &sprite,
+                &background_palettes[bg_palette_index as usize],
+                &sprite_palettes,
+            );
+
+        unsafe {
+            SCREEN[x as usize][self.scanline as usize] = color;
+        }
+
+        if !self.status_reg.get_flag(StatusRegisterFlag::Sprite0Hit)
+            && x < 255
+            && is_sprite0_hit_detected
+        {
+            self.status_reg
+                .set_flag(StatusRegisterFlag::Sprite0Hit, true);
+        }
+
+        if !self.status_reg.get_flag(StatusRegisterFlag::SpriteOverflow) && is_overflow_detected {
+            self.status_reg
+                .set_flag(StatusRegisterFlag::SpriteOverflow, true);
+        }
+    }
+
+    pub fn run_single_ppu_cycle(&mut self) -> bool {
         let mut nmi_triggered = false;
-        self.ppu_cycles += 3 * cpu_cycles as u16;
+   
+        if self.ppu_cycles > ACTIVE_PIXELS_START && self.ppu_cycles <= ACTIVE_PIXELS_END {
+            let x = self.ppu_cycles - ACTIVE_PIXELS_START;
+            if self.is_rendering_in_progress() && (x as usize % TILE_SIDE_LENGTH == 0) {
+                self.vram_address.inc_coarse_x();
+            }
+        }
+
+        if self.ppu_cycles == ACTIVE_PIXELS_END + 1 {
+            if self.is_rendering_in_progress() {
+                self.vram_address.inc_y();
+                self.vram_address
+                    .set(COARSE_X, self.t_vram_address.get(COARSE_X));
+                self.vram_address
+                    .set(NM_TABLE_X, self.t_vram_address.get(NM_TABLE_X));
+            }
+        }
+
+        match self.scanline {
+            PRE_RENDER_SCANLINE => match self.ppu_cycles {
+                0 => {
+                    self.status_reg
+                        .set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
+                    self.status_reg
+                        .set_flag(StatusRegisterFlag::SpriteOverflow, false);
+                    self.status_reg
+                        .set_flag(StatusRegisterFlag::Sprite0Hit, false);
+                }
+                280 => {
+                    if self.is_rendering_in_progress() {
+                        self.vram_address
+                            .set(FINE_Y, self.t_vram_address.get(FINE_Y));
+                        self.vram_address
+                            .set(COARSE_Y, self.t_vram_address.get(COARSE_Y));
+                        self.vram_address
+                            .set(NM_TABLE_Y, self.t_vram_address.get(NM_TABLE_Y));
+                    }
+                }
+                _ => (),
+            },
+            FIRST_VISIBLE_SCANLINE..=LAST_VISIBLE_SCANLINE => match self.ppu_cycles {
+                ACTIVE_PIXELS_START..=ACTIVE_PIXELS_END => {
+                    if self.is_rendering_in_progress() {
+                        self.render_pixel();
+                    }
+                }
+                _ => (),
+            },
+            VBLANK_START_SCANLINE => {
+                if self.ppu_cycles == 1 {
+                    self.status_reg
+                        .set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
+                    nmi_triggered = self.control_reg.is_generate_nmi_enabled();
+                }
+            }
+            _ => {}
+        };
+
+        self.ppu_cycles += 1;
         if self.ppu_cycles > PPU_CYCLES_PER_SCANLINE {
+            self.ppu_cycles = 0;
             self.scanline += 1;
-            self.ppu_cycles %= PPU_CYCLES_PER_SCANLINE;
             if self.scanline == 261 {
                 self.scanline = PRE_RENDER_SCANLINE;
-                self.status_reg
-                    .set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
-                self.status_reg
-                    .set_flag(StatusRegisterFlag::SpriteOverflow, false);
-                self.status_reg
-                    .set_flag(StatusRegisterFlag::Sprite0Hit, false);
-                if self.is_rendering_enabled() {
-                    self.vram_address = self.t_vram_address;
+                if self.frame == std::u128::MAX {
+                    self.frame = 0;
+                } else {
+                    self.frame += 1;
                 }
-            } else if self.scanline < POST_RENDER_SCANLINE {
-                if self.is_rendering_enabled() {
-                    self.render_scanline();
-                }
-            } else if self.scanline == VBLANK_START_SCANLINE {
-                self.status_reg
-                    .set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
-                nmi_triggered = self.control_reg.is_generate_nmi_enabled();
             }
         }
         return nmi_triggered;
@@ -365,53 +463,6 @@ impl PPU {
     fn get_scrolled_y(&self, y: usize) -> usize {
         (self.vram_address.get(FINE_Y) as usize) % TILE_SIDE_LENGTH
             + (self.vram_address.get(COARSE_Y) * TILE_SIDE_LENGTH as u16) as usize
-    }
-
-    fn render_scanline(&mut self) {
-        let background_palettes = self.get_palettes(true);
-        let sprite_palettes = self.get_palettes(false);
-        let (sprites, is_overflow_detected) =
-            self.get_sprites_for_scanline_and_check_for_overflow(self.scanline as u8);
-        for x in 0..DISPLAY_WIDTH {
-            let (bg_color_index, bg_palette_index) =
-                self.get_background_color_index(x, self.scanline as usize);
-            let (sprite_color_index, sprite) =
-                self.get_sprite_color_index(&sprites, x as u8, self.scanline as u8);
-
-            let (color, is_sprite0_hit_detected) = self
-                .determine_pixel_color_and_check_for_sprite0_hit(
-                    bg_color_index as u8,
-                    sprite_color_index,
-                    &sprite,
-                    &background_palettes[bg_palette_index as usize],
-                    &sprite_palettes,
-                );
-
-            if !self.status_reg.get_flag(StatusRegisterFlag::Sprite0Hit)
-                && x < 255
-                && is_sprite0_hit_detected
-            {
-                self.status_reg
-                    .set_flag(StatusRegisterFlag::Sprite0Hit, true);
-            }
-            unsafe {
-                SCREEN[x][self.scanline as usize] = color;
-            }
-            if x % 8 == 7 {
-                self.vram_address.inc_coarse_x();
-            }
-        }
-
-        self.vram_address.inc_y();
-        self.vram_address
-            .set(COARSE_X, self.t_vram_address.get(COARSE_X));
-        self.vram_address
-            .set(NM_TABLE_X, self.t_vram_address.get(NM_TABLE_X));
-
-        if !self.status_reg.get_flag(StatusRegisterFlag::SpriteOverflow) && is_overflow_detected {
-            self.status_reg
-                .set_flag(StatusRegisterFlag::SpriteOverflow, true);
-        }
     }
 
     fn determine_pixel_color_and_check_for_sprite0_hit(
@@ -545,8 +596,9 @@ impl PPU {
                 self.vram.borrow().get_sprite_palette(i as u8)
             };
             *p = [
-                self.color_mapper.map_nes_color(raw_universal_bckg_color &0x3F),
-                self.color_mapper.map_nes_color(raw_colors[0] & 0x3F ),
+                self.color_mapper
+                    .map_nes_color(raw_universal_bckg_color & 0x3F),
+                self.color_mapper.map_nes_color(raw_colors[0] & 0x3F),
                 self.color_mapper.map_nes_color(raw_colors[1] & 0x3F),
                 self.color_mapper.map_nes_color(raw_colors[2] & 0x3F),
             ];
@@ -565,7 +617,7 @@ impl PPU {
     }
 
     fn is_scanline_visible_or_pre_render(&self) -> bool {
-        self.scanline >= PRE_RENDER_SCANLINE && self.scanline < POST_RENDER_SCANLINE
+        self.scanline >= PRE_RENDER_SCANLINE && self.scanline <= LAST_VISIBLE_SCANLINE
     }
 }
 
@@ -575,7 +627,7 @@ impl WritePpuRegisters for PPU {
             WriteAccessRegister::PpuCtrl => {
                 self.control_reg.value = value;
                 self.t_vram_address
-                    .set(NM_TABLE, self.control_reg.get_base_nametable_index() as u16);    
+                    .set(NM_TABLE, self.control_reg.get_base_nametable_index() as u16);
             }
             WriteAccessRegister::PpuMask => {
                 self.mask_reg.value = value;
@@ -602,17 +654,16 @@ impl WritePpuRegisters for PPU {
                     self.t_vram_address.set(BIT_14, 0);
                 }
                 self.write_toggle = !self.write_toggle;
-                if self.is_rendering_in_progress() && self.fine_x_scroll > 0 {
-                    //println!("T {}",self.t_vram_address);
-                    //println!("V {}",self.vram_address);
-                    //println!("Fine X {}\n",self.fine_x_scroll);
-              }
             }
             WriteAccessRegister::PpuData => {
                 self.vram
                     .borrow_mut()
                     .store_byte(self.vram_address.address, value);
-                assert!(!self.is_rendering_in_progress());
+                assert!(
+                    !self.is_rendering_in_progress(),
+                    "Scanline {}",
+                    self.scanline
+                );
                 self.vram_address.address += self.control_reg.get_vram_increment();
             }
 
@@ -655,5 +706,4 @@ impl ReadPpuRegisters for PPU {
         }
     }
 }
-
 impl PpuRegisterAccess for PPU {}

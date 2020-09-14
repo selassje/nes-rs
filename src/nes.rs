@@ -36,7 +36,13 @@ impl Nes {
         )));
         let cpu = CPU::new(ram.clone());
 
-        Nes { cpu, ram, ppu, vram, apu }
+        Nes {
+            cpu,
+            ram,
+            ppu,
+            vram,
+            apu,
+        }
     }
 
     pub fn load(&mut self, nes_file: &NesFile) {
@@ -49,10 +55,15 @@ impl Nes {
 
     fn run_cpu_instruction(&mut self) -> bool {
         if let Some(mut cpu_cycles) = self.cpu.run_single_instruction() {
-            let nmi = self.ppu.borrow_mut().process_cpu_cycles(cpu_cycles);
-            if nmi {
-                self.cpu.nmi();
-                cpu_cycles += 7;
+            let loops = cpu_cycles * 3;
+            //let loops = 1;
+            for _ in 0..loops {
+                let nmi = self.ppu.borrow_mut().run_single_ppu_cycle();
+                //let nmi = self.ppu.borrow_mut().process_cpu_cycles(cpu_cycles);
+                if nmi {
+                    self.cpu.nmi();
+                    cpu_cycles += 7;
+                }
             }
             self.apu.borrow_mut().process_cpu_cycles(cpu_cycles);
             true
