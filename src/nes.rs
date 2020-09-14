@@ -53,26 +53,22 @@ impl Nes {
         self.cpu.reset();
     }
 
-    fn run_cpu_instruction(&mut self) -> bool {
-        if let Some(mut cpu_cycles) = self.cpu.run_single_instruction() {
-            let loops = cpu_cycles * 3;
-            //let loops = 1;
-            for _ in 0..loops {
-                let nmi = self.ppu.borrow_mut().run_single_ppu_cycle();
-                //let nmi = self.ppu.borrow_mut().process_cpu_cycles(cpu_cycles);
-                if nmi {
-                    self.cpu.nmi();
-                    cpu_cycles += 7;
-                }
-            }
-            self.apu.borrow_mut().process_cpu_cycles(cpu_cycles);
-            true
-        } else {
-            false
-        }
-    }
 
     pub fn run(&mut self) {
-        while self.run_cpu_instruction() {}
+        const PPU_CYCLES_PER_CPU_CYCLE : u16 = 3;
+        let mut cpu_cyles_for_next_instruction = self.cpu.fetch_next_instruction();
+        while cpu_cyles_for_next_instruction != 0 {
+            let mut ppu_cycles = PPU_CYCLES_PER_CPU_CYCLE * cpu_cyles_for_next_instruction;
+            let mut elapsed_ppu_cycles = 0;
+            while elapsed_ppu_cycles < ppu_cycles {
+                if self.ppu.borrow_mut().run_single_ppu_cycle() {
+                    let nmi_cpu_cycles = self.cpu.nmi() as u16;
+                    ppu_cycles  = PPU_CYCLES_PER_CPU_CYCLE * (self.cpu.fetch_next_instruction() + nmi_cpu_cycles);
+                } 
+                elapsed_ppu_cycles +=1;
+            }
+            self.cpu.run_next_instruction();
+            cpu_cyles_for_next_instruction = self.cpu.fetch_next_instruction();
+        }
     }
 }

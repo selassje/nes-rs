@@ -1,21 +1,20 @@
 mod opcodes;
 
+use self::AddressingMode::*;
 use crate::common::*;
 use crate::memory::CpuMemory;
-use opcodes::{get_opcodes,OpCode,OpCodes};
+use opcodes::{get_opcodes, OpCode, OpCodes};
 use spin_sleep::SpinSleeper;
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter, Result};
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-use self::AddressingMode::*;
 
 const NANOS_PER_CPU_CYCLE: u128 = 559;
 
 const DEBUG: bool = false;
 
 const STACK_PAGE: u16 = 0x0100;
-
 
 #[derive(Copy, Clone, Debug)]
 enum AddressingMode {
@@ -93,6 +92,11 @@ pub struct CPU {
     a: u8,
     x: u8,
     y: u8,
+    cycles: u128,
+    cycles_next: u16,
+    opcode_next: u8,
+    operand_1: u8,
+    operand_2: u8,
     address: Address,
     ram: Rc<RefCell<dyn CpuMemory>>,
     code_segment: (u16, u16),
@@ -108,6 +112,11 @@ impl CPU {
             a: 0,
             x: 0,
             y: 0,
+            cycles: 0,
+            cycles_next: 0,
+            opcode_next: 0,
+            operand_1: 0,
+            operand_2: 0,
             ram: ram,
             code_segment: (0, 0),
             address: Address::Implicit,
@@ -123,6 +132,11 @@ impl CPU {
         self.a = 0;
         self.x = 0;
         self.y = 0;
+        self.cycles = 0;
+        self.cycles_next = 0;
+        self.opcode_next = 0;
+        self.operand_1 = 0;
+        self.operand_2 = 0;
         self.code_segment = (0, 0xFFFF);
         self.address = Address::Implicit;
     }
@@ -179,35 +193,37 @@ impl CPU {
         self.ram.borrow().get_word(addr)
     }
 
-    pub fn run_single_instruction(&mut self) -> Option<u8> {
-        let (code_segment_start, code_segment_end) = self.code_segment;
-        if self.pc >= code_segment_start && self.pc <= code_segment_end {
-            let op = self.ram.borrow().get_byte(self.pc);
-            if let Some(OpCode(instruction, addressing_mode,base_cycles)) =
-                self.opcodes[op as usize]
-            {
-                let bytes = addressing_mode.get_bytes();
-                let mut b0 = 0;
-                let mut b1 = 0;
-                if self.pc + 1 <= code_segment_end {
-                    b0 = self.ram.borrow().get_byte(self.pc + 1);
-                }
-                if self.pc + 2 <= code_segment_end {
-                    b1 = self.ram.borrow().get_byte(self.pc + 2);
-                }
-                let (address, extra_cycles) =
-                    self.get_address_and_extra_cycles(b0, b1, addressing_mode);
-                self.address = address;
-                //println!("{:X} {:X} {:X} {:X} \t\tA:{:X} X:{:X} Y:{:X} P:{:X} SP={:X}",self.pc, op, b0,b1,self.a, self.x, self.y, self.ps, self.sp);
-                instruction(self);
-                self.pc += bytes as u16;
-                Some(base_cycles + extra_cycles)
-            } else {
-                panic!("Unknown instruction {:#04x} at {:#X} ", op, self.pc);
+    pub fn fetch_next_instruction(&mut self) -> u16 {
+        let op = self.ram.borrow().get_byte(self.pc);
+        let (_, code_segment_end) = self.code_segment;
+        if let Some(opcode) = self.opcodes[op as usize] {
+            if self.pc + 1 <= code_segment_end {
+                self.operand_1 = self.ram.borrow().get_byte(self.pc + 1);
             }
+            if self.pc + 2 <= code_segment_end {
+                self.operand_2 = self.ram.borrow().get_byte(self.pc + 2);
+            }
+            let (address, extra_cycles) =
+                self.get_address_and_extra_cycles(self.operand_1, self.operand_2, opcode.mode);
+            self.address = address;
+            self.cycles_next = (opcode.base_cycles + extra_cycles) as u16; 
+            self.opcode_next = op;
+            self.cycles_next
         } else {
-            println!("CPU Stopped execution at {:X}", self.pc);
-            None
+            panic!("Unknown instruction {:#04x} at {:#X} ", op, self.pc);
+        }
+    }
+
+    pub fn run_next_instruction(&mut self)  {
+        //println!("{:X} {:X} {:X} {:X} \t\tA:{:X} X:{:X} Y:{:X} P:{:X} SP={:X}",self.pc, self.opcode_next, self.operand_1, self.operand_2,self.a, self.x, self.y, self.ps, self.sp);
+        let opcode = self.opcodes[self.opcode_next as usize].unwrap();
+        (opcode.instruction)(self);
+        self.pc += opcode.mode.get_bytes() as u16;
+        let cycles_left = std::u128::MAX - self.cycles;
+        if cycles_left < self.cycles_next as u128 {
+            self.cycles = self.cycles_next as u128 - cycles_left;
+        } else {
+            self.cycles += self.cycles_next as u128;
         }
     }
 
@@ -644,13 +660,14 @@ impl CPU {
         self.pc = self.ram.borrow().get_word(0xFFFE) - 1;
     }
 
-    pub fn nmi(&mut self) {
+    pub fn nmi(&mut self) -> u8 {
         self.push_u16(self.pc);
         let mut ps = self.ps;
         ps &= !(ProcessorFlag::BFlagBit4 as u8);
         ps |= ProcessorFlag::BFlagBit5 as u8;
         self.push_u8(ps);
         self.pc = self.ram.borrow().get_word(0xFFFA);
+        7
     }
 
     fn pha(&mut self) {

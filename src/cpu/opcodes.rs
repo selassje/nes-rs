@@ -4,7 +4,7 @@ use super::{CPU};
 
 type Instruction = fn(&mut CPU);
 #[derive(Copy, Clone)]
-pub(super) struct OpCode( pub(super) Instruction, pub(super) AddressingMode, pub(super) u8);
+pub(super) struct OpCode {pub(super) instruction: Instruction, pub(super) mode: AddressingMode, pub(super) base_cycles: u8 }
 
 pub(super) type OpCodes = [Option<OpCode>; 256];
 
@@ -12,7 +12,7 @@ macro_rules! fill_opcodes {
     ($(($op:expr,$ins:ident,$mode:expr,$cycles:expr)),*) => {{
         let mut opcodes: OpCodes = [None; 256];
         $(
-        opcodes[$op] = Some(OpCode(CPU::$ins, $mode, $cycles));
+        opcodes[$op] = Some(OpCode{instruction:CPU::$ins, mode: $mode,base_cycles: $cycles});
         )*
         opcodes
     }};
