@@ -1,8 +1,10 @@
-use crate::colors::{ColorMapper, DefaultColorMapper, RgbColor};
 use crate::io_sdl::SCREEN;
 use crate::memory::VideoMemory;
 use crate::ram_ppu::*;
-use crate::screen::DISPLAY_WIDTH;
+use crate::{
+    colors::{ColorMapper, DefaultColorMapper, RgbColor},
+    screen::{DISPLAY_WIDTH,DISPLAY_HEIGHT},
+};
 
 use std::{cell::RefCell, default::Default, fmt::Display, rc::Rc};
 
@@ -332,7 +334,7 @@ impl PPU {
             PatternTable::new(&*self.vram.borrow(), 1),
         ];
         self.ppu_cycles = 0;
-        self.scanline = -1;
+        self.scanline = 0;
         self.frame = 1;
         self.vram_address = Default::default();
         self.t_vram_address = Default::default();
@@ -381,7 +383,7 @@ impl PPU {
 
     pub fn run_single_ppu_cycle(&mut self) -> bool {
         let mut nmi_triggered = false;
-   
+
         if self.ppu_cycles > ACTIVE_PIXELS_START && self.ppu_cycles <= ACTIVE_PIXELS_END {
             let x = self.ppu_cycles - ACTIVE_PIXELS_START;
             if self.is_rendering_in_progress() && (x as usize % TILE_SIDE_LENGTH == 0) {
@@ -390,7 +392,7 @@ impl PPU {
         }
 
         if self.ppu_cycles == ACTIVE_PIXELS_END + 1 {
-            if self.is_rendering_in_progress() {
+            if self.is_rendering_in_progress() && self.scanline != PRE_RENDER_SCANLINE {
                 self.vram_address.inc_y();
                 self.vram_address
                     .set(COARSE_X, self.t_vram_address.get(COARSE_X));
@@ -417,6 +419,7 @@ impl PPU {
                             .set(COARSE_Y, self.t_vram_address.get(COARSE_Y));
                         self.vram_address
                             .set(NM_TABLE_Y, self.t_vram_address.get(NM_TABLE_Y));
+                        // println!("Resetting V to T. Y in V is now {}  Y in T was {}",self.vram_address.get(COARSE_Y)*8 + self.vram_address.get(FINE_Y),self.t_vram_address.get(FINE_Y));
                     }
                 }
                 _ => (),
@@ -456,13 +459,17 @@ impl PPU {
     }
 
     fn get_scrolled_x(&self, x: usize) -> usize {
-        (self.fine_x_scroll as usize + x) % TILE_SIDE_LENGTH
+        ((self.fine_x_scroll as usize + x)
             + (self.vram_address.get(COARSE_X) * TILE_SIDE_LENGTH as u16) as usize
+            + (self.vram_address.get(NM_TABLE_X) as usize) * DISPLAY_WIDTH as usize)
+            % (2 * DISPLAY_WIDTH)
     }
 
     fn get_scrolled_y(&self, y: usize) -> usize {
-        (self.vram_address.get(FINE_Y) as usize) % TILE_SIDE_LENGTH
-            + (self.vram_address.get(COARSE_Y) * TILE_SIDE_LENGTH as u16) as usize
+        ((self.vram_address.get(FINE_Y) as usize)
+            + (self.vram_address.get(COARSE_Y) * (TILE_SIDE_LENGTH as u16)) as usize
+            + ((self.vram_address.get(NM_TABLE_Y) as usize) * DISPLAY_HEIGHT))
+            % (2 * DISPLAY_HEIGHT)
     }
 
     fn determine_pixel_color_and_check_for_sprite0_hit(
@@ -494,11 +501,14 @@ impl PPU {
     }
 
     fn get_background_color_index(&mut self, x: usize, y: usize) -> (u8, u8) {
-        let name_table_index = self.vram_address.get(NM_TABLE) as u8;
         let bg_pattern_table_index = self.control_reg.get_background_pattern_table_index();
         let bg_pattern_table = &self.pattern_tables[bg_pattern_table_index as usize];
-        let scrolled_x = self.get_scrolled_x(x);
+        let scrolled_x = self.get_scrolled_x(x % 8);
         let scrolled_y = self.get_scrolled_y(y);
+        let name_table_index =
+            (2 * (scrolled_y / DISPLAY_HEIGHT) + (scrolled_x / DISPLAY_WIDTH)) as u8;
+        let scrolled_x = scrolled_x % DISPLAY_WIDTH;
+        let scrolled_y = scrolled_y % DISPLAY_HEIGHT;
         let bg_color_tile_y = (scrolled_y / 16) as u8;
         let bg_color_tile_x = (scrolled_x / 16) as u8;
         let bg_palette_index = self.vram.borrow().get_background_pallete_index(
@@ -641,7 +651,6 @@ impl WritePpuRegisters for PPU {
                     self.t_vram_address.set(COARSE_X, (value >> 3) as u16);
                 }
                 self.write_toggle = !self.write_toggle;
-                //assert!(!(self.is_rendering_enabled() && self.is_scanline_visible_or_pre_render()));
             }
 
             WriteAccessRegister::PpuAddr => {
@@ -664,6 +673,7 @@ impl WritePpuRegisters for PPU {
                     "Scanline {}",
                     self.scanline
                 );
+                assert!(!self.is_rendering_in_progress());
                 self.vram_address.address += self.control_reg.get_vram_increment();
             }
 
@@ -696,6 +706,7 @@ impl ReadPpuRegisters for PPU {
             }
             ReadAccessRegister::PpuData => {
                 let val = self.vram.borrow_mut().get_byte(self.vram_address.address);
+                assert!(!self.is_rendering_in_progress());
                 self.vram_address.address += self.control_reg.get_vram_increment();
                 val
             }

@@ -3,6 +3,7 @@ mod opcodes;
 use self::AddressingMode::*;
 use crate::common::*;
 use crate::memory::CpuMemory;
+use crate::ram_ppu::DmaWriteAccessRegister::OamDma;
 use opcodes::{get_opcodes, OpCode, OpCodes};
 use spin_sleep::SpinSleeper;
 use std::cell::RefCell;
@@ -53,7 +54,7 @@ impl AddressingMode {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Address {
     Implicit,
     Accumulator,
@@ -132,7 +133,7 @@ impl CPU {
         self.a = 0;
         self.x = 0;
         self.y = 0;
-        self.cycles = 0;
+        self.cycles = 7;
         self.cycles_next = 0;
         self.opcode_next = 0;
         self.operand_1 = 0;
@@ -203,19 +204,34 @@ impl CPU {
             if self.pc + 2 <= code_segment_end {
                 self.operand_2 = self.ram.borrow().get_byte(self.pc + 2);
             }
-            let (address, extra_cycles) =
-                self.get_address_and_extra_cycles(self.operand_1, self.operand_2, opcode.mode);
-            self.address = address;
-            self.cycles_next = (opcode.base_cycles + extra_cycles) as u16; 
             self.opcode_next = op;
+            let (address, mut extra_cycles) = self.get_address_and_extra_cycle_from_page_crossing();
+            self.address = address;
+            extra_cycles += self.get_extra_cycles_from_branching() as u16
+                + self.get_extra_cycles_from_oam_dma();
+            self.cycles_next = opcode.base_cycles as u16 + extra_cycles;
             self.cycles_next
         } else {
             panic!("Unknown instruction {:#04x} at {:#X} ", op, self.pc);
         }
     }
 
-    pub fn run_next_instruction(&mut self)  {
-        //println!("{:X} {:X} {:X} {:X} \t\tA:{:X} X:{:X} Y:{:X} P:{:X} SP={:X}",self.pc, self.opcode_next, self.operand_1, self.operand_2,self.a, self.x, self.y, self.ps, self.sp);
+    pub fn run_next_instruction(&mut self) {
+        /*
+        println!(
+            "{:X} {:X} {:X} {:X} \t\tA:{:X} X:{:X} Y:{:X} P:{:X} SP={:X} CYCLES={}",
+            self.pc,
+            self.opcode_next,
+            self.operand_1,
+            self.operand_2,
+            self.a,
+            self.x,
+            self.y,
+            self.ps,
+            self.sp,
+            self.cycles
+        );
+        */
         let opcode = self.opcodes[self.opcode_next as usize].unwrap();
         (opcode.instruction)(self);
         self.pc += opcode.mode.get_bytes() as u16;
@@ -227,42 +243,92 @@ impl CPU {
         }
     }
 
-    fn get_address_and_extra_cycles(&self, b0: u8, b1: u8, mode: AddressingMode) -> (Address, u8) {
-        let b0_u16 = b0 as u16;
-        let b1_u16 = b1 as u16;
+    fn get_extra_cycles_from_oam_dma(&self) -> u16 {
+        let mut extra_cycles = 0;
+        if self.address == Address::RAM(OamDma as u16) {
+            extra_cycles = 513;
+            if self.cycles % 2 != 0 {
+                extra_cycles += 1;
+            }
+        }
+        extra_cycles
+    }
+
+    fn get_extra_cycles_from_branching(&self) -> u16 {
+        let opcode = self.opcodes[self.opcode_next as usize].unwrap();
+        let ins = opcode.instruction as usize;
+        let bcc_fn = Self::bcc as usize;
+        let bcs_fn = Self::bcs as usize;
+        let bpl_fn = Self::bpl as usize;
+        let bmi_fn = Self::bmi as usize;
+        let bne_fn = Self::bne as usize;
+        let beq_fn = Self::beq as usize;
+        let bvc_fn = Self::bvc as usize;
+        let bvs_fn = Self::bvs as usize;
+
+        if (ins == bcc_fn && self.check_condition_for_bcc())
+            || (ins == bcs_fn && self.check_condition_for_bcs())
+            || (ins == bpl_fn && self.check_condition_for_bpl())
+            || (ins == bmi_fn && self.check_condition_for_bmi())
+            || (ins == bne_fn && self.check_condition_for_bne())
+            || (ins == beq_fn && self.check_condition_for_beq())
+            || (ins == bvc_fn && self.check_condition_for_bvc())
+            || (ins == bvs_fn && self.check_condition_for_bvs())
+        {
+            let mut extra_cycles = 1;
+            if let Address::Relative(new_pc) = self.address {
+                if (new_pc + 2) & 0xFF00 != (self.pc + 2) & 0xFF00 {
+                    extra_cycles += 1;
+                }
+            } else {
+                panic!("");
+            }
+            extra_cycles
+        } else {
+            0
+        }
+    }
+
+    fn get_address_and_extra_cycle_from_page_crossing(&self) -> (Address, u16) {
+        let b0_u16 = self.operand_1 as u16;
+        let b1_u16 = self.operand_2 as u16;
         let x_u16 = self.x as u16;
         let y_u16 = self.y as u16;
         let zero_page_x = (b0_u16 + x_u16) & 0xFF;
         let zero_page_x_hi = (b0_u16 + x_u16 + 1) & 0xFF;
         let zero_page_y = (b0_u16 + y_u16) & 0xFF;
-        let mut add_cycles = 0;
+        let mut extra_cycle = 0;
 
-        match mode {
-            AddressingMode::Implicit => (Address::Implicit, 0),
-            AddressingMode::Accumulator => (Address::Accumulator, 0),
-            AddressingMode::Immediate => (Address::Immediate(b0), 0),
-            AddressingMode::ZeroPage => (Address::RAM(b0_u16), 0),
-            AddressingMode::ZeroPageX => (Address::RAM(zero_page_x), 0),
-            AddressingMode::ZeroPageY => (Address::RAM(zero_page_y), 0),
-            AddressingMode::Absolute => (Address::RAM(convert_2u8_to_u16(b0, b1)), 0),
+        let opcode = self.opcodes[self.opcode_next as usize].unwrap();
+        let address = match opcode.mode {
+            AddressingMode::Implicit => Address::Implicit,
+            AddressingMode::Accumulator => Address::Accumulator,
+            AddressingMode::Immediate => Address::Immediate(self.operand_1),
+            AddressingMode::ZeroPage => Address::RAM(b0_u16),
+            AddressingMode::ZeroPageX => Address::RAM(zero_page_x),
+            AddressingMode::ZeroPageY => Address::RAM(zero_page_y),
+            AddressingMode::Absolute => {
+                Address::RAM(convert_2u8_to_u16(self.operand_1, self.operand_2))
+            }
+
             AddressingMode::AbsoluteX => {
-                if b0_u16 + x_u16 > 0xFF {
-                    add_cycles = 1
+                if opcode.extra_cycle_on_page_crossing && b0_u16 + x_u16 > 0xFF {
+                    extra_cycle = 1
                 }
-                (Address::RAM(b0_u16 + x_u16 + (b1_u16 << 8)), add_cycles)
+                Address::RAM(b0_u16 + x_u16 + (b1_u16 << 8))
             }
             AddressingMode::AbsoluteY => {
-                if b0_u16 + y_u16 > 0xFF {
-                    add_cycles = 1
+                if opcode.extra_cycle_on_page_crossing && b0_u16 + y_u16 > 0xFF {
+                    extra_cycle = 1
                 }
-                (Address::RAM(b0_u16 + y_u16 + (b1_u16 << 8)), add_cycles)
+                Address::RAM(b0_u16 + y_u16 + (b1_u16 << 8))
             }
             AddressingMode::IndexedIndirectX => {
                 let indexed_indirect = convert_2u8_to_u16(
                     self.ram.borrow().get_byte(zero_page_x),
                     self.ram.borrow().get_byte(zero_page_x_hi),
                 );
-                (Address::RAM(indexed_indirect), 0)
+                Address::RAM(indexed_indirect)
             }
             AddressingMode::IndirectIndexedY => {
                 let indirect = convert_2u8_to_u16(
@@ -270,18 +336,16 @@ impl CPU {
                     self.ram.borrow().get_byte((b0_u16 + 1) & 0xFF),
                 );
                 let indirect_indexed = indirect + y_u16;
-                if indirect_indexed & 0xFF00 > indirect & 0xFF00 {
-                    add_cycles = 1;
+                if opcode.extra_cycle_on_page_crossing
+                    && indirect_indexed & 0xFF00 != indirect & 0xFF00
+                {
+                    extra_cycle = 1;
                 }
-
-                (Address::RAM(indirect_indexed), add_cycles)
+                Address::RAM(indirect_indexed)
             }
             AddressingMode::Relative => {
-                let new_pc = (self.pc as i16 + (b0 as i8 as i16)) as u16;
-                if new_pc & 0xFF00 != self.pc & 0xFF00 {
-                    add_cycles = 1
-                }
-                (Address::Relative(new_pc), add_cycles)
+                let new_pc = (self.pc as i16 + (self.operand_1 as i8 as i16)) as u16;
+                Address::Relative(new_pc)
             }
             AddressingMode::Indirect => {
                 let indirect = if b0_u16 == 0xFF {
@@ -295,9 +359,10 @@ impl CPU {
                         self.ram.borrow().get_byte(b0_u16 + (b1_u16 << 8) + 1),
                     )
                 };
-                (Address::RAM(indirect), 0)
+                Address::RAM(indirect)
             }
-        }
+        };
+        (address, extra_cycle)
     }
 
     fn load_from_address(&self) -> u8 {

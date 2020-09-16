@@ -1,46 +1,55 @@
-use super::AddressingMode::*;
 use super::AddressingMode;
-use super::{CPU};
+use super::AddressingMode::*;
+use super::CPU;
 
-type Instruction = fn(&mut CPU);
+pub type Instruction = fn(&mut CPU);
 #[derive(Copy, Clone)]
-pub(super) struct OpCode {pub(super) instruction: Instruction, pub(super) mode: AddressingMode, pub(super) base_cycles: u8 }
+pub(super) struct OpCode {
+    pub(super) instruction: Instruction,
+    pub(super) mode: AddressingMode,
+    pub(super) base_cycles: u8,
+    pub(super) extra_cycle_on_page_crossing: bool,
+}
 
 pub(super) type OpCodes = [Option<OpCode>; 256];
 
 macro_rules! fill_opcodes {
-    ($(($op:expr,$ins:ident,$mode:expr,$cycles:expr)),*) => {{
+    ($(($op:expr,$ins:ident,$mode:expr,$cycles:expr $(,$optional:expr)?)),*) => {{
         let mut opcodes: OpCodes = [None; 256];
         $(
-        opcodes[$op] = Some(OpCode{instruction:CPU::$ins, mode: $mode,base_cycles: $cycles});
+        let mut extra_cycle_on_page_crossing = false;
+        $(extra_cycle_on_page_crossing = $optional;
+        )?
+
+        opcodes[$op] = Some(OpCode{instruction:CPU::$ins, mode: $mode,base_cycles: $cycles,extra_cycle_on_page_crossing});
         )*
         opcodes
     }};
 }
-
+#[allow(unused_assignments, unused_mut)]
 pub(super) fn get_opcodes() -> OpCodes {
     fill_opcodes!(
         /*BRK*/
         (0x00, brk, Implicit, 7),
-         /*ADC*/
+        /*ADC*/
         (0x69, adc, Immediate, 2),
         (0x65, adc, ZeroPage, 3),
         (0x75, adc, ZeroPageX, 4),
         (0x6D, adc, Absolute, 4),
-        (0x7D, adc, AbsoluteX, 4),
-        (0x79, adc, AbsoluteY, 5),
+        (0x7D, adc, AbsoluteX, 4, true),
+        (0x79, adc, AbsoluteY, 4, true),
         (0x61, adc, IndexedIndirectX, 6),
-        (0x71, adc, IndirectIndexedY, 5),
+        (0x71, adc, IndirectIndexedY, 5, true),
         /*AND*/
         (0x29, and, Immediate, 2),
         (0x25, and, ZeroPage, 3),
         (0x35, and, ZeroPageX, 4),
         (0x2D, and, Absolute, 4),
-        (0x3D, and, AbsoluteX, 4),
-        (0x39, and, AbsoluteY, 4),
+        (0x3D, and, AbsoluteX, 4, true),
+        (0x39, and, AbsoluteY, 4, true),
         (0x21, and, IndexedIndirectX, 6),
-        (0x31, and, IndirectIndexedY, 5),
-         /*ASL*/
+        (0x31, and, IndirectIndexedY, 5, true),
+        /*ASL*/
         (0x0A, asl, Accumulator, 2),
         (0x06, asl, ZeroPage, 5),
         (0x16, asl, ZeroPageX, 6),
@@ -57,7 +66,7 @@ pub(super) fn get_opcodes() -> OpCodes {
         (0x70, bvs, Relative, 2),
         /*BIT*/
         (0x24, bit, ZeroPage, 3),
-        (0x2C, bit, Absolute, 5),
+        (0x2C, bit, Absolute, 4),
         /*CLEAR FLAGS*/
         (0x18, clc, Implicit, 2),
         (0xD8, cld, Implicit, 2),
@@ -68,10 +77,10 @@ pub(super) fn get_opcodes() -> OpCodes {
         (0xC5, cmp, ZeroPage, 3),
         (0xD5, cmp, ZeroPageX, 4),
         (0xCD, cmp, Absolute, 4),
-        (0xDD, cmp, AbsoluteX, 4),
-        (0xD9, cmp, AbsoluteY, 4),
+        (0xDD, cmp, AbsoluteX, 4, true),
+        (0xD9, cmp, AbsoluteY, 4, true),
         (0xC1, cmp, IndexedIndirectX, 6),
-        (0xD1, cmp, IndirectIndexedY, 5),
+        (0xD1, cmp, IndirectIndexedY, 5, true),
         /*CPX*/
         (0xE0, cpx, Immediate, 2),
         (0xE4, cpx, ZeroPage, 3),
@@ -87,15 +96,15 @@ pub(super) fn get_opcodes() -> OpCodes {
         (0xDE, dec, AbsoluteX, 7),
         (0xCA, dex, Implicit, 2),
         (0x88, dey, Implicit, 2),
-         /*EOR*/
+        /*EOR*/
         (0x49, eor, Immediate, 2),
         (0x45, eor, ZeroPage, 3),
         (0x55, eor, ZeroPageX, 4),
         (0x4D, eor, Absolute, 4),
-        (0x5D, eor, AbsoluteX, 4),
-        (0x59, eor, AbsoluteY, 4),
+        (0x5D, eor, AbsoluteX, 4, true),
+        (0x59, eor, AbsoluteY, 4, true),
         (0x41, eor, IndexedIndirectX, 6),
-        (0x51, eor, IndirectIndexedY, 5),
+        (0x51, eor, IndirectIndexedY, 5, true),
         /*INC*/
         (0xE6, inc, ZeroPage, 5),
         (0xF6, inc, ZeroPageX, 6),
@@ -113,22 +122,22 @@ pub(super) fn get_opcodes() -> OpCodes {
         (0xA5, lda, ZeroPage, 3),
         (0xB5, lda, ZeroPageX, 4),
         (0xAD, lda, Absolute, 4),
-        (0xBD, lda, AbsoluteX, 4),
-        (0xB9, lda, AbsoluteY, 4),
+        (0xBD, lda, AbsoluteX, 4, true),
+        (0xB9, lda, AbsoluteY, 4, true),
         (0xA1, lda, IndexedIndirectX, 6),
-        (0xB1, lda, IndirectIndexedY, 5),
+        (0xB1, lda, IndirectIndexedY, 5, true),
         /*LDX*/
         (0xA2, ldx, Immediate, 2),
-        (0xA6, ldx, ZeroPage, 2),
-        (0xB6, ldx, ZeroPageY, 2),
-        (0xAE, ldx, Absolute, 3),
-        (0xBE, ldx, AbsoluteY, 3),
+        (0xA6, ldx, ZeroPage, 3),
+        (0xB6, ldx, ZeroPageY, 4),
+        (0xAE, ldx, Absolute, 4),
+        (0xBE, ldx, AbsoluteY, 4, true),
         /*LDY*/
         (0xA0, ldy, Immediate, 2),
-        (0xA4, ldy, ZeroPage, 2),
-        (0xB4, ldy, ZeroPageX, 2),
-        (0xAC, ldy, Absolute, 3),
-        (0xBC, ldy, AbsoluteX, 3),
+        (0xA4, ldy, ZeroPage, 3),
+        (0xB4, ldy, ZeroPageX, 4),
+        (0xAC, ldy, Absolute, 4),
+        (0xBC, ldy, AbsoluteX, 4, true),
         /*LSR*/
         (0x4A, lsr, Accumulator, 2),
         (0x46, lsr, ZeroPage, 5),
@@ -142,15 +151,15 @@ pub(super) fn get_opcodes() -> OpCodes {
         (0x05, ora, ZeroPage, 3),
         (0x15, ora, ZeroPageX, 4),
         (0x0D, ora, Absolute, 4),
-        (0x1D, ora, AbsoluteX, 4),
-        (0x19, ora, AbsoluteY, 4),
+        (0x1D, ora, AbsoluteX, 4, true),
+        (0x19, ora, AbsoluteY, 4, true),
         (0x01, ora, IndexedIndirectX, 6),
-        (0x11, ora, IndirectIndexedY, 5),
+        (0x11, ora, IndirectIndexedY, 5, true),
         /*PUSH-PULL*/
         (0x48, pha, Implicit, 3),
         (0x08, php, Implicit, 3),
-        (0x68, pla, Implicit, 3),
-        (0x28, plp, Implicit, 3),
+        (0x68, pla, Implicit, 4),
+        (0x28, plp, Implicit, 4),
         /*ROL*/
         (0x2A, rol, Accumulator, 2),
         (0x26, rol, ZeroPage, 5),
@@ -172,10 +181,10 @@ pub(super) fn get_opcodes() -> OpCodes {
         (0xE5, sbc, ZeroPage, 3),
         (0xF5, sbc, ZeroPageX, 4),
         (0xED, sbc, Absolute, 4),
-        (0xFD, sbc, AbsoluteX, 4),
-        (0xF9, sbc, AbsoluteY, 4),
+        (0xFD, sbc, AbsoluteX, 4, true),
+        (0xF9, sbc, AbsoluteY, 4, true),
         (0xE1, sbc, IndexedIndirectX, 6),
-        (0xF1, sbc, IndirectIndexedY, 5),
+        (0xF1, sbc, IndirectIndexedY, 5, true),
         /*SET CLEARS*/
         (0x38, sec, Implicit, 2),
         (0xF8, sed, Implicit, 2),
@@ -204,7 +213,7 @@ pub(super) fn get_opcodes() -> OpCodes {
         (0x9A, txs, Implicit, 2),
         (0x98, tya, Implicit, 2),
         /*ILLEGAL OPPCODES */
-        (0x87, aax, ZeroPage,  3),
+        (0x87, aax, ZeroPage, 3),
         (0x97, aax, ZeroPageY, 4),
         (0x8F, aax, Absolute, 4),
         (0x83, aax, IndexedIndirectX, 6),
@@ -225,9 +234,9 @@ pub(super) fn get_opcodes() -> OpCodes {
         (0xA7, lax, ZeroPage, 3),
         (0xB7, lax, ZeroPageY, 4),
         (0xAF, lax, Absolute, 4),
-        (0xBF, lax, AbsoluteY, 4),
+        (0xBF, lax, AbsoluteY, 4, true),
         (0xA3, lax, IndexedIndirectX, 6),
-        (0xB3, lax, IndirectIndexedY, 5),
+        (0xB3, lax, IndirectIndexedY, 5, true),
         /*NOP*/
         (0x1A, nop, Implicit, 2),
         (0x3A, nop, Implicit, 2),
@@ -243,21 +252,21 @@ pub(super) fn get_opcodes() -> OpCodes {
         (0x54, nop, ZeroPageX, 4),
         (0x64, nop, ZeroPage, 3),
         (0x74, nop, ZeroPageX, 4),
-        (0x80, nop, Implicit, 2),
-        (0x82, nop, Implicit, 2),
-        (0x89, nop, Implicit, 2),
-        (0xC2, nop, Implicit, 2),
+        (0x80, nop, Immediate, 2),
+        (0x82, nop, Immediate, 2),
+        (0x89, nop, Immediate, 2),
+        (0xC2, nop, Immediate, 2),
         (0xD4, nop, ZeroPageX, 4),
-        (0xE2, nop, Implicit, 2),
+        (0xE2, nop, Immediate, 2),
         (0xF4, nop, ZeroPageX, 4),
         /*TOP*/
-        (0x0C, nop, Absolute, 4),
-        (0x1C, nop, AbsoluteX, 4),
-        (0x3C, nop, AbsoluteX, 4),
-        (0x5C, nop, AbsoluteX, 4),
-        (0x7C, nop, AbsoluteX, 4),
-        (0xDC, nop, AbsoluteX, 4),
-        (0xFC, nop, AbsoluteX, 4),
+        (0x0C, nop, Absolute, 4, true),
+        (0x1C, nop, AbsoluteX, 4, true),
+        (0x3C, nop, AbsoluteX, 4, true),
+        (0x5C, nop, AbsoluteX, 4, true),
+        (0x7C, nop, AbsoluteX, 4, true),
+        (0xDC, nop, AbsoluteX, 4, true),
+        (0xFC, nop, AbsoluteX, 4, true),
         (0x27, rla, ZeroPage, 5),
         (0x37, rla, ZeroPageX, 6),
         (0x2F, rla, Absolute, 6),
