@@ -56,19 +56,26 @@ impl Nes {
 
     pub fn run(&mut self) {
         const PPU_CYCLES_PER_CPU_CYCLE : u16 = 3;
-        let mut cpu_cyles_for_next_instruction = self.cpu.fetch_next_instruction();
-        while cpu_cyles_for_next_instruction != 0 {
-            let mut ppu_cycles = PPU_CYCLES_PER_CPU_CYCLE * cpu_cyles_for_next_instruction;
+        let mut cpu_cycles_for_next_instruction = self.cpu.fetch_next_instruction();
+        let mut current_ppu_cycle  = 0;
+        while cpu_cycles_for_next_instruction != 0 {
+            let mut ppu_cycles = PPU_CYCLES_PER_CPU_CYCLE * cpu_cycles_for_next_instruction;
             let mut elapsed_ppu_cycles = 0;
             while elapsed_ppu_cycles < ppu_cycles {
                 if self.ppu.borrow_mut().run_single_ppu_cycle() {
                     let nmi_cpu_cycles = self.cpu.nmi() as u16;
                     ppu_cycles  = PPU_CYCLES_PER_CPU_CYCLE * (self.cpu.fetch_next_instruction() + nmi_cpu_cycles);
-                } 
+                }
+                current_ppu_cycle += 1;
+                if current_ppu_cycle == PPU_CYCLES_PER_CPU_CYCLE {
+                    self.apu.borrow_mut().process_cpu_cycles(1);
+                    current_ppu_cycle = 0;
+                }
+                
                 elapsed_ppu_cycles +=1;
             }
             self.cpu.run_next_instruction();
-            cpu_cyles_for_next_instruction = self.cpu.fetch_next_instruction();
+            cpu_cycles_for_next_instruction = self.cpu.fetch_next_instruction();
         }
     }
 }
