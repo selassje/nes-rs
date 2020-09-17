@@ -127,10 +127,6 @@ impl Memory for RAM {
                 .expect("store_byte: missing input port entry");
             self.controller_access.borrow_mut().read(*port)
         } else if self.ppu_write_reg_map.contains_key(&addr) {
-            println!(
-                "Attempting to read from a Ppu write access register {:#X}",
-                addr
-            );
             0
         } else if self.controller_output_ports.contains_key(&addr) {
             panic!(
@@ -185,9 +181,9 @@ impl Memory for RAM {
             self.apu_access.borrow_mut().write(*reg, byte);
         } else if self.controller_input_ports.contains_key(&addr) {
         } else if self.ppu_read_reg_map.contains_key(&addr) {
-            panic!("Attempting to write to a read Ppu register");
+            //panic!("Attempting to write to a read Ppu register");
         } else if self.apu_read_reg_map.contains_key(&addr) {
-            panic!("Attempting to write to a read Apu register");
+            //panic!("Attempting to write to a read Apu register");
         } else if INTERNAL_RAM_RANGE.contains(&addr) {
             let mirrors = common::get_mirrors(addr, INTERNAL_MIRROR_SIZE, INTERNAL_RAM_RANGE);
             for m in mirrors {

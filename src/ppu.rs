@@ -95,6 +95,7 @@ enum StatusRegisterFlag {
     VerticalBlankStarted = 0b10000000,
 }
 
+#[derive(Copy, Clone, Default)]
 struct StatusRegister {
     value: u8,
 }
@@ -298,6 +299,9 @@ pub struct PPU {
     frame: u128,
     color_mapper: Box<dyn ColorMapper>,
     write_toggle: bool,
+    nmi_supressed: bool,
+    nmi_triggered: bool,
+    vbl_flag_supressed: bool,
     vram_address: VRAMAddress,
     t_vram_address: VRAMAddress,
     fine_x_scroll: u8,
@@ -322,6 +326,9 @@ impl PPU {
             t_vram_address: Default::default(),
             fine_x_scroll: 0,
             write_toggle: false,
+            nmi_supressed: false,
+            nmi_triggered: false,
+            vbl_flag_supressed: false,
         }
     }
 
@@ -343,6 +350,9 @@ impl PPU {
         self.t_vram_address = Default::default();
         self.fine_x_scroll = 0;
         self.write_toggle = false;
+        self.nmi_supressed = false;
+        self.nmi_triggered = false;
+        self.vbl_flag_supressed = false;
     }
 
     fn render_pixel(&mut self) {
@@ -350,10 +360,8 @@ impl PPU {
         let sprite_palettes = self.get_palettes(false);
 
         let x = self.ppu_cycles - ACTIVE_PIXELS_START;
-        let (bg_color_index, bg_palette_index) =
-            self.get_background_color_index(x as usize);
-        let (sprite_color_index, sprite) =
-            self.get_sprite_color_index(x as u8);
+        let (bg_color_index, bg_palette_index) = self.get_background_color_index(x as usize);
+        let (sprite_color_index, sprite) = self.get_sprite_color_index(x as u8);
 
         let (color, is_sprite0_hit_detected) = self
             .determine_pixel_color_and_check_for_sprite0_hit(
@@ -378,8 +386,6 @@ impl PPU {
     }
 
     pub fn run_single_ppu_cycle(&mut self) -> bool {
-        let mut nmi_triggered = false;
-
         if self.ppu_cycles > ACTIVE_PIXELS_START && self.ppu_cycles <= ACTIVE_PIXELS_END {
             let x = self.ppu_cycles - ACTIVE_PIXELS_START;
             if self.is_rendering_in_progress() && (x as usize % TILE_SIDE_LENGTH == 0) {
@@ -400,6 +406,9 @@ impl PPU {
         match self.scanline {
             PRE_RENDER_SCANLINE => match self.ppu_cycles {
                 1 => {
+                    self.nmi_supressed = false;
+                    self.vbl_flag_supressed = false;
+
                     self.status_reg
                         .set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
                     self.status_reg
@@ -419,7 +428,7 @@ impl PPU {
                 }
 
                 339 => {
-                    if !self.is_rendering_enabled() && self.frame % 2 == 1 {
+                    if self.is_rendering_enabled() && self.frame % 2 == 1 {
                         self.ppu_cycles += 1;
                     }
                 }
@@ -450,15 +459,12 @@ impl PPU {
             },
             VBLANK_START_SCANLINE => {
                 if self.ppu_cycles == 1 {
-                    self.status_reg
-                        .set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
-                    nmi_triggered = self.control_reg.is_generate_nmi_enabled();
-                }
-            }
-
-            260 => {
-                if self.ppu_cycles == 321 {
-                   // self.status_reg.set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
+                    if !self.vbl_flag_supressed {
+                        self.status_reg
+                            .set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
+                        //println!("Setting VBLANK");
+                        self.nmi_triggered = self.control_reg.is_generate_nmi_enabled();
+                    }
                 }
             }
 
@@ -466,7 +472,7 @@ impl PPU {
         };
 
         self.ppu_cycles += 1;
-        if self.ppu_cycles > PPU_CYCLES_PER_SCANLINE {
+        if self.ppu_cycles == PPU_CYCLES_PER_SCANLINE {
             self.ppu_cycles = 0;
             self.scanline += 1;
             if self.scanline == 261 {
@@ -477,8 +483,12 @@ impl PPU {
                     self.frame += 1;
                 }
             }
+        };
+        let nmi_triggered = self.nmi_triggered;
+        if nmi_triggered {
+            self.nmi_triggered = false;
         }
-        return nmi_triggered;
+        nmi_triggered && !self.nmi_supressed
     }
 
     fn get_scrolled_x(&self, x: usize) -> usize {
@@ -613,7 +623,9 @@ impl PPU {
             data: [s[0], s[1], s[2], s[3]],
         });
         let sprites = sprites.filter(|sprite| {
-            (self.scanline as u8) >= sprite.get_y() && (self.scanline as u8) < sprite.get_y() + self.control_reg.get_sprite_size_height()
+            (self.scanline as u8) >= sprite.get_y()
+                && (self.scanline as u8)
+                    < sprite.get_y() + self.control_reg.get_sprite_size_height()
         });
         let if_overflow = sprites.clone().count() > 8;
         (sprites.take(8).collect(), if_overflow)
@@ -658,6 +670,13 @@ impl WritePpuRegisters for PPU {
     fn write(&mut self, register: WriteAccessRegister, value: u8) -> () {
         match register {
             WriteAccessRegister::PpuCtrl => {
+                let new_control_register = ControlRegister { value };
+                self.nmi_triggered = self
+                    .status_reg
+                    .get_flag(StatusRegisterFlag::VerticalBlankStarted)
+                    && (new_control_register.is_generate_nmi_enabled()
+                        && !self.control_reg.is_generate_nmi_enabled());
+
                 self.control_reg.value = value;
                 self.t_vram_address
                     .set(NM_TABLE, self.control_reg.get_base_nametable_index() as u16);
@@ -721,11 +740,32 @@ impl ReadPpuRegisters for PPU {
     fn read(&mut self, register: ReadAccessRegister) -> u8 {
         match register {
             ReadAccessRegister::PpuStatus => {
-                let current_value = self.status_reg.value;
+                let mut vbl_flag_read_value = self
+                    .status_reg
+                    .get_flag(StatusRegisterFlag::VerticalBlankStarted);
+                if self.scanline == VBLANK_START_SCANLINE && self.ppu_cycles == 0 {
+                    self.nmi_supressed = true;
+                    self.vbl_flag_supressed = true;
+                    vbl_flag_read_value = false;
+                }
+
+                if self.scanline == VBLANK_START_SCANLINE
+                    && (self.ppu_cycles == 1 || self.ppu_cycles == 2)
+                {
+                    self.nmi_supressed = true;
+                    self.vbl_flag_supressed = true;
+                    vbl_flag_read_value = true;
+                }
+
+                let mut current_status = self.status_reg;
+                current_status.set_flag(
+                    StatusRegisterFlag::VerticalBlankStarted,
+                    vbl_flag_read_value,
+                );
                 self.write_toggle = false;
                 self.status_reg
                     .set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
-                current_value
+                current_status.value
             }
             ReadAccessRegister::PpuData => {
                 let val = self.vram.borrow_mut().get_byte(self.vram_address.address);
