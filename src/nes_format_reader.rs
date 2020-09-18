@@ -128,9 +128,9 @@ impl NesFile {
         let header =     NesHeader {prg_rom_units: in_bytes[read_index],
                                     chr_rom_units: in_bytes[read_index+1],
                                     flag_6:        in_bytes[read_index+2],
-                                    lo_n_mapper_number: in_bytes[read_index+2] & 0xF0,
+                                    lo_n_mapper_number: (in_bytes[read_index+2] & 0xF0) >> 4,
                                     flag_7: in_bytes[read_index + 3],
-                                    ho_n_mapper_number: in_bytes[read_index + 3] & 0xF0,
+                                    ho_n_mapper_number: (in_bytes[read_index + 3] & 0xF0) >> 4,
                                     prg_ram_units: in_bytes[read_index + 4],
                                     flag_9: in_bytes[read_index + 5],
                                     flag_10: in_bytes[read_index + 6],
@@ -194,8 +194,7 @@ impl NesFile {
               }
          }
 
-        let mapper_number = (header.ho_n_mapper_number<< 4  + header.lo_n_mapper_number) as u32;
-
+        let mapper_number = ((header.ho_n_mapper_number << 4) + header.lo_n_mapper_number) as u32;
         NesFile{trainer,
                 prg_rom,
                 chr_rom,

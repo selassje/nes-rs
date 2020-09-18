@@ -1,6 +1,7 @@
 extern crate sdl2;
 
-use crate::screen::{Screen, DISPLAY_HEIGHT, DISPLAY_WIDTH};
+use crate::{screen::{Screen, DISPLAY_HEIGHT, DISPLAY_WIDTH}, NesSettings};
+use pixels::PixelFormatEnum;
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 
 use lazy_static::lazy_static;
@@ -9,7 +10,7 @@ use sdl2::pixels;
 use sdl2::rect::Rect;
 
 use circular_queue::CircularQueue;
-use std::collections::HashMap;
+use std::{collections::HashMap, fs::File};
 use std::iter::FromIterator;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -55,8 +56,9 @@ impl IOSdl {
     pub fn new(title: String) -> IOSdl {
         IOSdl { title }
     }
-    pub fn run(&self) {
+    pub fn run(&self, settings: NesSettings) {
         const DISPLAY_SCALING: i16 = 2;
+        let start_time = Instant::now();
 
         let sdl_context = sdl2::init().unwrap();
         let sdl_audio = sdl_context.audio().unwrap();
@@ -97,7 +99,8 @@ impl IOSdl {
         let mut events = sdl_context.event_pump().unwrap();
         let mut frame_timer = Instant::now();
         let mut sound_timer = Instant::now();
-        loop {
+        while settings.duration == None || start_time.elapsed() < settings.duration.unwrap()  {
+
             *KEYBOARD.lock().unwrap() = HashMap::from_iter(events.keyboard_state().scancodes());
             events.pump_events();
             canvas.clear();
@@ -129,4 +132,19 @@ impl IOSdl {
             };
         }
     }
+
+    pub fn dump_frame(path: &str) {
+        let mut bitmap =  sdl2::surface::Surface::new(DISPLAY_WIDTH as u32 ,DISPLAY_HEIGHT as u32,PixelFormatEnum::RGB24).unwrap();
+        unsafe {
+                for (x, col) in SCREEN.iter().enumerate() {
+                    for (y, color) in col.iter().enumerate() {
+                       let (r,g,b) = *color;
+                       let pixel_color = pixels::Color::RGB(r, g, b);
+                       let _ = bitmap.fill_rect(Rect::new(x as i32,y as i32,1,1),pixel_color);
+                    }
+                }
+            }
+        let _ = bitmap.save_bmp(path);
+    }
 }
+

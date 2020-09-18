@@ -1,7 +1,6 @@
 /target
 **/*.rs.bk
 Cargo.lock
-*.txt
 *.nes
 !/test_roms/*
 !/test_roms/ppu/blargg/*.nes

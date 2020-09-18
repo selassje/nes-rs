@@ -409,6 +409,11 @@ impl PPU {
                     self.nmi_supressed = false;
                     self.vbl_flag_supressed = false;
 
+                    self.pattern_tables = [
+                        PatternTable::new(&*self.vram.borrow(), 0),
+                        PatternTable::new(&*self.vram.borrow(), 1),
+                    ];
+
                     self.status_reg
                         .set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
                     self.status_reg
@@ -462,7 +467,7 @@ impl PPU {
                     if !self.vbl_flag_supressed {
                         self.status_reg
                             .set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
-                        //println!("Setting VBLANK");
+  
                         self.nmi_triggered = self.control_reg.is_generate_nmi_enabled();
                     }
                 }

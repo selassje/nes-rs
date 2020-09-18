@@ -9,7 +9,7 @@ use spin_sleep::SpinSleeper;
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter, Result};
 use std::rc::Rc;
-use std::time::{Duration, Instant};
+
 
 const NANOS_PER_CPU_CYCLE: u128 = 559;
 
@@ -129,11 +129,11 @@ impl CPU {
         self.pc = 0xC000;
         self.pc = self.ram.borrow().get_word(0xFFFC);
         self.sp = 0xFD;
-        self.ps = 0x24;
+        self.ps = 0x04;
         self.a = 0;
         self.x = 0;
         self.y = 0;
-        self.cycles = 7;
+        self.cycles = 8;
         self.cycles_next = 0;
         self.opcode_next = 0;
         self.operand_1 = 0;
