@@ -76,9 +76,9 @@ impl Nes {
                 }
                 current_ppu_cycle += 1;
                 if current_ppu_cycle == PPU_CYCLES_PER_CPU_CYCLE {
-                    if self.settings.enable_sound {
-                        self.apu.borrow_mut().process_cpu_cycles(1);
-                    }
+                    self.apu
+                        .borrow_mut()
+                        .process_cpu_cycles(1, self.settings.enable_sound);
                     current_ppu_cycle = 0;
                 }
 

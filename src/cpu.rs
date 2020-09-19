@@ -177,8 +177,17 @@ impl CPU {
     }
 
     fn push_u16(&mut self, val: u16) {
-        let addr = self.sp as u16 + STACK_PAGE - 1;
-        self.ram.borrow_mut().store_word(addr, val);
+        let (addr_lo, addr_hi) = if self.sp == 0 {
+            (0xFF, 0x00)
+        } else {
+            (self.sp - 1, self.sp)
+        };
+        self.ram
+            .borrow_mut()
+            .store_byte(addr_lo as u16 + STACK_PAGE, (val & 0x00FF) as u8);
+        self.ram
+            .borrow_mut()
+            .store_byte(addr_hi as u16 + STACK_PAGE, ((val & 0xFF00) >> 8) as u8);
         self.sp -= 2;
     }
 
@@ -189,8 +198,15 @@ impl CPU {
 
     fn pop_u16(&mut self) -> u16 {
         self.sp += 2;
-        let addr = self.sp as u16 + STACK_PAGE - 1;
-        self.ram.borrow().get_word(addr)
+        let (addr_lo, addr_hi) = if self.sp == 0 {
+            (0xFF, 0x00)
+        } else {
+            (self.sp - 1, self.sp)
+        };
+        convert_2u8_to_u16(
+            self.ram.borrow().get_byte(addr_lo as u16 + STACK_PAGE),
+            self.ram.borrow().get_byte(addr_hi as u16 + STACK_PAGE),
+        )
     }
 
     pub fn fetch_next_instruction(&mut self) -> u16 {
@@ -216,21 +232,21 @@ impl CPU {
     }
 
     pub fn run_next_instruction(&mut self) {
-        /*
-        println!(
-            "{:X} {:X} {:X} {:X} \t\tA:{:X} X:{:X} Y:{:X} P:{:X} SP={:X} CYCLES={}",
-            self.pc,
-            self.opcode_next,
-            self.operand_1,
-            self.operand_2,
-            self.a,
-            self.x,
-            self.y,
-            self.ps,
-            self.sp,
-            self.cycles
-        );
-        */
+        if false {
+            println!(
+                "{:X} {:X} {:X} {:X} \t\tA:{:X} X:{:X} Y:{:X} P:{:X} SP={:X} CYCLES={}",
+                self.pc,
+                self.opcode_next,
+                self.operand_1,
+                self.operand_2,
+                self.a,
+                self.x,
+                self.y,
+                self.ps,
+                self.sp,
+                self.cycles
+            );
+        }
         let opcode = self.opcodes[self.opcode_next as usize].unwrap();
         (opcode.instruction)(self);
         self.pc += opcode.mode.get_bytes() as u16;
@@ -476,6 +492,25 @@ impl CPU {
 
     fn nop(&mut self) {}
 
+    fn brk(&mut self) {
+        self.push_u16(self.pc + 1);
+        let mut ps = self.ps;
+        ps |= ProcessorFlag::BFlagBit4 as u8;
+        ps |= ProcessorFlag::BFlagBit5 as u8;
+        self.push_u8(ps);
+        self.pc = self.ram.borrow().get_word(0xFFFE) - 1;
+    }
+
+    pub fn nmi(&mut self) -> u8 {
+        self.push_u16(self.pc);
+        let mut ps = self.ps;
+        ps &= !(ProcessorFlag::BFlagBit4 as u8);
+        ps |= ProcessorFlag::BFlagBit5 as u8;
+        self.push_u8(ps);
+        self.pc = self.ram.borrow().get_word(0xFFFA);
+        7
+    }
+
     fn jsr(&mut self) {
         self.push_u16(self.pc + 2);
         self.pc = self.get_ram_address() - 3;
@@ -715,25 +750,6 @@ impl CPU {
         self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
     }
 
-    fn brk(&mut self) {
-        self.push_u16(self.pc + 1);
-        let mut ps = self.ps;
-        ps |= ProcessorFlag::BFlagBit4 as u8;
-        ps |= ProcessorFlag::BFlagBit5 as u8;
-        self.push_u8(ps);
-        self.pc = self.ram.borrow().get_word(0xFFFE) - 1;
-    }
-
-    pub fn nmi(&mut self) -> u8 {
-        self.push_u16(self.pc);
-        let mut ps = self.ps;
-        ps &= !(ProcessorFlag::BFlagBit4 as u8);
-        ps |= ProcessorFlag::BFlagBit5 as u8;
-        self.push_u8(ps);
-        self.pc = self.ram.borrow().get_word(0xFFFA);
-        7
-    }
-
     fn pha(&mut self) {
         self.push_u8(self.a);
     }
@@ -807,6 +823,31 @@ impl CPU {
         self.store_to_address(result);
     }
 
+    fn alr(&mut self) {
+        self.and();
+        self.address = Address::Accumulator;
+        self.lsr();
+    }
+
+    fn anc(&mut self) {
+        self.and();
+        self.set_or_reset_flag(
+            ProcessorFlag::CarryFlag,
+            self.get_flag(ProcessorFlag::NegativeFlag),
+        );
+    }
+
+    fn arr(&mut self) {
+        self.and();
+        self.address = Address::Accumulator;
+        self.ror();
+    }
+
+    fn axa(&mut self) {
+        self.and();
+        self.lsr();
+    }
+
     fn dcp(&mut self) {
         self.dec();
         self.cmp();
@@ -816,6 +857,12 @@ impl CPU {
         self.inc();
         self.sbc();
     }
+
+    fn las(&mut self) {}
+
+    fn oal(&mut self) {}
+
+    fn sax(&mut self) {}
 
     fn slo(&mut self) {
         self.asl();
@@ -827,6 +874,8 @@ impl CPU {
         self.and();
     }
 
+    fn say(&mut self) {}
+
     fn sre(&mut self) {
         self.lsr();
         self.eor();
@@ -836,4 +885,13 @@ impl CPU {
         self.ror();
         self.adc();
     }
+
+    fn tas(&mut self) {}
+
+    fn xaa(&mut self) {
+        self.txa();
+        self.and();
+    }
+
+    fn xas(&mut self) {}
 }

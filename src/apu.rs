@@ -484,7 +484,7 @@ impl APU {
         self.noise.clock_envelope();
     }
 
-    pub fn process_cpu_cycles(&mut self, cpu_cycles: u8) {
+    pub fn process_cpu_cycles(&mut self, cpu_cycles: u8, enable_sound: bool) {
         static mut last_p1_sample: SampleFormat = 0;
 
         let elapsed_cpu_cycles = cpu_cycles as u16;
@@ -542,7 +542,9 @@ impl APU {
             }
         }
 
-        if self.cpu_cycles_sample + elapsed_cpu_cycles >= CPU_CYCLES_PER_SAMPLE as u16 {
+        if self.cpu_cycles_sample + elapsed_cpu_cycles >= CPU_CYCLES_PER_SAMPLE as u16
+            && enable_sound
+        {
             loop {
                 if SAMPLE_BUFFER.lock().unwrap().index != BUFFER_SIZE {
                     break;

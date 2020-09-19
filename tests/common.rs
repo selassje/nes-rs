@@ -1,5 +1,5 @@
 use nes_rs::run_test_rom;
-use std::{fs::File, io::Read};
+use std::{fs::File, io::Read, time::Duration};
 
 fn frames_are_the_same(rom_path: &str) -> bool {
     let path_1 = rom_path.to_owned() + ".bmp";
@@ -13,8 +13,12 @@ fn frames_are_the_same(rom_path: &str) -> bool {
     buffer_1 == buffer_2
 }
 
-pub fn run_simple_test(test_dir: &str, rom_name: &str) {
+pub fn run_simple_test(test_dir: &str, rom_name: &str, duration: Duration) {
     let rom_path = test_dir.to_owned() + rom_name;
-    run_test_rom(&rom_path);
+    run_test_rom(&rom_path, duration);
     assert!(frames_are_the_same(&rom_path));
+}
+
+pub fn run_simple_short_test(test_dir: &str, rom_name: &str) {
+    run_simple_test(test_dir, rom_name, Duration::from_secs(1));
 }

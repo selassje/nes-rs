@@ -19,7 +19,7 @@ mod ram_ppu;
 mod screen;
 mod vram;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct NesSettings {
     enable_sound: bool,
     duration: Option<Duration>,
@@ -52,7 +52,6 @@ fn nes_thread(nes_file: &nes_format_reader::NesFile, settings: NesSettings) {
 fn run_rom(path: &str, settings: NesSettings) {
     let rom = read_rom(path);
     let io = io_sdl::IOSdl::new(String::from(path));
-
     let nes_handle = thread::spawn(move || {
         nes_thread(&rom, settings);
     });
@@ -63,12 +62,12 @@ fn run_rom(path: &str, settings: NesSettings) {
     }
 }
 
-pub fn run_test_rom(path: &str) {
+pub fn run_test_rom(path: &str, duration: Duration) {
     run_rom(
         path,
         NesSettings {
             enable_sound: false,
-            duration: Some(Duration::from_secs(1)),
+            duration: Some(duration),
             dump_last_frame: true,
         },
     );

@@ -75,7 +75,9 @@ impl IOSdl {
         let apu_audio: AudioQueue<SampleFormat> =
             sdl_audio.open_queue(None, &desired_spec).unwrap();
 
-        apu_audio.resume();
+        if settings.enable_sound {
+            apu_audio.resume();
+        }
         let video_subsys = sdl_context.video().unwrap();
         let window = video_subsys
             .window(

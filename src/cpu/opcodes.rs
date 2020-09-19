@@ -217,6 +217,12 @@ pub(super) fn get_opcodes() -> OpCodes {
         (0x97, aax, ZeroPageY, 4),
         (0x8F, aax, Absolute, 4),
         (0x83, aax, IndexedIndirectX, 6),
+        (0x4B, alr, Immediate, 2),
+        (0x2B, anc, Immediate, 2),
+        (0x0B, anc, Immediate, 2),
+        (0x6B, arr, Immediate, 2),
+        (0x9F, axa, AbsoluteY, 5),
+        (0x93, axa, ZeroPageY, 6),
         (0xC7, dcp, ZeroPage, 5),
         (0xD7, dcp, ZeroPageX, 6),
         (0xCF, dcp, Absolute, 6),
@@ -237,6 +243,7 @@ pub(super) fn get_opcodes() -> OpCodes {
         (0xBF, lax, AbsoluteY, 4, true),
         (0xA3, lax, IndexedIndirectX, 6),
         (0xB3, lax, IndirectIndexedY, 5, true),
+        (0xBB, las, AbsoluteY, 4, true),
         /*NOP*/
         (0x1A, nop, Implicit, 2),
         (0x3A, nop, Implicit, 2),
@@ -267,6 +274,7 @@ pub(super) fn get_opcodes() -> OpCodes {
         (0x7C, nop, AbsoluteX, 4, true),
         (0xDC, nop, AbsoluteX, 4, true),
         (0xFC, nop, AbsoluteX, 4, true),
+        (0xAB, oal, Immediate, 2),
         (0x27, rla, ZeroPage, 5),
         (0x37, rla, ZeroPageX, 6),
         (0x2F, rla, Absolute, 6),
@@ -281,6 +289,8 @@ pub(super) fn get_opcodes() -> OpCodes {
         (0x7B, rra, AbsoluteY, 7),
         (0x63, rra, IndexedIndirectX, 8),
         (0x73, rra, IndirectIndexedY, 8),
+        (0xCB, sax, Immediate, 2),
+        (0x9C, say, AbsoluteX, 5),
         (0xEB, sbc, Immediate, 2),
         (0x07, slo, ZeroPage, 5),
         (0x17, slo, ZeroPageX, 6),
@@ -295,6 +305,9 @@ pub(super) fn get_opcodes() -> OpCodes {
         (0x5F, sre, AbsoluteX, 7),
         (0x5B, sre, AbsoluteY, 7),
         (0x43, sre, IndexedIndirectX, 8),
-        (0x53, sre, IndirectIndexedY, 8)
+        (0x53, sre, IndirectIndexedY, 8),
+        (0x9B, tas, AbsoluteY, 5),
+        (0x8B, xaa, Immediate, 2),
+        (0x9E, xas, AbsoluteY, 5)
     )
 }
