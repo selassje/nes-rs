@@ -5,14 +5,13 @@ use std::time::{Duration, Instant};
 
 use crate::io_sdl::{SampleFormat, BUFFER_SIZE, SAMPLE_BUFFER, SAMPLE_RATE};
 
-const CPU_CYCLES_PER_SECOND : u128 =  Duration::from_secs(1).as_nanos() / 559;
-const CPU_CYCLES_PER_SAMPLE : u128 =  CPU_CYCLES_PER_SECOND / SAMPLE_RATE as u128;
+const CPU_CYCLES_PER_SECOND: u128 = Duration::from_secs(1).as_nanos() / 559;
+const CPU_CYCLES_PER_SAMPLE: u128 = CPU_CYCLES_PER_SECOND / SAMPLE_RATE as u128;
 
 const LENGTH_COUNTER_LOOKUP_TABLE: [u8; 32] = [
     10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 2, 16, 24, 18, 48, 20, 96, 22,
     192, 24, 72, 26, 16, 28, 32, 30,
 ];
-
 
 const DUTY_CYCLE_SEQUENCES: [[SampleFormat; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1],
@@ -243,15 +242,15 @@ impl PulseWave {
         self.left_over_cpu_cycles = (total_elapsed_cycles % 2) as u8;
         let number_of_elapsed_ticks = (total_elapsed_cycles / 2) as u16;
         if number_of_elapsed_ticks as u16 > self.timer_tick && self.current_period != 0 {
-           // println!("current_period {} number_of_elapsed_ticks {}",self.current_period, number_of_elapsed_ticks);
+            // println!("current_period {} number_of_elapsed_ticks {}",self.current_period, number_of_elapsed_ticks);
             self.timer_tick = self.current_period + 1 - number_of_elapsed_ticks;
-          
+
             if self.sequencer_position > 0 {
                 self.sequencer_position -= 1;
             } else {
                 self.sequencer_position = 7;
             }
-        } else if  self.timer_tick >= number_of_elapsed_ticks {
+        } else if self.timer_tick >= number_of_elapsed_ticks {
             self.timer_tick -= number_of_elapsed_ticks;
         }
     }
@@ -443,7 +442,7 @@ pub struct APU {
     noise: Noise,
     dmc: DMC,
     cpu_cycles: u16,
-    cpu_cycles_sample : u16,
+    cpu_cycles_sample: u16,
     frame_interrupt: bool,
     dmc_interrupt: bool,
     sample_timer: Instant,
@@ -462,7 +461,7 @@ impl APU {
             noise: Noise::default(),
             dmc: DMC::default(),
             cpu_cycles: 0,
-            cpu_cycles_sample : 0,
+            cpu_cycles_sample: 0,
             frame_interrupt: false,
             dmc_interrupt: false,
             sample_timer: Instant::now(),
@@ -515,7 +514,13 @@ impl APU {
             self.cpu_cycles = (self.cpu_cycles + elapsed_cpu_cycles)
                 % FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES;
         }
-        let mut sample = Self::get_mixer_output(self.pulse_1.get_sample_value(), self.pulse_2.get_sample_value(),0,0,0);
+        let mut sample = Self::get_mixer_output(
+            self.pulse_1.get_sample_value(),
+            self.pulse_2.get_sample_value(),
+            0,
+            0,
+            0,
+        );
         unsafe {
             if sample != last_p1_sample {
                 /*
@@ -557,9 +562,9 @@ impl APU {
             sample_buffer.buffer[index] = sample;
             sample_buffer.index += 1;
             self.sample_timer = Instant::now();
-   
         }
-        self.cpu_cycles_sample =  (self.cpu_cycles_sample + elapsed_cpu_cycles )  % CPU_CYCLES_PER_SAMPLE as u16; 
+        self.cpu_cycles_sample =
+            (self.cpu_cycles_sample + elapsed_cpu_cycles) % CPU_CYCLES_PER_SAMPLE as u16;
     }
 
     fn get_mixer_output(

@@ -467,7 +467,7 @@ impl PPU {
                     if !self.vbl_flag_supressed {
                         self.status_reg
                             .set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
-  
+
                         self.nmi_triggered = self.control_reg.is_generate_nmi_enabled();
                     }
                 }

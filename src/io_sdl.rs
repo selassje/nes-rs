@@ -1,6 +1,9 @@
 extern crate sdl2;
 
-use crate::{screen::{Screen, DISPLAY_HEIGHT, DISPLAY_WIDTH}, NesSettings};
+use crate::{
+    screen::{Screen, DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    NesSettings,
+};
 use pixels::PixelFormatEnum;
 use sdl2::audio::{AudioQueue, AudioSpecDesired};
 
@@ -10,10 +13,10 @@ use sdl2::pixels;
 use sdl2::rect::Rect;
 
 use circular_queue::CircularQueue;
-use std::{collections::HashMap, fs::File};
 use std::iter::FromIterator;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+use std::{collections::HashMap, fs::File};
 pub type SampleFormat = u8;
 
 const FPS: u128 = 200;
@@ -71,7 +74,7 @@ impl IOSdl {
 
         let apu_audio: AudioQueue<SampleFormat> =
             sdl_audio.open_queue(None, &desired_spec).unwrap();
-    
+
         apu_audio.resume();
         let video_subsys = sdl_context.video().unwrap();
         let window = video_subsys
@@ -99,8 +102,7 @@ impl IOSdl {
         let mut events = sdl_context.event_pump().unwrap();
         let mut frame_timer = Instant::now();
         let mut sound_timer = Instant::now();
-        while settings.duration == None || start_time.elapsed() < settings.duration.unwrap()  {
-
+        while settings.duration == None || start_time.elapsed() < settings.duration.unwrap() {
             *KEYBOARD.lock().unwrap() = HashMap::from_iter(events.keyboard_state().scancodes());
             events.pump_events();
             canvas.clear();
@@ -122,7 +124,7 @@ impl IOSdl {
                 }
 
                 let mut buffer = SAMPLE_BUFFER.lock().unwrap();
-                if sound_timer.elapsed().as_nanos() > SOUND_FRAME_DURATION  {
+                if sound_timer.elapsed().as_nanos() > SOUND_FRAME_DURATION {
                     if buffer.index == BUFFER_SIZE {
                         apu_audio.queue(&buffer.buffer[..]);
                         buffer.index = 0;
@@ -134,17 +136,21 @@ impl IOSdl {
     }
 
     pub fn dump_frame(path: &str) {
-        let mut bitmap =  sdl2::surface::Surface::new(DISPLAY_WIDTH as u32 ,DISPLAY_HEIGHT as u32,PixelFormatEnum::RGB24).unwrap();
+        let mut bitmap = sdl2::surface::Surface::new(
+            DISPLAY_WIDTH as u32,
+            DISPLAY_HEIGHT as u32,
+            PixelFormatEnum::RGB24,
+        )
+        .unwrap();
         unsafe {
-                for (x, col) in SCREEN.iter().enumerate() {
-                    for (y, color) in col.iter().enumerate() {
-                       let (r,g,b) = *color;
-                       let pixel_color = pixels::Color::RGB(r, g, b);
-                       let _ = bitmap.fill_rect(Rect::new(x as i32,y as i32,1,1),pixel_color);
-                    }
+            for (x, col) in SCREEN.iter().enumerate() {
+                for (y, color) in col.iter().enumerate() {
+                    let (r, g, b) = *color;
+                    let pixel_color = pixels::Color::RGB(r, g, b);
+                    let _ = bitmap.fill_rect(Rect::new(x as i32, y as i32, 1, 1), pixel_color);
                 }
             }
+        }
         let _ = bitmap.save_bmp(path);
     }
 }
-

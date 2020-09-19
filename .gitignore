@@ -2,8 +2,8 @@
 **/*.rs.bk
 Cargo.lock
 *.nes
-!/test_roms/*
-!/test_roms/ppu/blargg/*.nes
-!/test_roms/nestest/*
+!/tests/*/*
+*.bmp
+!/tests/*/*.expected.bmp
 *.log
 *.zip

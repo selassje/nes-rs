@@ -10,7 +10,6 @@ use std::cell::RefCell;
 use std::fmt::{Display, Formatter, Result};
 use std::rc::Rc;
 
-
 const NANOS_PER_CPU_CYCLE: u128 = 559;
 
 const DEBUG: bool = false;

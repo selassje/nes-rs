@@ -47,7 +47,7 @@ impl Controllers {
             controller_1: controller_1,
             controller_2: controller_2,
             strobe: true,
-            next_controller_button: Cell::new(A as u8)
+            next_controller_button: Cell::new(A as u8),
         }
     }
 }
@@ -63,7 +63,8 @@ impl ReadInputPorts for Controllers {
                 .controller_2
                 .is_button_pressed(self.next_controller_button.get().into());
             if !self.strobe {
-                self.next_controller_button.set(self.next_controller_button.get() + 1);
+                self.next_controller_button
+                    .set(self.next_controller_button.get() + 1);
             }
         }
         match port {
@@ -83,6 +84,4 @@ impl WriteOutputPorts for Controllers {
     }
 }
 
-impl ControllerPortsAccess for Controllers {
-
-}
+impl ControllerPortsAccess for Controllers {}

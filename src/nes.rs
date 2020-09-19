@@ -1,13 +1,13 @@
-use crate::{apu::APU, NesSettings};
 use crate::controllers::Controllers;
 use crate::cpu::CPU;
 use crate::keyboard::KeyboardController;
 use crate::nes_format_reader::NesFile;
 use crate::ppu::PPU;
+use crate::{apu::APU, NesSettings};
 use crate::{ram::RAM, vram::VRAM};
-use std::time::{Duration, Instant};
-use std::{cell::RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::{Duration, Instant};
 
 pub struct Nes {
     cpu: CPU,
@@ -15,11 +15,11 @@ pub struct Nes {
     ppu: Rc<RefCell<PPU>>,
     vram: Rc<RefCell<VRAM>>,
     apu: Rc<RefCell<APU>>,
-    settings : NesSettings,
+    settings: NesSettings,
 }
 
 impl Nes {
-    pub fn new(settings : NesSettings) -> Self {
+    pub fn new(settings: NesSettings) -> Self {
         let controller_1 = KeyboardController::get_default_keyboard_controller_player1();
         let controller_2 = KeyboardController::get_default_keyboard_controller_player2();
         let controllers = Rc::new(RefCell::new(Controllers::new(
@@ -43,7 +43,7 @@ impl Nes {
             ppu,
             vram,
             apu,
-            settings 
+            settings,
         }
     }
 
@@ -55,7 +55,6 @@ impl Nes {
         self.cpu.reset();
     }
 
-
     pub fn run(&mut self) {
         let now = Instant::now();
         while self.settings.duration == None || now.elapsed() < self.settings.duration.unwrap() {
@@ -63,16 +62,17 @@ impl Nes {
         }
     }
     pub fn run_single_cpu_instruction(&mut self) {
-        const PPU_CYCLES_PER_CPU_CYCLE : u16 = 3;
+        const PPU_CYCLES_PER_CPU_CYCLE: u16 = 3;
         let cpu_cycles_for_next_instruction = self.cpu.fetch_next_instruction();
-        let mut current_ppu_cycle  = 0;
+        let mut current_ppu_cycle = 0;
         if cpu_cycles_for_next_instruction != 0 {
             let mut ppu_cycles = PPU_CYCLES_PER_CPU_CYCLE * cpu_cycles_for_next_instruction;
             let mut elapsed_ppu_cycles = 0;
             while elapsed_ppu_cycles < ppu_cycles {
                 if self.ppu.borrow_mut().run_single_ppu_cycle() {
                     let nmi_cpu_cycles = self.cpu.nmi() as u16;
-                    ppu_cycles  = PPU_CYCLES_PER_CPU_CYCLE * (self.cpu.fetch_next_instruction() + nmi_cpu_cycles);
+                    ppu_cycles = PPU_CYCLES_PER_CPU_CYCLE
+                        * (self.cpu.fetch_next_instruction() + nmi_cpu_cycles);
                 }
                 current_ppu_cycle += 1;
                 if current_ppu_cycle == PPU_CYCLES_PER_CPU_CYCLE {
@@ -81,8 +81,8 @@ impl Nes {
                     }
                     current_ppu_cycle = 0;
                 }
-                
-                elapsed_ppu_cycles +=1;
+
+                elapsed_ppu_cycles += 1;
             }
             self.cpu.run_next_instruction();
         }

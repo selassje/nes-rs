@@ -99,18 +99,17 @@ impl VRAM {
             Mirroring::HORIZONTAL => match namespace_region_offset {
                 0x0000..=0x03FF => 0x0400,
                 0x0400..=0x07FF => 0x0000,
-                0x0800..=0x0BFF => 0x0C00 ,
-                0x0C00..=0x0FFF => 0x0800 ,
+                0x0800..=0x0BFF => 0x0C00,
+                0x0C00..=0x0FFF => 0x0800,
                 _ => panic!("Unexpected nametable offset {:X}", namespace_region_offset),
             },
-        } +  namespace_region_offset % NAMETABLE_SIZE;
+        } + namespace_region_offset % NAMETABLE_SIZE;
         for i in 0..2 {
             let m = NAMETABLES_START + i * NAMETABLE_MIRROR_SIZE + internal_mirror_offset;
             if m < NAMETABLES_END {
                 mirrors.push(m);
             }
         }
-        //assert!(mirrors.len() == 4 || mirrors.len() == 3);
         mirrors
     }
 

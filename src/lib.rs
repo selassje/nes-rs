@@ -19,11 +19,11 @@ mod ram_ppu;
 mod screen;
 mod vram;
 
-#[derive(Copy,Clone)]
+#[derive(Copy, Clone)]
 pub struct NesSettings {
     enable_sound: bool,
     duration: Option<Duration>,
-    dump_last_frame: bool
+    dump_last_frame: bool,
 }
 
 impl Default for NesSettings {
@@ -31,7 +31,7 @@ impl Default for NesSettings {
         Self {
             enable_sound: true,
             duration: None,
-            dump_last_frame : false 
+            dump_last_frame: false,
         }
     }
 }
@@ -68,8 +68,8 @@ pub fn run_test_rom(path: &str) {
         path,
         NesSettings {
             enable_sound: false,
-            duration: Some(Duration::from_secs(5)),
-            dump_last_frame: true
+            duration: Some(Duration::from_secs(1)),
+            dump_last_frame: true,
         },
     );
 }
