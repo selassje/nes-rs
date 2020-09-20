@@ -4,15 +4,10 @@ use self::AddressingMode::*;
 use crate::common::*;
 use crate::memory::CpuMemory;
 use crate::ram_ppu::DmaWriteAccessRegister::OamDma;
-use opcodes::{get_opcodes, OpCode, OpCodes};
-use spin_sleep::SpinSleeper;
+use opcodes::{get_opcodes, OpCodes, NMI_OPCODE};
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter, Result};
 use std::rc::Rc;
-
-const NANOS_PER_CPU_CYCLE: u128 = 559;
-
-const DEBUG: bool = false;
 
 const STACK_PAGE: u16 = 0x0100;
 
@@ -101,6 +96,7 @@ pub struct CPU {
     ram: Rc<RefCell<dyn CpuMemory>>,
     code_segment: (u16, u16),
     opcodes: OpCodes,
+    nmi_triggered: bool,
 }
 
 impl CPU {
@@ -121,6 +117,7 @@ impl CPU {
             code_segment: (0, 0),
             address: Address::Implicit,
             opcodes: get_opcodes(),
+            nmi_triggered: false,
         }
     }
 
@@ -139,6 +136,7 @@ impl CPU {
         self.operand_2 = 0;
         self.code_segment = (0, 0xFFFF);
         self.address = Address::Implicit;
+        self.nmi_triggered = false;
     }
 
     fn set_flag(&mut self, flag: ProcessorFlag) {
@@ -210,7 +208,13 @@ impl CPU {
     }
 
     pub fn fetch_next_instruction(&mut self) -> u16 {
-        let op = self.ram.borrow().get_byte(self.pc);
+        let op = if self.nmi_triggered {
+            self.nmi_triggered = false;
+            NMI_OPCODE as u8
+        } else {
+            self.ram.borrow().get_byte(self.pc)
+        };
+
         let (_, code_segment_end) = self.code_segment;
         if let Some(opcode) = self.opcodes[op as usize] {
             if self.pc + 1 <= code_segment_end {
@@ -257,7 +261,6 @@ impl CPU {
             self.cycles += self.cycles_next as u128;
         }
     }
-
     fn get_extra_cycles_from_oam_dma(&self) -> u16 {
         let mut extra_cycles = 0;
         if self.address == Address::RAM(OamDma as u16) {
@@ -501,14 +504,17 @@ impl CPU {
         self.pc = self.ram.borrow().get_word(0xFFFE) - 1;
     }
 
-    pub fn nmi(&mut self) -> u8 {
+    fn nmi(&mut self) {
         self.push_u16(self.pc);
         let mut ps = self.ps;
         ps &= !(ProcessorFlag::BFlagBit4 as u8);
         ps |= ProcessorFlag::BFlagBit5 as u8;
         self.push_u8(ps);
-        self.pc = self.ram.borrow().get_word(0xFFFA);
-        7
+        self.pc = self.ram.borrow().get_word(0xFFFA) - 1;
+    }
+
+    pub fn nmi_triggered(&mut self) {
+        self.nmi_triggered = true;
     }
 
     fn jsr(&mut self) {

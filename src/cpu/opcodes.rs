@@ -11,6 +11,7 @@ pub(super) struct OpCode {
     pub(super) extra_cycle_on_page_crossing: bool,
 }
 
+pub(super) const NMI_OPCODE: usize = 0x02;
 pub(super) type OpCodes = [Option<OpCode>; 256];
 
 macro_rules! fill_opcodes {
@@ -212,6 +213,7 @@ pub(super) fn get_opcodes() -> OpCodes {
         (0x8A, txa, Implicit, 2),
         (0x9A, txs, Implicit, 2),
         (0x98, tya, Implicit, 2),
+        (NMI_OPCODE, nmi, Implicit, 7),
         /*ILLEGAL OPPCODES */
         (0x87, aax, ZeroPage, 3),
         (0x97, aax, ZeroPageY, 4),

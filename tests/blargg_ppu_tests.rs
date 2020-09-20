@@ -18,7 +18,6 @@ fn vram_access() {
     run_simple_short_test(PATH, "vram_access.nes");
 }
 #[test]
-#[ignore]
 fn vbl_clear_time() {
     run_simple_short_test(PATH, "vbl_clear_time.nes");
 }

@@ -13,10 +13,10 @@ use sdl2::pixels;
 use sdl2::rect::Rect;
 
 use circular_queue::CircularQueue;
+use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use std::{collections::HashMap, fs::File};
 pub type SampleFormat = u8;
 
 const FPS: u128 = 200;
