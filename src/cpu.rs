@@ -4,6 +4,7 @@ use self::AddressingMode::*;
 use crate::common::*;
 use crate::memory::CpuMemory;
 use crate::ram_ppu::DmaWriteAccessRegister::OamDma;
+use crate::ram_ppu::ReadAccessRegister::PpuStatus;
 use opcodes::{get_opcodes, OpCodes, NMI_OPCODE};
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter, Result};
@@ -207,7 +208,7 @@ impl CPU {
         )
     }
 
-    pub fn fetch_next_instruction(&mut self) -> u16 {
+    pub fn fetch_next_instruction(&mut self) -> (u16, bool) {
         let op = if self.nmi_triggered {
             self.nmi_triggered = false;
             NMI_OPCODE as u8
@@ -229,7 +230,10 @@ impl CPU {
             extra_cycles += self.get_extra_cycles_from_branching() as u16
                 + self.get_extra_cycles_from_oam_dma();
             self.cycles_next = opcode.base_cycles as u16 + extra_cycles;
-            self.cycles_next
+            (
+                self.cycles_next,
+                self.address == Address::RAM(PpuStatus as u16),
+            )
         } else {
             panic!("Unknown instruction {:#04x} at {:#X} ", op, self.pc);
         }

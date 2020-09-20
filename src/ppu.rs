@@ -299,7 +299,6 @@ pub struct PPU {
     frame: u128,
     color_mapper: Box<dyn ColorMapper>,
     write_toggle: bool,
-    nmi_supressed: bool,
     nmi_triggered: bool,
     vbl_flag_supressed: bool,
     vram_address: VRAMAddress,
@@ -326,7 +325,6 @@ impl PPU {
             t_vram_address: Default::default(),
             fine_x_scroll: 0,
             write_toggle: false,
-            nmi_supressed: false,
             nmi_triggered: false,
             vbl_flag_supressed: false,
         }
@@ -350,7 +348,6 @@ impl PPU {
         self.t_vram_address = Default::default();
         self.fine_x_scroll = 0;
         self.write_toggle = false;
-        self.nmi_supressed = false;
         self.nmi_triggered = false;
         self.vbl_flag_supressed = false;
     }
@@ -385,6 +382,28 @@ impl PPU {
         }
     }
 
+    pub fn run_cpu_cycles(
+        &mut self,
+        cpu_cycles: u16,
+        will_read_from_ppu_status_occur: bool,
+    ) -> bool {
+        let mut nmi_triggered = false;
+        for _ in 0..cpu_cycles * 3 {
+            if self.run_single_ppu_cycle() {
+                if nmi_triggered == false {
+                    nmi_triggered = true;
+                }
+            }
+        }
+        if will_read_from_ppu_status_occur {
+            if self.scanline == VBLANK_START_SCANLINE
+                && (self.ppu_cycles >= 1 && self.ppu_cycles <= 3)
+            {
+                nmi_triggered = false;
+            }
+        }
+        nmi_triggered
+    }
     pub fn run_single_ppu_cycle(&mut self) -> bool {
         if self.ppu_cycles > ACTIVE_PIXELS_START && self.ppu_cycles <= ACTIVE_PIXELS_END {
             let x = self.ppu_cycles - ACTIVE_PIXELS_START;
@@ -406,7 +425,6 @@ impl PPU {
         match self.scanline {
             PRE_RENDER_SCANLINE => match self.ppu_cycles {
                 1 => {
-                    self.nmi_supressed = false;
                     self.vbl_flag_supressed = false;
 
                     self.pattern_tables = [
@@ -493,7 +511,7 @@ impl PPU {
         if nmi_triggered {
             self.nmi_triggered = false;
         }
-        nmi_triggered && !self.nmi_supressed
+        nmi_triggered
     }
 
     fn get_scrolled_x(&self, x: usize) -> usize {
@@ -745,28 +763,11 @@ impl ReadPpuRegisters for PPU {
     fn read(&mut self, register: ReadAccessRegister) -> u8 {
         match register {
             ReadAccessRegister::PpuStatus => {
-                let mut vbl_flag_read_value = self
-                    .status_reg
-                    .get_flag(StatusRegisterFlag::VerticalBlankStarted);
-                if self.scanline == VBLANK_START_SCANLINE && self.ppu_cycles == 0 {
-                    self.nmi_supressed = true;
+                if self.scanline == VBLANK_START_SCANLINE && self.ppu_cycles == 1 {
                     self.vbl_flag_supressed = true;
-                    vbl_flag_read_value = false;
                 }
 
-                if self.scanline == VBLANK_START_SCANLINE
-                    && (self.ppu_cycles == 1 || self.ppu_cycles == 2)
-                {
-                    self.nmi_supressed = true;
-                    self.vbl_flag_supressed = true;
-                    vbl_flag_read_value = true;
-                }
-
-                let mut current_status = self.status_reg;
-                current_status.set_flag(
-                    StatusRegisterFlag::VerticalBlankStarted,
-                    vbl_flag_read_value,
-                );
+                let current_status = self.status_reg;
                 self.write_toggle = false;
                 self.status_reg
                     .set_flag(StatusRegisterFlag::VerticalBlankStarted, false);

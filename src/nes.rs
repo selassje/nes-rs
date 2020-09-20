@@ -7,7 +7,7 @@ use crate::{apu::APU, NesSettings};
 use crate::{ram::RAM, vram::VRAM};
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::time::{Instant};
+use std::time::Instant;
 
 pub struct Nes {
     cpu: CPU,
@@ -63,25 +63,20 @@ impl Nes {
     }
 
     pub fn run_single_cpu_instruction(&mut self) {
-        const PPU_CYCLES_PER_CPU_CYCLE: u16 = 3;
-        let cpu_cycles_for_next_instruction = self.cpu.fetch_next_instruction();
-        let mut current_ppu_cycle = 0;
+        let (cpu_cycles_for_next_instruction, will_read_from_ppu_status_occur) =
+            self.cpu.fetch_next_instruction();
         if cpu_cycles_for_next_instruction != 0 {
-            let ppu_cycles = PPU_CYCLES_PER_CPU_CYCLE * cpu_cycles_for_next_instruction;
-            let mut elapsed_ppu_cycles = 0;
-            while elapsed_ppu_cycles < ppu_cycles {
-                if self.ppu.borrow_mut().run_single_ppu_cycle() {
-                    self.cpu.nmi_triggered();
-                }
-                current_ppu_cycle += 1;
-                if current_ppu_cycle == PPU_CYCLES_PER_CPU_CYCLE {
-                    self.apu
-                        .borrow_mut()
-                        .process_cpu_cycles(1, self.settings.enable_sound);
-                    current_ppu_cycle = 0;
-                }
-                elapsed_ppu_cycles += 1;
+            if self.ppu.borrow_mut().run_cpu_cycles(
+                cpu_cycles_for_next_instruction,
+                will_read_from_ppu_status_occur,
+            ) {
+                self.cpu.nmi_triggered();
             }
+            self.apu.borrow_mut().process_cpu_cycles(
+                cpu_cycles_for_next_instruction as u8,
+                self.settings.enable_sound,
+            );
+
             self.cpu.run_next_instruction();
         }
     }

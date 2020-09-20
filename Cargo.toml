@@ -4,6 +4,19 @@ version = "0.1.0"
 authors = ["Przemyslaw Koziol <przemkoz85@gmail.com>"]
 edition = "2018"
 
+[[test]]
+name = "branch_timing_tests"
+path = "tests/branch_timing_tests.rs"
+[[test]]
+name = "vbl_nmi_timing"
+path = "tests/vbl_nmi_timing.rs"
+[[test]]
+name = "instr_timing"
+path = "tests/instr_timing.rs"
+[[test]]
+name = "blargg_ppu_tests"
+path = "tests/blargg_ppu_tests.rs"
+
 [dependencies]
 rand = "0.7.0"
 spin_sleep = "1.0.0"
