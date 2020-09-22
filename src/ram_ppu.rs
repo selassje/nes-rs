@@ -28,6 +28,21 @@ impl WriteAccessRegister {
     }
 }
 
+impl From<u16> for WriteAccessRegister {
+    fn from(value: u16) -> Self {
+        match value {
+            0x2000 => PpuCtrl,
+            0x2001 => PpuMask,
+            0x2003 => OamAddr,
+            0x2004 => WriteAccessRegister::OamData,
+            0x2005 => PpuScroll,
+            0x2006 => PpuAddr,
+            0x2007 => WriteAccessRegister::PpuData,
+            _ => panic!("Can't cast {} to WriteAccessRegister", value),
+        }
+    }
+}
+
 pub enum DmaWriteAccessRegister {
     OamDma = 0x4014,
 }
@@ -47,6 +62,17 @@ impl ReadAccessRegister {
             ReadAccessRegister::PpuData,
         ];
         REGISTERS.iter()
+    }
+}
+
+impl From<u16> for ReadAccessRegister {
+    fn from(value: u16) -> Self {
+        match value {
+            0x2002 => PpuStatus,
+            0x2004 => ReadAccessRegister::OamData,
+            0x2007 => ReadAccessRegister::PpuData,
+            _ => panic!("Can't cast {} to ReadAccessRegister", value),
+        }
     }
 }
 

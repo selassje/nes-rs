@@ -159,6 +159,7 @@ impl Memory for RAM {
                 .get(&addr)
                 .expect("store_byte: missing write register entry");
             self.ppu_access.borrow_mut().write(*reg, byte);
+            panic!("addad");
         } else if addr == DmaWriteAccessRegister::OamDma as u16 {
             let mut dma_data = [0; 256];
             for (i, e) in dma_data.iter_mut().enumerate() {

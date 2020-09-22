@@ -1,7 +1,7 @@
 mod opcodes;
 
 use self::AddressingMode::*;
-use crate::common::*;
+use crate::{common::*, ppu::PpuRegisterAccess2, ram_ppu::ReadAccessRegister, ram_ppu::WriteAccessRegister};
 use crate::memory::CpuMemory;
 use crate::ram_ppu::DmaWriteAccessRegister::OamDma;
 use crate::ram_ppu::ReadAccessRegister::PpuStatus;
@@ -98,10 +98,12 @@ pub struct CPU {
     code_segment: (u16, u16),
     opcodes: OpCodes,
     nmi_triggered: bool,
+    ppu_access: Rc<RefCell<dyn PpuRegisterAccess2>>,
+    call_ppu : bool,
 }
 
 impl CPU {
-    pub fn new(ram: Rc<RefCell<dyn CpuMemory>>) -> CPU {
+    pub fn new(ram: Rc<RefCell<dyn CpuMemory>>,ppu_access: Rc<RefCell<dyn PpuRegisterAccess2>>) -> CPU {
         CPU {
             pc: 0,
             sp: 0xFD,
@@ -119,6 +121,8 @@ impl CPU {
             address: Address::Implicit,
             opcodes: get_opcodes(),
             nmi_triggered: false,
+            ppu_access,
+            call_ppu : false,
         }
     }
 
@@ -218,6 +222,7 @@ impl CPU {
 
         let (_, code_segment_end) = self.code_segment;
         if let Some(opcode) = self.opcodes[op as usize] {
+            self.call_ppu = true;
             if self.pc + 1 <= code_segment_end {
                 self.operand_1 = self.ram.borrow().get_byte(self.pc + 1);
             }
@@ -240,9 +245,10 @@ impl CPU {
     }
 
     pub fn run_next_instruction(&mut self) {
-        if false {
+        if true {
+            let (sl, ppu_cycle,frame) = self.ppu_access.borrow_mut().get_time();
             println!(
-                "{:X} {:X} {:X} {:X} \t\tA:{:X} X:{:X} Y:{:X} P:{:X} SP={:X} CYCLES={}",
+                "{:X} {:X} {:X} {:X} \t\tA:{:X} X:{:X} Y:{:X} P:{:X} SP={:X} CYCLES={} SL={} PPU={} FR={}",
                 self.pc,
                 self.opcode_next,
                 self.operand_1,
@@ -252,7 +258,10 @@ impl CPU {
                 self.y,
                 self.ps,
                 self.sp,
-                self.cycles
+                self.cycles,
+                sl,
+                ppu_cycle,
+                frame
             );
         }
         let opcode = self.opcodes[self.opcode_next as usize].unwrap();
@@ -263,6 +272,13 @@ impl CPU {
             self.cycles = self.cycles_next as u128 - cycles_left;
         } else {
             self.cycles += self.cycles_next as u128;
+        }
+        if self.call_ppu {
+            self.nmi_triggered = self.ppu_access.borrow_mut().run_cpu_cycles2(self.cycles_next);
+            if self.nmi_triggered {
+                println!("NMI detected");
+                //self.nmi_triggered()
+            }
         }
     }
     fn get_extra_cycles_from_oam_dma(&self) -> u16 {
@@ -387,12 +403,29 @@ impl CPU {
         (address, extra_cycle)
     }
 
-    fn load_from_address(&self) -> u8 {
+    fn load_from_address(&mut self) -> u8 {
         match &self.address {
             Address::Implicit => panic!("load_from_address can't be used for implicit mode"),
             Address::Accumulator => self.a,
             Address::Immediate(i) => *i,
-            Address::RAM(address) => self.ram.borrow().get_byte(*address),
+            Address::RAM(address) =>  {
+                let mut nmi_triggered = false;
+                let byte; 
+                if *address == 0x2002 || *address ==  0x2004 || *address == 0x2007  {
+                    let ppu_read_result = self.ppu_access.borrow_mut().read2(ReadAccessRegister::from(*address),self.cycles_next);
+                    nmi_triggered = ppu_read_result.1;
+                    byte = ppu_read_result.0;
+                    self.call_ppu = false;
+
+                } else {
+                    byte = self.ram.borrow().get_byte(*address)
+                }
+                if nmi_triggered {
+                   // println!("NMI from read of {:X}",address);
+                    self.nmi_triggered()
+                }
+                byte
+            }
             Address::Relative(_) => panic!("load_from_address can't be used for the Relative mode"),
         }
     }
@@ -409,7 +442,28 @@ impl CPU {
             Address::Implicit => panic!("store_to_address can't be used for implicit mode"),
             Address::Accumulator => self.a = byte,
             Address::Immediate(_) => panic!("Not possible to store in Immediate addressing"),
-            Address::RAM(address) => self.ram.borrow_mut().store_byte(*address, byte),
+            Address::RAM(address) =>  {
+                let mut nmi_triggered = false; 
+                if *address >= 0x2000 && *address < 0x2008 {
+                    nmi_triggered = self.ppu_access.borrow_mut().write2(WriteAccessRegister::from(*address), byte, self.cycles_next);
+                    self.call_ppu = false;
+                } else  if *address == 0x4014 {
+                    let mut dma_data = [0; 256];
+                    for (i, e) in dma_data.iter_mut().enumerate() {
+                        let page_adress = (byte as u16) << 8;
+                        *e = self.ram.borrow_mut().get_byte(page_adress + i as u16);
+                    }
+                    nmi_triggered = self.ppu_access.borrow_mut().write_oam_dma2(dma_data, self.cycles_next);
+                    self.call_ppu = false;
+                }   
+                else {
+                    self.ram.borrow_mut().store_byte(*address, byte);
+                }
+                if nmi_triggered {
+                   // println!("NMI from writting to {:X}",address);
+                    self.nmi_triggered()
+                }
+            }
             Address::Relative(_) => panic!("store_to_address can't be used for the Relative mode"),
         }
     }

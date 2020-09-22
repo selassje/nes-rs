@@ -8,6 +8,23 @@ use crate::{
 
 use std::{cell::RefCell, default::Default, fmt::Display, rc::Rc};
 
+pub trait WritePpuRegisters2 {
+    fn write2(&mut self, register: WriteAccessRegister, value: u8, cpu_cycles: u16) -> bool;
+}
+
+pub trait ReadPpuRegisters2 {
+    fn read2(&mut self, register: ReadAccessRegister, cpu_cycles: u16) -> (u8, bool);
+}
+
+pub trait WriteOamDma2 {
+    fn write_oam_dma2(&mut self, data: [u8; 256], cpu_cycles: u16) -> bool;
+}
+
+pub trait PpuRegisterAccess2: WritePpuRegisters2 + WriteOamDma2 + ReadPpuRegisters2 {
+    fn run_cpu_cycles2(&mut self, cpu_cycles: u16) -> bool;
+    fn get_time(&mut self) -> (i16,u16,u128);
+}
+
 enum ControlRegisterFlag {
     BaseNametableAddress = 0b00000011,
     VramIncrement = 0b00000100,
@@ -28,6 +45,11 @@ const VBLANK_START_SCANLINE: i16 = 241;
 
 const ACTIVE_PIXELS_START: u16 = 4;
 const ACTIVE_PIXELS_END: u16 = ACTIVE_PIXELS_START + DISPLAY_WIDTH as u16 - 1;
+
+const CPU_PPU_ALIGNMENT: u16 = 2;
+const VBLANK_START_ONE_BEFORE_DOT: u16 = 1 + CPU_PPU_ALIGNMENT;
+const VBLANK_START_DOT: u16 = 1 + VBLANK_START_ONE_BEFORE_DOT;
+const VBLANK_START_ONE_AFTER: u16 = 1 + VBLANK_START_DOT;
 
 struct ControlRegister {
     value: u8,
@@ -301,6 +323,7 @@ pub struct PPU {
     write_toggle: bool,
     nmi_triggered: bool,
     vbl_flag_supressed: bool,
+    nmi_supressed: bool,
     vram_address: VRAMAddress,
     t_vram_address: VRAMAddress,
     fine_x_scroll: u8,
@@ -316,7 +339,7 @@ impl PPU {
             oam_address: 0,
             oam: [0; 256],
             pattern_tables: Default::default(),
-            ppu_cycles: 27,
+            ppu_cycles: 26,
             scanline: 0,
             scanline_sprites: Vec::new(),
             frame: 1,
@@ -327,6 +350,7 @@ impl PPU {
             write_toggle: false,
             nmi_triggered: false,
             vbl_flag_supressed: false,
+            nmi_supressed: false,
         }
     }
 
@@ -340,7 +364,7 @@ impl PPU {
             PatternTable::new(&*self.vram.borrow(), 0),
             PatternTable::new(&*self.vram.borrow(), 1),
         ];
-        self.ppu_cycles = 0;
+        self.ppu_cycles = 27;
         self.scanline = 0;
         self.scanline_sprites.clear();
         self.frame = 1;
@@ -350,6 +374,7 @@ impl PPU {
         self.write_toggle = false;
         self.nmi_triggered = false;
         self.vbl_flag_supressed = false;
+        self.nmi_supressed = false;
     }
 
     fn render_pixel(&mut self) {
@@ -404,6 +429,8 @@ impl PPU {
         }
         nmi_triggered
     }
+
+
     pub fn run_single_ppu_cycle(&mut self) -> bool {
         if self.ppu_cycles > ACTIVE_PIXELS_START && self.ppu_cycles <= ACTIVE_PIXELS_END {
             let x = self.ppu_cycles - ACTIVE_PIXELS_START;
@@ -426,6 +453,7 @@ impl PPU {
             PRE_RENDER_SCANLINE => match self.ppu_cycles {
                 1 => {
                     self.vbl_flag_supressed = false;
+                    self.nmi_supressed = false;
 
                     self.pattern_tables = [
                         PatternTable::new(&*self.vram.borrow(), 0),
@@ -481,12 +509,15 @@ impl PPU {
                 _ => (),
             },
             VBLANK_START_SCANLINE => {
-                if self.ppu_cycles == 1 {
+                if self.ppu_cycles == VBLANK_START_ONE_BEFORE_DOT {
                     if !self.vbl_flag_supressed {
                         self.status_reg
                             .set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
 
                         self.nmi_triggered = self.control_reg.is_generate_nmi_enabled();
+                        if self.nmi_triggered == true {
+                           // println!("VBLANK Start NMI");
+                        }
                     }
                 }
             }
@@ -500,6 +531,8 @@ impl PPU {
             self.scanline += 1;
             if self.scanline == 261 {
                 self.scanline = PRE_RENDER_SCANLINE;
+            }
+            if self.scanline == POST_RENDER_SCANLINE {
                 if self.frame == std::u128::MAX {
                     self.frame = 0;
                 } else {
@@ -507,6 +540,8 @@ impl PPU {
                 }
             }
         };
+
+        //self.nmi_triggered = self.status_reg.get_flag(StatusRegisterFlag::VerticalBlankStarted) && self.control_reg.is_generate_nmi_enabled();
         let nmi_triggered = self.nmi_triggered;
         if nmi_triggered {
             self.nmi_triggered = false;
@@ -787,3 +822,183 @@ impl ReadPpuRegisters for PPU {
     }
 }
 impl PpuRegisterAccess for PPU {}
+
+impl WritePpuRegisters2 for PPU {
+    fn write2(&mut self, register: WriteAccessRegister, value: u8, cpu_cycles: u16) -> bool {
+        let mut nmi_triggered = false;
+        match register {
+            WriteAccessRegister::PpuCtrl => {
+                nmi_triggered = self.run_cpu_cycles2(cpu_cycles);
+                let new_control_register = ControlRegister { value };
+                if self
+                    .status_reg
+                    .get_flag(StatusRegisterFlag::VerticalBlankStarted)
+                    && (!new_control_register.is_generate_nmi_enabled()
+                        && self.control_reg.is_generate_nmi_enabled()
+                        && (self.scanline == VBLANK_START_SCANLINE
+                            && (self.ppu_cycles == VBLANK_START_DOT || self.ppu_cycles == VBLANK_START_ONE_AFTER)))
+                {
+                    println!("Suppressing Immediate NMI");
+                    nmi_triggered = false;
+                } else if self
+                    .status_reg
+                    .get_flag(StatusRegisterFlag::VerticalBlankStarted)
+                    && (new_control_register.is_generate_nmi_enabled()
+                        && !self.control_reg.is_generate_nmi_enabled()
+                        && !(self.scanline == PRE_RENDER_SCANLINE
+                            && (self.ppu_cycles == VBLANK_START_ONE_BEFORE_DOT)))
+                {
+                    println!("Immediate NMI");
+                    nmi_triggered = true;
+                }
+
+                self.control_reg.value = value;
+
+                self.t_vram_address
+                    .set(NM_TABLE, self.control_reg.get_base_nametable_index() as u16);
+            }
+            WriteAccessRegister::PpuMask => {
+                nmi_triggered = self.run_cpu_cycles2(cpu_cycles);
+                self.mask_reg.value = value;
+            }
+            WriteAccessRegister::PpuScroll => {
+                nmi_triggered = self.run_cpu_cycles2(cpu_cycles);
+                if self.write_toggle {
+                    self.t_vram_address.set(FINE_Y, (value & 7) as u16);
+                    self.t_vram_address.set(COARSE_Y, (value >> 3) as u16);
+                } else {
+                    self.fine_x_scroll = value & 7;
+                    self.t_vram_address.set(COARSE_X, (value >> 3) as u16);
+                }
+                self.write_toggle = !self.write_toggle;
+            }
+
+            WriteAccessRegister::PpuAddr => {
+                nmi_triggered = self.run_cpu_cycles2(cpu_cycles);
+                if self.write_toggle {
+                    self.t_vram_address.set(LOW_BYTE, value as u16);
+                    self.vram_address.address = self.t_vram_address.address;
+                } else {
+                    self.t_vram_address
+                        .set(BITS_8_13, (value & 0b00111111) as u16);
+                    self.t_vram_address.set(BIT_14, 0);
+                }
+                self.write_toggle = !self.write_toggle;
+            }
+            WriteAccessRegister::PpuData => {
+                nmi_triggered = self.run_cpu_cycles2(cpu_cycles);
+                self.vram
+                    .borrow_mut()
+                    .store_byte(self.vram_address.address, value);
+                assert!(
+                    !self.is_rendering_in_progress(),
+                    "Scanline {}",
+                    self.scanline
+                );
+                assert!(!self.is_rendering_in_progress());
+                self.vram_address.address += self.control_reg.get_vram_increment();
+            }
+
+            WriteAccessRegister::OamAddr => {
+                nmi_triggered = self.run_cpu_cycles2(cpu_cycles);
+                self.oam_address = value
+            }
+
+            WriteAccessRegister::OamData => {
+                nmi_triggered = self.run_cpu_cycles2(cpu_cycles);
+                self.oam[self.oam_address as usize % 256] = value;
+                self.oam_address += 1
+            }
+        };
+        nmi_triggered
+    }
+}
+
+impl WriteOamDma2 for PPU {
+    fn write_oam_dma2(&mut self, data: [u8; 256], cpu_cycles: u16) -> bool {
+        let nmi_triggered = self.run_cpu_cycles2(cpu_cycles);
+        let write_len = 256 - self.oam_address as usize;
+        self.oam[self.oam_address as usize..].copy_from_slice(&data[..write_len as usize]);
+        nmi_triggered
+    }
+}
+
+impl ReadPpuRegisters2 for PPU {
+    fn read2(&mut self, register: ReadAccessRegister, cpu_cycles: u16) -> (u8, bool) {
+        let mut nmi_triggered = self.run_cpu_cycles2(cpu_cycles);
+        let vbl_read_value =  self.status_reg.get_flag(StatusRegisterFlag::VerticalBlankStarted);
+
+        let val = match register {
+            ReadAccessRegister::PpuStatus => {
+                if self.scanline == VBLANK_START_SCANLINE && self.ppu_cycles == VBLANK_START_ONE_BEFORE_DOT {
+                    println!("VBL flag should read as false");
+                    self.vbl_flag_supressed = true;
+                    assert!(!vbl_read_value);
+                    if nmi_triggered {
+                        println!(
+                            "Supressing NMI SL {} Cycle {} Fr {}",
+                            self.scanline, self.ppu_cycles, self.frame
+                        );
+                    }
+                    self.nmi_supressed = true;
+                    nmi_triggered = false;
+                }
+
+                if self.scanline == VBLANK_START_SCANLINE
+                    && (self.ppu_cycles == VBLANK_START_DOT || self.ppu_cycles == VBLANK_START_ONE_AFTER)
+                {
+                    if nmi_triggered {
+                        println!(
+                            "Supressing NMI SL {} Cycle {} Fr {}",
+                            self.scanline, self.ppu_cycles, self.frame
+                        );
+                    }
+                    assert!(vbl_read_value);
+                    self.nmi_supressed = true;
+                    nmi_triggered = false;
+                }
+
+                let current_status = self.status_reg;
+                self.write_toggle = false;
+                self.status_reg
+                    .set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
+                current_status.value
+            }
+            ReadAccessRegister::PpuData => {
+                let val = self.vram.borrow_mut().get_byte(self.vram_address.address);
+                assert!(!self.is_rendering_in_progress());
+                self.vram_address.address += self.control_reg.get_vram_increment();
+                val
+            }
+            ReadAccessRegister::OamData => {
+                let val = self.oam[self.oam_address as usize];
+                val
+            }
+        };
+        (val, nmi_triggered)
+    }
+}
+impl PpuRegisterAccess2 for PPU {
+    fn run_cpu_cycles2(&mut self, cpu_cycles: u16) -> bool {
+        let mut nmi_triggered = false;
+        for _ in 0..cpu_cycles * 3 {
+            if self.run_single_ppu_cycle() {
+                if nmi_triggered == false {
+                    nmi_triggered = true;
+                }
+            }
+        }
+        let is_nmi = nmi_triggered && !self.nmi_supressed;
+        if is_nmi {
+            println!(
+                "NMI at SL {} Cycle {} Fr {} cpu_cycles {}",
+                self.scanline, self.ppu_cycles, self.frame,cpu_cycles
+            );
+        }
+        is_nmi
+    }
+
+    fn get_time(&mut self) -> (i16, u16,u128) {
+        (self.scanline, self.ppu_cycles, self.frame)
+    }
+}
