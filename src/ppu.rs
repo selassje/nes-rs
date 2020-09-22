@@ -23,6 +23,7 @@ pub trait WriteOamDma2 {
 pub trait PpuRegisterAccess2: WritePpuRegisters2 + WriteOamDma2 + ReadPpuRegisters2 {
     fn run_cpu_cycles2(&mut self, cpu_cycles: u16) -> bool;
     fn get_time(&mut self) -> (i16,u16,u128);
+    fn get_nmi_cycle(&self) -> u16;
 }
 
 enum ControlRegisterFlag {
@@ -327,6 +328,7 @@ pub struct PPU {
     vram_address: VRAMAddress,
     t_vram_address: VRAMAddress,
     fine_x_scroll: u8,
+    last_nmi_triggered_cycle : u16,
 }
 
 impl PPU {
@@ -351,6 +353,7 @@ impl PPU {
             nmi_triggered: false,
             vbl_flag_supressed: false,
             nmi_supressed: false,
+            last_nmi_triggered_cycle: 0,
         }
     }
 
@@ -375,6 +378,7 @@ impl PPU {
         self.nmi_triggered = false;
         self.vbl_flag_supressed = false;
         self.nmi_supressed = false;
+        self.last_nmi_triggered_cycle = 0;
     }
 
     fn render_pixel(&mut self) {
@@ -451,7 +455,7 @@ impl PPU {
 
         match self.scanline {
             PRE_RENDER_SCANLINE => match self.ppu_cycles {
-                1 => {
+                VBLANK_START_ONE_BEFORE_DOT => {
                     self.vbl_flag_supressed = false;
                     self.nmi_supressed = false;
 
@@ -982,8 +986,10 @@ impl PpuRegisterAccess2 for PPU {
     fn run_cpu_cycles2(&mut self, cpu_cycles: u16) -> bool {
         let mut nmi_triggered = false;
         for _ in 0..cpu_cycles * 3 {
-            if self.run_single_ppu_cycle() {
+            let nmi_2 = self.run_single_ppu_cycle();
+            if nmi_2 {
                 if nmi_triggered == false {
+                    self.last_nmi_triggered_cycle = self.ppu_cycles;
                     nmi_triggered = true;
                 }
             }
@@ -992,7 +998,7 @@ impl PpuRegisterAccess2 for PPU {
         if is_nmi {
             println!(
                 "NMI at SL {} Cycle {} Fr {} cpu_cycles {}",
-                self.scanline, self.ppu_cycles, self.frame,cpu_cycles
+                self.scanline, self.last_nmi_triggered_cycle, self.frame,cpu_cycles
             );
         }
         is_nmi
@@ -1000,5 +1006,9 @@ impl PpuRegisterAccess2 for PPU {
 
     fn get_time(&mut self) -> (i16, u16,u128) {
         (self.scanline, self.ppu_cycles, self.frame)
+    }
+
+    fn get_nmi_cycle(&self) -> u16 {
+        self.last_nmi_triggered_cycle
     }
 }

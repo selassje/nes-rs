@@ -31,13 +31,11 @@ fn nmi_suppression() {
 }
 
 #[test]
-#[ignore]
 fn nmi_disable() {
     run_simple_short_test(PATH, "6.nmi_disable.nes");
 }
 
 #[test]
-#[ignore]
 fn nmi_timing() {
     run_simple_short_test(PATH, "7.nmi_timing.nes");
 }

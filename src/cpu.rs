@@ -100,6 +100,7 @@ pub struct CPU {
     nmi_triggered: bool,
     ppu_access: Rc<RefCell<dyn PpuRegisterAccess2>>,
     call_ppu : bool,
+    nmi_delay_by_one : bool
 }
 
 impl CPU {
@@ -123,6 +124,7 @@ impl CPU {
             nmi_triggered: false,
             ppu_access,
             call_ppu : false,
+            nmi_delay_by_one : false,
         }
     }
 
@@ -142,6 +144,7 @@ impl CPU {
         self.code_segment = (0, 0xFFFF);
         self.address = Address::Implicit;
         self.nmi_triggered = false;
+        self.nmi_delay_by_one = false;
     }
 
     fn set_flag(&mut self, flag: ProcessorFlag) {
@@ -213,8 +216,20 @@ impl CPU {
     }
 
     pub fn fetch_next_instruction(&mut self) -> (u16, bool) {
-        let op = if self.nmi_triggered {
+        let (_, ppu_cycle,_) = self.ppu_access.borrow_mut().get_time();
+        let mut use_nmi = false;
+        if self.nmi_triggered {
+            if self.nmi_delay_by_one {
+                self.nmi_delay_by_one = false;
+            } else if  ppu_cycle > 5  {
+                use_nmi = true;
+                self.nmi_triggered = false;
+            }
+        }
+
+        let op = if use_nmi {
             self.nmi_triggered = false;
+            self.nmi_delay_by_one = false;
             NMI_OPCODE as u8
         } else {
             self.ram.borrow().get_byte(self.pc)
@@ -245,7 +260,7 @@ impl CPU {
     }
 
     pub fn run_next_instruction(&mut self) {
-        if true {
+        if false {
             let (sl, ppu_cycle,frame) = self.ppu_access.borrow_mut().get_time();
             println!(
                 "{:X} {:X} {:X} {:X} \t\tA:{:X} X:{:X} Y:{:X} P:{:X} SP={:X} CYCLES={} SL={} PPU={} FR={}",
@@ -274,10 +289,10 @@ impl CPU {
             self.cycles += self.cycles_next as u128;
         }
         if self.call_ppu {
-            self.nmi_triggered = self.ppu_access.borrow_mut().run_cpu_cycles2(self.cycles_next);
-            if self.nmi_triggered {
+            let nmi_triggered = self.ppu_access.borrow_mut().run_cpu_cycles2(self.cycles_next);
+            if !self.nmi_triggered && nmi_triggered {
                 println!("NMI detected");
-                //self.nmi_triggered()
+                self.nmi_triggered()
             }
         }
     }
@@ -461,6 +476,7 @@ impl CPU {
                 }
                 if nmi_triggered {
                    // println!("NMI from writting to {:X}",address);
+                    self.nmi_delay_by_one = *address == 0x2000;
                     self.nmi_triggered()
                 }
             }
