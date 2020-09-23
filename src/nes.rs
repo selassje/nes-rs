@@ -35,8 +35,8 @@ impl Nes {
             controllers.clone(),
             apu.clone(),
         )));
-        let cpu = CPU::new(ram.clone());
 
+        let cpu = CPU::new(ram.clone(), ppu.clone());
         Nes {
             cpu,
             ram,
@@ -63,15 +63,13 @@ impl Nes {
     }
 
     pub fn run_single_cpu_instruction(&mut self) {
-        let (cpu_cycles_for_next_instruction, will_read_from_ppu_status_occur) =
-            self.cpu.fetch_next_instruction();
+        let cpu_cycles_for_next_instruction = self.cpu.fetch_next_instruction();
+
         if cpu_cycles_for_next_instruction != 0 {
-            if self.ppu.borrow_mut().run_cpu_cycles(
-                cpu_cycles_for_next_instruction,
-                will_read_from_ppu_status_occur,
-            ) {
-                self.cpu.nmi_triggered();
-            }
+            self.ppu
+                .borrow_mut()
+                .run_cpu_cycles(cpu_cycles_for_next_instruction);
+
             self.apu.borrow_mut().process_cpu_cycles(
                 cpu_cycles_for_next_instruction as u8,
                 self.settings.enable_sound,

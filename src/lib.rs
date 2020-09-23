@@ -5,6 +5,7 @@ mod colors;
 mod common;
 mod controllers;
 mod cpu;
+mod cpu_ppu;
 mod io_sdl;
 mod keyboard;
 mod mapper;

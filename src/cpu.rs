@@ -2,9 +2,9 @@ mod opcodes;
 
 use self::AddressingMode::*;
 use crate::common::*;
+use crate::cpu_ppu::{Nmi, PpuNmiState};
 use crate::memory::CpuMemory;
 use crate::ram_ppu::DmaWriteAccessRegister::OamDma;
-use crate::ram_ppu::ReadAccessRegister::PpuStatus;
 use opcodes::{get_opcodes, OpCodes, NMI_OPCODE};
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter, Result};
@@ -95,13 +95,13 @@ pub struct CPU {
     operand_2: u8,
     address: Address,
     ram: Rc<RefCell<dyn CpuMemory>>,
+    nmi_state: Rc<RefCell<dyn PpuNmiState>>,
     code_segment: (u16, u16),
     opcodes: OpCodes,
-    nmi_triggered: bool,
 }
 
 impl CPU {
-    pub fn new(ram: Rc<RefCell<dyn CpuMemory>>) -> CPU {
+    pub fn new(ram: Rc<RefCell<dyn CpuMemory>>, nmi_state: Rc<RefCell<dyn PpuNmiState>>) -> CPU {
         CPU {
             pc: 0,
             sp: 0xFD,
@@ -116,9 +116,9 @@ impl CPU {
             operand_2: 0,
             ram: ram,
             code_segment: (0, 0),
+            nmi_state,
             address: Address::Implicit,
             opcodes: get_opcodes(),
-            nmi_triggered: false,
         }
     }
 
@@ -137,7 +137,6 @@ impl CPU {
         self.operand_2 = 0;
         self.code_segment = (0, 0xFFFF);
         self.address = Address::Implicit;
-        self.nmi_triggered = false;
     }
 
     fn set_flag(&mut self, flag: ProcessorFlag) {
@@ -208,9 +207,8 @@ impl CPU {
         )
     }
 
-    pub fn fetch_next_instruction(&mut self) -> (u16, bool) {
-        let op = if self.nmi_triggered {
-            self.nmi_triggered = false;
+    pub fn fetch_next_instruction(&mut self) -> u16 {
+        let op = if self.nmi_state.borrow().was_nmi_triggered().is_some() {
             NMI_OPCODE as u8
         } else {
             self.ram.borrow().get_byte(self.pc)
@@ -230,10 +228,7 @@ impl CPU {
             extra_cycles += self.get_extra_cycles_from_branching() as u16
                 + self.get_extra_cycles_from_oam_dma();
             self.cycles_next = opcode.base_cycles as u16 + extra_cycles;
-            (
-                self.cycles_next,
-                self.address == Address::RAM(PpuStatus as u16),
-            )
+            self.cycles_next
         } else {
             panic!("Unknown instruction {:#04x} at {:#X} ", op, self.pc);
         }
@@ -515,10 +510,6 @@ impl CPU {
         ps |= ProcessorFlag::BFlagBit5 as u8;
         self.push_u8(ps);
         self.pc = self.ram.borrow().get_word(0xFFFA) - 1;
-    }
-
-    pub fn nmi_triggered(&mut self) {
-        self.nmi_triggered = true;
     }
 
     fn jsr(&mut self) {

@@ -1,10 +1,10 @@
-use crate::io_sdl::SCREEN;
 use crate::memory::VideoMemory;
 use crate::ram_ppu::*;
 use crate::{
     colors::{ColorMapper, DefaultColorMapper, RgbColor},
     screen::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
+use crate::{cpu_ppu::Nmi, cpu_ppu::PpuNmiState, io_sdl::SCREEN};
 
 use std::{cell::RefCell, default::Default, fmt::Display, rc::Rc};
 
@@ -14,7 +14,7 @@ enum ControlRegisterFlag {
     SpritePattern8x8 = 0b00001000,
     BackgroundPatternTableAddress = 0b00010000,
     SpriteSize = 0b00100000,
-    PpuMasterSlaveSelect = 0b01000000,
+    _PpuMasterSlaveSelect = 0b01000000,
     GenerateNMI = 0b10000000,
 }
 const TILE_SIDE_LENGTH: usize = 8;
@@ -23,7 +23,6 @@ const PPU_CYCLES_PER_SCANLINE: u16 = 341;
 const PRE_RENDER_SCANLINE: i16 = -1;
 const FIRST_VISIBLE_SCANLINE: i16 = 0;
 const LAST_VISIBLE_SCANLINE: i16 = 239;
-const POST_RENDER_SCANLINE: i16 = 240;
 const VBLANK_START_SCANLINE: i16 = 241;
 
 const ACTIVE_PIXELS_START: u16 = 4;
@@ -59,8 +58,8 @@ impl ControlRegister {
         (1 + bit) * 8
     }
 
-    fn is_read_backdrop_color_from_ext_enabled(&self) -> bool {
-        (self.value & ControlRegisterFlag::PpuMasterSlaveSelect as u8) != 0
+    fn _is_read_backdrop_color_from_ext_enabled(&self) -> bool {
+        (self.value & ControlRegisterFlag::_PpuMasterSlaveSelect as u8) != 0
     }
 
     fn is_generate_nmi_enabled(&self) -> bool {
@@ -69,14 +68,14 @@ impl ControlRegister {
 }
 
 enum MaskRegisterFlag {
-    GrayScale = 0b00000001,
+    _GrayScale = 0b00000001,
     ShowBackgroundInLeftMost8Pixels = 0b00000010,
     ShowSpritesdInLeftMost8Pixels = 0b00000100,
     ShowBackground = 0b00001000,
     ShowSprites = 0b00010000,
-    EmphasizeRed = 0b00100000,
-    EmphasizeGreen = 0b01000000,
-    EmphasizeBlue = 0b10000000,
+    _EmphasizeRed = 0b00100000,
+    _EmphasizeGreen = 0b01000000,
+    _EmphasizeBlue = 0b10000000,
 }
 
 struct MaskRegister {
@@ -299,7 +298,7 @@ pub struct PPU {
     frame: u128,
     color_mapper: Box<dyn ColorMapper>,
     write_toggle: bool,
-    nmi_triggered: bool,
+    nmi: Option<Nmi>,
     vbl_flag_supressed: bool,
     vram_address: VRAMAddress,
     t_vram_address: VRAMAddress,
@@ -325,7 +324,7 @@ impl PPU {
             t_vram_address: Default::default(),
             fine_x_scroll: 0,
             write_toggle: false,
-            nmi_triggered: false,
+            nmi: None,
             vbl_flag_supressed: false,
         }
     }
@@ -348,7 +347,7 @@ impl PPU {
         self.t_vram_address = Default::default();
         self.fine_x_scroll = 0;
         self.write_toggle = false;
-        self.nmi_triggered = false;
+        self.nmi = None;
         self.vbl_flag_supressed = false;
     }
 
@@ -382,29 +381,14 @@ impl PPU {
         }
     }
 
-    pub fn run_cpu_cycles(
-        &mut self,
-        cpu_cycles: u16,
-        will_read_from_ppu_status_occur: bool,
-    ) -> bool {
-        let mut nmi_triggered = false;
+    pub fn run_cpu_cycles(&mut self, cpu_cycles: u16) {
+        self.nmi = None;
         for _ in 0..cpu_cycles * 3 {
-            if self.run_single_ppu_cycle() {
-                if nmi_triggered == false {
-                    nmi_triggered = true;
-                }
-            }
+            self.run_single_ppu_cycle();
         }
-        if will_read_from_ppu_status_occur {
-            if self.scanline == VBLANK_START_SCANLINE
-                && (self.ppu_cycles >= 1 && self.ppu_cycles <= 3)
-            {
-                nmi_triggered = false;
-            }
-        }
-        nmi_triggered
     }
-    pub fn run_single_ppu_cycle(&mut self) -> bool {
+
+    fn run_single_ppu_cycle(&mut self) -> () {
         if self.ppu_cycles > ACTIVE_PIXELS_START && self.ppu_cycles <= ACTIVE_PIXELS_END {
             let x = self.ppu_cycles - ACTIVE_PIXELS_START;
             if self.is_rendering_in_progress() && (x as usize % TILE_SIDE_LENGTH == 0) {
@@ -486,7 +470,9 @@ impl PPU {
                         self.status_reg
                             .set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
 
-                        self.nmi_triggered = self.control_reg.is_generate_nmi_enabled();
+                        if self.control_reg.is_generate_nmi_enabled() {
+                            self.nmi = Some(Nmi::VblankStart);
+                        }
                     }
                 }
             }
@@ -507,11 +493,6 @@ impl PPU {
                 }
             }
         };
-        let nmi_triggered = self.nmi_triggered;
-        if nmi_triggered {
-            self.nmi_triggered = false;
-        }
-        nmi_triggered
     }
 
     fn get_scrolled_x(&self, x: usize) -> usize {
@@ -694,11 +675,11 @@ impl WritePpuRegisters for PPU {
         match register {
             WriteAccessRegister::PpuCtrl => {
                 let new_control_register = ControlRegister { value };
-                self.nmi_triggered = self
-                    .status_reg
-                    .get_flag(StatusRegisterFlag::VerticalBlankStarted)
-                    && (new_control_register.is_generate_nmi_enabled()
-                        && !self.control_reg.is_generate_nmi_enabled());
+                //            self.nmi_triggered = self
+                //                .status_reg
+                //                .get_flag(StatusRegisterFlag::VerticalBlankStarted)
+                //                && (new_control_register.is_generate_nmi_enabled()
+                //                    && !self.control_reg.is_generate_nmi_enabled());
 
                 self.control_reg.value = value;
                 self.t_vram_address
@@ -767,6 +748,12 @@ impl ReadPpuRegisters for PPU {
                     self.vbl_flag_supressed = true;
                 }
 
+                if self.scanline == VBLANK_START_SCANLINE
+                    && (self.ppu_cycles >= 1 && self.ppu_cycles <= 3)
+                {
+                    self.nmi = None;
+                }
+
                 let current_status = self.status_reg;
                 self.write_toggle = false;
                 self.status_reg
@@ -787,3 +774,9 @@ impl ReadPpuRegisters for PPU {
     }
 }
 impl PpuRegisterAccess for PPU {}
+
+impl PpuNmiState for PPU {
+    fn was_nmi_triggered(&self) -> Option<crate::cpu_ppu::Nmi> {
+        self.nmi
+    }
+}
