@@ -1,9 +1,15 @@
 #[derive(Copy, Clone, Debug)]
-pub enum Nmi {
-    VblankStart,
-    ImmediateOccurence,
+pub struct Nmi {
+    pub cycle : u16,
 }
 
-pub trait PpuNmiState {
+pub struct PpuTime {
+    pub scanline: i16,
+    pub cycle: u16,
+    pub frame: u128,
+}
+
+pub trait PpuState {
     fn was_nmi_triggered(&self) -> Option<Nmi>;
+    fn get_time(&self) -> PpuTime;
 }

@@ -2,7 +2,7 @@ mod opcodes;
 
 use self::AddressingMode::*;
 use crate::common::*;
-use crate::cpu_ppu::{Nmi, PpuNmiState};
+use crate::cpu_ppu::{Nmi, PpuState};
 use crate::memory::CpuMemory;
 use crate::ram_ppu::DmaWriteAccessRegister::OamDma;
 use opcodes::{get_opcodes, OpCodes, NMI_OPCODE};
@@ -95,13 +95,14 @@ pub struct CPU {
     operand_2: u8,
     address: Address,
     ram: Rc<RefCell<dyn CpuMemory>>,
-    nmi_state: Rc<RefCell<dyn PpuNmiState>>,
+    ppu_state: Rc<RefCell<dyn PpuState>>,
     code_segment: (u16, u16),
     opcodes: OpCodes,
+    nmi: Option<Nmi>,
 }
 
 impl CPU {
-    pub fn new(ram: Rc<RefCell<dyn CpuMemory>>, nmi_state: Rc<RefCell<dyn PpuNmiState>>) -> CPU {
+    pub fn new(ram: Rc<RefCell<dyn CpuMemory>>, ppu_state: Rc<RefCell<dyn PpuState>>) -> CPU {
         CPU {
             pc: 0,
             sp: 0xFD,
@@ -116,7 +117,8 @@ impl CPU {
             operand_2: 0,
             ram: ram,
             code_segment: (0, 0),
-            nmi_state,
+            ppu_state: ppu_state,
+            nmi : None,
             address: Address::Implicit,
             opcodes: get_opcodes(),
         }
@@ -208,7 +210,15 @@ impl CPU {
     }
 
     pub fn fetch_next_instruction(&mut self) -> u16 {
-        let op = if self.nmi_state.borrow().was_nmi_triggered().is_some() {
+        if self.nmi.is_none() {
+            self.nmi = self.ppu_state.borrow().was_nmi_triggered();
+        }
+
+        let ppu_time = self.ppu_state.borrow_mut().get_time();
+        let op = if self.nmi.is_some()
+            && ppu_time.cycle >= self.nmi.unwrap().cycle + 3
+        {
+            self.nmi = None;
             NMI_OPCODE as u8
         } else {
             self.ram.borrow().get_byte(self.pc)
@@ -228,6 +238,24 @@ impl CPU {
             extra_cycles += self.get_extra_cycles_from_branching() as u16
                 + self.get_extra_cycles_from_oam_dma();
             self.cycles_next = opcode.base_cycles as u16 + extra_cycles;
+            if false {
+                println!(
+                    "{:X} {:X} {:X} {:X} \t\tA:{:X} X:{:X} Y:{:X} P:{:X} SP={:X} CYCLES={} SL={} PPU={} FR={}",
+                    self.pc,
+                    self.opcode_next,
+                    self.operand_1,
+                    self.operand_2,
+                    self.a,
+                    self.x,
+                    self.y,
+                    self.ps,
+                    self.sp,
+                    self.cycles,
+                    ppu_time.scanline,
+                    ppu_time.cycle,
+                    ppu_time.frame
+                );
+            }
             self.cycles_next
         } else {
             panic!("Unknown instruction {:#04x} at {:#X} ", op, self.pc);
@@ -235,21 +263,6 @@ impl CPU {
     }
 
     pub fn run_next_instruction(&mut self) {
-        if false {
-            println!(
-                "{:X} {:X} {:X} {:X} \t\tA:{:X} X:{:X} Y:{:X} P:{:X} SP={:X} CYCLES={}",
-                self.pc,
-                self.opcode_next,
-                self.operand_1,
-                self.operand_2,
-                self.a,
-                self.x,
-                self.y,
-                self.ps,
-                self.sp,
-                self.cycles
-            );
-        }
         let opcode = self.opcodes[self.opcode_next as usize].unwrap();
         (opcode.instruction)(self);
         self.pc += opcode.mode.get_bytes() as u16;

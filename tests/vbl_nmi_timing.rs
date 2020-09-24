@@ -36,7 +36,6 @@ fn nmi_disable() {
 }
 
 #[test]
-#[ignore]
 fn nmi_timing() {
     run_simple_short_test(PATH, "7.nmi_timing.nes");
 }
