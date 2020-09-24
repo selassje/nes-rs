@@ -1,14 +1,10 @@
 os: windows
 
-install:
-  - choco install rust-ms --params="'/AddToPath:1'"
-
 matrix:
     include:        
         - language: rust
           script:
             - cargo install cargo-vcpkg
             - cargo vcpkg build
-            - cargo build --release
             - cargo test --release -- test-threads=1
           
