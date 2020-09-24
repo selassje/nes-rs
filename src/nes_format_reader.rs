@@ -6,7 +6,7 @@ enum NesFormat {
     Nes2_0,
     INes,
 }
-
+#[allow(dead_code)]
 enum HeaderFlag6 {
     MirroringVertical = 0b00000001,
     PrgRAMPresent = 0b00000010,
@@ -14,16 +14,19 @@ enum HeaderFlag6 {
     IgnoreMirroring = 0b00001000,
 }
 
+#[allow(dead_code)]
 enum HeaderFlag7 {
     VsSystem = 0b00000001,
     PlayChoice10 = 0b00000010,
     Flags8_15InNes2 = 0b00001100,
 }
 
+#[allow(dead_code)]
 enum HeaderFlag9 {
     TvSystem = 0b00000001,
 }
 
+#[allow(dead_code)]
 enum HeaderFlag10 {
     TvSystem = 0b00000011,
     PrgRAMPresent = 0b00010000,
@@ -50,12 +53,14 @@ type ChrRomUnit = [u8; common::CHR_ROM_UNIT_SIZE];
 type PlayChoiceInstRom = [u8; 8192];
 type PlayChoiceDecryptData = [u8; 16];
 
+#[allow(dead_code)]
 struct PlayChoiceRom {
     inst_rom: PlayChoiceInstRom,
     data_output: PlayChoiceDecryptData,
     counter_output: PlayChoiceDecryptData,
 }
 
+#[allow(dead_code)]
 pub struct NesFile {
     trainer: Option<Trainer>,
     prg_rom: Vec<PrgRomUnit>,
@@ -114,9 +119,6 @@ impl NesFile {
         }
     }
 
-    pub fn get_mirroring(&self) -> common::Mirroring {
-        self.mirroring
-    }
 
     pub fn new(in_bytes: &Vec<u8>) -> NesFile {
         let format = Self::get_format(in_bytes);

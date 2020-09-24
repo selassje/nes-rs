@@ -324,10 +324,12 @@ impl TriangleWave {
         (self.data[0] & 0b00100000) != 0
     }
 
+    #[allow(dead_code)]
     fn get_linear_counter_load(&self) -> u8 {
         self.data[0] & 0b01111111
     }
 
+    #[allow(dead_code)]
     fn get_timer(&self) -> u16 {
         let timer_hi = ((self.data[3] & 0x7) as u16) << 8;
         self.data[2] as u16 + timer_hi
@@ -363,22 +365,27 @@ impl Noise {
         (self.data[0] & 0b00100000) != 0
     }
 
+    #[allow(dead_code)]
     fn is_constant_volume_set(&self) -> bool {
         (self.data[0] & 0b00010000) != 0
     }
 
+    #[allow(dead_code)]
     fn get_volume_or_envelope(&self) -> u8 {
         self.data[0] & 0x0F
     }
 
+    #[allow(dead_code)]
     fn get_linear_counter_load(&self) -> u8 {
         self.data[0] & 0b01111111
     }
 
+    #[allow(dead_code)]
     fn is_noise_loop_set(&self) -> bool {
         (self.data[2] & 0b10000000) != 0
     }
 
+    #[allow(dead_code)]
     fn get_noise_period(&self) -> u8 {
         self.data[2] & 0x0F
     }
@@ -407,6 +414,7 @@ struct DMC {
     data: [u8; 4],
 }
 
+#[allow(dead_code)]
 impl DMC {
     fn is_irq_enabled(&self) -> bool {
         (self.data[0] & 0b10000000) != 0
@@ -485,7 +493,7 @@ impl APU {
     }
 
     pub fn process_cpu_cycles(&mut self, cpu_cycles: u8, enable_sound: bool) {
-        static mut last_p1_sample: SampleFormat = 0;
+        static mut LAST_P1_SAMPLE: SampleFormat = 0;
 
         let elapsed_cpu_cycles = cpu_cycles as u16;
 
@@ -522,7 +530,7 @@ impl APU {
             0,
         );
         unsafe {
-            if sample != last_p1_sample {
+            if sample != LAST_P1_SAMPLE {
                 /*
                                 println!(
                                     "PULSE 1 Sample {} duty {} duty_pos {} period {} length_counter {} halt_counter {} sweep_enabled {} sweep_shift {}, sweep_negate {} sweep_period {}",
@@ -538,7 +546,7 @@ impl APU {
                                     self.pulse_1.get_sweep_period(),
                                 );
                 */
-                last_p1_sample = sample;
+                LAST_P1_SAMPLE = sample;
             }
         }
 

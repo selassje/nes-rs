@@ -19,6 +19,7 @@ pub fn run_simple_test(test_dir: &str, rom_name: &str, duration: Duration) {
     assert!(frames_are_the_same(&rom_path));
 }
 
+#[allow(dead_code)]
 pub fn run_simple_short_test(test_dir: &str, rom_name: &str) {
     run_simple_test(test_dir, rom_name, Duration::from_secs(1));
 }
