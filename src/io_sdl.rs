@@ -72,12 +72,19 @@ impl IOSdl {
             samples: Some(BUFFER_SIZE as u16),
         };
 
-        let apu_audio: AudioQueue<SampleFormat> =
-            sdl_audio.open_queue(None, &desired_spec).unwrap();
+
+        let apu_audio: Option<AudioQueue<SampleFormat>> = 
+        if settings.enable_sound {
+            Some(sdl_audio.open_queue(None, &desired_spec).unwrap())
+            //apu_audio.unwrap().resume();
+        } else {
+            None
+        };
 
         if settings.enable_sound {
-            apu_audio.resume();
+            apu_audio.as_ref().unwrap().resume();
         }
+
         let video_subsys = sdl_context.video().unwrap();
         let window = video_subsys
             .window(
@@ -128,7 +135,9 @@ impl IOSdl {
                 let mut buffer = SAMPLE_BUFFER.lock().unwrap();
                 if sound_timer.elapsed().as_nanos() > SOUND_FRAME_DURATION {
                     if buffer.index == BUFFER_SIZE {
-                        apu_audio.queue(&buffer.buffer[..]);
+                        if let Some(ref apu_audio) = apu_audio {
+                           apu_audio.queue(&buffer.buffer[..]);
+                        }
                         buffer.index = 0;
                         sound_timer = Instant::now();
                     }
