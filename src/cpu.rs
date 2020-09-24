@@ -173,7 +173,11 @@ impl CPU {
         self.ram
             .borrow_mut()
             .store_byte(self.sp as u16 + STACK_PAGE, val);
-        self.sp -= 1;
+        if self.sp == 0 {
+           self.sp = 0xFF;
+        } else {
+            self.sp -= 1;
+        }
     }
 
     fn push_u16(&mut self, val: u16) {
@@ -188,16 +192,32 @@ impl CPU {
         self.ram
             .borrow_mut()
             .store_byte(addr_hi as u16 + STACK_PAGE, ((val & 0xFF00) >> 8) as u8);
-        self.sp -= 2;
+        if self.sp == 1 {
+            self.sp = 0xFF
+        } else if self.sp == 0 {
+            self.sp = 0xFE
+        } else {
+            self.sp -= 2;
+        }
     }
 
     fn pop_u8(&mut self) -> u8 {
-        self.sp += 1;
+        if self.sp == 0xFF {
+            self.sp = 1;
+        } else {
+            self.sp += 1;
+        }
         self.ram.borrow().get_byte(self.sp as u16 + STACK_PAGE)
     }
 
     fn pop_u16(&mut self) -> u16 {
-        self.sp += 2;
+        if self.sp == 0xFF {
+            self.sp = 1;
+        } else if self.sp == 0xFE {
+            self.sp = 0;
+        } else {
+            self.sp += 2;
+        }
         let (addr_lo, addr_hi) = if self.sp == 0 {
             (0xFF, 0x00)
         } else {
@@ -710,7 +730,7 @@ impl CPU {
 
     fn cmp(&mut self) {
         let m = self.load_from_address();
-        let result = (self.a as u16 - m as u16) as u8;
+        let result = (self.a as i16 - m as i16) as u8;
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == m);
         self.set_or_reset_flag(ProcessorFlag::CarryFlag, self.a >= m);
         self.set_or_reset_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);
@@ -718,7 +738,7 @@ impl CPU {
 
     fn cpx(&mut self) {
         let m = self.load_from_address();
-        let result = (self.x as u16 - m as u16) as u8;
+        let result = (self.x as i16 - m as i16) as u8;
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.x == m);
         self.set_or_reset_flag(ProcessorFlag::CarryFlag, self.x >= m);
         self.set_or_reset_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);
@@ -726,7 +746,7 @@ impl CPU {
 
     fn cpy(&mut self) {
         let m = self.load_from_address();
-        let result = (self.y as u16 - m as u16) as u8;
+        let result = (self.y as i16 - m as i16) as u8;
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.y == m);
         self.set_or_reset_flag(ProcessorFlag::CarryFlag, self.y >= m);
         self.set_or_reset_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);

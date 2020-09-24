@@ -748,7 +748,7 @@ impl WritePpuRegisters for PPU {
             WriteAccessRegister::OamAddr => self.oam_address = value,
             WriteAccessRegister::OamData => {
                 self.oam[self.oam_address as usize % 256] = value;
-                self.oam_address += 1
+                self.oam_address = ((self.oam_address as u16 + 1) % 256) as u8;
             }
         }
         ()
