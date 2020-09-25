@@ -72,7 +72,7 @@ impl Nes {
 
             self.apu.borrow_mut().process_cpu_cycles(
                 cpu_cycles_for_next_instruction as u8,
-                self.settings.enable_sound,
+                self.settings.test_mode,
             );
 
             self.cpu.run_next_instruction();

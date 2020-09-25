@@ -22,17 +22,15 @@ mod vram;
 
 #[derive(Copy, Clone, Debug)]
 pub struct NesSettings {
-    enable_sound: bool,
+    test_mode: bool,
     duration: Option<Duration>,
-    dump_last_frame: bool,
 }
 
 impl Default for NesSettings {
     fn default() -> Self {
         Self {
-            enable_sound: true,
+            test_mode: true,
             duration: None,
-            dump_last_frame: false,
         }
     }
 }
@@ -56,9 +54,11 @@ fn run_rom(path: &str, settings: NesSettings) {
     let nes_handle = thread::spawn(move || {
         nes_thread(&rom, settings);
     });
-    io.run(settings);
+    if settings.test_mode {
+        io.run(settings);
+    }
     let _ = nes_handle.join();
-    if settings.dump_last_frame {
+    if settings.test_mode {
         io_sdl::IOSdl::dump_frame(&(path.to_owned() + ".bmp"));
     }
 }
@@ -67,9 +67,8 @@ pub fn run_test_rom(path: &str, duration: Duration) {
     run_rom(
         path,
         NesSettings {
-            enable_sound: false,
+            test_mode: false,
             duration: Some(duration),
-            dump_last_frame: true,
         },
     );
 }
