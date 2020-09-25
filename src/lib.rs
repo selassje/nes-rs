@@ -54,7 +54,7 @@ fn run_rom(path: &str, settings: NesSettings) {
     let nes_handle = thread::spawn(move || {
         nes_thread(&rom, settings);
     });
-    if settings.test_mode {
+    if !settings.test_mode {
         io.run(settings);
     }
     let _ = nes_handle.join();
@@ -67,7 +67,7 @@ pub fn run_test_rom(path: &str, duration: Duration) {
     run_rom(
         path,
         NesSettings {
-            test_mode: false,
+            test_mode: true,
             duration: Some(duration),
         },
     );
