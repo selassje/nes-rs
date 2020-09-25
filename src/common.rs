@@ -4,6 +4,14 @@ pub const PRG_ROM_UNIT_SIZE: usize = 16384;
 pub const CHR_ROM_UNIT_SIZE: usize = 8192;
 pub const PRG_RAM_UNIT_SIZE: usize = 8192;
 
+pub const CPU_CYCLES_PER_FRAME: usize = 29780;
+
+#[derive(Copy, Clone, Debug)]
+pub enum Mirroring {
+    VERTICAL,
+    HORIZONTAL,
+}
+
 pub fn convert_2u8_to_u16(b0: u8, b1: u8) -> u16 {
     (b0 as u16) | ((b1 as u16) << 8)
 }
@@ -16,10 +24,4 @@ pub fn get_mirrors(addr: u16, mirror_size: u16, mirrors_range: Range<u16>) -> Ve
         mirrors.push(mirrors_range.start + i * mirror_size + offset);
     }
     mirrors
-}
-
-#[derive(Copy, Clone, Debug)]
-pub enum Mirroring {
-    VERTICAL,
-    HORIZONTAL,
 }

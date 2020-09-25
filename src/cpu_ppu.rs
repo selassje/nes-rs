@@ -1,6 +1,6 @@
 #[derive(Copy, Clone, Debug)]
 pub struct Nmi {
-    pub cycle : u16,
+    pub cycle: u16,
 }
 
 pub struct PpuTime {

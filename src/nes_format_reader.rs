@@ -119,7 +119,6 @@ impl NesFile {
         }
     }
 
-
     pub fn new(in_bytes: &Vec<u8>) -> NesFile {
         let format = Self::get_format(in_bytes);
         assert!(format == NesFormat::INes);

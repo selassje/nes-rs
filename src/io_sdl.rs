@@ -76,7 +76,7 @@ impl IOSdl {
             sdl_audio.open_queue(None, &desired_spec).unwrap();
 
         apu_audio.resume();
-        
+
         let video_subsys = sdl_context.video().unwrap();
         let window = video_subsys
             .window(

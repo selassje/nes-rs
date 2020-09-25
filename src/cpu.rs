@@ -118,7 +118,7 @@ impl CPU {
             ram: ram,
             code_segment: (0, 0),
             ppu_state: ppu_state,
-            nmi : None,
+            nmi: None,
             address: Address::Implicit,
             opcodes: get_opcodes(),
         }
@@ -174,7 +174,7 @@ impl CPU {
             .borrow_mut()
             .store_byte(self.sp as u16 + STACK_PAGE, val);
         if self.sp == 0 {
-           self.sp = 0xFF;
+            self.sp = 0xFF;
         } else {
             self.sp -= 1;
         }
@@ -235,9 +235,7 @@ impl CPU {
         }
 
         let ppu_time = self.ppu_state.borrow_mut().get_time();
-        let op = if self.nmi.is_some()
-            && ppu_time.cycle >= self.nmi.unwrap().cycle + 3
-        {
+        let op = if self.nmi.is_some() && ppu_time.cycle >= self.nmi.unwrap().cycle + 3 {
             self.nmi = None;
             NMI_OPCODE as u8
         } else {

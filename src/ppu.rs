@@ -476,7 +476,9 @@ impl PPU {
                         self.status_reg
                             .set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
                         if self.control_reg.is_generate_nmi_enabled() {
-                            self.nmi = Some(Nmi{cycle : self.ppu_cycle});
+                            self.nmi = Some(Nmi {
+                                cycle: self.ppu_cycle,
+                            });
                         }
                     }
                 }
@@ -700,7 +702,9 @@ impl WritePpuRegisters for PPU {
                         && !(self.scanline == PRE_RENDER_SCANLINE
                             && (self.ppu_cycle == VBLANK_START_ONE_CYCLE_BEFORE)))
                 {
-                    self.nmi = Some(Nmi{cycle : self.ppu_cycle});
+                    self.nmi = Some(Nmi {
+                        cycle: self.ppu_cycle,
+                    });
                 }
 
                 self.control_reg.value = value;
