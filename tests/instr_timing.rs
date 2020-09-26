@@ -12,5 +12,5 @@ fn instr_timing() {
 
 #[test]
 fn branch_timing() {
-    run_simple_test(PATH, "2-branch_timing.nes",Duration::from_secs(1));
+    run_simple_test(PATH, "2-branch_timing.nes",Duration::from_secs(3));
 }

@@ -1,12 +1,8 @@
 use self::StatusRegisterFlag::*;
-use crate::ram_apu::*;
-use std::default::Default;
-use std::time::{Duration, Instant};
+use crate::{io::AudioAccess, ram_apu::*};
+use std::{cell::RefCell, default::Default, rc::Rc};
 
-use crate::io_sdl::{SampleFormat, BUFFER_SIZE, SAMPLE_BUFFER, SAMPLE_RATE};
-
-const CPU_CYCLES_PER_SECOND: u128 = Duration::from_secs(1).as_nanos() / 559;
-const CPU_CYCLES_PER_SAMPLE: u128 = CPU_CYCLES_PER_SECOND / SAMPLE_RATE as u128;
+use crate::io::SampleFormat;
 
 const LENGTH_COUNTER_LOOKUP_TABLE: [u8; 32] = [
     10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 2, 16, 24, 18, 48, 20, 96, 22,
@@ -442,6 +438,7 @@ impl DMC {
 }
 
 pub struct APU {
+    audio_access: Rc<RefCell<dyn AudioAccess>>,
     frame_counter: FrameCounter,
     status: StatusRegister,
     pulse_1: PulseWave,
@@ -450,16 +447,12 @@ pub struct APU {
     noise: Noise,
     dmc: DMC,
     cpu_cycles: u16,
-    cpu_cycles_sample: u16,
     frame_interrupt: bool,
     dmc_interrupt: bool,
-    sample_timer: Instant,
-    t_inc: f32,
-    t_phase: f32,
 }
 
 impl APU {
-    pub fn new() -> Self {
+    pub fn new(audio_access: Rc<RefCell<dyn AudioAccess>>) -> Self {
         APU {
             frame_counter: FrameCounter { data: 0 },
             status: StatusRegister { data: 0 },
@@ -469,12 +462,9 @@ impl APU {
             noise: Noise::default(),
             dmc: DMC::default(),
             cpu_cycles: 0,
-            cpu_cycles_sample: 0,
             frame_interrupt: false,
             dmc_interrupt: false,
-            sample_timer: Instant::now(),
-            t_inc: 440.0 / SAMPLE_RATE as f32,
-            t_phase: 0.0,
+            audio_access,
         }
     }
 
@@ -492,9 +482,7 @@ impl APU {
         self.noise.clock_envelope();
     }
 
-    pub fn process_cpu_cycles(&mut self, cpu_cycles: u8, enable_sound: bool) {
-        static mut LAST_P1_SAMPLE: SampleFormat = 0;
-
+    pub fn process_cpu_cycles(&mut self, cpu_cycles: u8, _: bool) {
         let elapsed_cpu_cycles = cpu_cycles as u16;
 
         if self.is_quarter_frame_reached(elapsed_cpu_cycles) {
@@ -522,59 +510,15 @@ impl APU {
             self.cpu_cycles = (self.cpu_cycles + elapsed_cpu_cycles)
                 % FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES;
         }
-        let mut sample = Self::get_mixer_output(
+        let sample = Self::get_mixer_output(
             self.pulse_1.get_sample_value(),
             self.pulse_2.get_sample_value(),
             0,
             0,
             0,
         );
-        unsafe {
-            if sample != LAST_P1_SAMPLE {
-                /*
-                                println!(
-                                    "PULSE 1 Sample {} duty {} duty_pos {} period {} length_counter {} halt_counter {} sweep_enabled {} sweep_shift {}, sweep_negate {} sweep_period {}",
-                                    sample,
-                                    self.pulse_1.get_duty_cycle(),
-                                    self.pulse_1.sequencer_position,
-                                    self.pulse_1.current_period,
-                                    self.pulse_1.length_counter,
-                                    self.pulse_1.is_length_counter_halt_envelope_loop_flag_set(),
-                                    self.pulse_1.is_sweep_unit_enabled(),
-                                    self.pulse_1.get_sweep_shift(),
-                                    self.pulse_1.is_sweep_negate_enabled(),
-                                    self.pulse_1.get_sweep_period(),
-                                );
-                */
-                LAST_P1_SAMPLE = sample;
-            }
-        }
 
-        if self.cpu_cycles_sample + elapsed_cpu_cycles >= CPU_CYCLES_PER_SAMPLE as u16
-            && enable_sound
-        {
-            loop {
-                if SAMPLE_BUFFER.lock().unwrap().index != BUFFER_SIZE {
-                    break;
-                }
-            }
-            if false {
-                if self.t_phase >= 0.0 && self.t_phase < 0.5 {
-                    sample = 15;
-                } else {
-                    sample = 0;
-                }
-            }
-            self.t_phase = (self.t_phase + self.t_inc) % 1.0;
-
-            let mut sample_buffer = SAMPLE_BUFFER.lock().unwrap();
-            let index = sample_buffer.index;
-            sample_buffer.buffer[index] = sample;
-            sample_buffer.index += 1;
-            self.sample_timer = Instant::now();
-        }
-        self.cpu_cycles_sample =
-            (self.cpu_cycles_sample + elapsed_cpu_cycles) % CPU_CYCLES_PER_SAMPLE as u16;
+        self.audio_access.borrow_mut().add_sample(sample);
     }
 
     fn get_mixer_output(

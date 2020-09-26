@@ -4,8 +4,8 @@ use std::iter::FromIterator;
 use crate::{
     common,
     io::{
-        AudioAccess, KeyCode, KeyboardAccess, RgbColor, SampleFormat, VideoAccess, FRAME_HEIGHT,
-        FRAME_WIDTH, IO,
+        AudioAccess, Frame, KeyCode, KeyboardAccess, RgbColor, SampleFormat, VideoAccess,
+        FRAME_HEIGHT, FRAME_WIDTH, IO,
     },
 };
 
@@ -14,13 +14,10 @@ use sdl2::{
     render::Canvas, video::Window, EventPump,
 };
 
-const FPS: usize = 60;
 const SAMPLE_RATE: usize = 41100;
-const SAMPLES_PER_FRAME: usize = SAMPLE_RATE / FPS;
+const SAMPLES_PER_FRAME: usize = SAMPLE_RATE / common::FPS;
 const SAMPLE_INTERPOLATION: usize = common::CPU_CYCLES_PER_FRAME / SAMPLES_PER_FRAME;
 const DISPLAY_SCALING: i16 = 2;
-
-type Frame = [[RgbColor; FRAME_HEIGHT]; FRAME_WIDTH];
 
 struct SampleBuffer {
     samples_ignored: usize,
@@ -60,6 +57,14 @@ fn keycode_to_sdl2_scancode(key: KeyCode) -> Scancode {
         KeyCode::S => Scancode::S,
         KeyCode::A => Scancode::A,
         KeyCode::D => Scancode::D,
+        KeyCode::Kp4 => Scancode::Kp4,
+        KeyCode::Kp5 => Scancode::Kp5,
+        KeyCode::Kp6 => Scancode::Kp6,
+        KeyCode::KpPlus => Scancode::KpPlus,
+        KeyCode::Up => Scancode::Up,
+        KeyCode::Down => Scancode::Down,
+        KeyCode::Left => Scancode::Left,
+        KeyCode::Right => Scancode::Right,
     }
 }
 
@@ -135,6 +140,8 @@ impl IO for IOSdl2 {
         self.canvas.present();
         self.audio_queue.queue(&self.sample_buffer.buffer[..]);
     }
+
+    fn dump_frame(&self, _: &str) {}
 }
 
 impl VideoAccess for IOSdl2 {
@@ -150,7 +157,7 @@ impl AudioAccess for IOSdl2 {
 }
 
 impl KeyboardAccess for IOSdl2 {
-    fn is_key_pressed(&mut self, key: crate::io::KeyCode) -> bool {
+    fn is_key_pressed(&self, key: crate::io::KeyCode) -> bool {
         let sdl2_scancode = keycode_to_sdl2_scancode(key);
         let key_state = self.keyboard_state.get(&sdl2_scancode);
         *key_state.unwrap_or(&false)

@@ -1,10 +1,10 @@
-use crate::memory::VideoMemory;
 use crate::ram_ppu::*;
 use crate::{
     colors::{ColorMapper, DefaultColorMapper, RgbColor},
     screen::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
 };
-use crate::{cpu_ppu::Nmi, cpu_ppu::PpuState, io_sdl::SCREEN};
+use crate::{cpu_ppu::Nmi, cpu_ppu::PpuState};
+use crate::{io::VideoAccess, memory::VideoMemory};
 
 use std::{cell::RefCell, default::Default, fmt::Display, rc::Rc};
 
@@ -291,6 +291,7 @@ impl Display for VRAMAddress {
 }
 
 pub struct PPU {
+    video_access: Rc<RefCell<dyn VideoAccess>>,
     vram: Rc<RefCell<dyn VideoMemory>>,
     control_reg: ControlRegister,
     mask_reg: MaskRegister,
@@ -312,7 +313,10 @@ pub struct PPU {
 }
 
 impl PPU {
-    pub fn new(vram: Rc<RefCell<dyn VideoMemory>>) -> PPU {
+    pub fn new(
+        vram: Rc<RefCell<dyn VideoMemory>>,
+        video_access: Rc<RefCell<dyn VideoAccess>>,
+    ) -> PPU {
         PPU {
             vram: vram,
             control_reg: ControlRegister { value: 0 },
@@ -332,6 +336,7 @@ impl PPU {
             write_toggle: false,
             nmi: None,
             vbl_flag_supressed: false,
+            video_access,
         }
     }
 
@@ -374,9 +379,9 @@ impl PPU {
                 &sprite_palettes,
             );
 
-        unsafe {
-            SCREEN[x as usize][self.scanline as usize] = color;
-        }
+        self.video_access
+            .borrow_mut()
+            .set_pixel(x as usize, self.scanline as usize, color);
 
         if !self.status_reg.get_flag(StatusRegisterFlag::Sprite0Hit)
             && x < 255

@@ -1,4 +1,4 @@
-use std::{env, fs::File, io::Read, thread, time::Duration};
+use std::{env, fs::File, io::Read, time::Duration};
 
 mod apu;
 mod colors;
@@ -7,6 +7,7 @@ mod controllers;
 mod cpu;
 mod cpu_ppu;
 mod io;
+mod io_dummy;
 mod io_sdl;
 mod io_sdl2;
 mod keyboard;
@@ -31,7 +32,7 @@ pub struct NesSettings {
 impl Default for NesSettings {
     fn default() -> Self {
         Self {
-            test_mode: true,
+            test_mode: false,
             duration: None,
         }
     }
@@ -44,24 +45,13 @@ fn read_rom(file_name: &str) -> nes_format_reader::NesFile {
     nes_format_reader::NesFile::new(&rom)
 }
 
-fn nes_thread(nes_file: &nes_format_reader::NesFile, settings: NesSettings) {
-    let mut nes = nes::Nes::new(settings);
-    nes.load(nes_file);
-    nes.run();
-}
-
 fn run_rom(path: &str, settings: NesSettings) {
-    let rom = read_rom(path);
-    let io = io_sdl::IOSdl::new(String::from(path));
-    let nes_handle = thread::spawn(move || {
-        nes_thread(&rom, settings);
-    });
-    if !settings.test_mode {
-        io.run(settings);
-    }
-    let _ = nes_handle.join();
+    let nes_file = read_rom(path);
+    let mut nes = nes::Nes::new(path, settings);
+    nes.load(&nes_file);
+    nes.run();
     if settings.test_mode {
-        io_sdl::IOSdl::dump_frame(&(path.to_owned() + ".bmp"));
+        nes.dump_frame(&(path.to_owned() + ".bmp"));
     }
 }
 

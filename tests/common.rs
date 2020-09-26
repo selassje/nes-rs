@@ -31,5 +31,5 @@ pub fn run_simple_test(test_dir: &str, rom_name: &str, duration: Duration) {
 
 #[allow(dead_code)]
 pub fn run_simple_short_test(test_dir: &str, rom_name: &str) {
-    run_simple_test(test_dir, rom_name, Duration::from_secs(1));
+    run_simple_test(test_dir, rom_name, Duration::from_secs(5));
 }
