@@ -7,7 +7,7 @@ const PATH: &str = "tests\\instr_timing\\";
 
 #[test]
 fn instr_timing() {
-    run_simple_test(PATH, "1-instr_timing.nes",Duration::from_secs(30));
+    run_simple_test(PATH, "1-instr_timing.nes",Duration::from_secs(40));
 }
 
 #[test]
