@@ -1,7 +1,7 @@
 use crate::ram_ppu::*;
 use crate::{
     colors::{ColorMapper, DefaultColorMapper, RgbColor},
-    screen::{DISPLAY_HEIGHT, DISPLAY_WIDTH},
+    io::{FRAME_HEIGHT, FRAME_WIDTH},
 };
 use crate::{cpu_ppu::Nmi, cpu_ppu::PpuState};
 use crate::{io::VideoAccess, memory::VideoMemory};
@@ -27,7 +27,8 @@ const POST_RENDER_SCANLINE: i16 = 240;
 const VBLANK_START_SCANLINE: i16 = 241;
 
 const ACTIVE_PIXELS_CYCLE_START: u16 = 4;
-const ACTIVE_PIXELS_CYCLE_END: u16 = ACTIVE_PIXELS_CYCLE_START + DISPLAY_WIDTH as u16 - 1;
+const ACTIVE_PIXELS_CYCLE_END: u16 = ACTIVE_PIXELS_CYCLE_START + FRAME_WIDTH as u16 - 1;
+
 
 const CPU_PPU_ALIGNMENT: u16 = 2;
 const VBLANK_START_ONE_CYCLE_BEFORE: u16 = 1 + CPU_PPU_ALIGNMENT;
@@ -512,15 +513,15 @@ impl PPU {
     fn get_scrolled_x(&self, x: usize) -> usize {
         ((self.fine_x_scroll as usize + x)
             + (self.vram_address.get(COARSE_X) * TILE_SIDE_LENGTH as u16) as usize
-            + (self.vram_address.get(NM_TABLE_X) as usize) * DISPLAY_WIDTH as usize)
-            % (2 * DISPLAY_WIDTH)
+            + (self.vram_address.get(NM_TABLE_X) as usize) * FRAME_WIDTH as usize)
+            % (2 *FRAME_WIDTH)
     }
 
     fn get_scrolled_y(&self) -> usize {
         ((self.vram_address.get(FINE_Y) as usize)
             + (self.vram_address.get(COARSE_Y) * (TILE_SIDE_LENGTH as u16)) as usize
-            + ((self.vram_address.get(NM_TABLE_Y) as usize) * DISPLAY_HEIGHT))
-            % (2 * DISPLAY_HEIGHT)
+            + ((self.vram_address.get(NM_TABLE_Y) as usize) * FRAME_HEIGHT))
+            % (2 * FRAME_HEIGHT)
     }
 
     fn determine_pixel_color_and_check_for_sprite0_hit(
@@ -557,9 +558,9 @@ impl PPU {
         let scrolled_x = self.get_scrolled_x(x % 8);
         let scrolled_y = self.get_scrolled_y();
         let name_table_index =
-            (2 * (scrolled_y / DISPLAY_HEIGHT) + (scrolled_x / DISPLAY_WIDTH)) as u8;
-        let scrolled_x = scrolled_x % DISPLAY_WIDTH;
-        let scrolled_y = scrolled_y % DISPLAY_HEIGHT;
+            (2 * (scrolled_y / FRAME_HEIGHT) + (scrolled_x / FRAME_WIDTH)) as u8;
+        let scrolled_x = scrolled_x % FRAME_WIDTH;
+        let scrolled_y = scrolled_y % FRAME_HEIGHT;
         let bg_color_tile_y = (scrolled_y / 16) as u8;
         let bg_color_tile_x = (scrolled_x / 16) as u8;
         let bg_palette_index = self.vram.borrow().get_background_pallete_index(

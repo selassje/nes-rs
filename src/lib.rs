@@ -8,7 +8,6 @@ mod cpu;
 mod cpu_ppu;
 mod io;
 mod io_dummy;
-mod io_sdl;
 mod io_sdl2;
 mod keyboard;
 mod mapper;
@@ -20,7 +19,6 @@ mod ram;
 mod ram_apu;
 mod ram_controllers;
 mod ram_ppu;
-mod screen;
 mod vram;
 
 #[derive(Copy, Clone, Debug)]

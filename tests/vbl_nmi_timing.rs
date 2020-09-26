@@ -8,7 +8,7 @@ const PATH: &str = "tests\\vbl_nmi_timing\\";
 
 #[test]
 fn frame_basics() {
-    run_simple_test(PATH, "1.frame_basics.nes", Duration::from_secs(5));
+    run_simple_test(PATH, "1.frame_basics.nes", Duration::from_secs(10));
 }
 
 #[test]
