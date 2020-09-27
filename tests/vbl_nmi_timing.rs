@@ -27,7 +27,7 @@ fn vbl_clear_timing() {
 
 #[test]
 fn nmi_suppression() {
-    run_simple_short_test(PATH, "5.nmi_suppression.nes");
+    run_simple_test(PATH, "5.nmi_suppression.nes",Duration::from_secs(5));
 }
 
 #[test]
