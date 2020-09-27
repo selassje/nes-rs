@@ -1,27 +1,30 @@
+use std::slice::Iter;
+
 use sdl2::{
     pixels::{self, PixelFormatEnum},
     rect::Rect,
 };
 
-use crate::io::{
-    AudioAccess, Frame, KeyboardAccess, RgbColor, VideoAccess, FRAME_HEIGHT, FRAME_WIDTH, IO,
-};
+use super::{DumpFrame, RgbColor, VideoAccess, FRAME_HEIGHT, FRAME_WIDTH};
 
-pub struct IODummy {
+type Frame = [[RgbColor; FRAME_HEIGHT]; FRAME_WIDTH];
+pub(super) struct IOInternal {
     frame: Frame,
 }
 
-impl IODummy {
-    pub fn new(_: &str) -> Self {
-        IODummy {
+impl IOInternal {
+    pub fn new() -> Self {
+        IOInternal {
             frame: [[(255, 255, 255); FRAME_HEIGHT]; FRAME_WIDTH],
         }
     }
+
+    pub fn get_pixel_iter(&self) -> Iter<[RgbColor; FRAME_HEIGHT]> {
+        self.frame.iter()
+    }
 }
 
-impl IO for IODummy {
-    fn present_frame(&mut self) {}
-
+impl DumpFrame for IOInternal {
     fn dump_frame(&self, path: &str) {
         let mut bitmap = sdl2::surface::Surface::new(
             FRAME_WIDTH as u32,
@@ -40,18 +43,8 @@ impl IO for IODummy {
     }
 }
 
-impl AudioAccess for IODummy {
-    fn add_sample(&mut self, _: crate::io::SampleFormat) {}
-}
-
-impl VideoAccess for IODummy {
+impl VideoAccess for IOInternal {
     fn set_pixel(&mut self, x: usize, y: usize, color: RgbColor) {
         self.frame[x][y] = color;
-    }
-}
-
-impl KeyboardAccess for IODummy {
-    fn is_key_pressed(&self, _: crate::io::KeyCode) -> bool {
-        false
     }
 }

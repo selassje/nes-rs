@@ -7,8 +7,6 @@ mod controllers;
 mod cpu;
 mod cpu_ppu;
 mod io;
-mod io_dummy;
-mod io_sdl2;
 mod keyboard;
 mod mapper;
 mod memory;

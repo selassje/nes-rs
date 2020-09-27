@@ -4,8 +4,8 @@ use std::iter::FromIterator;
 use crate::{
     common,
     io::{
-        AudioAccess, Frame, KeyCode, KeyboardAccess, RgbColor, SampleFormat, VideoAccess,
-        FRAME_HEIGHT, FRAME_WIDTH, IO,
+        AudioAccess, KeyCode, KeyboardAccess, RgbColor, SampleFormat, VideoAccess, FRAME_HEIGHT,
+        FRAME_WIDTH, IO,
     },
 };
 
@@ -13,6 +13,8 @@ use sdl2::{
     audio::AudioQueue, audio::AudioSpecDesired, keyboard::Scancode, pixels, rect::Rect,
     render::Canvas, video::Window, EventPump,
 };
+
+use super::io_internal::IOInternal;
 
 const SAMPLE_RATE: usize = 41100;
 const SAMPLES_PER_FRAME: usize = SAMPLE_RATE / common::FPS;
@@ -39,7 +41,7 @@ impl SampleBuffer {
 }
 
 pub struct IOSdl2 {
-    frame: Frame,
+    io_internal: IOInternal,
     sample_buffer: SampleBuffer,
     audio_queue: AudioQueue<SampleFormat>,
     events: EventPump,
@@ -110,7 +112,7 @@ impl IOSdl2 {
         let events = sdl_context.event_pump().unwrap();
 
         IOSdl2 {
-            frame: [[(255, 255, 255); FRAME_HEIGHT]; FRAME_WIDTH],
+            io_internal: IOInternal::new(),
             sample_buffer: SampleBuffer {
                 index: 0,
                 samples_ignored: 0,
@@ -128,7 +130,7 @@ impl IO for IOSdl2 {
     fn present_frame(&mut self) {
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
         self.events.pump_events();
-        for (x, col) in self.frame.iter().enumerate() {
+        for (x, col) in self.io_internal.get_pixel_iter().enumerate() {
             for (y, color) in col.iter().enumerate() {
                 let x = (x * (DISPLAY_SCALING as usize)) as i32;
                 let y = (y * (DISPLAY_SCALING as usize)) as i32;
@@ -140,13 +142,11 @@ impl IO for IOSdl2 {
         self.canvas.present();
         self.audio_queue.queue(&self.sample_buffer.buffer[..]);
     }
-
-    fn dump_frame(&self, _: &str) {}
 }
 
 impl VideoAccess for IOSdl2 {
     fn set_pixel(&mut self, x: usize, y: usize, color: RgbColor) {
-        self.frame[x][y] = color;
+        self.io_internal.set_pixel(x, y, color);
     }
 }
 

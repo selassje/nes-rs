@@ -1,7 +1,10 @@
+pub mod io_dummy;
+mod io_internal;
+pub mod io_sdl2;
+
 pub type SampleFormat = u8;
 pub const FRAME_WIDTH: usize = 256;
 pub const FRAME_HEIGHT: usize = 240;
-pub type Frame = [[RgbColor; FRAME_HEIGHT]; FRAME_WIDTH];
 pub type RgbColor = (u8, u8, u8);
 
 #[derive(Copy, Clone)]
@@ -34,9 +37,12 @@ pub trait VideoAccess {
 
 pub trait IO {
     fn present_frame(&mut self);
-    fn dump_frame(&self, path: &str);
 }
 
 pub trait KeyboardAccess {
     fn is_key_pressed(&self, key: KeyCode) -> bool;
+}
+
+pub trait DumpFrame {
+    fn dump_frame(&self, path: &str);
 }

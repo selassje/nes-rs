@@ -1,12 +1,12 @@
 use common::FPS;
-use io_sdl2::IOSdl2;
 
 use crate::keyboard::KeyboardController;
 use crate::nes_format_reader::NesFile;
 use crate::ppu::PPU;
 use crate::{apu::APU, NesSettings};
 use crate::{
-    common, controllers::Controllers, io::KeyboardAccess, io::IO, io_dummy::IODummy, io_sdl2,
+    common, controllers::Controllers, io::io_dummy::IODummy, io::io_sdl2::IOSdl2,
+    io::KeyboardAccess, io::IO,
 };
 use crate::{cpu::CPU, io::AudioAccess, io::VideoAccess};
 use crate::{ram::RAM, vram::VRAM};
@@ -83,7 +83,7 @@ impl Nes {
     }
 
     pub fn dump_frame(&mut self, path: &str) {
-        self.io.borrow().dump_frame(path);
+        //        self.io.borrow().dump_frame(path);
     }
     pub fn run(&mut self) {
         const FRAME_DURATION: Duration =

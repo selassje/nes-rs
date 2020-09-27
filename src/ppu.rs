@@ -29,7 +29,6 @@ const VBLANK_START_SCANLINE: i16 = 241;
 const ACTIVE_PIXELS_CYCLE_START: u16 = 4;
 const ACTIVE_PIXELS_CYCLE_END: u16 = ACTIVE_PIXELS_CYCLE_START + FRAME_WIDTH as u16 - 1;
 
-
 const CPU_PPU_ALIGNMENT: u16 = 2;
 const VBLANK_START_ONE_CYCLE_BEFORE: u16 = 1 + CPU_PPU_ALIGNMENT;
 const VBLANK_START_CYCLE: u16 = 1 + VBLANK_START_ONE_CYCLE_BEFORE;
@@ -514,7 +513,7 @@ impl PPU {
         ((self.fine_x_scroll as usize + x)
             + (self.vram_address.get(COARSE_X) * TILE_SIDE_LENGTH as u16) as usize
             + (self.vram_address.get(NM_TABLE_X) as usize) * FRAME_WIDTH as usize)
-            % (2 *FRAME_WIDTH)
+            % (2 * FRAME_WIDTH)
     }
 
     fn get_scrolled_y(&self) -> usize {
@@ -557,8 +556,7 @@ impl PPU {
         let bg_pattern_table = &self.pattern_tables[bg_pattern_table_index as usize];
         let scrolled_x = self.get_scrolled_x(x % 8);
         let scrolled_y = self.get_scrolled_y();
-        let name_table_index =
-            (2 * (scrolled_y / FRAME_HEIGHT) + (scrolled_x / FRAME_WIDTH)) as u8;
+        let name_table_index = (2 * (scrolled_y / FRAME_HEIGHT) + (scrolled_x / FRAME_WIDTH)) as u8;
         let scrolled_x = scrolled_x % FRAME_WIDTH;
         let scrolled_y = scrolled_y % FRAME_HEIGHT;
         let bg_color_tile_y = (scrolled_y / 16) as u8;
