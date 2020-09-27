@@ -482,7 +482,7 @@ impl APU {
         self.noise.clock_envelope();
     }
 
-    pub fn process_cpu_cycles(&mut self, cpu_cycles: u8, _: bool) {
+    pub fn process_cpu_cycles(&mut self, cpu_cycles: u8) {
         let elapsed_cpu_cycles = cpu_cycles as u16;
 
         if self.is_quarter_frame_reached(elapsed_cpu_cycles) {

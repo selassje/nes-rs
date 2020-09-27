@@ -1,6 +1,6 @@
-pub mod io_dummy;
-mod io_internal;
+pub mod io_test;
 pub mod io_sdl2;
+mod io_internal;
 
 pub type SampleFormat = u8;
 pub const FRAME_WIDTH: usize = 256;

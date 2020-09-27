@@ -1,4 +1,4 @@
-use nes_rs::run_test_rom;
+use nes_rs::nes_test::NesTest;
 use std::{
     fs::{self, File},
     io::Read,
@@ -25,7 +25,9 @@ fn delete_frame(rom_path: &str) {
 pub fn run_simple_test(test_dir: &str, rom_name: &str, duration: Duration) {
     let rom_path = test_dir.to_owned() + rom_name;
     delete_frame(&rom_path);
-    run_test_rom(&rom_path, duration);
+    let mut nes_test = NesTest::new(&rom_path);
+    nes_test.run_for(duration);
+    nes_test.dump_frame();
     assert!(frames_are_the_same(&rom_path));
 }
 
