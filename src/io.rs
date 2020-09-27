@@ -1,13 +1,13 @@
-pub mod io_test;
-pub mod io_sdl2;
 mod io_internal;
+pub mod io_sdl2;
+pub mod io_test;
 
 pub type SampleFormat = u8;
 pub const FRAME_WIDTH: usize = 256;
 pub const FRAME_HEIGHT: usize = 240;
 pub type RgbColor = (u8, u8, u8);
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum KeyCode {
     Q,
     E,
@@ -41,8 +41,4 @@ pub trait IO {
 
 pub trait KeyboardAccess {
     fn is_key_pressed(&self, key: KeyCode) -> bool;
-}
-
-pub trait DumpFrame {
-    fn dump_frame(&self, path: &str);
 }

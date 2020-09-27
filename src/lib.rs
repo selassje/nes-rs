@@ -1,9 +1,9 @@
-use std::{cell::RefCell, env, fs::File, io::Read, rc::Rc}; 
+use std::{cell::RefCell, env, fs::File, io::Read, rc::Rc};
 
 mod apu;
 mod colors;
 mod common;
-mod controllers;
+pub mod controllers;
 mod cpu;
 mod cpu_ppu;
 mod io;
@@ -34,7 +34,6 @@ fn run_rom(path: &str) {
     let mut nes = nes::Nes::new(io);
     nes.load(&nes_file);
     nes.run(None);
-    
 }
 
 pub fn run() {

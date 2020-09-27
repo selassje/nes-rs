@@ -6,7 +6,7 @@ use crate::{
 use std::iter::FromIterator;
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-type ButtonKeyMap = HashMap<Button, KeyCode>;
+pub type ButtonKeyMap = HashMap<Button, KeyCode>;
 
 pub struct KeyboardController {
     button_key_map: ButtonKeyMap,
@@ -14,20 +14,37 @@ pub struct KeyboardController {
 }
 
 impl KeyboardController {
+
+    pub fn get_default_player_1_mapping() -> ButtonKeyMap {
+        HashMap::from_iter(vec![
+            (Button::A, KeyCode::Q),
+            (Button::B, KeyCode::E),
+            (Button::Select, KeyCode::C),
+            (Button::Start, KeyCode::Space),
+            (Button::Up, KeyCode::W),
+            (Button::Down, KeyCode::S),
+            (Button::Left, KeyCode::A),
+            (Button::Right, KeyCode::D),
+        ])
+    }
+
+    pub fn get_default_player_2_mapping() -> ButtonKeyMap {
+        HashMap::from_iter(vec![
+            (Button::A, KeyCode::Kp4),
+            (Button::B, KeyCode::Kp5),
+            (Button::Select, KeyCode::Kp6),
+            (Button::Start, KeyCode::KpPlus),
+            (Button::Up, KeyCode::Up),
+            (Button::Down, KeyCode::Down),
+            (Button::Left, KeyCode::Left),
+            (Button::Right, KeyCode::Right),
+        ])
+    }
     pub fn get_default_keyboard_controller_player1(
         keyboard_access: Rc<RefCell<dyn KeyboardAccess>>,
     ) -> Self {
         KeyboardController {
-            button_key_map: HashMap::from_iter(vec![
-                (Button::A, KeyCode::Q),
-                (Button::B, KeyCode::E),
-                (Button::Select, KeyCode::C),
-                (Button::Start, KeyCode::Space),
-                (Button::Up, KeyCode::W),
-                (Button::Down, KeyCode::S),
-                (Button::Left, KeyCode::A),
-                (Button::Right, KeyCode::D),
-            ]),
+            button_key_map: Self::get_default_player_1_mapping(),
             keyboard_access,
         }
     }
@@ -36,16 +53,7 @@ impl KeyboardController {
         keyboard_access: Rc<RefCell<dyn KeyboardAccess>>,
     ) -> Self {
         KeyboardController {
-            button_key_map: HashMap::from_iter(vec![
-                (Button::A, KeyCode::Kp4),
-                (Button::B, KeyCode::Kp5),
-                (Button::Select, KeyCode::Kp6),
-                (Button::Start, KeyCode::KpPlus),
-                (Button::Up, KeyCode::Up),
-                (Button::Down, KeyCode::Down),
-                (Button::Left, KeyCode::Left),
-                (Button::Right, KeyCode::Right),
-            ]),
+            button_key_map: Self::get_default_player_2_mapping(),
             keyboard_access,
         }
     }

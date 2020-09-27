@@ -5,7 +5,7 @@ use sdl2::{
     rect::Rect,
 };
 
-use super::{DumpFrame, RgbColor, VideoAccess, FRAME_HEIGHT, FRAME_WIDTH};
+use super::{RgbColor, VideoAccess, FRAME_HEIGHT, FRAME_WIDTH};
 
 type Frame = [[RgbColor; FRAME_HEIGHT]; FRAME_WIDTH];
 pub(super) struct IOInternal {
@@ -22,10 +22,7 @@ impl IOInternal {
     pub fn get_pixel_iter(&self) -> Iter<[RgbColor; FRAME_HEIGHT]> {
         self.frame.iter()
     }
-}
-
-impl DumpFrame for IOInternal {
-    fn dump_frame(&self, path: &str) {
+    pub(super) fn dump_frame(&self, path: &str) {
         let mut bitmap = sdl2::surface::Surface::new(
             FRAME_WIDTH as u32,
             FRAME_HEIGHT as u32,
