@@ -19,13 +19,19 @@ impl NesTest {
         String::from(frame_path)
     }
 
-    pub fn new(rom_path: &str, test_name: &str, test_fn: impl Fn(&mut NesTest) + 'static) -> Self {
+    pub fn new(rom_path: &str, suffix: Option<&str>, test_fn: impl Fn(&mut NesTest) + 'static) -> Self {
         let io_test = Rc::new(RefCell::new(io_test::IOTest::new(rom_path)));
         let mut nes = Nes::new(io_test.clone());
         let mut dir = PathBuf::from(rom_path);
+        let mut test_name = dir.file_name().unwrap().to_str().unwrap().to_owned();
+        if let Some(suffix) = suffix {
+            let suffix : String = ".".to_owned() + suffix;
+            test_name.extend(suffix.chars())
+        }
+
         dir.pop();
-        let output_frame_path = Self::create_frame_path(&dir, test_name, "");
-        let expected_frame_path = Self::create_frame_path(&dir, test_name, ".expected");
+        let output_frame_path = Self::create_frame_path(&dir, &test_name, "");
+        let expected_frame_path = Self::create_frame_path(&dir, &test_name, ".expected");
         let nes_file = read_rom(rom_path);
         nes.load(&nes_file);
 

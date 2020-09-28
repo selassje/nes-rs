@@ -14,7 +14,6 @@ pub struct KeyboardController {
 }
 
 impl KeyboardController {
-
     pub fn get_default_player_1_mapping() -> ButtonKeyMap {
         HashMap::from_iter(vec![
             (Button::A, KeyCode::Q),

@@ -13,7 +13,7 @@ fn nestest_official() {
         nes_test.run_for(Duration::from_secs(3));
     };
 
-    let mut nes_test = NesTest::new(&rom_path,"nestest.nes.official",test_fn,);
+    let mut nes_test = NesTest::new(&rom_path,Some("official"),test_fn,);
     assert!(nes_test.run());
 }
 
@@ -29,6 +29,6 @@ fn nestest_unofficial() {
         nes_test.run_for(Duration::from_secs(3));
     };
 
-    let mut nes_test = NesTest::new(&rom_path,"nestest.nes.unofficial",test_fn,);
+    let mut nes_test = NesTest::new(&rom_path, Some("unofficial"),test_fn,);
     assert!(nes_test.run());
 }
