@@ -1,9 +1,7 @@
 use nes_rs::nes_test::NesTest;
 use std::time::Duration;
 
-pub fn run_simple_test(test_dir: &str, rom_name: &str, duration: Duration) {
-    let rom_path = test_dir.to_owned() + rom_name;
-
+pub fn run_simple_test(rom_path: &str, duration: Duration) {
     let test_fn = move |nes_test: &mut NesTest| {
         nes_test.run_for(duration);
     };
@@ -13,6 +11,6 @@ pub fn run_simple_test(test_dir: &str, rom_name: &str, duration: Duration) {
 }
 
 #[allow(dead_code)]
-pub fn run_simple_short_test(test_dir: &str, rom_name: &str) {
-    run_simple_test(test_dir, rom_name, Duration::from_secs(3));
+pub fn run_simple_short_test(rom_path: &str) {
+    run_simple_test(rom_path, Duration::from_secs(3));
 }

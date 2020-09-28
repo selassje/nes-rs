@@ -6,5 +6,5 @@ matrix:
           script:
             - cargo install cargo-vcpkg
             - cargo vcpkg build
-            - cargo test --release -- --test-threads=1
+            - cargo test --release 
           
