@@ -1,6 +1,5 @@
 use common::FPS;
 
-use crate::apu::APU;
 use crate::common;
 use crate::controllers::Controllers;
 use crate::cpu::CPU;
@@ -8,11 +7,11 @@ use crate::io::AudioAccess;
 use crate::io::KeyboardAccess;
 use crate::io::VideoAccess;
 use crate::io::IO;
-use crate::keyboard::KeyboardController;
 use crate::nes_format_reader::NesFile;
 use crate::ppu::PPU;
 use crate::ram::RAM;
 use crate::vram::VRAM;
+use crate::{apu::APU, controllers::Controller};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -29,16 +28,17 @@ pub struct Nes {
 }
 
 impl Nes {
-    pub fn new<T>(io: Rc<RefCell<T>>) -> Self
+    pub fn new<T>(
+        io: Rc<RefCell<T>>,
+        controller_1: Rc<dyn Controller>,
+        controller_2: Rc<dyn Controller>,
+    ) -> Self
     where
         T: IO + VideoAccess + AudioAccess + KeyboardAccess + 'static,
     {
-        let controller_1 = KeyboardController::get_default_keyboard_controller_player1(io.clone());
-        let controller_2 = KeyboardController::get_default_keyboard_controller_player2(io.clone());
-        let controllers = Rc::new(RefCell::new(Controllers::new(
-            Box::new(controller_1),
-            Box::new(controller_2),
-        )));
+        // let controller_1 = KeyboardController::get_default_keyboard_controller_player1(io.clone());
+        //let controller_2 = KeyboardController::get_default_keyboard_controller_player2(io.clone());
+        let controllers = Rc::new(RefCell::new(Controllers::new(controller_1, controller_2)));
 
         let vram = Rc::new(RefCell::new(VRAM::new()));
         let ppu = Rc::new(RefCell::new(PPU::new(vram.clone(), io.clone())));
@@ -72,9 +72,10 @@ impl Nes {
         const FRAME_DURATION: Duration =
             Duration::from_nanos((Duration::from_secs(1).as_nanos() / FPS as u128) as u64);
 
-        let mut elapsed_frames : u128 = 0;
+        let mut elapsed_frames: u128 = 0;
         let mut frame_start = Instant::now();
-        while duration == None || elapsed_frames < duration.unwrap().as_secs() as u128 * FPS as u128 {
+        while duration == None || elapsed_frames < duration.unwrap().as_secs() as u128 * FPS as u128
+        {
             self.run_single_frame();
             self.io.borrow_mut().present_frame();
 
@@ -83,7 +84,7 @@ impl Nes {
                 std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);
             }
             frame_start = Instant::now();
-            elapsed_frames +=1;
+            elapsed_frames += 1;
         }
     }
 

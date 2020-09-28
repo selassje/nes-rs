@@ -3,7 +3,7 @@ use std::{cell::RefCell, env, fs::File, io::Read, rc::Rc};
 mod apu;
 mod colors;
 mod common;
-pub mod controllers;
+mod controllers;
 mod cpu;
 mod cpu_ppu;
 mod io;
@@ -31,7 +31,11 @@ fn read_rom(file_name: &str) -> nes_format_reader::NesFile {
 fn run_rom(path: &str) {
     let nes_file = read_rom(path);
     let io = Rc::new(RefCell::new(io::io_sdl2::IOSdl2::new(path)));
-    let mut nes = nes::Nes::new(io);
+    let controller_1 =
+        Rc::new(keyboard::KeyboardController::get_default_keyboard_controller_player1(io.clone()));
+    let controller_2 =
+        Rc::new(keyboard::KeyboardController::get_default_keyboard_controller_player2(io.clone()));
+    let mut nes = nes::Nes::new(io, controller_1, controller_2);
     nes.load(&nes_file);
     nes.run(None);
 }

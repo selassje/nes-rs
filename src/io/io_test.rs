@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 
 use crate::io::{AudioAccess, KeyboardAccess, RgbColor, VideoAccess, IO};
-use crate::{
-    controllers::Button, io::io_internal::IOInternal, keyboard::ButtonKeyMap,
-    keyboard::KeyboardController,
-};
+use crate::{controllers::Button, io::io_internal::IOInternal, keyboard::ButtonKeyMap};
 
 use super::KeyCode;
 #[derive(PartialEq)]
@@ -24,8 +21,8 @@ impl IOTest {
     pub fn new(_: &str) -> Self {
         IOTest {
             io_internal: IOInternal::new(),
-            player_1_button_key_map: KeyboardController::get_default_player_1_mapping(),
-            player_2_button_key_map: KeyboardController::get_default_player_2_mapping(),
+            player_1_button_key_map: HashMap::new(),
+            player_2_button_key_map: HashMap::new(),
             keys_state: HashMap::new(),
         }
     }
@@ -41,6 +38,15 @@ impl IOTest {
         };
         let key = mapping.get(&button).unwrap();
         self.keys_state.insert(*key, state);
+    }
+
+    pub fn set_key_mappings(
+        &mut self,
+        player_1_button_key_map: ButtonKeyMap,
+        player_2_button_key_map: ButtonKeyMap,
+    ) {
+        self.player_1_button_key_map = player_1_button_key_map;
+        self.player_2_button_key_map = player_2_button_key_map;
     }
 }
 

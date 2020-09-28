@@ -14,7 +14,7 @@ pub struct KeyboardController {
 }
 
 impl KeyboardController {
-    pub fn get_default_player_1_mapping() -> ButtonKeyMap {
+    fn get_default_player_1_mapping() -> ButtonKeyMap {
         HashMap::from_iter(vec![
             (Button::A, KeyCode::Q),
             (Button::B, KeyCode::E),
@@ -27,7 +27,7 @@ impl KeyboardController {
         ])
     }
 
-    pub fn get_default_player_2_mapping() -> ButtonKeyMap {
+    fn get_default_player_2_mapping() -> ButtonKeyMap {
         HashMap::from_iter(vec![
             (Button::A, KeyCode::Kp4),
             (Button::B, KeyCode::Kp5),
@@ -55,6 +55,10 @@ impl KeyboardController {
             button_key_map: Self::get_default_player_2_mapping(),
             keyboard_access,
         }
+    }
+
+    pub fn get_key_mappings(&self) -> ButtonKeyMap {
+        self.button_key_map.clone()
     }
 }
 

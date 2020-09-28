@@ -1,6 +1,6 @@
 use self::Button::*;
 use crate::ram_controllers::*;
-use std::cell::Cell;
+use std::{cell::Cell, rc::Rc};
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
 pub enum Button {
@@ -35,14 +35,14 @@ pub trait Controller {
 }
 
 pub struct Controllers {
-    controller_1: Box<dyn Controller>,
-    controller_2: Box<dyn Controller>,
+    controller_1: Rc<dyn Controller>,
+    controller_2: Rc<dyn Controller>,
     strobe: bool,
     next_controller_button: Cell<u8>,
 }
 
 impl Controllers {
-    pub fn new(controller_1: Box<dyn Controller>, controller_2: Box<dyn Controller>) -> Self {
+    pub fn new(controller_1: Rc<dyn Controller>, controller_2: Rc<dyn Controller>) -> Self {
         Controllers {
             controller_1: controller_1,
             controller_2: controller_2,
