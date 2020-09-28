@@ -72,9 +72,9 @@ impl Nes {
         const FRAME_DURATION: Duration =
             Duration::from_nanos((Duration::from_secs(1).as_nanos() / FPS as u128) as u64);
 
-        let run_start = Instant::now();
+        let mut elapsed_frames : u128 = 0;
         let mut frame_start = Instant::now();
-        while duration == None || run_start.elapsed() < duration.unwrap() {
+        while duration == None || elapsed_frames < duration.unwrap().as_secs() as u128 * FPS as u128 {
             self.run_single_frame();
             self.io.borrow_mut().present_frame();
 
@@ -83,6 +83,7 @@ impl Nes {
                 std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);
             }
             frame_start = Instant::now();
+            elapsed_frames +=1;
         }
     }
 
