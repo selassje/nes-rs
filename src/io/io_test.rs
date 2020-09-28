@@ -1,15 +1,23 @@
 use std::collections::HashMap;
 
-use crate::{controllers::Button, io::io_internal::IOInternal, keyboard::ButtonKeyMap, keyboard::KeyboardController};
 use crate::io::{AudioAccess, KeyboardAccess, RgbColor, VideoAccess, IO};
+use crate::{
+    controllers::Button, io::io_internal::IOInternal, keyboard::ButtonKeyMap,
+    keyboard::KeyboardController,
+};
 
 use super::KeyCode;
+#[derive(PartialEq)]
+pub enum Player {
+    Player1,
+    _Player2,
+}
 
 pub struct IOTest {
     io_internal: IOInternal,
     player_1_button_key_map: ButtonKeyMap,
     player_2_button_key_map: ButtonKeyMap,
-    keys_state: HashMap<KeyCode,bool>,
+    keys_state: HashMap<KeyCode, bool>,
 }
 
 impl IOTest {
@@ -18,39 +26,21 @@ impl IOTest {
             io_internal: IOInternal::new(),
             player_1_button_key_map: KeyboardController::get_default_player_1_mapping(),
             player_2_button_key_map: KeyboardController::get_default_player_2_mapping(),
-            keys_state : HashMap::new(),
+            keys_state: HashMap::new(),
         }
     }
     pub fn dump_frame(&self, path: &str) {
         self.io_internal.dump_frame(path);
     }
 
-    fn set_button_state(&mut self, button: Button, mapping : &ButtonKeyMap, state: bool ) {
+    pub fn set_button_state(&mut self, button: Button, player1: Player, state: bool) {
+        let mapping = if player1 == Player::Player1 {
+            self.player_1_button_key_map.clone()
+        } else {
+            self.player_2_button_key_map.clone()
+        };
         let key = mapping.get(&button).unwrap();
         self.keys_state.insert(*key, state);
-    }    
-    fn press_button(&mut self, button: Button, mapping : &ButtonKeyMap  ) {
-        self.set_button_state(button, mapping, true);
-    }    
-
-    fn release_button(&mut self, button: Button, mapping : &ButtonKeyMap  ) {
-        self.set_button_state(button, mapping, false);
-    }
-    
-    pub fn press_button_player_1(&mut self, button: Button) {
-        self.press_button(button, &self.player_1_button_key_map.clone());
-    }
-   
-    pub fn press_button_player_2(&mut self, button: Button) {
-        self.press_button(button, &self.player_2_button_key_map.clone());
-    }
-
-    pub fn release_button_player_1(&mut self, button: Button) {
-        self.release_button(button, &self.player_1_button_key_map.clone());
-    }
-    
-    pub fn release_button_player_2(&mut self, button: Button) {
-        self.release_button(button, &self.player_2_button_key_map.clone());
     }
 }
 

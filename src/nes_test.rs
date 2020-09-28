@@ -1,29 +1,89 @@
-use std::{cell::RefCell, rc::Rc, time::Duration};
+use crate::{controllers::Button, io::io_test, nes::Nes, read_rom};
+use fs::File;
+use std::{cell::RefCell, fs, io::Read, path::Path, path::PathBuf, rc::Rc, time::Duration};
 
-use crate::{io::io_test, nes::Nes, read_rom};
+type TestFn = dyn Fn(&mut NesTest);
 
 pub struct NesTest {
     nes: Nes,
-    pub io_test: Rc<RefCell<io_test::IOTest>>,
+    io_test: Rc<RefCell<io_test::IOTest>>,
+    output_frame_path: String,
+    expected_frame_path: String,
+    test_fn: Rc<TestFn>,
 }
 
 impl NesTest {
-    pub fn new(rom_path: &str) -> Self {
+    fn create_frame_path(dir: &PathBuf, test_name: &str, suffix: &str) -> String {
+        let frame_path = dir.join(Path::new(&(test_name.to_owned() + suffix + ".bmp")));
+        let frame_path = frame_path.to_str().unwrap();
+        String::from(frame_path)
+    }
+
+    pub fn new(rom_path: &str, test_name: &str, test_fn: impl Fn(&mut NesTest) + 'static) -> Self {
         let io_test = Rc::new(RefCell::new(io_test::IOTest::new(rom_path)));
         let mut nes = Nes::new(io_test.clone());
+        let mut dir = PathBuf::from(rom_path);
+        dir.pop();
+        let output_frame_path = Self::create_frame_path(&dir, test_name, "");
+        let expected_frame_path = Self::create_frame_path(&dir, test_name, ".expected");
         let nes_file = read_rom(rom_path);
         nes.load(&nes_file);
+
         NesTest {
             io_test,
             nes,
+            output_frame_path,
+            expected_frame_path,
+            test_fn: Rc::new(test_fn),
         }
+    }
+
+    fn delete_output_frame(&self) {
+        fs::remove_file(self.output_frame_path.clone()).unwrap_or_default();
+    }
+
+    fn frames_are_the_same(&self) -> bool {
+        let mut file_1 = File::open(self.output_frame_path.clone())
+            .expect(&format!("Unable to open {}", self.output_frame_path));
+        let mut file_2 = File::open(self.expected_frame_path.clone())
+            .expect(&format!("Unable to open {}", self.expected_frame_path));
+        let mut buffer_1 = Vec::new();
+        let mut buffer_2 = Vec::new();
+        let _ = file_1.read_to_end(&mut buffer_1);
+        let _ = file_2.read_to_end(&mut buffer_2);
+        buffer_1 == buffer_2
+    }
+
+    pub fn run(&mut self) -> bool {
+        self.delete_output_frame();
+        self.test_fn.clone()(self);
+        self.dump_frame();
+        self.frames_are_the_same()
     }
 
     pub fn run_for(&mut self, duration: Duration) {
         self.nes.run(Some(duration))
     }
 
-    pub fn dump_frame(&self,path: &str) {
-        self.io_test.borrow().dump_frame(&path)
+    pub fn press_player_1_start(&mut self) {
+        self.io_test
+            .borrow_mut()
+            .set_button_state(Button::Start, io_test::Player::Player1, true);
+    }
+
+    pub fn press_player_1_select(&mut self) {
+        self.io_test
+            .borrow_mut()
+            .set_button_state(Button::Select, io_test::Player::Player1, true);
+    }
+
+    pub fn release_player_1_select(&mut self) {
+        self.io_test
+            .borrow_mut()
+            .set_button_state(Button::Select, io_test::Player::Player1, false);
+    }
+
+    fn dump_frame(&self) {
+        self.io_test.borrow().dump_frame(&self.output_frame_path)
     }
 }
