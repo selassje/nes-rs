@@ -601,6 +601,12 @@ impl WriteAcessRegisters for APU {
             WriteAccessRegister::Pulse2_2 => self.pulse_2.data[2] = value,
             WriteAccessRegister::Pulse2_3 => {
                 self.pulse_2.data[3] = value;
+                if self
+                    .status
+                    .is_flag_enabled(StatusRegisterFlag::Pulse2Enabled)
+                {
+                    reload_length_counter(&mut self.pulse_2);
+                }
                 self.pulse_2.reset();
             }
 
@@ -652,8 +658,10 @@ impl WriteAcessRegisters for APU {
             WriteAccessRegister::FrameCounter => {
                 self.frame_counter.data = value;
                 self.cpu_cycles = 0;
-                self.perform_half_frame_update();
-                self.perform_quarter_frame_update();
+                if self.frame_counter.get_sequencer_mode() == 1 {
+                    self.perform_half_frame_update();
+                    self.perform_quarter_frame_update();
+                }
             }
         }
     }
