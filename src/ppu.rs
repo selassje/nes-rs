@@ -392,7 +392,7 @@ impl PPU {
         }
     }
 
-    pub fn run_single_cpu_instruction(&mut self, cpu_cycles: u16) {
+    pub fn run_cpu_cycles(&mut self, cpu_cycles: u16) {
         self.nmi = None;
         for _ in 0..cpu_cycles * 3 {
             self.run_single_ppu_cycle();

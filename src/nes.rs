@@ -100,11 +100,11 @@ impl Nes {
         if cpu_cycles_for_next_instruction != 0 {
             self.ppu
                 .borrow_mut()
-                .run_single_cpu_instruction(cpu_cycles_for_next_instruction);
+                .run_cpu_cycles(cpu_cycles_for_next_instruction);
 
             self.apu
                 .borrow_mut()
-                .process_cpu_cycles(cpu_cycles_for_next_instruction as u8);
+                .run_cpu_cycles(cpu_cycles_for_next_instruction);
 
             self.cpu.run_next_instruction();
         }

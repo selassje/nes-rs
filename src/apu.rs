@@ -16,19 +16,19 @@ const DUTY_CYCLE_SEQUENCES: [[SampleFormat; 8]; 4] = [
     [1, 0, 0, 1, 1, 1, 1, 1],
 ];
 
-trait LengthCounterSupport {
+trait LengthCounterChannel {
     fn get_length_counter_load(&self) -> u8;
-    fn set_length_counter(&mut self, count: u8);
-}
+    fn get_length_counter(&self) -> u8;
+    fn set_length_counter(&mut self, value: u8);
 
-fn reload_length_counter<T: LengthCounterSupport>(channel: &mut T) {
-    channel.set_length_counter(
-        LENGTH_COUNTER_LOOKUP_TABLE[channel.get_length_counter_load() as usize],
-    );
-}
-
-fn reset_length_counter<T: LengthCounterSupport>(channel: &mut T) {
-    channel.set_length_counter(0);
+    fn reload_length_counter(&mut self) {
+        self.set_length_counter(
+            LENGTH_COUNTER_LOOKUP_TABLE[self.get_length_counter_load() as usize],
+        );
+    }
+    fn reset_length_counter(&mut self) {
+        self.set_length_counter(0);
+    }
 }
 
 const FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES: u16 = 7457;
@@ -51,6 +51,7 @@ impl FrameCounter {
     }
 }
 
+#[derive(Copy, Clone)]
 enum StatusRegisterFlag {
     Pulse1Enabled = 0b00000001,
     Pulse2Enabled = 0b00000010,
@@ -233,14 +234,12 @@ impl PulseWave {
         self.sweep_unit.reload_flag = true;
     }
 
-    fn process_elapsed_cpu_cycles(&mut self, elapsed_cpu_cycles: u16) {
-        let total_elapsed_cycles = elapsed_cpu_cycles + self.left_over_cpu_cycles as u16;
+    fn run_cpu_cycles(&mut self, cpu_cycles: u16) {
+        let total_elapsed_cycles = cpu_cycles + self.left_over_cpu_cycles as u16;
         self.left_over_cpu_cycles = (total_elapsed_cycles % 2) as u8;
         let number_of_elapsed_ticks = (total_elapsed_cycles / 2) as u16;
         if number_of_elapsed_ticks as u16 > self.timer_tick && self.current_period != 0 {
-            // println!("current_period {} number_of_elapsed_ticks {}",self.current_period, number_of_elapsed_ticks);
             self.timer_tick = self.current_period + 1 - number_of_elapsed_ticks;
-
             if self.sequencer_position > 0 {
                 self.sequencer_position -= 1;
             } else {
@@ -251,23 +250,19 @@ impl PulseWave {
         }
     }
 
+    fn get_sample(&self) -> SampleFormat {
+        DUTY_CYCLE_SEQUENCES[self.get_duty_cycle() as usize][self.sequencer_position as usize]
+            * self.get_volume() as SampleFormat
+    }
+
     fn get_volume(&self) -> u8 {
-        //return 15;
         if self.length_counter == 0 {
-            if self.sweep_unit.is_muting {
-                // println!("muted by the sweep");
-            }
             0
         } else if self.is_constant_volume_set() {
             self.get_constant_volume_or_envelope_divider_reload_value()
         } else {
             self.envelope.decay_level_counter
         }
-    }
-
-    fn get_sample_value(&self) -> SampleFormat {
-        DUTY_CYCLE_SEQUENCES[self.get_duty_cycle() as usize][self.sequencer_position as usize]
-            * self.get_volume() as SampleFormat
     }
 
     fn clock_envelope(&mut self) {
@@ -299,7 +294,7 @@ impl PulseWave {
     }
 }
 
-impl LengthCounterSupport for PulseWave {
+impl LengthCounterChannel for PulseWave {
     fn get_length_counter_load(&self) -> u8 {
         (self.data[3] & 0b11111000) >> 3
     }
@@ -307,12 +302,18 @@ impl LengthCounterSupport for PulseWave {
     fn set_length_counter(&mut self, counter: u8) {
         self.length_counter = counter
     }
+
+    fn get_length_counter(&self) -> u8 {
+        self.length_counter
+    }
 }
 
 #[derive(Default)]
 struct TriangleWave {
     data: [u8; 4],
     length_counter: u8,
+    linear_counter: u8,
+    linear_counter_reload_flag: bool,
 }
 
 impl TriangleWave {
@@ -338,15 +339,25 @@ impl TriangleWave {
             self.length_counter -= 1;
         }
     }
+
+    fn run_cpu_cycles(&mut self, cpu_cycles: u16) {}
+
+    fn get_sample(&self) -> SampleFormat {
+        0
+    }
 }
 
-impl LengthCounterSupport for TriangleWave {
+impl LengthCounterChannel for TriangleWave {
     fn get_length_counter_load(&self) -> u8 {
         (self.data[3] & 0b11111000) >> 3
     }
 
     fn set_length_counter(&mut self, counter: u8) {
         self.length_counter = counter
+    }
+
+    fn get_length_counter(&self) -> u8 {
+        self.length_counter
     }
 }
 
@@ -386,6 +397,11 @@ impl Noise {
         self.data[2] & 0x0F
     }
 
+    fn run_cpu_cycles(&mut self, cpu_cycles: u16) {}
+
+    fn get_sample(&self) -> SampleFormat {
+        0
+    }
     fn clock_envelope(&self) {}
 
     fn clock_length_counter_and_sweep_unit(&mut self) {
@@ -395,13 +411,17 @@ impl Noise {
     }
 }
 
-impl LengthCounterSupport for Noise {
+impl LengthCounterChannel for Noise {
     fn get_length_counter_load(&self) -> u8 {
         (self.data[3] & 0b11111000) >> 3
     }
 
     fn set_length_counter(&mut self, counter: u8) {
         self.length_counter = counter
+    }
+
+    fn get_length_counter(&self) -> u8 {
+        self.length_counter
     }
 }
 
@@ -434,6 +454,11 @@ impl DMC {
 
     fn get_sample_length(&self) -> u8 {
         self.data[3]
+    }
+    fn run_cpu_cycles(&mut self, cpu_cycles: u16) {}
+
+    fn get_sample(&self) -> SampleFormat {
+        0
     }
 }
 
@@ -468,6 +493,32 @@ impl APU {
         }
     }
 
+    fn get_length_counter_channel(
+        &mut self,
+        flag: StatusRegisterFlag,
+    ) -> &mut dyn LengthCounterChannel {
+        match flag {
+            Pulse1Enabled => &mut self.pulse_1,
+            Pulse2Enabled => &mut self.pulse_2,
+            TriangleEnabled => &mut self.triangle,
+            NoiseEnabled => &mut self.noise,
+            _ => panic!("Incorrect status register flag {}", flag as u8),
+        }
+    }
+
+    fn reload_length_counter_if_enabled(&mut self, flag: StatusRegisterFlag) {
+        if self.status.is_flag_enabled(flag) {
+            self.get_length_counter_channel(flag)
+                .reload_length_counter();
+        }
+    }
+
+    fn reset_length_counter_if_disabled(&mut self, flag: StatusRegisterFlag) {
+        if !self.status.is_flag_enabled(flag) {
+            self.get_length_counter_channel(flag).reset_length_counter();
+        }
+    }
+
     fn perform_half_frame_update(&mut self) {
         self.pulse_1.clock_length_counter_and_sweep_unit();
         self.pulse_2.clock_length_counter_and_sweep_unit();
@@ -482,43 +533,47 @@ impl APU {
         self.noise.clock_envelope();
     }
 
-    pub fn process_cpu_cycles(&mut self, cpu_cycles: u8) {
-        let elapsed_cpu_cycles = cpu_cycles as u16;
-
-        if self.is_quarter_frame_reached(elapsed_cpu_cycles) {
+    pub fn run_cpu_cycles(&mut self, cpu_cycles: u16) {
+        if self.is_quarter_frame_reached(cpu_cycles) {
             self.perform_quarter_frame_update();
         }
 
-        if self.is_half_frame_reached(elapsed_cpu_cycles) {
+        if self.is_half_frame_reached(cpu_cycles) {
             self.perform_half_frame_update();
         }
 
-        self.pulse_1.process_elapsed_cpu_cycles(elapsed_cpu_cycles);
-        self.pulse_2.process_elapsed_cpu_cycles(elapsed_cpu_cycles);
+        self.pulse_1.run_cpu_cycles(cpu_cycles);
+        self.pulse_2.run_cpu_cycles(cpu_cycles);
+        self.triangle.run_cpu_cycles(cpu_cycles);
+        self.noise.run_cpu_cycles(cpu_cycles);
+        self.dmc.run_cpu_cycles(cpu_cycles);
 
         if self.frame_counter.get_sequencer_mode() == 0
-            && (self.cpu_cycles + elapsed_cpu_cycles) >= FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
+            && (self.cpu_cycles + cpu_cycles) >= FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
             && !self.frame_counter.is_interrupt_inhibit_flag_set()
         {
             self.frame_interrupt = true;
         }
 
         if self.frame_counter.get_sequencer_mode() == 0 {
-            self.cpu_cycles = (self.cpu_cycles + elapsed_cpu_cycles)
-                % FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES;
+            self.cpu_cycles =
+                (self.cpu_cycles + cpu_cycles) % FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES;
         } else {
-            self.cpu_cycles = (self.cpu_cycles + elapsed_cpu_cycles)
-                % FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES;
+            self.cpu_cycles =
+                (self.cpu_cycles + cpu_cycles) % FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES;
         }
+
         let sample = Self::get_mixer_output(
-            self.pulse_1.get_sample_value(),
-            self.pulse_2.get_sample_value(),
-            0,
-            0,
-            0,
+            self.pulse_1.get_sample(),
+            self.pulse_2.get_sample(),
+            self.triangle.get_sample(),
+            self.noise.get_sample(),
+            self.dmc.get_sample(),
         );
 
-        self.audio_access.borrow_mut().add_sample(sample);
+        for _ in 0..cpu_cycles {
+            self.audio_access.borrow_mut().add_sample(sample);
+        }
     }
 
     fn get_mixer_output(
@@ -584,13 +639,8 @@ impl WriteAcessRegisters for APU {
             WriteAccessRegister::Pulse1_2 => self.pulse_1.data[2] = value,
             WriteAccessRegister::Pulse1_3 => {
                 self.pulse_1.data[3] = value;
-                if self
-                    .status
-                    .is_flag_enabled(StatusRegisterFlag::Pulse1Enabled)
-                {
-                    reload_length_counter(&mut self.pulse_1);
-                }
                 self.pulse_1.reset();
+                self.reload_length_counter_if_enabled(StatusRegisterFlag::Pulse1Enabled);
             }
 
             WriteAccessRegister::Pulse2_0 => self.pulse_2.data[0] = value,
@@ -601,25 +651,25 @@ impl WriteAcessRegisters for APU {
             WriteAccessRegister::Pulse2_2 => self.pulse_2.data[2] = value,
             WriteAccessRegister::Pulse2_3 => {
                 self.pulse_2.data[3] = value;
-                if self
-                    .status
-                    .is_flag_enabled(StatusRegisterFlag::Pulse2Enabled)
-                {
-                    reload_length_counter(&mut self.pulse_2);
-                }
                 self.pulse_2.reset();
+                self.reload_length_counter_if_enabled(StatusRegisterFlag::Pulse2Enabled);
             }
 
             WriteAccessRegister::Triangle0 => self.triangle.data[0] = value,
             WriteAccessRegister::Triangle1 => self.triangle.data[1] = value,
             WriteAccessRegister::Triangle2 => self.triangle.data[2] = value,
-            WriteAccessRegister::Triangle3 => self.triangle.data[3] = value,
-
+            WriteAccessRegister::Triangle3 => {
+                self.triangle.data[3] = value;
+                self.triangle.linear_counter_reload_flag = true;
+                self.reload_length_counter_if_enabled(StatusRegisterFlag::TriangleEnabled);
+            }
             WriteAccessRegister::Noise0 => self.noise.data[0] = value,
             WriteAccessRegister::Noise1 => self.noise.data[1] = value,
             WriteAccessRegister::Noise2 => self.noise.data[2] = value,
-            WriteAccessRegister::Noise3 => self.noise.data[3] = value,
-
+            WriteAccessRegister::Noise3 => {
+                self.noise.data[3] = value;
+                self.reload_length_counter_if_enabled(StatusRegisterFlag::NoiseEnabled);
+            }
             WriteAccessRegister::DMC0 => self.dmc.data[0] = value,
             WriteAccessRegister::DMC1 => self.dmc.data[1] = value,
             WriteAccessRegister::DMC2 => self.dmc.data[2] = value,
@@ -627,32 +677,10 @@ impl WriteAcessRegisters for APU {
 
             WriteAccessRegister::Status => {
                 self.status.data = value;
-                if !self
-                    .status
-                    .is_flag_enabled(StatusRegisterFlag::Pulse1Enabled)
-                {
-                    reset_length_counter(&mut self.pulse_1);
-                }
-                if !self
-                    .status
-                    .is_flag_enabled(StatusRegisterFlag::Pulse2Enabled)
-                {
-                    reset_length_counter(&mut self.pulse_2);
-                }
-
-                if !self
-                    .status
-                    .is_flag_enabled(StatusRegisterFlag::TriangleEnabled)
-                {
-                    reset_length_counter(&mut self.triangle);
-                }
-
-                if !self
-                    .status
-                    .is_flag_enabled(StatusRegisterFlag::NoiseEnabled)
-                {
-                    reset_length_counter(&mut self.noise);
-                }
+                self.reset_length_counter_if_disabled(StatusRegisterFlag::Pulse1Enabled);
+                self.reset_length_counter_if_disabled(StatusRegisterFlag::Pulse2Enabled);
+                self.reset_length_counter_if_disabled(StatusRegisterFlag::TriangleEnabled);
+                self.reset_length_counter_if_disabled(StatusRegisterFlag::NoiseEnabled);
                 self.frame_interrupt = false;
             }
             WriteAccessRegister::FrameCounter => {
@@ -674,22 +702,17 @@ impl ReadAccessRegisters for APU {
                 let mut out = StatusRegister { data: 0 };
                 out.set_flag_status(StatusRegisterFlag::FrameInterrupt, self.frame_interrupt);
                 out.set_flag_status(StatusRegisterFlag::DMCInterrupt, self.dmc_interrupt);
-                out.set_flag_status(
-                    StatusRegisterFlag::NoiseEnabled,
-                    self.noise.length_counter > 0,
-                );
-                out.set_flag_status(
-                    StatusRegisterFlag::TriangleEnabled,
-                    self.triangle.length_counter > 0,
-                );
-                out.set_flag_status(
-                    StatusRegisterFlag::Pulse2Enabled,
-                    self.pulse_2.length_counter > 0,
-                );
-                out.set_flag_status(
-                    StatusRegisterFlag::Pulse1Enabled,
-                    self.pulse_1.length_counter > 0,
-                );
+
+                let mut set_status = |flag| {
+                    let channel = self.get_length_counter_channel(flag);
+                    out.set_flag_status(flag, channel.get_length_counter() > 0);
+                };
+
+                set_status(StatusRegisterFlag::NoiseEnabled);
+                set_status(StatusRegisterFlag::TriangleEnabled);
+                set_status(StatusRegisterFlag::Pulse1Enabled);
+                set_status(StatusRegisterFlag::Pulse2Enabled);
+
                 self.frame_interrupt = false;
                 out.data
             }
