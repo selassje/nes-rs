@@ -10,3 +10,7 @@ fn len_ctr() {
 fn len_table() {
     run_simple_short_test("tests\\apu_test\\2-len_table.nes");
 }
+#[test]
+fn irq_flag() {
+    run_simple_short_test("tests\\apu_test\\3-irq_flag.nes");
+}

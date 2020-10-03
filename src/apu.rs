@@ -686,6 +686,11 @@ impl WriteAcessRegisters for APU {
             WriteAccessRegister::FrameCounter => {
                 self.frame_counter.data = value;
                 self.cpu_cycles = 0;
+
+                if self.frame_counter.is_interrupt_inhibit_flag_set() {
+                    self.frame_interrupt = false;
+                }
+
                 if self.frame_counter.get_sequencer_mode() == 1 {
                     self.perform_half_frame_update();
                     self.perform_quarter_frame_update();
