@@ -4,7 +4,6 @@ use std::{cell::RefCell, default::Default, rc::Rc};
 
 use crate::io::SampleFormat;
 
-const CPU_CYCLES_PER_FRAME_MODE_0: u16 = 29830;
 const LENGTH_COUNTER_LOOKUP_TABLE: [u8; 32] = [
     10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22,
     192, 24, 72, 26, 16, 28, 32, 30,
@@ -472,7 +471,7 @@ pub struct APU {
     triangle: TriangleWave,
     noise: Noise,
     dmc: DMC,
-    cpu_cycles: u16,
+    cpu_cycle: u16,
     frame_interrupt: bool,
     dmc_interrupt: bool,
     pending_reset_cycle: Option<u16>,
@@ -489,7 +488,7 @@ impl APU {
             triangle: TriangleWave::default(),
             noise: Noise::default(),
             dmc: DMC::default(),
-            cpu_cycles: 8,
+            cpu_cycle: 8,
             frame_interrupt: false,
             dmc_interrupt: false,
             audio_access,
@@ -524,6 +523,14 @@ impl APU {
         }
     }
 
+    fn shifted_cpu_cycle(&mut self, shift: u16) -> u16 {
+        let max = if self.frame_counter.get_sequencer_mode() == 0 {
+            FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
+        } else {
+            FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES
+        } + 1;
+        (self.cpu_cycle + shift) % max
+    }
     fn perform_half_frame_update(&mut self) {
         self.pulse_1.clock_length_counter_and_sweep_unit();
         self.pulse_2.clock_length_counter_and_sweep_unit();
@@ -544,11 +551,9 @@ impl APU {
         }
     }
     pub fn run_single_cpu_cycle(&mut self, cpu_cycles: u16) {
-        let mut reset_happened = false;
         if let Some(pending_reset_cycle) = self.pending_reset_cycle {
-            if pending_reset_cycle == self.cpu_cycles {
-                self.cpu_cycles = 0;
-                //reset_happened = true;
+            if pending_reset_cycle == self.cpu_cycle {
+                self.cpu_cycle = 0;
                 self.pending_reset_cycle = None;
                 if self.frame_counter.get_sequencer_mode() == 1 {
                     self.perform_half_frame_update();
@@ -571,28 +576,21 @@ impl APU {
         self.dmc.run_cpu_cycles(cpu_cycles);
 
         if self.frame_counter.get_sequencer_mode() == 0
-            && (self.cpu_cycles == CPU_CYCLES_PER_FRAME_MODE_0 - 2
-                || ((self.cpu_cycles == CPU_CYCLES_PER_FRAME_MODE_0 - 1 || self.cpu_cycles == 0)
+            && (self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES - 1
+                || ((self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
+                    || self.cpu_cycle == 0)
                     && self.reset_in_progress))
             && !self.frame_counter.is_interrupt_inhibit_flag_set()
         {
-            if self.cpu_cycles == CPU_CYCLES_PER_FRAME_MODE_0 - 2 {
+            if self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES - 1 {
                 self.reset_in_progress = true;
             }
-            if self.cpu_cycles == 0 {
+            if self.cpu_cycle == 0 {
                 self.reset_in_progress = false;
             }
-
-            //println!("Setting IRQ {} {}", self.cpu_cycles, cpu_cycles);
             self.frame_interrupt = true;
         }
-
-        if self.frame_counter.get_sequencer_mode() == 0 {
-            self.cpu_cycles = (self.cpu_cycles + cpu_cycles) % (CPU_CYCLES_PER_FRAME_MODE_0);
-        } else {
-            self.cpu_cycles =
-                (self.cpu_cycles + cpu_cycles) % (FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES + 1);
-        }
+        self.cpu_cycle = self.shifted_cpu_cycle(1);
 
         let sample = Self::get_mixer_output(
             self.pulse_1.get_sample(),
@@ -622,19 +620,18 @@ impl APU {
     }
 
     fn is_half_frame_reached(&self, elapsed_cpu_cycles: u16) -> bool {
-        if self.cpu_cycles < FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES
-            && self.cpu_cycles + elapsed_cpu_cycles >= FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES
+        if self.cpu_cycle < FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES
+            && self.cpu_cycle + elapsed_cpu_cycles >= FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES
         {
             return true;
         } else if self.frame_counter.get_sequencer_mode() == 0
-            && self.cpu_cycles < FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
-            && self.cpu_cycles + elapsed_cpu_cycles >= FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
+            && self.cpu_cycle < FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
+            && self.cpu_cycle + elapsed_cpu_cycles >= FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
         {
-            // println!("Clocking second half");
             return true;
         } else if self.frame_counter.get_sequencer_mode() == 1
-            && self.cpu_cycles < FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES
-            && self.cpu_cycles + elapsed_cpu_cycles >= FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES
+            && self.cpu_cycle < FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES
+            && self.cpu_cycle + elapsed_cpu_cycles >= FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES
         {
             return true;
         }
@@ -645,13 +642,13 @@ impl APU {
         if self.is_half_frame_reached(elapsed_cpu_cycles) {
             return true;
         } else {
-            if self.cpu_cycles < FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES
-                && self.cpu_cycles + elapsed_cpu_cycles >= FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES
+            if self.cpu_cycle < FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES
+                && self.cpu_cycle + elapsed_cpu_cycles >= FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES
             {
                 return true;
             }
-            if self.cpu_cycles < FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES
-                && self.cpu_cycles + elapsed_cpu_cycles >= FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES
+            if self.cpu_cycle < FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES
+                && self.cpu_cycle + elapsed_cpu_cycles >= FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES
             {
                 return true;
             }
@@ -715,20 +712,13 @@ impl WriteAcessRegisters for APU {
                 self.reset_length_counter_if_disabled(StatusRegisterFlag::NoiseEnabled);
             }
             WriteAccessRegister::FrameCounter => {
+                let shift = if self.cpu_cycle % 2 == 0 { 3 } else { 2 };
                 self.frame_counter.data = value;
-                if self.frame_counter.get_sequencer_mode() == 1 {
-                    println!("5 sequence mode enabled");
-                }
 
                 if self.frame_counter.is_interrupt_inhibit_flag_set() {
-                    println!("Clearing FI by FC write");
                     self.frame_interrupt = false;
                 }
-
-                self.pending_reset_cycle = Some(
-                    (self.cpu_cycles + if self.cpu_cycles % 2 == 0 { 3 } else { 2 })
-                        % CPU_CYCLES_PER_FRAME_MODE_0,
-                );
+                self.pending_reset_cycle = Some(self.shifted_cpu_cycle(shift));
             }
         }
     }
@@ -752,11 +742,7 @@ impl ReadAccessRegisters for APU {
                 set_status(StatusRegisterFlag::Pulse1Enabled);
                 set_status(StatusRegisterFlag::Pulse2Enabled);
 
-                if self.frame_interrupt {
-                    println!("Reading IRQ flag as set {}", self.cpu_cycles);
-                }
-
-                if self.cpu_cycles != 0 {
+                if self.cpu_cycle != 0 {
                     self.frame_interrupt = false;
                 }
                 out.data
