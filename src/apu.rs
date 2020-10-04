@@ -312,6 +312,7 @@ impl LengthCounterChannel for PulseWave {
 struct TriangleWave {
     data: [u8; 4],
     length_counter: u8,
+    #[allow(dead_code)]
     linear_counter: u8,
     linear_counter_reload_flag: bool,
 }
@@ -340,7 +341,7 @@ impl TriangleWave {
         }
     }
 
-    fn run_cpu_cycles(&mut self, cpu_cycles: u16) {}
+    fn run_cpu_cycles(&mut self, _: u16) {}
 
     fn get_sample(&self) -> SampleFormat {
         0
@@ -397,6 +398,7 @@ impl Noise {
         self.data[2] & 0x0F
     }
 
+    #[allow(unused_variables)]
     fn run_cpu_cycles(&mut self, cpu_cycles: u16) {}
 
     fn get_sample(&self) -> SampleFormat {
@@ -455,6 +457,7 @@ impl DMC {
     fn get_sample_length(&self) -> u8 {
         self.data[3]
     }
+    #[allow(unused_variables)]
     fn run_cpu_cycles(&mut self, cpu_cycles: u16) {}
 
     fn get_sample(&self) -> SampleFormat {

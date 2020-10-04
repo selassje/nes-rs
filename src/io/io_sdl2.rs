@@ -16,8 +16,8 @@ use sdl2::{
 
 use super::io_internal::IOInternal;
 
-const SAMPLE_RATE: usize = 41100;
-const SAMPLES_PER_FRAME: usize = SAMPLE_RATE / common::FPS;
+const SAMPLE_RATE: usize = 41100 / 2;
+const SAMPLES_PER_FRAME: usize = SAMPLE_RATE / 53;
 const SAMPLE_INTERPOLATION: usize = common::CPU_CYCLES_PER_FRAME / SAMPLES_PER_FRAME;
 const DISPLAY_SCALING: i16 = 2;
 
@@ -29,14 +29,16 @@ struct SampleBuffer {
 
 impl SampleBuffer {
     fn add(&mut self, sample: SampleFormat) {
-        if self.samples_ignored == 0 {
+        if self.samples_ignored == 0 && self.index < SAMPLES_PER_FRAME {
             self.buffer[self.index] = sample;
-            self.index = (self.index + 1) % SAMPLES_PER_FRAME;
-            if self.index == SAMPLES_PER_FRAME {
-                self.index = 0;
-            }
+            self.index = self.index + 1;
         }
         self.samples_ignored = (self.samples_ignored + 1) % SAMPLE_INTERPOLATION;
+    }
+
+    fn reset(&mut self) {
+        self.index = 0;
+        self.samples_ignored = 0;
     }
 }
 
@@ -141,6 +143,7 @@ impl IO for IOSdl2 {
         }
         self.canvas.present();
         self.audio_queue.queue(&self.sample_buffer.buffer[..]);
+        self.sample_buffer.reset();
     }
 }
 
