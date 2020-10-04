@@ -20,6 +20,10 @@ fn jitter() {
 }
 
 #[test]
+fn len_timing() {
+    run_simple_short_test("tests\\apu_tests\\5-len_timing.nes");
+}
+#[test]
 fn irq_flag_timing() {
     run_simple_short_test("tests\\apu_tests\\6-irq_flag_timing.nes");
 }

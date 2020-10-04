@@ -35,7 +35,7 @@ const FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES: u16 = 7457;
 const FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES: u16 = 14913;
 const FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES: u16 = 22371;
 const FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES: u16 = 29829;
-const FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES: u16 = 37282;
+const FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES: u16 = 37281;
 
 struct FrameCounter {
     data: u8,
@@ -475,7 +475,7 @@ pub struct APU {
     frame_interrupt: bool,
     dmc_interrupt: bool,
     pending_reset_cycle: Option<u16>,
-    reset_in_progress: bool,
+    irq_flag_setting_in_progress: bool,
 }
 
 impl APU {
@@ -493,7 +493,7 @@ impl APU {
             dmc_interrupt: false,
             audio_access,
             pending_reset_cycle: None,
-            reset_in_progress: false,
+            irq_flag_setting_in_progress: false,
         }
     }
 
@@ -579,14 +579,14 @@ impl APU {
             && (self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES - 1
                 || ((self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
                     || self.cpu_cycle == 0)
-                    && self.reset_in_progress))
+                    && self.irq_flag_setting_in_progress))
             && !self.frame_counter.is_interrupt_inhibit_flag_set()
         {
             if self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES - 1 {
-                self.reset_in_progress = true;
+                self.irq_flag_setting_in_progress = true;
             }
             if self.cpu_cycle == 0 {
-                self.reset_in_progress = false;
+                self.irq_flag_setting_in_progress = false;
             }
             self.frame_interrupt = true;
         }
@@ -742,7 +742,8 @@ impl ReadAccessRegisters for APU {
                 set_status(StatusRegisterFlag::Pulse1Enabled);
                 set_status(StatusRegisterFlag::Pulse2Enabled);
 
-                if self.cpu_cycle != 0 {
+                let interrupt_set_cycles = vec![FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES, 0];
+                if !interrupt_set_cycles.contains(&self.cpu_cycle) {
                     self.frame_interrupt = false;
                 }
                 out.data
