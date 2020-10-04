@@ -16,6 +16,10 @@ path = "tests/instr_timing.rs"
 [[test]]
 name = "blargg_ppu_tests"
 path = "tests/blargg_ppu_tests.rs"
+[[test]]
+name = "apu_tests"
+path = "tests/apu_tests.rs"
+
 
 [dependencies]
 rand = "0.7.0"
