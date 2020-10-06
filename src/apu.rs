@@ -234,8 +234,8 @@ impl PulseWave {
         self.sweep_unit.reload_flag = true;
     }
 
-    fn run_cpu_cycles(&mut self, cpu_cycles: u16) {
-        let total_elapsed_cycles = cpu_cycles + self.left_over_cpu_cycles as u16;
+    fn run_single_cpu_cycle(&mut self) {
+        let total_elapsed_cycles = 1 + self.left_over_cpu_cycles as u16;
         self.left_over_cpu_cycles = (total_elapsed_cycles % 2) as u8;
         let number_of_elapsed_ticks = (total_elapsed_cycles / 2) as u16;
         if number_of_elapsed_ticks as u16 > self.timer_tick && self.current_period != 0 {
@@ -312,7 +312,6 @@ impl LengthCounterChannel for PulseWave {
 struct TriangleWave {
     data: [u8; 4],
     length_counter: u8,
-    #[allow(dead_code)]
     linear_counter: u8,
     linear_counter_reload_flag: bool,
 }
@@ -341,7 +340,7 @@ impl TriangleWave {
         }
     }
 
-    fn run_cpu_cycles(&mut self, _: u16) {}
+    fn run_single_cpu_cycle(&mut self) {}
 
     fn get_sample(&self) -> SampleFormat {
         0
@@ -399,7 +398,7 @@ impl Noise {
     }
 
     #[allow(unused_variables)]
-    fn run_cpu_cycles(&mut self, cpu_cycles: u16) {}
+    fn run_single_cpu_cycle(&mut self) {}
 
     fn get_sample(&self) -> SampleFormat {
         0
@@ -457,8 +456,7 @@ impl DMC {
     fn get_sample_length(&self) -> u8 {
         self.data[3]
     }
-    #[allow(unused_variables)]
-    fn run_cpu_cycles(&mut self, cpu_cycles: u16) {}
+    fn run_single_cpu_cycle(&mut self) {}
 
     fn get_sample(&self) -> SampleFormat {
         0
@@ -550,10 +548,10 @@ impl APU {
 
     pub fn run_cpu_cycles(&mut self, cpu_cycles: u16) {
         for _ in 0..cpu_cycles {
-            self.run_single_cpu_cycle(1);
+            self.run_single_cpu_cycle();
         }
     }
-    pub fn run_single_cpu_cycle(&mut self, cpu_cycles: u16) {
+    pub fn run_single_cpu_cycle(&mut self) {
         if let Some(pending_reset_cycle) = self.pending_reset_cycle {
             if pending_reset_cycle == self.cpu_cycle {
                 self.cpu_cycle = 0;
@@ -564,19 +562,19 @@ impl APU {
                 }
             }
         }
-        if self.is_quarter_frame_reached(cpu_cycles) {
+        if self.is_quarter_frame_reached() {
             self.perform_quarter_frame_update();
         }
 
-        if self.is_half_frame_reached(cpu_cycles) {
+        if self.is_half_frame_reached() {
             self.perform_half_frame_update();
         }
 
-        self.pulse_1.run_cpu_cycles(cpu_cycles);
-        self.pulse_2.run_cpu_cycles(cpu_cycles);
-        self.triangle.run_cpu_cycles(cpu_cycles);
-        self.noise.run_cpu_cycles(cpu_cycles);
-        self.dmc.run_cpu_cycles(cpu_cycles);
+        self.pulse_1.run_single_cpu_cycle();
+        self.pulse_2.run_single_cpu_cycle();
+        self.triangle.run_single_cpu_cycle();
+        self.noise.run_single_cpu_cycle();
+        self.dmc.run_single_cpu_cycle();
 
         if self.frame_counter.get_sequencer_mode() == 0
             && (self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES - 1
@@ -603,9 +601,7 @@ impl APU {
             self.dmc.get_sample(),
         );
 
-        for _ in 0..cpu_cycles {
-            self.audio_access.borrow_mut().add_sample(sample);
-        }
+        self.audio_access.borrow_mut().add_sample(sample);
     }
 
     fn get_mixer_output(
@@ -622,37 +618,29 @@ impl APU {
         ((puls_out + tnd_out) * 100.0) as SampleFormat
     }
 
-    fn is_half_frame_reached(&self, elapsed_cpu_cycles: u16) -> bool {
-        if self.cpu_cycle < FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES
-            && self.cpu_cycle + elapsed_cpu_cycles >= FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES
-        {
+    fn is_half_frame_reached(&self) -> bool {
+        if self.cpu_cycle + 1 == FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES {
             return true;
         } else if self.frame_counter.get_sequencer_mode() == 0
-            && self.cpu_cycle < FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
-            && self.cpu_cycle + elapsed_cpu_cycles >= FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
+            && self.cpu_cycle + 1 == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
         {
             return true;
         } else if self.frame_counter.get_sequencer_mode() == 1
-            && self.cpu_cycle < FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES
-            && self.cpu_cycle + elapsed_cpu_cycles >= FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES
+            && self.cpu_cycle + 1 == FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES
         {
             return true;
         }
         false
     }
 
-    fn is_quarter_frame_reached(&self, elapsed_cpu_cycles: u16) -> bool {
-        if self.is_half_frame_reached(elapsed_cpu_cycles) {
+    fn is_quarter_frame_reached(&self) -> bool {
+        if self.is_half_frame_reached() {
             return true;
         } else {
-            if self.cpu_cycle < FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES
-                && self.cpu_cycle + elapsed_cpu_cycles >= FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES
-            {
+            if self.cpu_cycle + 1 == FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES {
                 return true;
             }
-            if self.cpu_cycle < FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES
-                && self.cpu_cycle + elapsed_cpu_cycles >= FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES
-            {
+            if self.cpu_cycle + 1 == FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES {
                 return true;
             }
         }
