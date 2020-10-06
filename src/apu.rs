@@ -396,6 +396,7 @@ struct Noise {
     shift_register: u16,
     envelope: Envelope,
     timer_tick: u16,
+    left_over_cycle: u16,
 }
 
 impl Noise {
@@ -406,6 +407,7 @@ impl Noise {
             shift_register: 1,
             envelope: Default::default(),
             timer_tick: 0,
+            left_over_cycle: 0,
         }
     }
 
@@ -444,18 +446,22 @@ impl Noise {
     }
 
     fn clock_timer(&mut self) {
-        if self.timer_tick == 0 {
-            let snd_xor_bit = if self.is_mode_flag_set() {
-                (self.shift_register & 0b000000_01000000) >> 6
+        self.left_over_cycle += 1;
+        if self.left_over_cycle % 2 == 0 {
+            self.left_over_cycle = 0;
+            if self.timer_tick == 0 {
+                let snd_xor_bit = if self.is_mode_flag_set() {
+                    (self.shift_register & 0b000000_01000000) >> 6
+                } else {
+                    (self.shift_register & 0b000000_00000010) >> 1
+                };
+                let feedback_bit = (self.shift_register & 1) ^ snd_xor_bit;
+                self.shift_register >>= 1;
+                self.shift_register |= feedback_bit << 14;
+                self.timer_tick = self.get_timer();
             } else {
-                (self.shift_register & 0b000000_00000010) >> 1
-            };
-            let feedback_bit = (self.shift_register & 1) ^ snd_xor_bit;
-            self.shift_register >>= 1;
-            self.shift_register |= feedback_bit << 14;
-            self.timer_tick = self.get_timer();
-        } else {
-            self.timer_tick -= 1;
+                self.timer_tick -= 1;
+            }
         }
     }
 
