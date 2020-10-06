@@ -21,6 +21,11 @@ mod vram;
 
 pub mod nes_test;
 
+extern crate enum_tryfrom;
+
+#[macro_use]
+extern crate enum_tryfrom_derive;
+
 fn read_rom(file_name: &str) -> nes_format_reader::NesFile {
     let mut rom = Vec::new();
     let mut file = File::open(&file_name).expect("Unable to open ROM");

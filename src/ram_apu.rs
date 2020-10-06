@@ -1,7 +1,6 @@
-use self::WriteAccessRegister::*;
-use std::slice::Iter;
-
-#[derive(Copy, Clone, Debug)]
+use std::convert::TryFrom;
+#[derive(Copy, Clone, Debug, TryFromPrimitive)]
+#[TryFromPrimitiveType = "u16"]
 pub enum WriteAccessRegister {
     Pulse1_0 = 0x4000,
     Pulse1_1 = 0x4001,
@@ -28,50 +27,14 @@ pub enum WriteAccessRegister {
     FrameCounter = 0x4017,
 }
 
-impl WriteAccessRegister {
-    pub fn iterator() -> Iter<'static, WriteAccessRegister> {
-        static REGISTERS: [WriteAccessRegister; 22] = [
-            Pulse1_0,
-            Pulse1_1,
-            Pulse1_2,
-            Pulse1_3,
-            Pulse2_0,
-            Pulse2_1,
-            Pulse2_2,
-            Pulse2_3,
-            Triangle0,
-            Triangle1,
-            Triangle2,
-            Triangle3,
-            Noise0,
-            Noise1,
-            Noise2,
-            Noise3,
-            DMC0,
-            DMC1,
-            DMC2,
-            DMC3,
-            WriteAccessRegister::Status,
-            FrameCounter,
-        ];
-        REGISTERS.iter()
-    }
-}
-
 pub trait WriteAcessRegisters {
     fn write(&mut self, register: WriteAccessRegister, value: u8) -> ();
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, TryFromPrimitive)]
+#[TryFromPrimitiveType = "u16"]
 pub enum ReadAccessRegister {
     Status = 0x4015,
-}
-
-impl ReadAccessRegister {
-    pub fn iterator() -> Iter<'static, ReadAccessRegister> {
-        static REGISTERS: [ReadAccessRegister; 1] = [ReadAccessRegister::Status];
-        REGISTERS.iter()
-    }
 }
 
 pub trait ReadAccessRegisters {

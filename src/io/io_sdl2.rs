@@ -16,8 +16,8 @@ use sdl2::{
 
 use super::io_internal::IOInternal;
 
-const SAMPLE_RATE: usize = 41100 / 2;
-const SAMPLES_PER_FRAME: usize = SAMPLE_RATE / 53;
+const SAMPLE_RATE: usize = 41100;
+const SAMPLES_PER_FRAME: usize = SAMPLE_RATE / (common::FPS - 3);
 const SAMPLE_INTERPOLATION: usize = common::CPU_CYCLES_PER_FRAME / SAMPLES_PER_FRAME;
 const DISPLAY_SCALING: i16 = 2;
 

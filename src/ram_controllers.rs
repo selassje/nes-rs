@@ -1,28 +1,16 @@
-use self::InputPort::*;
-use self::OutputPort::*;
-use std::slice::Iter;
-#[derive(Copy, Clone, Debug)]
+use std::convert::TryFrom;
+
+#[derive(Copy, Clone, Debug, TryFromPrimitive)]
+#[TryFromPrimitiveType = "u16"]
 pub enum InputPort {
     Controller1 = 0x4016,
     Controller2 = 0x4017,
 }
-#[derive(Copy, Clone, Debug, PartialEq)]
+
+#[derive(Copy, Clone, Debug, PartialEq, TryFromPrimitive)]
+#[TryFromPrimitiveType = "u16"]
 pub enum OutputPort {
     Controllers1And2 = 0x4016,
-}
-
-impl InputPort {
-    pub fn iterator() -> Iter<'static, InputPort> {
-        static CONTROLLERS: [InputPort; 2] = [Controller1, Controller2];
-        CONTROLLERS.iter()
-    }
-}
-
-impl OutputPort {
-    pub fn iterator() -> Iter<'static, OutputPort> {
-        static CONTROLLERS: [OutputPort; 1] = [Controllers1And2];
-        CONTROLLERS.iter()
-    }
 }
 
 pub trait ReadInputPorts {

@@ -1,8 +1,7 @@
-use self::ReadAccessRegister::*;
-use self::WriteAccessRegister::*;
-use std::slice::Iter;
+use std::convert::TryFrom;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, TryFromPrimitive)]
+#[TryFromPrimitiveType = "u16"]
 pub enum WriteAccessRegister {
     PpuCtrl = 0x2000,
     PpuMask = 0x2001,
@@ -13,41 +12,18 @@ pub enum WriteAccessRegister {
     PpuData = 0x2007,
 }
 
-impl WriteAccessRegister {
-    pub fn iterator() -> Iter<'static, WriteAccessRegister> {
-        static REGISTERS: [WriteAccessRegister; 7] = [
-            PpuCtrl,
-            PpuMask,
-            OamAddr,
-            WriteAccessRegister::OamData,
-            PpuScroll,
-            PpuAddr,
-            WriteAccessRegister::PpuData,
-        ];
-        REGISTERS.iter()
-    }
-}
-
+#[derive(TryFromPrimitive)]
+#[TryFromPrimitiveType = "u16"]
 pub enum DmaWriteAccessRegister {
     OamDma = 0x4014,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, TryFromPrimitive)]
+#[TryFromPrimitiveType = "u16"]
 pub enum ReadAccessRegister {
     PpuStatus = 0x2002,
     OamData = 0x2004,
     PpuData = 0x2007,
-}
-
-impl ReadAccessRegister {
-    pub fn iterator() -> Iter<'static, ReadAccessRegister> {
-        static REGISTERS: [ReadAccessRegister; 3] = [
-            PpuStatus,
-            ReadAccessRegister::OamData,
-            ReadAccessRegister::PpuData,
-        ];
-        REGISTERS.iter()
-    }
 }
 
 pub trait WritePpuRegisters {

@@ -310,6 +310,8 @@ pub struct PPU {
     vram_address: VRAMAddress,
     t_vram_address: VRAMAddress,
     fine_x_scroll: u8,
+    sprite_palettes: Palettes,
+    background_palletes: Palettes,
 }
 
 impl PPU {
@@ -329,7 +331,7 @@ impl PPU {
             scanline: 0,
             scanline_sprites: Vec::new(),
             frame: 1,
-            color_mapper: Box::new(DefaultColorMapper {}),
+            color_mapper: Box::new(DefaultColorMapper::new()),
             vram_address: Default::default(),
             t_vram_address: Default::default(),
             fine_x_scroll: 0,
@@ -337,6 +339,8 @@ impl PPU {
             nmi: None,
             vbl_flag_supressed: false,
             video_access,
+            sprite_palettes: Default::default(),
+            background_palletes: Default::default(),
         }
     }
 
@@ -363,9 +367,6 @@ impl PPU {
     }
 
     fn render_pixel(&mut self) {
-        let background_palettes = self.get_palettes(true);
-        let sprite_palettes = self.get_palettes(false);
-
         let x = self.ppu_cycle - ACTIVE_PIXELS_CYCLE_START;
         let (bg_color_index, bg_palette_index) = self.get_background_color_index(x as usize);
         let (sprite_color_index, sprite) = self.get_sprite_color_index(x as u8);
@@ -375,8 +376,8 @@ impl PPU {
                 bg_color_index as u8,
                 sprite_color_index,
                 &sprite,
-                &background_palettes[bg_palette_index as usize],
-                &sprite_palettes,
+                &self.background_palletes[bg_palette_index as usize],
+                &self.sprite_palettes,
             );
 
         self.video_access
@@ -420,6 +421,9 @@ impl PPU {
         match self.scanline {
             PRE_RENDER_SCANLINE => match self.ppu_cycle {
                 VBLANK_START_ONE_CYCLE_BEFORE => {
+                    self.background_palletes = self.get_palettes(true);
+                    self.sprite_palettes = self.get_palettes(false);
+
                     self.vbl_flag_supressed = false;
 
                     self.pattern_tables = [

@@ -20,12 +20,12 @@ path = "tests/blargg_ppu_tests.rs"
 name = "apu_tests"
 path = "tests/apu_tests.rs"
 
+[profile.release] 
+debug = true
 
 [dependencies]
-rand = "0.7.0"
-spin_sleep = "1.0.0"
-lazy_static = "1.4.0"
-circular-queue =  "0.2.6"
+enum-tryfrom = "0.2.1"
+enum-tryfrom-derive = "0.2.1"
 
 [dependencies.sdl2]
 version = "0.34"

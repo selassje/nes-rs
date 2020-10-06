@@ -36,8 +36,6 @@ impl Nes {
     where
         T: IO + VideoAccess + AudioAccess + KeyboardAccess + 'static,
     {
-        // let controller_1 = KeyboardController::get_default_keyboard_controller_player1(io.clone());
-        //let controller_2 = KeyboardController::get_default_keyboard_controller_player2(io.clone());
         let controllers = Rc::new(RefCell::new(Controllers::new(controller_1, controller_2)));
 
         let vram = Rc::new(RefCell::new(VRAM::new()));
@@ -80,7 +78,7 @@ impl Nes {
             self.io.borrow_mut().present_frame();
 
             let elapsed_time_since_frame_start = frame_start.elapsed();
-            if elapsed_time_since_frame_start < FRAME_DURATION {
+            if duration.is_none() && elapsed_time_since_frame_start < FRAME_DURATION {
                 std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);
             }
             frame_start = Instant::now();

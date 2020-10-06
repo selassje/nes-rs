@@ -4,11 +4,13 @@ pub trait ColorMapper {
     fn map_nes_color(&self, color: u8) -> RgbColor;
 }
 
-pub struct DefaultColorMapper {}
+pub struct DefaultColorMapper {
+    color_map: [RgbColor; 64],
+}
 
-impl ColorMapper for DefaultColorMapper {
-    fn map_nes_color(&self, color: u8) -> RgbColor {
-        match color {
+impl DefaultColorMapper {
+    pub fn new() -> Self {
+        let map_color = |color| match color {
             0x00 => (124, 124, 124),
             0x01 => (0, 0, 252),
             0x02 => (0, 0, 188),
@@ -78,6 +80,18 @@ impl ColorMapper for DefaultColorMapper {
             0x3F => (0, 0, 0),
 
             _ => panic!("This shouldn't happen"),
+        };
+        let mut color_map = [(0, 0, 0); 64];
+        for i in 0..64 {
+            color_map[i] = map_color(i);
         }
+
+        DefaultColorMapper { color_map }
+    }
+}
+
+impl ColorMapper for DefaultColorMapper {
+    fn map_nes_color(&self, color: u8) -> RgbColor {
+        self.color_map[color as usize]
     }
 }
