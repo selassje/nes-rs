@@ -16,6 +16,11 @@ const DUTY_CYCLE_SEQUENCES: [[SampleFormat; 8]; 4] = [
     [1, 0, 0, 1, 1, 1, 1, 1],
 ];
 
+const TRIANGLE_SEQUENCE: [SampleFormat; 32] = [
+    15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+    13, 14, 15,
+];
+
 trait LengthCounterChannel {
     fn get_length_counter_load(&self) -> u8;
     fn get_length_counter(&self) -> u8;
@@ -234,7 +239,7 @@ impl PulseWave {
         self.sweep_unit.reload_flag = true;
     }
 
-    fn run_single_cpu_cycle(&mut self) {
+    fn clock_timer(&mut self) {
         let total_elapsed_cycles = 1 + self.left_over_cpu_cycles as u16;
         self.left_over_cpu_cycles = (total_elapsed_cycles % 2) as u8;
         let number_of_elapsed_ticks = (total_elapsed_cycles / 2) as u16;
@@ -312,16 +317,17 @@ impl LengthCounterChannel for PulseWave {
 struct TriangleWave {
     data: [u8; 4],
     length_counter: u8,
+    timer_tick: u16,
     linear_counter: u8,
     linear_counter_reload_flag: bool,
+    sequencer_position: usize,
 }
 
 impl TriangleWave {
-    fn is_length_counter_halt_set(&self) -> bool {
-        (self.data[0] & 0b00100000) != 0
+    fn is_control_flag_set(&self) -> bool {
+        (self.data[0] & 0b10000000) != 0
     }
 
-    #[allow(dead_code)]
     fn get_linear_counter_load(&self) -> u8 {
         self.data[0] & 0b01111111
     }
@@ -332,18 +338,37 @@ impl TriangleWave {
         self.data[2] as u16 + timer_hi
     }
 
-    fn clock_linear_counter(&mut self) {}
+    fn clock_linear_counter(&mut self) {
+        if self.linear_counter_reload_flag {
+            self.linear_counter = self.get_linear_counter_load();
+        } else if self.linear_counter > 0 {
+            self.linear_counter -= 1;
+        }
+
+        if !self.is_control_flag_set() {
+            self.linear_counter_reload_flag = false;
+        }
+    }
 
     fn clock_length_counter(&mut self) {
-        if self.length_counter > 0 && !self.is_length_counter_halt_set() {
+        if self.length_counter > 0 && !self.is_control_flag_set() {
             self.length_counter -= 1;
         }
     }
 
-    fn run_single_cpu_cycle(&mut self) {}
+    fn clock_timer(&mut self) {
+        if self.length_counter > 0 && self.linear_counter > 0 {
+            if self.timer_tick == 0 {
+                self.sequencer_position = (1 + self.sequencer_position) % 32;
+                self.timer_tick = self.get_timer();
+            } else {
+                self.timer_tick -= 1;
+            }
+        }
+    }
 
     fn get_sample(&self) -> SampleFormat {
-        0
+        TRIANGLE_SEQUENCE[self.sequencer_position]
     }
 }
 
@@ -570,9 +595,9 @@ impl APU {
             self.perform_half_frame_update();
         }
 
-        self.pulse_1.run_single_cpu_cycle();
-        self.pulse_2.run_single_cpu_cycle();
-        self.triangle.run_single_cpu_cycle();
+        self.pulse_1.clock_timer();
+        self.pulse_2.clock_timer();
+        self.triangle.clock_timer();
         self.noise.run_single_cpu_cycle();
         self.dmc.run_single_cpu_cycle();
 
