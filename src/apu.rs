@@ -21,6 +21,10 @@ const TRIANGLE_SEQUENCE: [SampleFormat; 32] = [
     13, 14, 15,
 ];
 
+const NOISE_PERIOD_NTSC: [u16; 16] = [
+    4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068,
+];
+
 trait LengthCounterChannel {
     fn get_length_counter_load(&self) -> u8;
     fn get_length_counter(&self) -> u8;
@@ -386,50 +390,81 @@ impl LengthCounterChannel for TriangleWave {
     }
 }
 
-#[derive(Default)]
 struct Noise {
     data: [u8; 4],
     length_counter: u8,
+    shift_register: u16,
+    envelope: Envelope,
+    timer_tick: u16,
 }
 
 impl Noise {
+    fn new() -> Self {
+        Noise {
+            data: [0; 4],
+            length_counter: 0,
+            shift_register: 1,
+            envelope: Default::default(),
+            timer_tick: 0,
+        }
+    }
+
+    fn reset(&mut self) {
+        self.envelope.start_flag = true;
+    }
+
     fn is_length_counter_halt_set(&self) -> bool {
         (self.data[0] & 0b00100000) != 0
     }
 
-    #[allow(dead_code)]
     fn is_constant_volume_set(&self) -> bool {
         (self.data[0] & 0b00010000) != 0
     }
 
-    #[allow(dead_code)]
-    fn get_volume_or_envelope(&self) -> u8 {
+    fn get_constant_volume_or_envelope_divider_reload_value(&self) -> u8 {
         self.data[0] & 0x0F
     }
 
-    #[allow(dead_code)]
-    fn get_linear_counter_load(&self) -> u8 {
-        self.data[0] & 0b01111111
+    fn is_mode_flag_set(&self) -> bool {
+        self.data[2] & 0b10000000 != 0
     }
 
-    #[allow(dead_code)]
-    fn is_noise_loop_set(&self) -> bool {
-        (self.data[2] & 0b10000000) != 0
+    fn get_timer(&self) -> u16 {
+        NOISE_PERIOD_NTSC[(self.data[2] & 0x0F) as usize]
     }
 
-    #[allow(dead_code)]
-    fn get_noise_period(&self) -> u8 {
-        self.data[2] & 0x0F
+    fn get_sample(&self) -> u8 {
+        if self.length_counter == 0 || self.shift_register & 1 == 0 {
+            0
+        } else if self.is_constant_volume_set() {
+            self.get_constant_volume_or_envelope_divider_reload_value()
+        } else {
+            self.envelope.decay_level_counter
+        }
     }
 
-    #[allow(unused_variables)]
-    fn run_single_cpu_cycle(&mut self) {}
-
-    fn get_sample(&self) -> SampleFormat {
-        0
+    fn clock_timer(&mut self) {
+        if self.timer_tick == 0 {
+            let snd_xor_bit = if self.is_mode_flag_set() {
+                (self.shift_register & 0b000000_01000000) >> 6
+            } else {
+                (self.shift_register & 0b000000_00000010) >> 1
+            };
+            let feedback_bit = (self.shift_register & 1) ^ snd_xor_bit;
+            self.shift_register >>= 1;
+            self.shift_register |= feedback_bit << 14;
+            self.timer_tick = self.get_timer();
+        } else {
+            self.timer_tick -= 1;
+        }
     }
-    fn clock_envelope(&self) {}
 
+    fn clock_envelope(&mut self) {
+        self.envelope.clock(
+            self.get_constant_volume_or_envelope_divider_reload_value(),
+            self.is_length_counter_halt_set(),
+        )
+    }
     fn clock_length_counter_and_sweep_unit(&mut self) {
         if self.length_counter > 0 && !self.is_length_counter_halt_set() {
             self.length_counter -= 1;
@@ -512,7 +547,7 @@ impl APU {
             pulse_1: PulseWave::new(false),
             pulse_2: PulseWave::new(true),
             triangle: TriangleWave::default(),
-            noise: Noise::default(),
+            noise: Noise::new(),
             dmc: DMC::default(),
             cpu_cycle: 8,
             frame_interrupt: false,
@@ -598,7 +633,7 @@ impl APU {
         self.pulse_1.clock_timer();
         self.pulse_2.clock_timer();
         self.triangle.clock_timer();
-        self.noise.run_single_cpu_cycle();
+        self.noise.clock_timer();
         self.dmc.run_single_cpu_cycle();
 
         if self.frame_counter.get_sequencer_mode() == 0
@@ -713,6 +748,7 @@ impl WriteAcessRegisters for APU {
             WriteAccessRegister::Noise2 => self.noise.data[2] = value,
             WriteAccessRegister::Noise3 => {
                 self.noise.data[3] = value;
+                self.noise.reset();
                 self.reload_length_counter_if_enabled(StatusRegisterFlag::NoiseEnabled);
             }
             WriteAccessRegister::DMC0 => self.dmc.data[0] = value,
