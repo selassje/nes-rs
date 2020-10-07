@@ -38,3 +38,8 @@ pub trait VideoMemory {
 
     fn get_sprite_palette(&self, palette_index: u8) -> [u8; 3];
 }
+
+pub trait DmcMemory {
+    fn set_sample_address(&mut self, address: u8);
+    fn get_next_sample_byte(&mut self) -> u8;
+}

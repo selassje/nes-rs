@@ -46,6 +46,7 @@ impl Nes {
             controllers.clone(),
             apu.clone(),
         )));
+        apu.borrow_mut().set_dmc_memory(ram.clone());
         let cpu = CPU::new(ram.clone(), ppu.clone());
 
         Nes {

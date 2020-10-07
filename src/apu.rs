@@ -1,5 +1,5 @@
 use self::StatusRegisterFlag::*;
-use crate::{io::AudioAccess, ram_apu::*};
+use crate::{io::AudioAccess, memory::DmcMemory, ram_apu::*};
 use std::{cell::RefCell, default::Default, rc::Rc};
 
 use crate::io::SampleFormat;
@@ -19,6 +19,10 @@ const DUTY_CYCLE_SEQUENCES: [[SampleFormat; 8]; 4] = [
 const TRIANGLE_SEQUENCE: [SampleFormat; 32] = [
     15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
     13, 14, 15,
+];
+
+const DMC_RATES_NTSC: [u16; 16] = [
+    428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54,
 ];
 
 const NOISE_PERIOD_NTSC: [u16; 16] = [
@@ -492,13 +496,84 @@ impl LengthCounterChannel for Noise {
     }
 }
 
-#[derive(Default)]
 struct DMC {
     data: [u8; 4],
+    timer_tick: u16,
+    sample_buffer: Option<u8>,
+    shift_register: u8,
+    silence_flag: bool,
+    bits_remaining: u8,
+    bytes_remaining: u16,
+    output_value: u8,
+    dmc_memory: Option<Rc<RefCell<dyn DmcMemory>>>,
 }
 
-#[allow(dead_code)]
 impl DMC {
+    fn new() -> Self {
+        DMC {
+            data: [0; 4],
+            timer_tick: 0,
+            bits_remaining: 0,
+            bytes_remaining: 0,
+            silence_flag: true,
+            sample_buffer: None,
+            shift_register: 0,
+            output_value: 0,
+            dmc_memory: None,
+        }
+    }
+
+    fn reset_timer(&mut self) {
+        self.timer_tick = self.get_timer();
+    }
+
+    fn start_sample(&mut self) {
+        self.bytes_remaining = self.get_sample_length();
+        self.output_value = self.get_direct_load();
+        //  println!("Sample length is {}", self.get_sample_length());
+        self.dmc_memory
+            .as_ref()
+            .unwrap()
+            .borrow_mut()
+            .set_sample_address(self.get_sample_address());
+    }
+
+    fn prepare_next_sample_buffer(&mut self, dmc_interrupt: &mut bool, dmc_enabled: bool) {
+        assert!(self.sample_buffer.is_none());
+        self.bits_remaining = 8;
+        if self.bytes_remaining > 0 {
+            self.sample_buffer = Some(
+                self.dmc_memory
+                    .as_ref()
+                    .unwrap()
+                    .borrow_mut()
+                    .get_next_sample_byte(),
+            );
+            self.bytes_remaining -= 1;
+            if self.bytes_remaining == 0 {
+                if self.is_loop_enabled() {
+                    //println!("looping dmc");
+                    self.start_sample();
+                } else if self.is_irq_enabled() {
+                    //println!("Setting dmc interrupt");
+                    *dmc_interrupt = true;
+                } else {
+                    // println!("Sample processed");
+                }
+            }
+            self.silence_flag = false;
+        } else if dmc_enabled {
+            self.start_sample();
+            self.silence_flag = self.bytes_remaining == 0;
+            if self.bytes_remaining > 0 {
+                self.prepare_next_sample_buffer(dmc_interrupt, dmc_enabled);
+            }
+        //  self.silence_flag = true;
+        } else {
+            self.silence_flag = true;
+        }
+    }
+
     fn is_irq_enabled(&self) -> bool {
         (self.data[0] & 0b10000000) != 0
     }
@@ -507,11 +582,11 @@ impl DMC {
         (self.data[0] & 0b01000000) != 0
     }
 
-    fn get_frequency(&self) -> u8 {
-        self.data[0] & 0x0F
+    fn get_timer(&self) -> u16 {
+        DMC_RATES_NTSC[(self.data[0] & 0x0F) as usize]
     }
 
-    fn get_load_counter(&self) -> u8 {
+    fn get_direct_load(&self) -> u8 {
         self.data[1] & 0b01111111
     }
 
@@ -519,13 +594,38 @@ impl DMC {
         self.data[2]
     }
 
-    fn get_sample_length(&self) -> u8 {
-        self.data[3]
+    fn get_sample_length(&self) -> u16 {
+        (self.data[3] as u16 * 16) + 1
     }
-    fn run_single_cpu_cycle(&mut self) {}
+    fn clock_timer(&mut self, dmc_interrupt: &mut bool, dmc_enabled: bool) {
+        if self.timer_tick == 0 {
+            if self.bits_remaining == 0 {
+                self.prepare_next_sample_buffer(dmc_interrupt, dmc_enabled);
+                if !self.silence_flag {
+                    //println!("Empty sample buffer");
+                    self.shift_register = self.sample_buffer.take().unwrap();
+                }
+            }
+
+            if !self.silence_flag {
+                if self.shift_register & 1 == 1 {
+                    if self.output_value <= 125 {
+                        self.output_value += 2;
+                    }
+                } else if self.output_value >= 2 {
+                    self.output_value -= 2;
+                }
+            }
+            self.bits_remaining -= 1;
+            self.shift_register >>= 1;
+            self.reset_timer();
+        } else {
+            self.timer_tick -= 1;
+        }
+    }
 
     fn get_sample(&self) -> SampleFormat {
-        0
+        self.output_value
     }
 }
 
@@ -554,7 +654,7 @@ impl APU {
             pulse_2: PulseWave::new(true),
             triangle: TriangleWave::default(),
             noise: Noise::new(),
-            dmc: DMC::default(),
+            dmc: DMC::new(),
             cpu_cycle: 8,
             frame_interrupt: false,
             dmc_interrupt: false,
@@ -562,6 +662,10 @@ impl APU {
             pending_reset_cycle: None,
             irq_flag_setting_in_progress: false,
         }
+    }
+
+    pub fn set_dmc_memory(&mut self, dmc_memory: Rc<RefCell<dyn DmcMemory>>) {
+        self.dmc.dmc_memory = Some(dmc_memory);
     }
 
     fn get_length_counter_channel(
@@ -640,7 +744,10 @@ impl APU {
         self.pulse_2.clock_timer();
         self.triangle.clock_timer();
         self.noise.clock_timer();
-        self.dmc.run_single_cpu_cycle();
+        self.dmc.clock_timer(
+            &mut self.dmc_interrupt,
+            self.status.is_flag_enabled(StatusRegisterFlag::DMCEnabled),
+        );
 
         if self.frame_counter.get_sequencer_mode() == 0
             && (self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES - 1
@@ -757,17 +864,32 @@ impl WriteAcessRegisters for APU {
                 self.noise.reset();
                 self.reload_length_counter_if_enabled(StatusRegisterFlag::NoiseEnabled);
             }
-            WriteAccessRegister::DMC0 => self.dmc.data[0] = value,
+            WriteAccessRegister::DMC0 => {
+                self.dmc.data[0] = value;
+                self.dmc.reset_timer();
+                if !self.dmc.is_irq_enabled() {
+                    self.dmc_interrupt = false;
+                }
+            }
             WriteAccessRegister::DMC1 => self.dmc.data[1] = value,
             WriteAccessRegister::DMC2 => self.dmc.data[2] = value,
-            WriteAccessRegister::DMC3 => self.dmc.data[3] = value,
+            WriteAccessRegister::DMC3 => {
+                self.dmc.data[3] = value;
+                self.dmc.reset_timer();
+                println!("Setting length to {}", value);
+            }
 
             WriteAccessRegister::Status => {
                 self.status.data = value;
+                if !self.status.is_flag_enabled(StatusRegisterFlag::DMCEnabled) {
+                    self.dmc.bytes_remaining = 0;
+                }
+
                 self.reset_length_counter_if_disabled(StatusRegisterFlag::Pulse1Enabled);
                 self.reset_length_counter_if_disabled(StatusRegisterFlag::Pulse2Enabled);
                 self.reset_length_counter_if_disabled(StatusRegisterFlag::TriangleEnabled);
                 self.reset_length_counter_if_disabled(StatusRegisterFlag::NoiseEnabled);
+                self.dmc_interrupt = false;
             }
             WriteAccessRegister::FrameCounter => {
                 let shift = if self.cpu_cycle % 2 == 0 { 3 } else { 2 };
@@ -789,6 +911,7 @@ impl ReadAccessRegisters for APU {
                 let mut out = StatusRegister { data: 0 };
                 out.set_flag_status(StatusRegisterFlag::FrameInterrupt, self.frame_interrupt);
                 out.set_flag_status(StatusRegisterFlag::DMCInterrupt, self.dmc_interrupt);
+                out.set_flag_status(StatusRegisterFlag::DMCEnabled, self.dmc.bytes_remaining > 0);
 
                 let mut set_status = |flag| {
                     let channel = self.get_length_counter_channel(flag);
