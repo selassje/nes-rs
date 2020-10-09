@@ -499,12 +499,18 @@ impl LengthCounterChannel for Noise {
 struct DMC {
     data: [u8; 4],
     timer_tick: u16,
+    sample_period: u16,
     sample_buffer: Option<u8>,
     shift_register: u8,
     silence_flag: bool,
-    bits_remaining: u8,
+    bits_counter: u8,
     bytes_remaining: u16,
+    next_bytes_remaining: u16,
     output_value: u8,
+    start_pending: bool,
+    elapsed_cycles: u16,
+    elapsed_bytes: u16,
+    elapsed_ticks: u16,
     dmc_memory: Option<Rc<RefCell<dyn DmcMemory>>>,
 }
 
@@ -513,23 +519,31 @@ impl DMC {
         DMC {
             data: [0; 4],
             timer_tick: 0,
-            bits_remaining: 0,
+            bits_counter: 0,
             bytes_remaining: 0,
+            next_bytes_remaining: 0,
             silence_flag: true,
             sample_buffer: None,
             shift_register: 0,
             output_value: 0,
             dmc_memory: None,
+            elapsed_cycles: 0,
+            elapsed_bytes: 0,
+            elapsed_ticks: 0,
+            start_pending: false,
+            sample_period: 0,
         }
     }
 
     fn reset_timer(&mut self) {
-        self.timer_tick = self.get_timer();
+        self.timer_tick = 0;
     }
 
     fn start_sample(&mut self) {
-        self.bytes_remaining = self.get_sample_length();
+        self.bytes_remaining = self.next_bytes_remaining;
+        // self.bytes_remaining = self.get_sample_length();
         self.output_value = self.get_direct_load();
+        self.sample_period = self.get_timer() - 1;
         //  println!("Sample length is {}", self.get_sample_length());
         self.dmc_memory
             .as_ref()
@@ -538,39 +552,62 @@ impl DMC {
             .set_sample_address(self.get_sample_address());
     }
 
-    fn prepare_next_sample_buffer(&mut self, dmc_interrupt: &mut bool, dmc_enabled: bool) {
-        assert!(self.sample_buffer.is_none());
-        self.bits_remaining = 8;
-        if self.bytes_remaining > 0 {
-            self.sample_buffer = Some(
-                self.dmc_memory
-                    .as_ref()
-                    .unwrap()
-                    .borrow_mut()
-                    .get_next_sample_byte(),
-            );
-            self.bytes_remaining -= 1;
-            if self.bytes_remaining == 0 {
-                if self.is_loop_enabled() {
-                    //println!("looping dmc");
-                    self.start_sample();
-                } else if self.is_irq_enabled() {
-                    //println!("Setting dmc interrupt");
-                    *dmc_interrupt = true;
-                } else {
-                    // println!("Sample processed");
-                }
-            }
-            self.silence_flag = false;
-        } else if dmc_enabled {
-            self.start_sample();
-            self.silence_flag = self.bytes_remaining == 0;
+    fn fetch_next_sample_buffer(
+        &mut self,
+        dmc_interrupt: &mut bool,
+        dmc_enabled: bool,
+        cycles: u16,
+        frame: u128,
+    ) {
+        if self.sample_buffer.is_none() {
             if self.bytes_remaining > 0 {
-                self.prepare_next_sample_buffer(dmc_interrupt, dmc_enabled);
+                self.sample_buffer = Some(
+                    self.dmc_memory
+                        .as_ref()
+                        .unwrap()
+                        .borrow_mut()
+                        .get_next_sample_byte(),
+                );
+                println!("Filled buffer");
+                self.bytes_remaining -= 1;
+                if self.bytes_remaining == 0 {
+                    if self.is_loop_enabled() {
+                        //println!("looping dmc");
+                        self.next_bytes_remaining = self.get_sample_length();
+                        self.start_sample();
+                    } else if self.is_irq_enabled() {
+                        //println!("Setting dmc interrupt");
+                        *dmc_interrupt = true;
+                    } else {
+                        println!(
+                            "Sample processed {}/{} elapsed {} bytes {} ticks {}",
+                            cycles,
+                            frame,
+                            self.elapsed_cycles,
+                            self.elapsed_bytes,
+                            self.elapsed_ticks
+                        );
+                    }
+                }
+            } else if self.start_pending {
+                self.start_sample();
+                self.start_pending = false;
+                if self.bytes_remaining > 0 {
+                    println!(
+                        "started sample req cycles {} cyc/fr {}/{} req bytes {} req ticks {}",
+                        (self.bytes_remaining - 1) * self.get_timer() * 8,
+                        cycles,
+                        frame,
+                        self.bytes_remaining - 1,
+                        (self.bytes_remaining - 1) * 8,
+                    );
+                    self.elapsed_cycles = 0;
+                    self.elapsed_bytes = 0;
+                    self.elapsed_ticks = 0;
+                    self.fetch_next_sample_buffer(dmc_interrupt, dmc_enabled, cycles, frame);
+                }
+                //  self.silence_flag = true;
             }
-        //  self.silence_flag = true;
-        } else {
-            self.silence_flag = true;
         }
     }
 
@@ -597,30 +634,63 @@ impl DMC {
     fn get_sample_length(&self) -> u16 {
         (self.data[3] as u16 * 16) + 1
     }
-    fn clock_timer(&mut self, dmc_interrupt: &mut bool, dmc_enabled: bool) {
-        if self.timer_tick == 0 {
-            if self.bits_remaining == 0 {
-                self.prepare_next_sample_buffer(dmc_interrupt, dmc_enabled);
-                if !self.silence_flag {
-                    //println!("Empty sample buffer");
-                    self.shift_register = self.sample_buffer.take().unwrap();
-                }
-            }
-
-            if !self.silence_flag {
-                if self.shift_register & 1 == 1 {
-                    if self.output_value <= 125 {
-                        self.output_value += 2;
+    fn clock_timer(
+        &mut self,
+        dmc_interrupt: &mut bool,
+        dmc_enabled: bool,
+        cycles: u16,
+        frame: u128,
+    ) {
+        if true {
+            if self.timer_tick == 0 {
+                if self.bits_counter == 0 {
+                    let prev_sil = self.silence_flag;
+                    self.bits_counter = 8;
+                    if !self.silence_flag {
+                        self.elapsed_bytes += 1;
+                        println!(
+                            "byte processed period {} rem {}",
+                            self.get_timer() - 1,
+                            self.bytes_remaining
+                        );
                     }
-                } else if self.output_value >= 2 {
-                    self.output_value -= 2;
+                    self.silence_flag = if let Some(buffer) = self.sample_buffer.take() {
+                        println!("Emptied buffer");
+                        assert!(self.sample_buffer.is_none());
+                        self.fetch_next_sample_buffer(dmc_interrupt, dmc_enabled, cycles, frame);
+                        self.shift_register = buffer;
+                        false
+                    } else {
+                        true
+                    };
                 }
+
+                if !self.silence_flag {
+                    if self.shift_register & 1 == 1 {
+                        if self.output_value <= 125 {
+                            self.output_value += 2;
+                        }
+                    } else if self.output_value >= 2 {
+                        self.output_value -= 2;
+                    }
+                    self.elapsed_cycles += 1;
+                }
+                self.bits_counter -= 1;
+                self.shift_register >>= 1;
+                if !self.silence_flag {
+                    self.elapsed_ticks += 1;
+                }
+                self.timer_tick = self.get_timer() - 1;
+            //println!("Tick passed period {}", self.get_timer() - 1);
+            } else {
+                if !self.silence_flag {
+                    // self.elapsed_cycles += 1;
+                }
+                self.timer_tick -= 1;
             }
-            self.bits_remaining -= 1;
-            self.shift_register >>= 1;
-            self.reset_timer();
-        } else {
-            self.timer_tick -= 1;
+            if !self.silence_flag {
+                self.elapsed_cycles += 1;
+            }
         }
     }
 
@@ -640,6 +710,7 @@ pub struct APU {
     dmc: DMC,
     cpu_cycle: u16,
     frame_interrupt: bool,
+    frame: u128,
     dmc_interrupt: bool,
     pending_reset_cycle: Option<u16>,
     irq_flag_setting_in_progress: bool,
@@ -655,10 +726,11 @@ impl APU {
             triangle: TriangleWave::default(),
             noise: Noise::new(),
             dmc: DMC::new(),
-            cpu_cycle: 8,
+            cpu_cycle: 0,
             frame_interrupt: false,
             dmc_interrupt: false,
             audio_access,
+            frame: 1,
             pending_reset_cycle: None,
             irq_flag_setting_in_progress: false,
         }
@@ -744,9 +816,19 @@ impl APU {
         self.pulse_2.clock_timer();
         self.triangle.clock_timer();
         self.noise.clock_timer();
+
+        self.dmc.fetch_next_sample_buffer(
+            &mut self.dmc_interrupt,
+            self.status.is_flag_enabled(StatusRegisterFlag::DMCEnabled),
+            self.cpu_cycle,
+            self.frame,
+        );
+
         self.dmc.clock_timer(
             &mut self.dmc_interrupt,
             self.status.is_flag_enabled(StatusRegisterFlag::DMCEnabled),
+            self.cpu_cycle,
+            self.frame,
         );
 
         if self.frame_counter.get_sequencer_mode() == 0
@@ -765,6 +847,14 @@ impl APU {
             self.frame_interrupt = true;
         }
         self.cpu_cycle = self.shifted_cpu_cycle(1);
+
+        if self.cpu_cycle == 0 {
+            if self.frame == std::u128::MAX {
+                self.frame = 0;
+            } else {
+                self.frame += 1;
+            }
+        }
 
         let sample = Self::get_mixer_output(
             self.pulse_1.get_sample(),
@@ -866,29 +956,67 @@ impl WriteAcessRegisters for APU {
             }
             WriteAccessRegister::DMC0 => {
                 self.dmc.data[0] = value;
-                self.dmc.reset_timer();
+                println!(
+                    "Setting rate to {} {}/{}",
+                    self.dmc.get_timer(),
+                    self.frame,
+                    self.cpu_cycle
+                );
+                //self.dmc.reset_timer();
                 if !self.dmc.is_irq_enabled() {
+                    println!("Clearing DMI interrup");
                     self.dmc_interrupt = false;
+                    // self.frame_interrupt = false;
                 }
             }
             WriteAccessRegister::DMC1 => self.dmc.data[1] = value,
             WriteAccessRegister::DMC2 => self.dmc.data[2] = value,
             WriteAccessRegister::DMC3 => {
-                self.dmc.data[3] = value;
-                self.dmc.reset_timer();
-                println!("Setting length to {}", value);
+                if true {
+                    //    if true {
+                    println!(
+                        "Setting length to {} bytes rem {}",
+                        value, self.dmc.bytes_remaining
+                    );
+                    self.dmc.data[3] = value;
+                //self.dmc.reset_timer();
+                } else {
+                    println!("Ingoring length setting");
+                }
             }
 
             WriteAccessRegister::Status => {
                 self.status.data = value;
                 if !self.status.is_flag_enabled(StatusRegisterFlag::DMCEnabled) {
+                    println!("Clearing DMC enable");
+                    // self.dmc.sample_buffer = None;
                     self.dmc.bytes_remaining = 0;
+                } else if self.dmc.bytes_remaining == 0 {
+                    // self.dmc
+                    //   .fetch_next_sample_buffer(&mut self.dmc_interrupt, false, 0, 0);
+                    println!(
+                        "Enabling DMC cycle {} frame {} req cycles {} loop {}",
+                        self.cpu_cycle,
+                        self.frame,
+                        self.dmc.bytes_remaining * self.dmc.get_timer(),
+                        self.dmc.is_loop_enabled()
+                    );
+                    //self.dmc.start_sample();
+                    self.dmc.next_bytes_remaining = self.dmc.get_sample_length();
+                    if self.dmc.sample_buffer.is_some() && !self.dmc.is_loop_enabled() {
+                        self.dmc.bytes_remaining += 1;
+                    }
+                    self.dmc.start_pending = true;
+                } else {
+                    println!("Ignoring Enable DMC");
                 }
 
                 self.reset_length_counter_if_disabled(StatusRegisterFlag::Pulse1Enabled);
                 self.reset_length_counter_if_disabled(StatusRegisterFlag::Pulse2Enabled);
                 self.reset_length_counter_if_disabled(StatusRegisterFlag::TriangleEnabled);
                 self.reset_length_counter_if_disabled(StatusRegisterFlag::NoiseEnabled);
+
+                println!("Clear DMI interrupt flag");
                 self.dmc_interrupt = false;
             }
             WriteAccessRegister::FrameCounter => {
@@ -909,9 +1037,19 @@ impl ReadAccessRegisters for APU {
         match register {
             ReadAccessRegister::Status => {
                 let mut out = StatusRegister { data: 0 };
+                //self.dmc_interrupt = false;
                 out.set_flag_status(StatusRegisterFlag::FrameInterrupt, self.frame_interrupt);
                 out.set_flag_status(StatusRegisterFlag::DMCInterrupt, self.dmc_interrupt);
                 out.set_flag_status(StatusRegisterFlag::DMCEnabled, self.dmc.bytes_remaining > 0);
+                println!(
+                    "DMC bytes {} cycle {} frame {} elapsed {} dmc_irq {} fi {}",
+                    self.dmc.bytes_remaining,
+                    self.cpu_cycle,
+                    self.frame,
+                    self.dmc.elapsed_cycles,
+                    self.dmc_interrupt,
+                    self.frame_interrupt,
+                );
 
                 let mut set_status = |flag| {
                     let channel = self.get_length_counter_channel(flag);
