@@ -145,19 +145,19 @@ impl SweepUnit {
     fn get_target_period(
         &self,
         raw_period: u16,
-        target_period: u16,
+        current_period: u16,
         shift: u8,
         negate: bool,
     ) -> u16 {
         let change_amount = raw_period >> shift;
         if negate {
             if self.use_ones_complement {
-                target_period - change_amount - 1
+                current_period - change_amount - 1
             } else {
-                target_period - change_amount
+                current_period - change_amount
             }
         } else {
-            target_period + change_amount
+            current_period + change_amount
         }
     }
 
@@ -182,7 +182,6 @@ struct PulseWave {
     length_counter: u8,
     sequencer_position: u8,
     timer_tick: u16,
-    left_over_cpu_cycles: u8,
     envelope: Envelope,
     sweep_unit: SweepUnit,
     current_period: u16,
@@ -195,7 +194,6 @@ impl PulseWave {
             length_counter: 0,
             timer_tick: 0,
             current_period: 0,
-            left_over_cpu_cycles: 0,
             sequencer_position: 0,
             envelope: Envelope::default(),
             sweep_unit: SweepUnit::new(use_ones_complement_for_sweep_unit),
@@ -242,24 +240,20 @@ impl PulseWave {
     fn reset(&mut self) {
         self.sequencer_position = 0;
         self.current_period = self.get_raw_timer_period();
-        self.timer_tick = self.get_raw_timer_period();
         self.envelope.start_flag = true;
         self.sweep_unit.reload_flag = true;
     }
 
     fn clock_timer(&mut self) {
-        let total_elapsed_cycles = 1 + self.left_over_cpu_cycles as u16;
-        self.left_over_cpu_cycles = (total_elapsed_cycles % 2) as u8;
-        let number_of_elapsed_ticks = (total_elapsed_cycles / 2) as u16;
-        if number_of_elapsed_ticks as u16 > self.timer_tick && self.current_period != 0 {
-            self.timer_tick = self.current_period + 1 - number_of_elapsed_ticks;
+        if self.timer_tick == 0 {
             if self.sequencer_position > 0 {
                 self.sequencer_position -= 1;
             } else {
                 self.sequencer_position = 7;
             }
-        } else if self.timer_tick >= number_of_elapsed_ticks {
-            self.timer_tick -= number_of_elapsed_ticks;
+            self.timer_tick = 2 * self.current_period;
+        } else {
+            self.timer_tick -= 1;
         }
     }
 
@@ -269,7 +263,7 @@ impl PulseWave {
     }
 
     fn get_volume(&self) -> u8 {
-        if self.length_counter == 0 {
+        if self.length_counter == 0 || self.sweep_unit.is_muting {
             0
         } else if self.is_constant_volume_set() {
             self.get_constant_volume_or_envelope_divider_reload_value()
@@ -340,7 +334,6 @@ impl TriangleWave {
         self.data[0] & 0b01111111
     }
 
-    #[allow(dead_code)]
     fn get_timer(&self) -> u16 {
         let timer_hi = ((self.data[3] & 0x7) as u16) << 8;
         self.data[2] as u16 + timer_hi
@@ -400,7 +393,6 @@ struct Noise {
     shift_register: u16,
     envelope: Envelope,
     timer_tick: u16,
-    left_over_cycle: u16,
 }
 
 impl Noise {
@@ -411,7 +403,6 @@ impl Noise {
             shift_register: 1,
             envelope: Default::default(),
             timer_tick: 0,
-            left_over_cycle: 0,
         }
     }
 
@@ -436,7 +427,7 @@ impl Noise {
     }
 
     fn get_timer(&self) -> u16 {
-        NOISE_PERIOD_NTSC[(self.data[2] & 0x0F) as usize]
+        2 * NOISE_PERIOD_NTSC[(self.data[2] & 0x0F) as usize]
     }
 
     fn get_sample(&self) -> u8 {
@@ -450,22 +441,18 @@ impl Noise {
     }
 
     fn clock_timer(&mut self) {
-        self.left_over_cycle += 1;
-        if self.left_over_cycle % 2 == 0 {
-            self.left_over_cycle = 0;
-            if self.timer_tick == 0 {
-                let snd_xor_bit = if self.is_mode_flag_set() {
-                    (self.shift_register & 0b000000_01000000) >> 6
-                } else {
-                    (self.shift_register & 0b000000_00000010) >> 1
-                };
-                let feedback_bit = (self.shift_register & 1) ^ snd_xor_bit;
-                self.shift_register >>= 1;
-                self.shift_register |= feedback_bit << 14;
-                self.timer_tick = self.get_timer();
+        if self.timer_tick == 0 {
+            let snd_xor_bit = if self.is_mode_flag_set() {
+                (self.shift_register & 0b000000_01000000) >> 6
             } else {
-                self.timer_tick -= 1;
-            }
+                (self.shift_register & 0b000000_00000010) >> 1
+            };
+            let feedback_bit = (self.shift_register & 1) ^ snd_xor_bit;
+            self.shift_register >>= 1;
+            self.shift_register |= feedback_bit << 14;
+            self.timer_tick = self.get_timer();
+        } else {
+            self.timer_tick -= 1;
         }
     }
 
@@ -475,7 +462,7 @@ impl Noise {
             self.is_length_counter_halt_set(),
         )
     }
-    fn clock_length_counter_and_sweep_unit(&mut self) {
+    fn clock_length_counter(&mut self) {
         if self.length_counter > 0 && !self.is_length_counter_halt_set() {
             self.length_counter -= 1;
         }
@@ -698,7 +685,7 @@ impl APU {
         self.pulse_1.clock_length_counter_and_sweep_unit();
         self.pulse_2.clock_length_counter_and_sweep_unit();
         self.triangle.clock_length_counter();
-        self.noise.clock_length_counter_and_sweep_unit();
+        self.noise.clock_length_counter();
     }
 
     fn perform_quarter_frame_update(&mut self) {
