@@ -96,11 +96,9 @@ impl Nes {
     }
 
     fn run_single_cpu_cycle(&mut self) {
-        let start_of_instruction = self.cpu.maybe_fetch_next_instruction();
+        self.cpu.maybe_fetch_next_instruction();
 
-        self.ppu
-            .borrow_mut()
-            .run_single_cpu_cycle(start_of_instruction);
+        self.ppu.borrow_mut().run_single_cpu_cycle();
 
         self.apu.borrow_mut().run_single_cpu_cycle();
 

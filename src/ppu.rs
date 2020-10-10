@@ -393,10 +393,7 @@ impl PPU {
         }
     }
 
-    pub fn run_single_cpu_cycle(&mut self, clear_nmi: bool) {
-        if clear_nmi {
-            self.nmi = None;
-        }
+    pub fn run_single_cpu_cycle(&mut self) {
         for _ in 0..3 {
             self.run_single_ppu_cycle();
         }
@@ -815,8 +812,8 @@ impl ReadPpuRegisters for PPU {
 impl PpuRegisterAccess for PPU {}
 
 impl PpuState for PPU {
-    fn was_nmi_triggered(&self) -> Option<crate::cpu_ppu::Nmi> {
-        self.nmi
+    fn maybe_take_nmi(&mut self) -> Option<crate::cpu_ppu::Nmi> {
+        self.nmi.take()
     }
 
     fn get_time(&self) -> crate::cpu_ppu::PpuTime {

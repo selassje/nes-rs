@@ -239,7 +239,7 @@ impl CPU {
 
     fn fetch_next_instruction(&mut self) {
         if self.nmi.is_none() {
-            self.nmi = self.ppu_state.borrow().was_nmi_triggered();
+            self.nmi = self.ppu_state.borrow_mut().maybe_take_nmi();
         }
 
         let ppu_time = self.ppu_state.borrow_mut().get_time();
