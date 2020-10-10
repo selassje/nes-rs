@@ -539,6 +539,57 @@ impl DMC {
             .set_sample_address(self.get_sample_address());
     }
 
+    fn is_irq_enabled(&self) -> bool {
+        (self.data[0] & 0b10000000) != 0
+    }
+
+    fn is_loop_enabled(&self) -> bool {
+        (self.data[0] & 0b01000000) != 0
+    }
+
+    fn get_timer(&self) -> u16 {
+        DMC_RATES_NTSC[(self.data[0] & 0x0F) as usize]
+    }
+
+    fn get_direct_load(&self) -> u8 {
+        self.data[1] & 0b01111111
+    }
+
+    fn get_sample_address(&self) -> u8 {
+        self.data[2]
+    }
+
+    fn get_sample_length(&self) -> u16 {
+        (self.data[3] as u16 * 16) + 1
+    }
+    fn clock_timer(&mut self) {
+        if self.timer_tick == 0 {
+            if self.bits_counter == 0 {
+                self.bits_counter = 8;
+                self.silence_flag = if let Some(buffer) = self.sample_buffer.take() {
+                    self.shift_register = buffer;
+                    false
+                } else {
+                    true
+                };
+            }
+            if !self.silence_flag {
+                if self.shift_register & 1 == 1 {
+                    if self.output_value <= 125 {
+                        self.output_value += 2;
+                    }
+                } else if self.output_value >= 2 {
+                    self.output_value -= 2;
+                }
+            }
+            self.bits_counter -= 1;
+            self.shift_register >>= 1;
+            self.timer_tick = self.get_timer() - 1;
+        } else {
+            self.timer_tick -= 1;
+        }
+    }
+
     fn fetch_next_sample_buffer(&mut self) {
         if self.sample_buffer.is_none() {
             if self.bytes_remaining > 0 {
@@ -567,62 +618,6 @@ impl DMC {
             }
         }
     }
-
-    fn is_irq_enabled(&self) -> bool {
-        (self.data[0] & 0b10000000) != 0
-    }
-
-    fn is_loop_enabled(&self) -> bool {
-        (self.data[0] & 0b01000000) != 0
-    }
-
-    fn get_timer(&self) -> u16 {
-        DMC_RATES_NTSC[(self.data[0] & 0x0F) as usize]
-    }
-
-    fn get_direct_load(&self) -> u8 {
-        self.data[1] & 0b01111111
-    }
-
-    fn get_sample_address(&self) -> u8 {
-        self.data[2]
-    }
-
-    fn get_sample_length(&self) -> u16 {
-        (self.data[3] as u16 * 16) + 1
-    }
-    fn clock_timer(&mut self) {
-        if true {
-            if self.timer_tick == 0 {
-                if self.bits_counter == 0 {
-                    self.bits_counter = 8;
-                    self.silence_flag = if let Some(buffer) = self.sample_buffer.take() {
-                        self.fetch_next_sample_buffer();
-                        self.shift_register = buffer;
-                        false
-                    } else {
-                        true
-                    };
-                }
-
-                if !self.silence_flag {
-                    if self.shift_register & 1 == 1 {
-                        if self.output_value <= 125 {
-                            self.output_value += 2;
-                        }
-                    } else if self.output_value >= 2 {
-                        self.output_value -= 2;
-                    }
-                }
-                self.bits_counter -= 1;
-                self.shift_register >>= 1;
-                self.timer_tick = self.get_timer() - 1;
-            } else {
-                self.timer_tick -= 1;
-            }
-        }
-    }
-
     fn get_sample(&self) -> SampleFormat {
         self.output_value
     }
@@ -745,7 +740,6 @@ impl APU {
         self.noise.clock_timer();
 
         self.dmc.fetch_next_sample_buffer();
-
         self.dmc.clock_timer();
 
         if self.frame_counter.get_sequencer_mode() == 0
@@ -799,14 +793,15 @@ impl APU {
     }
 
     fn is_half_frame_reached(&self) -> bool {
-        if self.cpu_cycle + 1 == FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES {
+        let next_cpu_cycle = self.cpu_cycle + 1;
+        if next_cpu_cycle == FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES {
             return true;
         } else if self.frame_counter.get_sequencer_mode() == 0
-            && self.cpu_cycle + 1 == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
+            && next_cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
         {
             return true;
         } else if self.frame_counter.get_sequencer_mode() == 1
-            && self.cpu_cycle + 1 == FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES
+            && next_cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES
         {
             return true;
         }
@@ -814,13 +809,14 @@ impl APU {
     }
 
     fn is_quarter_frame_reached(&self) -> bool {
+        let next_cpu_cycle = self.cpu_cycle + 1;
         if self.is_half_frame_reached() {
             return true;
         } else {
-            if self.cpu_cycle + 1 == FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES {
+            if next_cpu_cycle == FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES {
                 return true;
             }
-            if self.cpu_cycle + 1 == FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES {
+            if next_cpu_cycle == FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES {
                 return true;
             }
         }
