@@ -69,7 +69,7 @@ impl Nes {
 
     pub fn run(&mut self, duration: Option<Duration>) {
         const FRAME_DURATION: Duration =
-            Duration::from_nanos((Duration::from_secs(1).as_nanos() / FPS as u128) as u64);
+            Duration::from_nanos((Duration::from_secs(1).as_nanos() / (FPS + 3) as u128) as u64);
 
         let mut io_state: IOState = Default::default();
         let mut elapsed_frames: u128 = 0;

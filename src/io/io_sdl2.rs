@@ -17,7 +17,7 @@ use sdl2::{
 use super::{io_internal::IOInternal, IOState};
 
 const SAMPLE_RATE: usize = 41100;
-const SAMPLES_PER_FRAME: usize = SAMPLE_RATE / (common::FPS - 3);
+const SAMPLES_PER_FRAME: usize = SAMPLE_RATE / (common::FPS);
 const SAMPLE_INTERPOLATION: usize = common::CPU_CYCLES_PER_FRAME / SAMPLES_PER_FRAME;
 const DISPLAY_SCALING: i16 = 2;
 
@@ -103,14 +103,12 @@ impl IOSdl2 {
 
         let mut canvas = window
             .into_canvas()
-            //.present_vsync()
             .build()
             .map_err(|e| e.to_string())
             .unwrap();
 
         canvas.set_draw_color(pixels::Color::RGB(0, 0, 0));
         canvas.present();
-
         let events = sdl_context.event_pump().unwrap();
 
         IOSdl2 {
