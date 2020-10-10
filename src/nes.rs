@@ -1,6 +1,5 @@
 use common::FPS;
 
-use crate::common;
 use crate::controllers::Controllers;
 use crate::cpu::CPU;
 use crate::io::AudioAccess;
@@ -12,6 +11,7 @@ use crate::ppu::PPU;
 use crate::ram::RAM;
 use crate::vram::VRAM;
 use crate::{apu::APU, controllers::Controller};
+use crate::{common, io::IOState};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -71,13 +71,15 @@ impl Nes {
         const FRAME_DURATION: Duration =
             Duration::from_nanos((Duration::from_secs(1).as_nanos() / FPS as u128) as u64);
 
+        let mut io_state: IOState = Default::default();
         let mut elapsed_frames: u128 = 0;
         let mut frame_start = Instant::now();
-        while duration == None || elapsed_frames < duration.unwrap().as_secs() as u128 * FPS as u128
+        while (duration == None
+            || elapsed_frames < duration.unwrap().as_secs() as u128 * FPS as u128)
+            && !io_state.quit
         {
             self.run_single_frame();
-            self.io.borrow_mut().present_frame();
-
+            io_state = self.io.borrow_mut().present_frame();
             let elapsed_time_since_frame_start = frame_start.elapsed();
             if duration.is_none() && elapsed_time_since_frame_start < FRAME_DURATION {
                 std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);

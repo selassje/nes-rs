@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::io::{AudioAccess, KeyboardAccess, RgbColor, VideoAccess, IO};
 use crate::{controllers::Button, io::io_internal::IOInternal, keyboard::ButtonKeyMap};
 
-use super::KeyCode;
+use super::{IOState, KeyCode};
 #[derive(PartialEq)]
 pub enum Player {
     Player1,
@@ -51,7 +51,9 @@ impl IOTest {
 }
 
 impl IO for IOTest {
-    fn present_frame(&mut self) {}
+    fn present_frame(&mut self) -> IOState {
+        Default::default()
+    }
 }
 
 impl AudioAccess for IOTest {

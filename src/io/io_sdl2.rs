@@ -14,7 +14,7 @@ use sdl2::{
     render::Canvas, video::Window, EventPump,
 };
 
-use super::io_internal::IOInternal;
+use super::{io_internal::IOInternal, IOState};
 
 const SAMPLE_RATE: usize = 41100;
 const SAMPLES_PER_FRAME: usize = SAMPLE_RATE / (common::FPS - 3);
@@ -129,8 +129,10 @@ impl IOSdl2 {
 }
 
 impl IO for IOSdl2 {
-    fn present_frame(&mut self) {
+    fn present_frame(&mut self) -> IOState {
+        let mut io_state: IOState = Default::default();
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
+        io_state.quit = *self.keyboard_state.get(&Scancode::Escape).unwrap();
         self.events.pump_events();
         for (x, col) in self.io_internal.get_pixel_iter().enumerate() {
             for (y, color) in col.iter().enumerate() {
@@ -144,6 +146,7 @@ impl IO for IOSdl2 {
         self.canvas.present();
         self.audio_queue.queue(&self.sample_buffer.buffer[..]);
         self.sample_buffer.reset();
+        io_state
     }
 }
 
