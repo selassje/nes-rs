@@ -2,10 +2,9 @@ use super::AddressingMode;
 use super::AddressingMode::*;
 use super::CPU;
 
-pub type Instruction = fn(&mut CPU);
 #[derive(Copy, Clone)]
 pub(super) struct OpCode {
-    pub(super) instruction: Instruction,
+    pub(super) instruction: super::InstructionFun,
     pub(super) mode: AddressingMode,
     pub(super) base_cycles: u8,
     pub(super) extra_cycle_on_page_crossing: bool,

@@ -393,9 +393,11 @@ impl PPU {
         }
     }
 
-    pub fn run_cpu_cycles(&mut self, cpu_cycles: u16) {
-        self.nmi = None;
-        for _ in 0..cpu_cycles * 3 {
+    pub fn run_single_cpu_cycle(&mut self, clear_nmi: bool) {
+        if clear_nmi {
+            self.nmi = None;
+        }
+        for _ in 0..3 {
             self.run_single_ppu_cycle();
         }
     }

@@ -90,25 +90,20 @@ impl Nes {
     }
 
     fn run_single_frame(&mut self) {
-        let mut elapsed_cpu_cycles = 0;
-        while elapsed_cpu_cycles < common::CPU_CYCLES_PER_FRAME {
-            elapsed_cpu_cycles += self.run_single_cpu_instruction() as usize;
+        for _ in 0..common::CPU_CYCLES_PER_FRAME {
+            self.run_single_cpu_cycle();
         }
     }
 
-    fn run_single_cpu_instruction(&mut self) -> u16 {
-        let cpu_cycles_for_next_instruction = self.cpu.fetch_next_instruction();
-        if cpu_cycles_for_next_instruction != 0 {
-            self.ppu
-                .borrow_mut()
-                .run_cpu_cycles(cpu_cycles_for_next_instruction);
+    fn run_single_cpu_cycle(&mut self) {
+        let start_of_instruction = self.cpu.maybe_fetch_next_instruction();
 
-            self.apu
-                .borrow_mut()
-                .run_cpu_cycles(cpu_cycles_for_next_instruction);
+        self.ppu
+            .borrow_mut()
+            .run_single_cpu_cycle(start_of_instruction);
 
-            self.cpu.run_next_instruction();
-        }
-        cpu_cycles_for_next_instruction
+        self.apu.borrow_mut().run_single_cpu_cycle();
+
+        self.cpu.run_single_cycle();
     }
 }

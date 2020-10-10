@@ -695,11 +695,6 @@ impl APU {
         self.noise.clock_envelope();
     }
 
-    pub fn run_cpu_cycles(&mut self, cpu_cycles: u16) {
-        for _ in 0..cpu_cycles {
-            self.run_single_cpu_cycle();
-        }
-    }
     pub fn run_single_cpu_cycle(&mut self) {
         if let Some(pending_reset_cycle) = self.pending_reset_cycle {
             if pending_reset_cycle == self.cpu_cycle {
@@ -771,9 +766,9 @@ impl APU {
         dmc: u8,
     ) -> SampleFormat {
         let mut n = (pulse_1 + pulse_2) as f32;
-        let puls_out = 95.52 / (8128.0 / n + 100.0);
+        let puls_out = 95.52 / ((8128.0 / n) + 100.0);
         n = (3 * triangle + 2 * noise + dmc) as f32;
-        let tnd_out = 163.67 / (24329.0 / n + 100.0);
+        let tnd_out = 163.67 / ((24329.0 / n) + 100.0);
         ((puls_out + tnd_out) * 100.0) as SampleFormat
     }
 
