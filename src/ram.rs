@@ -159,7 +159,6 @@ impl DmcMemory for RAM {
     }
 
     fn get_next_sample_byte(&mut self) -> u8 {
-        // println!("Reading sample from {:#X}", self.dmc_sample_address);
         let byte = self.memory[self.dmc_sample_address];
         self.dmc_sample_address = (self.dmc_sample_address + 1) % 0x8000;
         byte

@@ -611,10 +611,8 @@ impl DMC {
                 }
             } else if self.start_pending {
                 self.start_sample();
+                self.fetch_next_sample_buffer();
                 self.start_pending = false;
-                if self.bytes_remaining > 0 {
-                    self.fetch_next_sample_buffer();
-                }
             }
         }
     }
@@ -883,9 +881,6 @@ impl WriteAcessRegisters for APU {
                     self.dmc.bytes_remaining = 0;
                 } else if self.dmc.bytes_remaining == 0 {
                     self.dmc.next_bytes_remaining = self.dmc.get_sample_length();
-                    if self.dmc.sample_buffer.is_some() && !self.dmc.is_loop_enabled() {
-                        self.dmc.bytes_remaining += 1;
-                    }
                     self.dmc.start_pending = true;
                 }
                 self.reset_length_counter_if_disabled(StatusRegisterFlag::Pulse1Enabled);
@@ -914,7 +909,10 @@ impl ReadAccessRegisters for APU {
                 let mut out = StatusRegister { data: 0 };
                 out.set_flag_status(StatusRegisterFlag::FrameInterrupt, self.frame_interrupt);
                 out.set_flag_status(StatusRegisterFlag::DMCInterrupt, self.dmc.interrupt);
-                out.set_flag_status(StatusRegisterFlag::DMCEnabled, self.dmc.bytes_remaining > 0);
+                out.set_flag_status(
+                    StatusRegisterFlag::DMCEnabled,
+                    self.dmc.bytes_remaining > 0 || self.dmc.start_pending,
+                );
 
                 let mut set_status = |flag| {
                     let channel = self.get_length_counter_channel(flag);
