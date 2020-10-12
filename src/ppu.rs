@@ -386,6 +386,10 @@ impl PPU {
 
         if !self.status_reg.get_flag(StatusRegisterFlag::Sprite0Hit)
             && x < 255
+            && self
+                .mask_reg
+                .is_flag_enabled(MaskRegisterFlag::ShowBackground)
+            && self.mask_reg.is_flag_enabled(MaskRegisterFlag::ShowSprites)
             && is_sprite0_hit_detected
         {
             self.status_reg
@@ -393,9 +397,8 @@ impl PPU {
         }
     }
 
-    pub fn run_cpu_cycles(&mut self, cpu_cycles: u16) {
-        self.nmi = None;
-        for _ in 0..cpu_cycles * 3 {
+    pub fn run_single_cpu_cycle(&mut self) {
+        for _ in 0..3 {
             self.run_single_ppu_cycle();
         }
     }
@@ -813,8 +816,8 @@ impl ReadPpuRegisters for PPU {
 impl PpuRegisterAccess for PPU {}
 
 impl PpuState for PPU {
-    fn was_nmi_triggered(&self) -> Option<crate::cpu_ppu::Nmi> {
-        self.nmi
+    fn maybe_take_nmi(&mut self) -> Option<crate::cpu_ppu::Nmi> {
+        self.nmi.take()
     }
 
     fn get_time(&self) -> crate::cpu_ppu::PpuTime {

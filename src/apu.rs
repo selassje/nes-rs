@@ -1,5 +1,5 @@
 use self::StatusRegisterFlag::*;
-use crate::{io::AudioAccess, ram_apu::*};
+use crate::{io::AudioAccess, memory::DmcMemory, ram_apu::*};
 use std::{cell::RefCell, default::Default, rc::Rc};
 
 use crate::io::SampleFormat;
@@ -9,16 +9,20 @@ const LENGTH_COUNTER_LOOKUP_TABLE: [u8; 32] = [
     192, 24, 72, 26, 16, 28, 32, 30,
 ];
 
-const DUTY_CYCLE_SEQUENCES: [[SampleFormat; 8]; 4] = [
+const DUTY_CYCLE_SEQUENCES: [[u8; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1],
-    [0, 1, 1, 0, 0, 0, 0, 0],
-    [0, 1, 1, 1, 1, 0, 0, 0],
-    [1, 0, 0, 1, 1, 1, 1, 1],
+    [0, 0, 0, 0, 0, 0, 1, 1],
+    [0, 0, 0, 0, 1, 1, 1, 1],
+    [1, 1, 1, 1, 1, 1, 0, 0],
 ];
 
-const TRIANGLE_SEQUENCE: [SampleFormat; 32] = [
+const TRIANGLE_SEQUENCE: [u8; 32] = [
     15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
     13, 14, 15,
+];
+
+const DMC_RATES_NTSC: [u16; 16] = [
+    428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106, 84, 72, 54,
 ];
 
 const NOISE_PERIOD_NTSC: [u16; 16] = [
@@ -141,19 +145,19 @@ impl SweepUnit {
     fn get_target_period(
         &self,
         raw_period: u16,
-        target_period: u16,
+        current_period: u16,
         shift: u8,
         negate: bool,
     ) -> u16 {
         let change_amount = raw_period >> shift;
         if negate {
             if self.use_ones_complement {
-                target_period - change_amount - 1
+                current_period - change_amount - 1
             } else {
-                target_period - change_amount
+                current_period - change_amount
             }
         } else {
-            target_period + change_amount
+            current_period + change_amount
         }
     }
 
@@ -178,7 +182,6 @@ struct PulseWave {
     length_counter: u8,
     sequencer_position: u8,
     timer_tick: u16,
-    left_over_cpu_cycles: u8,
     envelope: Envelope,
     sweep_unit: SweepUnit,
     current_period: u16,
@@ -191,7 +194,6 @@ impl PulseWave {
             length_counter: 0,
             timer_tick: 0,
             current_period: 0,
-            left_over_cpu_cycles: 0,
             sequencer_position: 0,
             envelope: Envelope::default(),
             sweep_unit: SweepUnit::new(use_ones_complement_for_sweep_unit),
@@ -238,34 +240,30 @@ impl PulseWave {
     fn reset(&mut self) {
         self.sequencer_position = 0;
         self.current_period = self.get_raw_timer_period();
-        self.timer_tick = self.get_raw_timer_period();
         self.envelope.start_flag = true;
         self.sweep_unit.reload_flag = true;
     }
 
     fn clock_timer(&mut self) {
-        let total_elapsed_cycles = 1 + self.left_over_cpu_cycles as u16;
-        self.left_over_cpu_cycles = (total_elapsed_cycles % 2) as u8;
-        let number_of_elapsed_ticks = (total_elapsed_cycles / 2) as u16;
-        if number_of_elapsed_ticks as u16 > self.timer_tick && self.current_period != 0 {
-            self.timer_tick = self.current_period + 1 - number_of_elapsed_ticks;
+        if self.timer_tick == 0 {
             if self.sequencer_position > 0 {
                 self.sequencer_position -= 1;
             } else {
                 self.sequencer_position = 7;
             }
-        } else if self.timer_tick >= number_of_elapsed_ticks {
-            self.timer_tick -= number_of_elapsed_ticks;
+            self.timer_tick = (2 * self.current_period) - 1;
+        } else {
+            self.timer_tick -= 1;
         }
     }
 
-    fn get_sample(&self) -> SampleFormat {
+    fn get_sample(&self) -> u8 {
         DUTY_CYCLE_SEQUENCES[self.get_duty_cycle() as usize][self.sequencer_position as usize]
-            * self.get_volume() as SampleFormat
+            * self.get_volume() as u8
     }
 
     fn get_volume(&self) -> u8 {
-        if self.length_counter == 0 {
+        if self.length_counter == 0 || self.sweep_unit.is_muting {
             0
         } else if self.is_constant_volume_set() {
             self.get_constant_volume_or_envelope_divider_reload_value()
@@ -336,7 +334,6 @@ impl TriangleWave {
         self.data[0] & 0b01111111
     }
 
-    #[allow(dead_code)]
     fn get_timer(&self) -> u16 {
         let timer_hi = ((self.data[3] & 0x7) as u16) << 8;
         self.data[2] as u16 + timer_hi
@@ -371,7 +368,7 @@ impl TriangleWave {
         }
     }
 
-    fn get_sample(&self) -> SampleFormat {
+    fn get_sample(&self) -> u8 {
         TRIANGLE_SEQUENCE[self.sequencer_position]
     }
 }
@@ -396,7 +393,6 @@ struct Noise {
     shift_register: u16,
     envelope: Envelope,
     timer_tick: u16,
-    left_over_cycle: u16,
 }
 
 impl Noise {
@@ -407,7 +403,6 @@ impl Noise {
             shift_register: 1,
             envelope: Default::default(),
             timer_tick: 0,
-            left_over_cycle: 0,
         }
     }
 
@@ -432,7 +427,7 @@ impl Noise {
     }
 
     fn get_timer(&self) -> u16 {
-        NOISE_PERIOD_NTSC[(self.data[2] & 0x0F) as usize]
+        2 * NOISE_PERIOD_NTSC[(self.data[2] & 0x0F) as usize]
     }
 
     fn get_sample(&self) -> u8 {
@@ -446,22 +441,18 @@ impl Noise {
     }
 
     fn clock_timer(&mut self) {
-        self.left_over_cycle += 1;
-        if self.left_over_cycle % 2 == 0 {
-            self.left_over_cycle = 0;
-            if self.timer_tick == 0 {
-                let snd_xor_bit = if self.is_mode_flag_set() {
-                    (self.shift_register & 0b000000_01000000) >> 6
-                } else {
-                    (self.shift_register & 0b000000_00000010) >> 1
-                };
-                let feedback_bit = (self.shift_register & 1) ^ snd_xor_bit;
-                self.shift_register >>= 1;
-                self.shift_register |= feedback_bit << 14;
-                self.timer_tick = self.get_timer();
+        if self.timer_tick == 0 {
+            let snd_xor_bit = if self.is_mode_flag_set() {
+                (self.shift_register & 0b000000_01000000) >> 6
             } else {
-                self.timer_tick -= 1;
-            }
+                (self.shift_register & 0b000000_00000010) >> 1
+            };
+            let feedback_bit = (self.shift_register & 1) ^ snd_xor_bit;
+            self.shift_register >>= 1;
+            self.shift_register |= feedback_bit << 14;
+            self.timer_tick = self.get_timer();
+        } else {
+            self.timer_tick -= 1;
         }
     }
 
@@ -471,7 +462,7 @@ impl Noise {
             self.is_length_counter_halt_set(),
         )
     }
-    fn clock_length_counter_and_sweep_unit(&mut self) {
+    fn clock_length_counter(&mut self) {
         if self.length_counter > 0 && !self.is_length_counter_halt_set() {
             self.length_counter -= 1;
         }
@@ -492,13 +483,48 @@ impl LengthCounterChannel for Noise {
     }
 }
 
-#[derive(Default)]
 struct DMC {
     data: [u8; 4],
+    timer_tick: u16,
+    sample_buffer: Option<u8>,
+    shift_register: u8,
+    silence_flag: bool,
+    bits_counter: u8,
+    bytes_remaining: u16,
+    next_bytes_remaining: u16,
+    output_value: u8,
+    start_pending: bool,
+    interrupt: bool,
+    dmc_memory: Option<Rc<RefCell<dyn DmcMemory>>>,
 }
 
-#[allow(dead_code)]
 impl DMC {
+    fn new() -> Self {
+        DMC {
+            data: [0; 4],
+            timer_tick: 0,
+            bits_counter: 0,
+            bytes_remaining: 0,
+            next_bytes_remaining: 0,
+            silence_flag: true,
+            sample_buffer: None,
+            shift_register: 0,
+            output_value: 0,
+            dmc_memory: None,
+            start_pending: false,
+            interrupt: false,
+        }
+    }
+
+    fn start_sample(&mut self) {
+        self.bytes_remaining = self.next_bytes_remaining;
+        self.dmc_memory
+            .as_ref()
+            .unwrap()
+            .borrow_mut()
+            .set_sample_address(self.get_sample_address());
+    }
+
     fn is_irq_enabled(&self) -> bool {
         (self.data[0] & 0b10000000) != 0
     }
@@ -507,11 +533,11 @@ impl DMC {
         (self.data[0] & 0b01000000) != 0
     }
 
-    fn get_frequency(&self) -> u8 {
-        self.data[0] & 0x0F
+    fn get_timer(&self) -> u16 {
+        DMC_RATES_NTSC[(self.data[0] & 0x0F) as usize]
     }
 
-    fn get_load_counter(&self) -> u8 {
+    fn get_direct_load(&self) -> u8 {
         self.data[1] & 0b01111111
     }
 
@@ -519,13 +545,65 @@ impl DMC {
         self.data[2]
     }
 
-    fn get_sample_length(&self) -> u8 {
-        self.data[3]
+    fn get_sample_length(&self) -> u16 {
+        (self.data[3] as u16 * 16) + 1
     }
-    fn run_single_cpu_cycle(&mut self) {}
+    fn clock_timer(&mut self) {
+        if self.timer_tick == 0 {
+            if self.bits_counter == 0 {
+                self.bits_counter = 8;
+                self.silence_flag = if let Some(buffer) = self.sample_buffer.take() {
+                    self.shift_register = buffer;
+                    false
+                } else {
+                    true
+                };
+            }
+            if !self.silence_flag {
+                if self.shift_register & 1 == 1 {
+                    if self.output_value <= 125 {
+                        self.output_value += 2;
+                    }
+                } else if self.output_value >= 2 {
+                    self.output_value -= 2;
+                }
+            }
+            self.bits_counter -= 1;
+            self.shift_register >>= 1;
+            self.timer_tick = self.get_timer() - 1;
+        } else {
+            self.timer_tick -= 1;
+        }
+    }
 
-    fn get_sample(&self) -> SampleFormat {
-        0
+    fn fetch_next_sample_buffer(&mut self) {
+        if self.sample_buffer.is_none() {
+            if self.bytes_remaining > 0 {
+                self.sample_buffer = Some(
+                    self.dmc_memory
+                        .as_ref()
+                        .unwrap()
+                        .borrow_mut()
+                        .get_next_sample_byte(),
+                );
+                self.bytes_remaining -= 1;
+                if self.bytes_remaining == 0 {
+                    if self.is_loop_enabled() {
+                        self.next_bytes_remaining = self.get_sample_length();
+                        self.start_sample();
+                    } else if self.is_irq_enabled() {
+                        self.interrupt = true;
+                    }
+                }
+            } else if self.start_pending {
+                self.start_sample();
+                self.fetch_next_sample_buffer();
+                self.start_pending = false;
+            }
+        }
+    }
+    fn get_sample(&self) -> u8 {
+        self.output_value
     }
 }
 
@@ -540,7 +618,7 @@ pub struct APU {
     dmc: DMC,
     cpu_cycle: u16,
     frame_interrupt: bool,
-    dmc_interrupt: bool,
+    frame: u128,
     pending_reset_cycle: Option<u16>,
     irq_flag_setting_in_progress: bool,
 }
@@ -554,14 +632,18 @@ impl APU {
             pulse_2: PulseWave::new(true),
             triangle: TriangleWave::default(),
             noise: Noise::new(),
-            dmc: DMC::default(),
-            cpu_cycle: 8,
+            dmc: DMC::new(),
+            cpu_cycle: 0,
             frame_interrupt: false,
-            dmc_interrupt: false,
             audio_access,
+            frame: 1,
             pending_reset_cycle: None,
             irq_flag_setting_in_progress: false,
         }
+    }
+
+    pub fn set_dmc_memory(&mut self, dmc_memory: Rc<RefCell<dyn DmcMemory>>) {
+        self.dmc.dmc_memory = Some(dmc_memory);
     }
 
     fn get_length_counter_channel(
@@ -602,7 +684,7 @@ impl APU {
         self.pulse_1.clock_length_counter_and_sweep_unit();
         self.pulse_2.clock_length_counter_and_sweep_unit();
         self.triangle.clock_length_counter();
-        self.noise.clock_length_counter_and_sweep_unit();
+        self.noise.clock_length_counter();
     }
 
     fn perform_quarter_frame_update(&mut self) {
@@ -612,11 +694,6 @@ impl APU {
         self.noise.clock_envelope();
     }
 
-    pub fn run_cpu_cycles(&mut self, cpu_cycles: u16) {
-        for _ in 0..cpu_cycles {
-            self.run_single_cpu_cycle();
-        }
-    }
     pub fn run_single_cpu_cycle(&mut self) {
         if let Some(pending_reset_cycle) = self.pending_reset_cycle {
             if pending_reset_cycle == self.cpu_cycle {
@@ -640,7 +717,9 @@ impl APU {
         self.pulse_2.clock_timer();
         self.triangle.clock_timer();
         self.noise.clock_timer();
-        self.dmc.run_single_cpu_cycle();
+
+        self.dmc.fetch_next_sample_buffer();
+        self.dmc.clock_timer();
 
         if self.frame_counter.get_sequencer_mode() == 0
             && (self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES - 1
@@ -659,13 +738,21 @@ impl APU {
         }
         self.cpu_cycle = self.shifted_cpu_cycle(1);
 
+        if self.cpu_cycle == 0 {
+            if self.frame == std::u128::MAX {
+                self.frame = 0;
+            } else {
+                self.frame += 1;
+            }
+        }
+
         let sample = Self::get_mixer_output(
             self.pulse_1.get_sample(),
             self.pulse_2.get_sample(),
             self.triangle.get_sample(),
             self.noise.get_sample(),
             self.dmc.get_sample(),
-        );
+        ) - 0.5;
 
         self.audio_access.borrow_mut().add_sample(sample);
     }
@@ -677,22 +764,31 @@ impl APU {
         noise: u8,
         dmc: u8,
     ) -> SampleFormat {
-        let mut n = (pulse_1 + pulse_2) as f32;
-        let puls_out = 95.52 / (8128.0 / n + 100.0);
-        n = (3 * triangle + 2 * noise + dmc) as f32;
-        let tnd_out = 163.67 / (24329.0 / n + 100.0);
-        ((puls_out + tnd_out) * 100.0) as SampleFormat
+        let mut n = pulse_1 + pulse_2;
+        let puls_out = if n != 0 {
+            95.52 / ((8128.0 / (n as f32)) + 100.0)
+        } else {
+            0.0
+        };
+        n = 3 * triangle + 2 * noise + dmc;
+        let tnd_out = if n != 0 {
+            163.67 / ((24329.0 / (n as f32)) + 100.0)
+        } else {
+            0.0
+        };
+        (puls_out + tnd_out) as SampleFormat
     }
 
     fn is_half_frame_reached(&self) -> bool {
-        if self.cpu_cycle + 1 == FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES {
+        let next_cpu_cycle = self.cpu_cycle + 1;
+        if next_cpu_cycle == FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES {
             return true;
         } else if self.frame_counter.get_sequencer_mode() == 0
-            && self.cpu_cycle + 1 == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
+            && next_cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
         {
             return true;
         } else if self.frame_counter.get_sequencer_mode() == 1
-            && self.cpu_cycle + 1 == FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES
+            && next_cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES
         {
             return true;
         }
@@ -700,13 +796,14 @@ impl APU {
     }
 
     fn is_quarter_frame_reached(&self) -> bool {
+        let next_cpu_cycle = self.cpu_cycle + 1;
         if self.is_half_frame_reached() {
             return true;
         } else {
-            if self.cpu_cycle + 1 == FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES {
+            if next_cpu_cycle == FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES {
                 return true;
             }
-            if self.cpu_cycle + 1 == FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES {
+            if next_cpu_cycle == FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES {
                 return true;
             }
         }
@@ -757,22 +854,37 @@ impl WriteAcessRegisters for APU {
                 self.noise.reset();
                 self.reload_length_counter_if_enabled(StatusRegisterFlag::NoiseEnabled);
             }
-            WriteAccessRegister::DMC0 => self.dmc.data[0] = value,
-            WriteAccessRegister::DMC1 => self.dmc.data[1] = value,
+            WriteAccessRegister::DMC0 => {
+                self.dmc.data[0] = value;
+                if !self.dmc.is_irq_enabled() {
+                    self.dmc.interrupt = false;
+                }
+            }
+            WriteAccessRegister::DMC1 => {
+                self.dmc.data[1] = value;
+                self.dmc.output_value = self.dmc.get_direct_load();
+            }
             WriteAccessRegister::DMC2 => self.dmc.data[2] = value,
             WriteAccessRegister::DMC3 => self.dmc.data[3] = value,
 
             WriteAccessRegister::Status => {
                 self.status.data = value;
+                if !self.status.is_flag_enabled(StatusRegisterFlag::DMCEnabled) {
+                    self.dmc.bytes_remaining = 0;
+                } else if self.dmc.bytes_remaining == 0 {
+                    self.dmc.next_bytes_remaining = self.dmc.get_sample_length();
+                    self.dmc.start_pending = true;
+                }
                 self.reset_length_counter_if_disabled(StatusRegisterFlag::Pulse1Enabled);
                 self.reset_length_counter_if_disabled(StatusRegisterFlag::Pulse2Enabled);
                 self.reset_length_counter_if_disabled(StatusRegisterFlag::TriangleEnabled);
                 self.reset_length_counter_if_disabled(StatusRegisterFlag::NoiseEnabled);
+
+                self.dmc.interrupt = false;
             }
             WriteAccessRegister::FrameCounter => {
                 let shift = if self.cpu_cycle % 2 == 0 { 3 } else { 2 };
                 self.frame_counter.data = value;
-
                 if self.frame_counter.is_interrupt_inhibit_flag_set() {
                     self.frame_interrupt = false;
                 }
@@ -788,7 +900,11 @@ impl ReadAccessRegisters for APU {
             ReadAccessRegister::Status => {
                 let mut out = StatusRegister { data: 0 };
                 out.set_flag_status(StatusRegisterFlag::FrameInterrupt, self.frame_interrupt);
-                out.set_flag_status(StatusRegisterFlag::DMCInterrupt, self.dmc_interrupt);
+                out.set_flag_status(StatusRegisterFlag::DMCInterrupt, self.dmc.interrupt);
+                out.set_flag_status(
+                    StatusRegisterFlag::DMCEnabled,
+                    self.dmc.bytes_remaining > 0 || self.dmc.start_pending,
+                );
 
                 let mut set_status = |flag| {
                     let channel = self.get_length_counter_channel(flag);

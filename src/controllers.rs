@@ -1,6 +1,6 @@
 use self::Button::*;
 use crate::ram_controllers::*;
-use std::{cell::Cell, rc::Rc};
+use std::rc::Rc;
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
 pub enum Button {
@@ -35,41 +35,51 @@ pub trait Controller {
 }
 
 pub struct Controllers {
-    controller_1: Rc<dyn Controller>,
-    controller_2: Rc<dyn Controller>,
+    controller_1: ControllerState,
+    controller_2: ControllerState,
     strobe: bool,
-    next_controller_button: Cell<u8>,
+}
+
+struct ControllerState {
+    controller: Rc<dyn Controller>,
+    button: u8,
+}
+
+impl ControllerState {
+    fn read(&mut self, strobe: bool) -> u8 {
+        if self.button < 8 {
+            let val = self.controller.is_button_pressed(self.button.into());
+            if !strobe {
+                self.button += 1;
+            }
+            val
+        } else {
+            1
+        }
+    }
 }
 
 impl Controllers {
     pub fn new(controller_1: Rc<dyn Controller>, controller_2: Rc<dyn Controller>) -> Self {
         Controllers {
-            controller_1: controller_1,
-            controller_2: controller_2,
+            controller_1: ControllerState {
+                controller: controller_1,
+                button: 0,
+            },
+            controller_2: ControllerState {
+                controller: controller_2,
+                button: 0,
+            },
             strobe: true,
-            next_controller_button: Cell::new(A as u8),
         }
     }
 }
 
 impl ReadInputPorts for Controllers {
-    fn read(&self, port: InputPort) -> u8 {
-        let (mut controller1_output, mut controller2_output) = (1, 1);
-        if self.next_controller_button.get() < 8 {
-            controller1_output = self
-                .controller_1
-                .is_button_pressed(self.next_controller_button.get().into());
-            controller2_output = self
-                .controller_2
-                .is_button_pressed(self.next_controller_button.get().into());
-            if !self.strobe {
-                self.next_controller_button
-                    .set(self.next_controller_button.get() + 1);
-            }
-        }
-        match port {
-            InputPort::Controller1 => controller1_output | 0x40,
-            InputPort::Controller2 => controller2_output | 0x40,
+    fn read(&mut self, port: InputPort) -> u8 {
+        0x40 | match port {
+            InputPort::Controller1 => self.controller_1.read(self.strobe),
+            InputPort::Controller2 => self.controller_2.read(self.strobe),
         }
     }
 }
@@ -79,7 +89,8 @@ impl WriteOutputPorts for Controllers {
         assert!(port == OutputPort::Controllers1And2);
         self.strobe = (1 & value) != 0;
         if self.strobe {
-            self.next_controller_button.set(A as u8);
+            self.controller_1.button = A as u8;
+            self.controller_2.button = A as u8;
         }
     }
 }

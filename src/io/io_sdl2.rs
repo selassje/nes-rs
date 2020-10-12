@@ -14,30 +14,52 @@ use sdl2::{
     render::Canvas, video::Window, EventPump,
 };
 
-use super::io_internal::IOInternal;
+use super::{io_internal::IOInternal, IOState};
 
-const SAMPLE_RATE: usize = 41100;
-const SAMPLES_PER_FRAME: usize = SAMPLE_RATE / (common::FPS - 3);
+const SAMPLE_RATE: usize = 44100;
+//const SAMPLE_RATE: usize = common::CPU_CYCLES_PER_FRAME * common::FPS;
+const SAMPLES_PER_FRAME: usize = SAMPLE_RATE / (common::FPS);
 const SAMPLE_INTERPOLATION: usize = common::CPU_CYCLES_PER_FRAME / SAMPLES_PER_FRAME;
+const BUFFER_SIZE: usize = SAMPLES_PER_FRAME;
 const DISPLAY_SCALING: i16 = 2;
 
 struct SampleBuffer {
     samples_ignored: usize,
     index: usize,
-    buffer: [SampleFormat; SAMPLES_PER_FRAME],
+    total: u16,
+    extra: u16,
+    sum: f32,
+    buffer: [SampleFormat; BUFFER_SIZE],
 }
 
 impl SampleBuffer {
     fn add(&mut self, sample: SampleFormat) {
-        if self.samples_ignored == 0 && self.index < SAMPLES_PER_FRAME {
-            self.buffer[self.index] = sample;
+        self.total += 1;
+        if self.samples_ignored == 0 && self.index < BUFFER_SIZE {
+            self.buffer[self.index] = (self.sum + sample) / SAMPLE_INTERPOLATION as f32;
+            // println!("Sample {}", sample);
+            //self.buffer[self.index] = sample;
+            if self.buffer[self.index] <= -0.45 {
+                self.buffer[self.index] = -0.5;
+            }
             self.index = self.index + 1;
+            self.sum = 0.0;
+        //println!("Adding sample {}", sample);
+        } else if self.samples_ignored == 0 && self.index >= BUFFER_SIZE {
+            //  println!("Missed sample {}", SAMPLE_INTERPOLATION);
+            self.extra += 1;
+        }
+        {
+            self.sum += sample;
         }
         self.samples_ignored = (self.samples_ignored + 1) % SAMPLE_INTERPOLATION;
     }
 
     fn reset(&mut self) {
         self.index = 0;
+        self.total = 0;
+        self.extra = 0;
+        self.sum = 0.0;
         self.samples_ignored = 0;
     }
 }
@@ -103,22 +125,23 @@ impl IOSdl2 {
 
         let mut canvas = window
             .into_canvas()
-            //.present_vsync()
             .build()
             .map_err(|e| e.to_string())
             .unwrap();
 
         canvas.set_draw_color(pixels::Color::RGB(0, 0, 0));
         canvas.present();
-
         let events = sdl_context.event_pump().unwrap();
 
         IOSdl2 {
             io_internal: IOInternal::new(),
             sample_buffer: SampleBuffer {
                 index: 0,
+                total: 0,
+                extra: 0,
                 samples_ignored: 0,
-                buffer: [0; SAMPLES_PER_FRAME],
+                sum: 0.0,
+                buffer: [0.0; BUFFER_SIZE],
             },
             audio_queue,
             canvas,
@@ -129,8 +152,10 @@ impl IOSdl2 {
 }
 
 impl IO for IOSdl2 {
-    fn present_frame(&mut self) {
+    fn present_frame(&mut self) -> IOState {
+        let mut io_state: IOState = Default::default();
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
+        io_state.quit = *self.keyboard_state.get(&Scancode::Escape).unwrap();
         self.events.pump_events();
         for (x, col) in self.io_internal.get_pixel_iter().enumerate() {
             for (y, color) in col.iter().enumerate() {
@@ -142,8 +167,22 @@ impl IO for IOSdl2 {
             }
         }
         self.canvas.present();
-        self.audio_queue.queue(&self.sample_buffer.buffer[..]);
+        while self.audio_queue.size() != 0 {}
+
+        if self.audio_queue.size() == 0 {
+            self.audio_queue
+                .queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);
+        }
+        // println!(
+        //     "Total samples {} extra {} samples_per_frame {} interopolation {}",
+        //     self.sample_buffer.total,
+        //     self.sample_buffer.extra,
+        //     SAMPLES_PER_FRAME,
+        //     SAMPLE_INTERPOLATION
+        // );
         self.sample_buffer.reset();
+
+        io_state
     }
 }
 

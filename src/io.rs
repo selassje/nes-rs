@@ -2,10 +2,15 @@ mod io_internal;
 pub mod io_sdl2;
 pub mod io_test;
 
-pub type SampleFormat = u8;
+pub type SampleFormat = f32;
 pub const FRAME_WIDTH: usize = 256;
 pub const FRAME_HEIGHT: usize = 240;
 pub type RgbColor = (u8, u8, u8);
+
+#[derive(Default)]
+pub struct IOState {
+    pub quit: bool,
+}
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum KeyCode {
@@ -36,7 +41,7 @@ pub trait VideoAccess {
 }
 
 pub trait IO {
-    fn present_frame(&mut self);
+    fn present_frame(&mut self) -> IOState;
 }
 
 pub trait KeyboardAccess {

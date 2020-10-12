@@ -32,6 +32,7 @@ pub struct RAM {
     ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>,
     controller_access: Rc<RefCell<dyn ControllerPortsAccess>>,
     apu_access: Rc<RefCell<dyn ram_apu::ApuRegisterAccess>>,
+    dmc_sample_address: usize,
 }
 
 impl RAM {
@@ -46,6 +47,7 @@ impl RAM {
             ppu_access: ppu_access,
             controller_access: controller_access,
             apu_access: apu_access,
+            dmc_sample_address: 0,
         }
     }
 
@@ -148,5 +150,17 @@ impl CpuMemory for RAM {
         } else {
             (0, 0)
         }
+    }
+}
+
+impl DmcMemory for RAM {
+    fn set_sample_address(&mut self, address: u8) {
+        self.dmc_sample_address = 0xC000 + (address as usize * 64);
+    }
+
+    fn get_next_sample_byte(&mut self) -> u8 {
+        let byte = self.memory[self.dmc_sample_address];
+        self.dmc_sample_address = (self.dmc_sample_address + 1) % 0x8000;
+        byte
     }
 }

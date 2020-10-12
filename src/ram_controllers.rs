@@ -14,7 +14,7 @@ pub enum OutputPort {
 }
 
 pub trait ReadInputPorts {
-    fn read(&self, port: InputPort) -> u8;
+    fn read(&mut self, port: InputPort) -> u8;
 }
 
 pub trait WriteOutputPorts {
