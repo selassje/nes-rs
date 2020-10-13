@@ -171,7 +171,7 @@ type Sprites = Vec<Sprite>;
 
 impl Sprite {
     fn get_y(&self) -> u8 {
-        ((self.data[0] as u16) % 256) as u8
+        ((self.data[0] as u16 + 1) % 256) as u8
     }
 
     fn get_x(&self) -> u8 {
@@ -476,9 +476,7 @@ impl PPU {
                 }
 
                 ACTIVE_PIXELS_CYCLE_START..=ACTIVE_PIXELS_CYCLE_END => {
-                    if self.is_rendering_in_progress() {
-                        self.render_pixel();
-                    }
+                    self.render_pixel();
                 }
                 _ => (),
             },
@@ -543,6 +541,7 @@ impl PPU {
             sprite_palletes[sprite.get_palette_index() as usize][sprite_color_index as usize];
         let mut final_color = bg_pallete[0];
         let mut sprite0_hit = false;
+
         if bg_color_index != 0 && sprite_color_index == 0 {
             final_color = bg_color;
         } else if bg_color_index == 0 && sprite_color_index != 0 {
@@ -576,8 +575,11 @@ impl PPU {
         let mut bg_color_index = 0;
         if self
             .mask_reg
-            .is_flag_enabled(MaskRegisterFlag::ShowBackgroundInLeftMost8Pixels)
-            || x >= 8
+            .is_flag_enabled(MaskRegisterFlag::ShowBackground)
+            && (self
+                .mask_reg
+                .is_flag_enabled(MaskRegisterFlag::ShowBackgroundInLeftMost8Pixels)
+                || x >= 8)
         {
             let bg_tile_y = (scrolled_y / 8) as u8;
             let bg_tile_x = (scrolled_x / 8) as u8;
@@ -592,10 +594,11 @@ impl PPU {
     }
 
     fn get_sprite_color_index(&self, x: u8) -> (u8, Sprite) {
-        if self
-            .mask_reg
-            .is_flag_enabled(MaskRegisterFlag::ShowSpritesdInLeftMost8Pixels)
-            || x >= 8
+        if self.mask_reg.is_flag_enabled(MaskRegisterFlag::ShowSprites)
+            && (self
+                .mask_reg
+                .is_flag_enabled(MaskRegisterFlag::ShowSpritesdInLeftMost8Pixels)
+                || x >= 8)
         {
             let is_sprite_mode_8x16 = self.control_reg.get_sprite_size_height() == 16;
             for sprite in self.scanline_sprites.iter().filter(|s| s.get_y() > 0) {
