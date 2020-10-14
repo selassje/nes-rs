@@ -33,10 +33,10 @@ enum-tryfrom-derive = "0.2.1"
 [dependencies.sdl2]
 version = "0.34"
 default-features = false
-features = ["gfx","static-link","use-vcpkg"]
+features = ["gfx","ttf","static-link","use-vcpkg"]
 
 [package.metadata.vcpkg]
-dependencies = ["sdl2", "sdl2-gfx"]
+dependencies = ["sdl2","sdl2-ttf", "sdl2-gfx"]
 git = "https://github.com/microsoft/vcpkg"
 rev = "a0518036077baa4"
 

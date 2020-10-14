@@ -751,16 +751,12 @@ impl WritePpuRegisters for PPU {
                 self.write_toggle = !self.write_toggle;
             }
             WriteAccessRegister::PpuData => {
-                self.vram
-                    .borrow_mut()
-                    .store_byte(self.vram_address.address, value);
-                assert!(
-                    !self.is_rendering_in_progress(),
-                    "Scanline {}",
-                    self.scanline
-                );
-                assert!(!self.is_rendering_in_progress());
-                self.vram_address.address += self.control_reg.get_vram_increment();
+                if !self.is_rendering_in_progress() {
+                    self.vram
+                        .borrow_mut()
+                        .store_byte(self.vram_address.address, value);
+                    self.vram_address.address += self.control_reg.get_vram_increment();
+                }
             }
 
             WriteAccessRegister::OamAddr => self.oam_address = value,

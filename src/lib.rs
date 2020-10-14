@@ -11,7 +11,7 @@ mod keyboard;
 mod mapper;
 mod memory;
 mod nes;
-mod nes_format_reader;
+mod nes_file;
 mod ppu;
 mod ram;
 mod ram_apu;
@@ -26,11 +26,11 @@ extern crate enum_tryfrom;
 #[macro_use]
 extern crate enum_tryfrom_derive;
 
-fn read_rom(file_name: &str) -> nes_format_reader::NesFile {
+fn read_rom(file_name: &str) -> nes_file::NesFile {
     let mut rom = Vec::new();
     let mut file = File::open(&file_name).expect("Unable to open ROM");
     file.read_to_end(&mut rom).expect("Unable to read ROM");
-    nes_format_reader::NesFile::new(&rom)
+    nes_file::NesFile::new(&rom)
 }
 
 fn run_rom(path: &str) {

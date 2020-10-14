@@ -6,7 +6,7 @@ use crate::io::AudioAccess;
 use crate::io::KeyboardAccess;
 use crate::io::VideoAccess;
 use crate::io::IO;
-use crate::nes_format_reader::NesFile;
+use crate::nes_file::NesFile;
 use crate::ppu::PPU;
 use crate::ram::RAM;
 use crate::vram::VRAM;

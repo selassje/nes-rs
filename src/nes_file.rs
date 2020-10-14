@@ -142,7 +142,6 @@ impl NesFile {
         } else {
             common::Mirroring::HORIZONTAL
         };
-
         read_index = 16;
         let mut trainer = Option::None;
         if header.flag_6 & (HeaderFlag6::TrainerPresent as u8) == 1 {

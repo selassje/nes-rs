@@ -9,9 +9,11 @@ use crate::{
     },
 };
 
+use pixels::Color;
 use sdl2::{
     audio::AudioQueue, audio::AudioSpecDesired, keyboard::Scancode, pixels, rect::Rect,
-    render::Canvas, video::Window, EventPump,
+    render::Canvas, render::TextureQuery, rwops::RWops, ttf::Sdl2TtfContext, video::Window,
+    EventPump,
 };
 
 use super::{io_internal::IOInternal, IOState};
@@ -71,6 +73,7 @@ pub struct IOSdl2 {
     events: EventPump,
     canvas: Canvas<Window>,
     keyboard_state: HashMap<Scancode, bool>,
+    ttf_context: Sdl2TtfContext,
 }
 
 fn keycode_to_sdl2_scancode(key: KeyCode) -> Scancode {
@@ -147,7 +150,30 @@ impl IOSdl2 {
             canvas,
             events,
             keyboard_state: HashMap::new(),
+            ttf_context: sdl2::ttf::init().unwrap(),
         }
+    }
+
+    fn draw_fps(&mut self) {
+        let font_data = include_bytes!("../../res/OpenSans-Regular.ttf");
+        let r = RWops::from_bytes(font_data).unwrap();
+        let mut font = self.ttf_context.load_font_from_rwops(r, 14).unwrap();
+        font.set_style(sdl2::ttf::FontStyle::BOLD);
+        let texture_creator = self.canvas.texture_creator();
+        let surface = font
+            .render("FPS 60/60")
+            .blended(Color::RGBA(255, 255, 255, 255))
+            .map_err(|e| e.to_string())
+            .unwrap();
+
+        let texture = texture_creator
+            .create_texture_from_surface(&surface)
+            .map_err(|e| e.to_string())
+            .unwrap();
+        let TextureQuery { width, height, .. } = texture.query();
+        let x = DISPLAY_SCALING * FRAME_WIDTH as i16 - width as i16;
+        let target = Rect::new(x as i32, 0, width, height as u32);
+        let _ = self.canvas.copy(&texture, None, Some(target));
     }
 }
 
@@ -166,6 +192,7 @@ impl IO for IOSdl2 {
                 let _ = self.canvas.draw_rect(rect);
             }
         }
+        self.draw_fps();
         self.canvas.present();
         while self.audio_queue.size() != 0 {}
 
