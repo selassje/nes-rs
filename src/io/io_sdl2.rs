@@ -16,7 +16,7 @@ use sdl2::{
     EventPump,
 };
 
-use super::{io_internal::IOInternal, IOState};
+use super::{io_internal::IOInternal, IOControl, IOState};
 
 const SAMPLE_RATE: usize = 44100;
 //const SAMPLE_RATE: usize = common::CPU_CYCLES_PER_FRAME * common::FPS;
@@ -154,14 +154,14 @@ impl IOSdl2 {
         }
     }
 
-    fn draw_fps(&mut self) {
+    fn draw_fps(&mut self, fps: u8) {
         let font_data = include_bytes!("../../res/OpenSans-Regular.ttf");
         let r = RWops::from_bytes(font_data).unwrap();
         let mut font = self.ttf_context.load_font_from_rwops(r, 14).unwrap();
         font.set_style(sdl2::ttf::FontStyle::BOLD);
         let texture_creator = self.canvas.texture_creator();
         let surface = font
-            .render("FPS 60/60")
+            .render(&format!("FPS {}", fps))
             .blended(Color::RGBA(255, 255, 255, 255))
             .map_err(|e| e.to_string())
             .unwrap();
@@ -178,7 +178,7 @@ impl IOSdl2 {
 }
 
 impl IO for IOSdl2 {
-    fn present_frame(&mut self) -> IOState {
+    fn present_frame(&mut self, control: IOControl) -> IOState {
         let mut io_state: IOState = Default::default();
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
         io_state.quit = *self.keyboard_state.get(&Scancode::Escape).unwrap();
@@ -192,7 +192,7 @@ impl IO for IOSdl2 {
                 let _ = self.canvas.draw_rect(rect);
             }
         }
-        self.draw_fps();
+        self.draw_fps(control.fps);
         self.canvas.present();
         while self.audio_queue.size() != 0 {}
 

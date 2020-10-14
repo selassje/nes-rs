@@ -1,6 +1,5 @@
 use common::FPS;
 
-use crate::controllers::Controllers;
 use crate::cpu::CPU;
 use crate::io::AudioAccess;
 use crate::io::KeyboardAccess;
@@ -12,6 +11,7 @@ use crate::ram::RAM;
 use crate::vram::VRAM;
 use crate::{apu::APU, controllers::Controller};
 use crate::{common, io::IOState};
+use crate::{controllers::Controllers, io::IOControl};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -73,13 +73,27 @@ impl Nes {
 
         let mut io_state: IOState = Default::default();
         let mut elapsed_frames: u128 = 0;
+
         let mut frame_start = Instant::now();
+
+        let mut fps = 0;
+        let mut one_second_timer = Instant::now();
+
+        let mut io_control = IOControl { fps: 0 };
+
         while (duration == None
             || elapsed_frames < duration.unwrap().as_secs() as u128 * FPS as u128)
             && !io_state.quit
         {
             self.run_single_frame();
-            io_state = self.io.borrow_mut().present_frame();
+            if one_second_timer.elapsed() < Duration::from_secs(1) {
+                fps += 1;
+            } else {
+                one_second_timer = Instant::now();
+                io_control.fps = fps;
+                fps = 1;
+            }
+            io_state = self.io.borrow_mut().present_frame(io_control);
             let elapsed_time_since_frame_start = frame_start.elapsed();
             if duration.is_none() && elapsed_time_since_frame_start < FRAME_DURATION {
                 std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);

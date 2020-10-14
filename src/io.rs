@@ -12,6 +12,11 @@ pub struct IOState {
     pub quit: bool,
 }
 
+#[derive(Copy, Clone)]
+pub struct IOControl {
+    pub fps: u8,
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum KeyCode {
     Q,
@@ -41,7 +46,7 @@ pub trait VideoAccess {
 }
 
 pub trait IO {
-    fn present_frame(&mut self) -> IOState;
+    fn present_frame(&mut self, control: IOControl) -> IOState;
 }
 
 pub trait KeyboardAccess {
