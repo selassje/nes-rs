@@ -87,20 +87,22 @@ impl Nes {
             && !io_state.quit
         {
             self.run_single_frame();
-            if one_second_timer.elapsed() < Duration::from_secs(1) {
-                fps += 1;
-            } else {
-                one_second_timer = Instant::now();
-                if fps != FPS {
-                    frame_duration_adjustment += FPS as i32 - fps as i32;
-                    frame_duration = Duration::from_nanos(
-                        (Duration::from_secs(1).as_nanos()
-                            / ((FPS as i32 + frame_duration_adjustment) as u128))
-                            as u64,
-                    );
+            if duration == None {
+                if one_second_timer.elapsed() < Duration::from_secs(1) {
+                    fps += 1;
+                } else {
+                    one_second_timer = Instant::now();
+                    if fps != FPS {
+                        frame_duration_adjustment += FPS as i32 - fps as i32;
+                        frame_duration = Duration::from_nanos(
+                            (Duration::from_secs(1).as_nanos()
+                                / ((FPS as i32 + frame_duration_adjustment) as u128))
+                                as u64,
+                        );
+                    }
+                    io_control.fps = fps as u8;
+                    fps = 1;
                 }
-                io_control.fps = fps as u8;
-                fps = 1;
             }
             io_state = self.io.borrow_mut().present_frame(io_control);
             let elapsed_time_since_frame_start = frame_start.elapsed();
