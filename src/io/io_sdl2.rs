@@ -19,17 +19,17 @@ use sdl2::{
 use super::{io_internal::IOInternal, IOControl, IOState};
 
 const SAMPLE_RATE: usize = 44100;
-const SAMPLES_PER_FRAME: usize = SAMPLE_RATE / (common::FPS);
+
+const SAMPLE_RATE_ADJ: usize = (SAMPLE_RATE as f32 * 1.01) as usize;
+const SAMPLES_PER_FRAME: usize = SAMPLE_RATE_ADJ / (common::FPS);
 const SAMPLE_BUCKET_SIZE: f32 =
-    (common::FPS * common::CPU_CYCLES_PER_FRAME) as f32 / SAMPLE_RATE as f32;
-const BUFFER_SIZE: usize = SAMPLES_PER_FRAME;
+    (common::FPS * common::CPU_CYCLES_PER_FRAME) as f32 / SAMPLE_RATE_ADJ as f32;
+const BUFFER_SIZE: usize = 2 * SAMPLES_PER_FRAME;
 
 const DISPLAY_SCALING: i16 = 2;
 
 struct SampleBuffer {
     index: usize,
-    total: u16,
-    extra: u16,
     sum: f32,
     bucket_size: f32,
     buffer: [SampleFormat; BUFFER_SIZE],
@@ -55,8 +55,6 @@ impl SampleBuffer {
 
     fn reset(&mut self) {
         self.index = 0;
-        self.total = 0;
-        self.extra = 0;
         self.sum = 0.0;
         self.bucket_size = 0.0;
     }
@@ -136,8 +134,6 @@ impl IOSdl2 {
             io_internal: IOInternal::new(),
             sample_buffer: SampleBuffer {
                 index: 0,
-                total: 0,
-                extra: 0,
                 sum: 0.0,
                 bucket_size: 0.0,
                 buffer: [0.0; BUFFER_SIZE],
@@ -191,9 +187,11 @@ impl IO for IOSdl2 {
         self.draw_fps(control.fps);
         self.canvas.present();
 
+        self.audio_queue.pause();
         self.audio_queue
             .queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);
 
+        self.audio_queue.resume();
         // println!(
         //     "Total samples {} current {} extra {} samples_per_frame {} interopolation {}",
         //     self.sample_buffer.total,
