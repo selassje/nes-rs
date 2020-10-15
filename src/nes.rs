@@ -68,9 +68,10 @@ impl Nes {
     }
 
     pub fn run(&mut self, duration: Option<Duration>) {
-        const FRAME_DURATION: Duration =
-            Duration::from_nanos((Duration::from_secs(1).as_nanos() / (FPS + 3) as u128) as u64);
+        let mut frame_duration: Duration =
+            Duration::from_nanos((Duration::from_secs(1).as_nanos() / (FPS) as u128) as u64);
 
+        let mut frame_duration_adjustment: i32 = 0;
         let mut io_state: IOState = Default::default();
         let mut elapsed_frames: u128 = 0;
 
@@ -90,13 +91,21 @@ impl Nes {
                 fps += 1;
             } else {
                 one_second_timer = Instant::now();
-                io_control.fps = fps;
+                if fps != FPS {
+                    frame_duration_adjustment += FPS as i32 - fps as i32;
+                    frame_duration = Duration::from_nanos(
+                        (Duration::from_secs(1).as_nanos()
+                            / ((FPS as i32 + frame_duration_adjustment) as u128))
+                            as u64,
+                    );
+                }
+                io_control.fps = fps as u8;
                 fps = 1;
             }
             io_state = self.io.borrow_mut().present_frame(io_control);
             let elapsed_time_since_frame_start = frame_start.elapsed();
-            if duration.is_none() && elapsed_time_since_frame_start < FRAME_DURATION {
-                std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);
+            if duration.is_none() && elapsed_time_since_frame_start < frame_duration {
+                std::thread::sleep(frame_duration - elapsed_time_since_frame_start);
             }
             frame_start = Instant::now();
             elapsed_frames += 1;
