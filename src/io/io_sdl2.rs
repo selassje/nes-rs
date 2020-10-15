@@ -19,10 +19,11 @@ use sdl2::{
 use super::{io_internal::IOInternal, IOControl, IOState};
 
 const SAMPLE_RATE: usize = 44100;
-//const SAMPLE_RATE: usize = common::CPU_CYCLES_PER_FRAME * common::FPS;
 const SAMPLES_PER_FRAME: usize = SAMPLE_RATE / (common::FPS);
-const SAMPLE_INTERPOLATION: usize = common::CPU_CYCLES_PER_FRAME / SAMPLES_PER_FRAME;
+const SAMPLE_BUCKET_SIZE: f32 =
+    (common::FPS * common::CPU_CYCLES_PER_FRAME) as f32 / SAMPLE_RATE as f32;
 const BUFFER_SIZE: usize = SAMPLES_PER_FRAME;
+
 const DISPLAY_SCALING: i16 = 2;
 
 struct SampleBuffer {
@@ -36,33 +37,36 @@ struct SampleBuffer {
 
 impl SampleBuffer {
     fn add(&mut self, sample: SampleFormat) {
+        const SAMPLE_BUCKET_SIZE_INT: usize = SAMPLE_BUCKET_SIZE as usize;
+        const FRACTION_LEFT: f32 = SAMPLE_BUCKET_SIZE - SAMPLE_BUCKET_SIZE_INT as f32;
+        const FRACTION_RIGHT: f32 = 1.0 - FRACTION_LEFT;
         self.total += 1;
-        if self.samples_ignored == 0 && self.index < BUFFER_SIZE {
-            self.buffer[self.index] = (self.sum + sample) / SAMPLE_INTERPOLATION as f32;
-            // println!("Sample {}", sample);
-            //self.buffer[self.index] = sample;
-            if self.buffer[self.index] <= -0.45 {
-                self.buffer[self.index] = -0.5;
+        if self.index < BUFFER_SIZE {
+            if self.samples_ignored == SAMPLE_BUCKET_SIZE_INT && self.index % 2 == 0 {
+                self.buffer[self.index] =
+                    (self.sum + FRACTION_LEFT * sample) / (SAMPLE_BUCKET_SIZE_INT + 1) as f32;
+                self.index = self.index + 1;
+                self.sum = FRACTION_RIGHT * sample;
+            } else if self.samples_ignored == SAMPLE_BUCKET_SIZE_INT - 1 && self.index % 2 == 1 {
+                self.buffer[self.index] = (self.sum + sample) / (SAMPLE_BUCKET_SIZE_INT + 1) as f32;
+                self.index += 1;
+                self.sum = 0.0;
+                self.samples_ignored += 1;
+            } else {
+                self.sum += sample;
             }
-            self.index = self.index + 1;
-            self.sum = 0.0;
-        //println!("Adding sample {}", sample);
-        } else if self.samples_ignored == 0 && self.index >= BUFFER_SIZE {
-            //  println!("Missed sample {}", SAMPLE_INTERPOLATION);
+        } else {
             self.extra += 1;
         }
-        {
-            self.sum += sample;
-        }
-        self.samples_ignored = (self.samples_ignored + 1) % SAMPLE_INTERPOLATION;
+        self.samples_ignored = (self.samples_ignored + 1) % (SAMPLE_BUCKET_SIZE_INT + 1);
     }
 
     fn reset(&mut self) {
         self.index = 0;
         self.total = 0;
         self.extra = 0;
-        self.sum = 0.0;
         self.samples_ignored = 0;
+        self.sum = 0.0;
     }
 }
 
@@ -194,18 +198,17 @@ impl IO for IOSdl2 {
         }
         self.draw_fps(control.fps);
         self.canvas.present();
-        while self.audio_queue.size() != 0 {}
 
-        if self.audio_queue.size() == 0 {
-            self.audio_queue
-                .queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);
-        }
+        self.audio_queue
+            .queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);
+
         // println!(
-        //     "Total samples {} extra {} samples_per_frame {} interopolation {}",
+        //     "Total samples {} current {} extra {} samples_per_frame {} interopolation {}",
         //     self.sample_buffer.total,
+        //     self.sample_buffer.index,
         //     self.sample_buffer.extra,
         //     SAMPLES_PER_FRAME,
-        //     SAMPLE_INTERPOLATION
+        //     SAMPLE_BUCKET_SIZE,
         // );
         self.sample_buffer.reset();
 
