@@ -369,7 +369,11 @@ impl TriangleWave {
     }
 
     fn get_sample(&self) -> u8 {
-        TRIANGLE_SEQUENCE[self.sequencer_position]
+        if self.get_timer() >= 2 {
+            TRIANGLE_SEQUENCE[self.sequencer_position]
+        } else {
+            0
+        }
     }
 }
 
@@ -752,7 +756,7 @@ impl APU {
             self.triangle.get_sample(),
             self.noise.get_sample(),
             self.dmc.get_sample(),
-        ) - 0.5;
+        );
 
         self.audio_access.borrow_mut().add_sample(sample);
     }

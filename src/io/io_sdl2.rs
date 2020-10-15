@@ -27,46 +27,38 @@ const BUFFER_SIZE: usize = SAMPLES_PER_FRAME;
 const DISPLAY_SCALING: i16 = 2;
 
 struct SampleBuffer {
-    samples_ignored: usize,
     index: usize,
     total: u16,
     extra: u16,
     sum: f32,
+    bucket_size: f32,
     buffer: [SampleFormat; BUFFER_SIZE],
 }
 
 impl SampleBuffer {
     fn add(&mut self, sample: SampleFormat) {
-        const SAMPLE_BUCKET_SIZE_INT: usize = SAMPLE_BUCKET_SIZE as usize;
-        const FRACTION_LEFT: f32 = SAMPLE_BUCKET_SIZE - SAMPLE_BUCKET_SIZE_INT as f32;
-        const FRACTION_RIGHT: f32 = 1.0 - FRACTION_LEFT;
-        self.total += 1;
-        if self.index < BUFFER_SIZE {
-            if self.samples_ignored == SAMPLE_BUCKET_SIZE_INT && self.index % 2 == 0 {
-                self.buffer[self.index] =
-                    (self.sum + FRACTION_LEFT * sample) / (SAMPLE_BUCKET_SIZE_INT + 1) as f32;
-                self.index = self.index + 1;
-                self.sum = FRACTION_RIGHT * sample;
-            } else if self.samples_ignored == SAMPLE_BUCKET_SIZE_INT - 1 && self.index % 2 == 1 {
-                self.buffer[self.index] = (self.sum + sample) / (SAMPLE_BUCKET_SIZE_INT + 1) as f32;
-                self.index += 1;
-                self.sum = 0.0;
-                self.samples_ignored += 1;
-            } else {
-                self.sum += sample;
-            }
+        if 1.0 + self.bucket_size >= SAMPLE_BUCKET_SIZE {
+            let bucket_diff = SAMPLE_BUCKET_SIZE - self.bucket_size;
+            assert!(bucket_diff >= 0.0 && bucket_diff <= 1.0);
+            let bucket_diff_comp = 1.0 - bucket_diff;
+            self.sum += bucket_diff * sample;
+            let target_sample = self.sum / SAMPLE_BUCKET_SIZE.floor();
+            self.buffer[self.index] = target_sample;
+            self.index += 1;
+            self.sum = bucket_diff_comp * sample;
+            self.bucket_size = bucket_diff_comp;
         } else {
-            self.extra += 1;
+            self.sum += sample;
+            self.bucket_size += 1.0;
         }
-        self.samples_ignored = (self.samples_ignored + 1) % (SAMPLE_BUCKET_SIZE_INT + 1);
     }
 
     fn reset(&mut self) {
         self.index = 0;
         self.total = 0;
         self.extra = 0;
-        self.samples_ignored = 0;
         self.sum = 0.0;
+        self.bucket_size = 0.0;
     }
 }
 
@@ -146,8 +138,8 @@ impl IOSdl2 {
                 index: 0,
                 total: 0,
                 extra: 0,
-                samples_ignored: 0,
                 sum: 0.0,
+                bucket_size: 0.0,
                 buffer: [0.0; BUFFER_SIZE],
             },
             audio_queue,
@@ -208,7 +200,7 @@ impl IO for IOSdl2 {
         //     self.sample_buffer.index,
         //     self.sample_buffer.extra,
         //     SAMPLES_PER_FRAME,
-        //     SAMPLE_BUCKET_SIZE,
+        //     self.sample_buffer.bucket_size,
         // );
         self.sample_buffer.reset();
 
