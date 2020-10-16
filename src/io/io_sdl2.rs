@@ -187,11 +187,9 @@ impl IO for IOSdl2 {
         self.draw_fps(control.fps);
         self.canvas.present();
 
-        self.audio_queue.pause();
         self.audio_queue
             .queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);
 
-        self.audio_queue.resume();
         // println!(
         //     "Total samples {} current {} extra {} samples_per_frame {} interopolation {}",
         //     self.sample_buffer.total,
