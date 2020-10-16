@@ -28,7 +28,11 @@ extern crate enum_tryfrom_derive;
 
 fn read_rom(file_name: &str) -> nes_file::NesFile {
     let mut rom = Vec::new();
-    let mut file = File::open(&file_name).expect("Unable to open ROM");
+    let mut file = File::open(&file_name).expect(&format!(
+        "Unable to open ROM {} current dir {}",
+        file_name,
+        std::env::current_dir().unwrap().display()
+    ));
     file.read_to_end(&mut rom).expect("Unable to read ROM");
     nes_file::NesFile::new(&rom)
 }
