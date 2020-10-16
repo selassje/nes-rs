@@ -19,12 +19,10 @@ use sdl2::{
 use super::{io_internal::IOInternal, IOControl, IOState};
 
 const SAMPLE_RATE: usize = 44100;
-
-const SAMPLE_RATE_ADJ: usize = (SAMPLE_RATE as f32 * 1.01) as usize;
-const SAMPLES_PER_FRAME: usize = SAMPLE_RATE_ADJ / (common::FPS);
-const SAMPLE_BUCKET_SIZE: f32 =
+const SAMPLE_RATE_ADJ: usize = (SAMPLE_RATE as f32 * 1.0101) as usize;
+const INITIAL_SAMPLE_BUCKET_SIZE: f32 =
     (common::FPS * common::CPU_CYCLES_PER_FRAME) as f32 / SAMPLE_RATE_ADJ as f32;
-const BUFFER_SIZE: usize = 2 * SAMPLES_PER_FRAME;
+const BUFFER_SIZE: usize = 10000;
 
 const DISPLAY_SCALING: i16 = 2;
 
@@ -32,17 +30,18 @@ struct SampleBuffer {
     index: usize,
     sum: f32,
     bucket_size: f32,
+    target_bucket_size: f32,
     buffer: [SampleFormat; BUFFER_SIZE],
 }
 
 impl SampleBuffer {
     fn add(&mut self, sample: SampleFormat) {
-        if 1.0 + self.bucket_size >= SAMPLE_BUCKET_SIZE {
-            let bucket_diff = SAMPLE_BUCKET_SIZE - self.bucket_size;
+        if 1.0 + self.bucket_size >= self.target_bucket_size {
+            let bucket_diff = self.target_bucket_size - self.bucket_size;
             assert!(bucket_diff >= 0.0 && bucket_diff <= 1.0);
             let bucket_diff_comp = 1.0 - bucket_diff;
             self.sum += bucket_diff * sample;
-            let target_sample = self.sum / SAMPLE_BUCKET_SIZE.floor();
+            let target_sample = self.sum / self.target_bucket_size.floor();
             self.buffer[self.index] = target_sample;
             self.index += 1;
             self.sum = bucket_diff_comp * sample;
@@ -53,10 +52,12 @@ impl SampleBuffer {
         }
     }
 
-    fn reset(&mut self) {
+    fn reset(&mut self, fps: u8) {
         self.index = 0;
         self.sum = 0.0;
         self.bucket_size = 0.0;
+        self.target_bucket_size =
+            (fps as usize * common::CPU_CYCLES_PER_FRAME) as f32 / SAMPLE_RATE_ADJ as f32;
     }
 }
 
@@ -99,7 +100,7 @@ impl IOSdl2 {
         let desired_spec = AudioSpecDesired {
             freq: Some(SAMPLE_RATE as i32),
             channels: Some(1),
-            samples: Some(SAMPLES_PER_FRAME as u16),
+            samples: Some(BUFFER_SIZE as u16),
         };
 
         let audio_queue: AudioQueue<SampleFormat> =
@@ -137,6 +138,7 @@ impl IOSdl2 {
                 sum: 0.0,
                 bucket_size: 0.0,
                 buffer: [0.0; BUFFER_SIZE],
+                target_bucket_size: INITIAL_SAMPLE_BUCKET_SIZE,
             },
             audio_queue,
             canvas,
@@ -198,7 +200,7 @@ impl IO for IOSdl2 {
         //     SAMPLES_PER_FRAME,
         //     self.sample_buffer.bucket_size,
         // );
-        self.sample_buffer.reset();
+        self.sample_buffer.reset(control.fps);
 
         io_state
     }

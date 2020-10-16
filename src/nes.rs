@@ -80,7 +80,9 @@ impl Nes {
         let mut fps = 0;
         let mut one_second_timer = Instant::now();
 
-        let mut io_control = IOControl { fps: 0 };
+        let mut io_control = IOControl {
+            fps: common::FPS as u8,
+        };
 
         while (duration == None
             || elapsed_frames < duration.unwrap().as_secs() as u128 * FPS as u128)
