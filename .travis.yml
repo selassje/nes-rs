@@ -1,10 +1,12 @@
-os: windows
+language: rust
 
-matrix:
+script:
+     - cargo install cargo-vcpkg
+     - cargo vcpkg build
+     - cargo test --release 
+     
+jobs:
     include:        
-        - language: rust
-          script:
-            - cargo install cargo-vcpkg
-            - cargo vcpkg build
-            - cargo test --release 
+        - dist : xenial
+        - os : windows 
           
