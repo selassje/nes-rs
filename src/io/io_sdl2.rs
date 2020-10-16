@@ -4,19 +4,18 @@ use std::iter::FromIterator;
 use crate::{
     common,
     io::{
-        AudioAccess, KeyCode, KeyboardAccess, RgbColor, SampleFormat, VideoAccess, FRAME_HEIGHT,
-        FRAME_WIDTH, IO,
+        AudioAccess, IOControl, IOState, KeyCode, KeyboardAccess, RgbColor, SampleFormat,
+        VideoAccess, FRAME_HEIGHT, FRAME_WIDTH, IO, PIXEL_SIZE,
     },
 };
 
-use pixels::Color;
 use sdl2::{
-    audio::AudioQueue, audio::AudioSpecDesired, keyboard::Scancode, pixels, rect::Rect,
-    render::Canvas, render::TextureQuery, rwops::RWops, ttf::Sdl2TtfContext, video::Window,
-    EventPump,
+    audio::AudioQueue, audio::AudioSpecDesired, keyboard::Scancode, pixels::Color,
+    pixels::PixelFormatEnum, rect::Rect, render::Canvas, render::TextureQuery, rwops::RWops,
+    ttf::Sdl2TtfContext, video::Window, EventPump,
 };
 
-use super::{io_internal::IOInternal, IOControl, IOState};
+use super::io_internal::IOInternal;
 
 const SAMPLE_RATE: usize = 44100;
 const SAMPLE_RATE_ADJ: usize = (SAMPLE_RATE as f32 * 1.0101) as usize;
@@ -127,7 +126,7 @@ impl IOSdl2 {
             .map_err(|e| e.to_string())
             .unwrap();
 
-        canvas.set_draw_color(pixels::Color::RGB(0, 0, 0));
+        canvas.set_draw_color(Color::RGB(0, 0, 0));
         canvas.present();
         let events = sdl_context.event_pump().unwrap();
 
@@ -177,29 +176,28 @@ impl IO for IOSdl2 {
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
         io_state.quit = *self.keyboard_state.get(&Scancode::Escape).unwrap();
         self.events.pump_events();
-        for (x, col) in self.io_internal.get_pixel_iter().enumerate() {
-            for (y, color) in col.iter().enumerate() {
-                let x = (x * (DISPLAY_SCALING as usize)) as i32;
-                let y = (y * (DISPLAY_SCALING as usize)) as i32;
-                let rect = Rect::new(x, y, DISPLAY_SCALING as u32, DISPLAY_SCALING as u32);
-                let _ = self.canvas.set_draw_color(*color);
-                let _ = self.canvas.draw_rect(rect);
-            }
-        }
+        let texture_creator = self.canvas.texture_creator();
+        let mut streaming_texture = texture_creator
+            .create_texture_streaming(
+                PixelFormatEnum::RGB24,
+                FRAME_WIDTH as u32,
+                FRAME_HEIGHT as u32,
+            )
+            .unwrap();
+
+        let _ = streaming_texture.update(
+            Rect::new(0, 0, FRAME_WIDTH as u32, FRAME_HEIGHT as u32),
+            self.io_internal.get_pixels_slice(),
+            FRAME_WIDTH * PIXEL_SIZE,
+        );
+
+        let _ = self.canvas.copy(&streaming_texture, None, None);
         self.draw_fps(control.fps);
         self.canvas.present();
 
         self.audio_queue
             .queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);
 
-        // println!(
-        //     "Total samples {} current {} extra {} samples_per_frame {} interopolation {}",
-        //     self.sample_buffer.total,
-        //     self.sample_buffer.index,
-        //     self.sample_buffer.extra,
-        //     SAMPLES_PER_FRAME,
-        //     self.sample_buffer.bucket_size,
-        // );
         self.sample_buffer.reset(control.fps);
 
         io_state

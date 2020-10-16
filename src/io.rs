@@ -6,6 +6,7 @@ pub type SampleFormat = f32;
 pub const FRAME_WIDTH: usize = 256;
 pub const FRAME_HEIGHT: usize = 240;
 pub type RgbColor = (u8, u8, u8);
+const PIXEL_SIZE: usize = std::mem::size_of::<RgbColor>();
 
 #[derive(Default)]
 pub struct IOState {
