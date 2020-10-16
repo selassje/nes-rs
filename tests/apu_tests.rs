@@ -30,10 +30,10 @@ fn irq_flag_timing() {
 
 #[test]
 fn dmc_basics() {
-    run_simple_short_test("tests\\apu_tests\\7-dmc_basics.nes");
+    run_simple_short_test("tests/apu_tests/7-dmc_basics.nes");
 }
 
 #[test]
 fn dmc_rates() {
-    run_simple_short_test("tests\\apu_tests\\8-dmc_rates.nes");
+    run_simple_short_test("tests/apu_tests/8-dmc_rates.nes");
 }
