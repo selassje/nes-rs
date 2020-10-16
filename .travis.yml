@@ -7,6 +7,5 @@ script:
      
 jobs:
     include:        
-        - dist : xenial
+        - dist : bionic
         - os : windows 
-          
