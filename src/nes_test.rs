@@ -25,6 +25,7 @@ impl NesTest {
         test_fn: impl Fn(&mut NesTest) + 'static,
     ) -> Self {
         let io_test = Rc::new(RefCell::new(io_test::IOTest::new(rom_path)));
+        let nes_file = read_rom(rom_path);
         let controller_1 = Rc::new(
             keyboard::KeyboardController::get_default_keyboard_controller_player1(io_test.clone()),
         );
@@ -35,7 +36,7 @@ impl NesTest {
             controller_1.get_key_mappings(),
             controller_2.get_key_mappings(),
         );
-        let mut nes = Nes::new(io_test.clone(), controller_1, controller_2);
+        let mut nes = Nes::new(io_test.clone(), &nes_file, controller_1, controller_2);
         let mut dir = PathBuf::from(rom_path);
         let mut test_name = dir.file_name().unwrap().to_str().unwrap().to_owned();
         if let Some(suffix) = suffix {
@@ -46,8 +47,7 @@ impl NesTest {
         dir.pop();
         let output_frame_path = Self::create_frame_path(&dir, &test_name, "");
         let expected_frame_path = Self::create_frame_path(&dir, &test_name, ".expected");
-        let nes_file = read_rom(rom_path);
-        nes.load(&nes_file);
+        nes.reset();
 
         NesTest {
             io_test,

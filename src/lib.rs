@@ -44,8 +44,8 @@ fn run_rom(path: &str) {
         Rc::new(keyboard::KeyboardController::get_default_keyboard_controller_player1(io.clone()));
     let controller_2 =
         Rc::new(keyboard::KeyboardController::get_default_keyboard_controller_player2(io.clone()));
-    let mut nes = nes::Nes::new(io, controller_1, controller_2);
-    nes.load(&nes_file);
+    let mut nes = nes::Nes::new(io, &nes_file, controller_1, controller_2);
+    nes.reset();
     nes.run(None);
 }
 

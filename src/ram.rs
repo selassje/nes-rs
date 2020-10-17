@@ -26,17 +26,17 @@ const PPU_REGISTERS_RANGE: Range<u16> = Range {
     end: PPU_REGISTERS_END,
 };
 
-const CARTRIDGE_SPACE_START: u16 = 0x8000;
-const CARTRIDGE_SPACE_END: u16 = 0xFFFF;
+const CARTRIDGE_SPACE_START: u32 = 0x8000;
+const CARTRIDGE_SPACE_END: u32 = 0xFFFF + 1;
 
-const CARTRIDGE_SPACE_RANGE: Range<u16> = Range {
+const CARTRIDGE_SPACE_RANGE: Range<u32> = Range {
     start: CARTRIDGE_SPACE_START,
     end: CARTRIDGE_SPACE_END,
 };
 
 pub struct RAM {
     memory: [u8; 65536],
-    mapper: Option<Rc<RefCell<dyn Mapper>>>,
+    mapper: Rc<RefCell<dyn Mapper>>,
     ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>,
     controller_access: Rc<RefCell<dyn ControllerPortsAccess>>,
     apu_access: Rc<RefCell<dyn ram_apu::ApuRegisterAccess>>,
@@ -48,10 +48,11 @@ impl RAM {
         ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>,
         controller_access: Rc<RefCell<dyn ControllerPortsAccess>>,
         apu_access: Rc<RefCell<dyn ram_apu::ApuRegisterAccess>>,
+        mapper: Rc<RefCell<dyn Mapper>>,
     ) -> RAM {
         RAM {
             memory: [0; 65536],
-            mapper: None,
+            mapper: mapper,
             ppu_access: ppu_access,
             controller_access: controller_access,
             apu_access: apu_access,
@@ -59,9 +60,8 @@ impl RAM {
         }
     }
 
-    pub fn load_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
+    pub fn reset(&mut self) {
         self.memory.iter_mut().for_each(|m| *m = 0);
-        self.mapper = Some(mapper);
     }
 }
 
@@ -91,8 +91,8 @@ impl Memory for RAM {
                 "Attempting to read from a Apu write access register {:#X}",
                 addr
             );
-        } else if CARTRIDGE_SPACE_RANGE.contains(&addr) {
-            self.mapper.as_ref().unwrap().borrow_mut().get_byte(addr)
+        } else if CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)) {
+            self.mapper.borrow_mut().get_byte(addr)
         } else {
             self.memory[addr as usize]
         }
@@ -132,6 +132,8 @@ impl Memory for RAM {
             for m in mirrors {
                 self.memory[m as usize] = byte;
             }
+        } else if CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)) {
+            self.mapper.borrow_mut().store_byte(addr, byte)
         } else {
             self.memory[addr as usize] = byte;
         }
@@ -144,21 +146,18 @@ impl Memory for RAM {
     }
 
     fn store_word(&mut self, addr: u16, bytes: u16) {
-        self.memory[addr as usize] = (bytes & 0x00FF) as u8;
-        self.memory[addr as usize + 1] = ((bytes & 0xFF00) >> 8) as u8;
+        self.store_byte(addr, (bytes & 0x00FF) as u8);
+        self.store_byte(addr + 1, ((bytes & 0xFF00) >> 8) as u8);
     }
 }
 
 impl CpuMemory for RAM {
     fn get_code_segment(&self) -> (u16, u16) {
-        if let Some(ref mapper) = self.mapper {
-            return (
-                mapper.borrow().get_rom_start(),
-                mapper.borrow().get_rom_start() - 1 + mapper.borrow().get_pgr_rom().len() as u16,
-            );
-        } else {
-            (0, 0)
-        }
+        (
+            self.mapper.borrow().get_rom_start(),
+            self.mapper.borrow().get_rom_start() - 1
+                + self.mapper.borrow().get_pgr_rom().len() as u16,
+        )
     }
 }
 
@@ -168,7 +167,7 @@ impl DmcMemory for RAM {
     }
 
     fn get_next_sample_byte(&mut self) -> u8 {
-        let byte = self.memory[self.dmc_sample_address];
+        let byte = self.get_byte(self.dmc_sample_address as u16);
         self.dmc_sample_address = (self.dmc_sample_address + 1) % 0x8000;
         byte
     }

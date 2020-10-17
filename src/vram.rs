@@ -38,22 +38,21 @@ const ATTRIBUTE_DATA_QUADRANT_MASKS: [u8; 4] = [
 
 pub struct VRAM {
     memory: [u8; ADDRESS_SPACE],
-    mirroring: Mirroring,
+    mapper: Rc<RefCell<dyn Mapper>>,
     read_buffer: u8,
 }
 
 impl VRAM {
-    pub fn new() -> Self {
+    pub fn new(mapper: Rc<RefCell<dyn Mapper>>) -> Self {
         VRAM {
             memory: [0; ADDRESS_SPACE],
-            mirroring: Mirroring::VERTICAL,
+            mapper,
             read_buffer: 0,
         }
     }
 
-    pub fn load_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
-        self.store_bytes(0, &mapper.borrow().get_chr_rom().to_vec());
-        self.mirroring = mapper.borrow().get_mirroring();
+    pub fn reset(&mut self) {
+        self.store_bytes(0, &self.mapper.clone().borrow().get_chr_rom().to_vec());
     }
 
     fn get_attribute_table(&self, table_index: u8) -> [u8; 64] {
@@ -88,7 +87,7 @@ impl VRAM {
         );
         assert!(mirrors.len() == 2);
         let namespace_region_offset = addr % NAMETABLE_MIRROR_SIZE;
-        let internal_mirror_offset = match self.mirroring {
+        let internal_mirror_offset = match self.mapper.borrow_mut().get_mirroring() {
             Mirroring::VERTICAL => match namespace_region_offset {
                 0x0000..=0x03FF => 0x0800,
                 0x0400..=0x07FF => 0x0C00,

@@ -30,6 +30,7 @@ pub struct Nes {
 impl Nes {
     pub fn new<T>(
         io: Rc<RefCell<T>>,
+        nes_file: &NesFile,
         controller_1: Rc<dyn Controller>,
         controller_2: Rc<dyn Controller>,
     ) -> Self
@@ -37,15 +38,17 @@ impl Nes {
         T: IO + VideoAccess + AudioAccess + KeyboardAccess + 'static,
     {
         let controllers = Rc::new(RefCell::new(Controllers::new(controller_1, controller_2)));
-
-        let vram = Rc::new(RefCell::new(VRAM::new()));
+        let mapper = nes_file.create_mapper();
+        let vram = Rc::new(RefCell::new(VRAM::new(mapper.clone())));
         let ppu = Rc::new(RefCell::new(PPU::new(vram.clone(), io.clone())));
         let apu = Rc::new(RefCell::new(APU::new(io.clone())));
         let ram = Rc::new(RefCell::new(RAM::new(
             ppu.clone(),
             controllers.clone(),
             apu.clone(),
+            mapper.clone(),
         )));
+
         apu.borrow_mut().set_dmc_memory(ram.clone());
         let cpu = CPU::new(ram.clone(), ppu.clone());
 
@@ -59,11 +62,10 @@ impl Nes {
         }
     }
 
-    pub fn load(&mut self, nes_file: &NesFile) {
-        let mapper = nes_file.create_mapper();
-        self.vram.borrow_mut().load_mapper(mapper.clone());
+    pub fn reset(&mut self) {
+        self.vram.borrow_mut().reset();
         self.ppu.borrow_mut().reset();
-        self.ram.borrow_mut().load_mapper(mapper);
+        self.ram.borrow_mut().reset();
         self.cpu.reset();
     }
 
