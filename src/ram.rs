@@ -92,7 +92,7 @@ impl Memory for RAM {
                 addr
             );
         } else if CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)) {
-            self.mapper.borrow_mut().get_byte(addr)
+            self.mapper.borrow_mut().get_pgr_byte(addr)
         } else {
             self.memory[addr as usize]
         }
@@ -133,7 +133,7 @@ impl Memory for RAM {
                 self.memory[m as usize] = byte;
             }
         } else if CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)) {
-            self.mapper.borrow_mut().store_byte(addr, byte)
+            self.mapper.borrow_mut().store_pgr_byte(addr, byte)
         } else {
             self.memory[addr as usize] = byte;
         }
@@ -148,16 +148,6 @@ impl Memory for RAM {
     fn store_word(&mut self, addr: u16, bytes: u16) {
         self.store_byte(addr, (bytes & 0x00FF) as u8);
         self.store_byte(addr + 1, ((bytes & 0xFF00) >> 8) as u8);
-    }
-}
-
-impl CpuMemory for RAM {
-    fn get_code_segment(&self) -> (u16, u16) {
-        (
-            self.mapper.borrow().get_rom_start(),
-            self.mapper.borrow().get_rom_start() - 1
-                + self.mapper.borrow().get_pgr_rom().len() as u16,
-        )
     }
 }
 

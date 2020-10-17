@@ -10,10 +10,6 @@ pub trait Memory {
     fn store_word(&mut self, addr: u16, bytes: u16);
 }
 
-pub trait CpuMemory: Memory {
-    fn get_code_segment(&self) -> (u16, u16);
-}
-
 pub trait VideoMemory {
     fn store_byte(&mut self, addr: u16, byte: u8);
 

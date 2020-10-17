@@ -1,6 +1,5 @@
 use common::FPS;
 
-use crate::cpu::CPU;
 use crate::io::AudioAccess;
 use crate::io::KeyboardAccess;
 use crate::io::VideoAccess;
@@ -12,6 +11,7 @@ use crate::vram::VRAM;
 use crate::{apu::APU, controllers::Controller};
 use crate::{common, io::IOState};
 use crate::{controllers::Controllers, io::IOControl};
+use crate::{cpu::CPU, mappers::Mapper};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -25,6 +25,7 @@ pub struct Nes {
     vram: Rc<RefCell<VRAM>>,
     apu: Rc<RefCell<APU>>,
     io: Rc<RefCell<dyn IO>>,
+    mapper: Rc<RefCell<dyn Mapper>>,
 }
 
 impl Nes {
@@ -59,6 +60,7 @@ impl Nes {
             vram,
             apu,
             io,
+            mapper,
         }
     }
 
@@ -66,6 +68,7 @@ impl Nes {
         self.vram.borrow_mut().reset();
         self.ppu.borrow_mut().reset();
         self.ram.borrow_mut().reset();
+        self.mapper.borrow_mut().reset();
         self.cpu.reset();
     }
 

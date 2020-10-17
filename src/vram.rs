@@ -52,7 +52,7 @@ impl VRAM {
     }
 
     pub fn reset(&mut self) {
-        self.store_bytes(0, &self.mapper.clone().borrow().get_chr_rom().to_vec());
+        self.memory.iter_mut().for_each(|m| *m = 0);
     }
 
     fn get_attribute_table(&self, table_index: u8) -> [u8; 64] {
@@ -64,8 +64,12 @@ impl VRAM {
         attribute_table
     }
 
-    fn get_byte(&self, addres: u16) -> u8 {
-        self.memory[addres as usize]
+    fn get_byte(&self, address: u16) -> u8 {
+        if address < NAMETABLES_START {
+            self.mapper.borrow_mut().get_chr_byte(address)
+        } else {
+            self.memory[address as usize]
+        }
     }
 
     fn get_palette(&self, start_addres: u16) -> [u8; 3] {
@@ -184,27 +188,31 @@ impl VideoMemory for VRAM {
     }
 
     fn store_byte(&mut self, addr: u16, byte: u8) {
-        if NAMETABLES_RANGE.contains(&addr) {
+        if addr < NAMETABLES_START {
+            self.mapper.borrow_mut().store_chr_byte(addr, byte);
+        } else if NAMETABLES_RANGE.contains(&addr) {
             let mirrors = self.get_nametable_mirrors(addr);
             for m in mirrors {
                 self.memory[m as usize] = byte;
             }
+            self.memory[addr as usize] = byte;
         } else if PALETTES_RANGE.contains(&addr) {
             let mirrors = self.get_pallete_mirrors(addr);
             for m in mirrors {
                 self.memory[m as usize] = byte;
             }
+            self.memory[addr as usize] = byte;
         }
-        self.memory[addr as usize] = byte;
     }
 
     fn get_byte(&mut self, addr: u16) -> u8 {
+        let byte = (self as &VRAM).get_byte(addr);
         if PALETTES_RANGE.contains(&addr) {
-            self.read_buffer = self.memory[addr as usize - 0x1000];
-            self.memory[addr as usize]
+            self.read_buffer = byte;
+            byte
         } else {
             let read_buffer = self.read_buffer;
-            self.read_buffer = self.memory[addr as usize];
+            self.read_buffer = byte;
             read_buffer
         }
     }

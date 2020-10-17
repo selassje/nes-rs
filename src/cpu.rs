@@ -1,10 +1,9 @@
 mod opcodes;
 
 use self::AddressingMode::*;
-use crate::common::*;
 use crate::cpu_ppu::{Nmi, PpuState};
-use crate::memory::CpuMemory;
 use crate::ram_ppu::DmaWriteAccessRegister::OamDma;
+use crate::{common::*, memory::Memory};
 use opcodes::{get_opcodes, OpCodes, NMI_OPCODE};
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter, Result};
@@ -100,7 +99,7 @@ pub struct CPU {
     cycle: u128,
     instruction: Option<Instruction>,
     address: Address,
-    ram: Rc<RefCell<dyn CpuMemory>>,
+    ram: Rc<RefCell<dyn Memory>>,
     ppu_state: Rc<RefCell<dyn PpuState>>,
     code_segment: (u16, u16),
     opcodes: OpCodes,
@@ -108,7 +107,7 @@ pub struct CPU {
 }
 
 impl CPU {
-    pub fn new(ram: Rc<RefCell<dyn CpuMemory>>, ppu_state: Rc<RefCell<dyn PpuState>>) -> CPU {
+    pub fn new(ram: Rc<RefCell<dyn Memory>>, ppu_state: Rc<RefCell<dyn PpuState>>) -> CPU {
         CPU {
             pc: 0,
             sp: 0xFD,
