@@ -61,7 +61,7 @@ impl Nes {
 
     pub fn load(&mut self, nes_file: &NesFile) {
         let mapper = nes_file.create_mapper();
-        self.vram.borrow_mut().load_mapper(&mapper);
+        self.vram.borrow_mut().load_mapper(mapper.clone());
         self.ppu.borrow_mut().reset();
         self.ram.borrow_mut().load_mapper(mapper);
         self.cpu.reset();

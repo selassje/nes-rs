@@ -2,7 +2,7 @@ use crate::common;
 use crate::ram_apu;
 use crate::ram_controllers::*;
 use crate::ram_ppu::*;
-use crate::{mapper::Mapper, memory::*};
+use crate::{mappers::Mapper, memory::*};
 use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::ops::Range;
@@ -26,9 +26,17 @@ const PPU_REGISTERS_RANGE: Range<u16> = Range {
     end: PPU_REGISTERS_END,
 };
 
+const CARTRIDGE_SPACE_START: u16 = 0x8000;
+const CARTRIDGE_SPACE_END: u16 = 0xFFFF;
+
+const CARTRIDGE_SPACE_RANGE: Range<u16> = Range {
+    start: CARTRIDGE_SPACE_START,
+    end: CARTRIDGE_SPACE_END,
+};
+
 pub struct RAM {
     memory: [u8; 65536],
-    mapper: Option<Box<dyn Mapper>>,
+    mapper: Option<Rc<RefCell<dyn Mapper>>>,
     ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>,
     controller_access: Rc<RefCell<dyn ControllerPortsAccess>>,
     apu_access: Rc<RefCell<dyn ram_apu::ApuRegisterAccess>>,
@@ -51,9 +59,8 @@ impl RAM {
         }
     }
 
-    pub fn load_mapper(&mut self, mapper: Box<dyn Mapper>) {
+    pub fn load_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
         self.memory.iter_mut().for_each(|m| *m = 0);
-        self.store_bytes(mapper.get_rom_start(), &mapper.get_pgr_rom().to_vec());
         self.mapper = Some(mapper);
     }
 }
@@ -84,13 +91,15 @@ impl Memory for RAM {
                 "Attempting to read from a Apu write access register {:#X}",
                 addr
             );
+        } else if CARTRIDGE_SPACE_RANGE.contains(&addr) {
+            self.mapper.as_ref().unwrap().borrow_mut().get_byte(addr)
         } else {
             self.memory[addr as usize]
         }
     }
 
     fn get_word(&self, addr: u16) -> u16 {
-        common::convert_2u8_to_u16(self.memory[addr as usize], self.memory[addr as usize + 1])
+        common::convert_2u8_to_u16(self.get_byte(addr), self.get_byte(addr + 1))
     }
 
     fn store_byte(&mut self, addr: u16, byte: u8) {
@@ -144,8 +153,8 @@ impl CpuMemory for RAM {
     fn get_code_segment(&self) -> (u16, u16) {
         if let Some(ref mapper) = self.mapper {
             return (
-                mapper.get_rom_start(),
-                mapper.get_rom_start() - 1 + mapper.get_pgr_rom().len() as u16,
+                mapper.borrow().get_rom_start(),
+                mapper.borrow().get_rom_start() - 1 + mapper.borrow().get_pgr_rom().len() as u16,
             );
         } else {
             (0, 0)

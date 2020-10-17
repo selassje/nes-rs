@@ -1,8 +1,8 @@
 use self::AttributeDataQuadrantMask::*;
 use crate::common::{self, Mirroring};
-use crate::{mapper::Mapper, memory::VideoMemory};
+use crate::{mappers::Mapper, memory::VideoMemory};
 
-use std::ops::Range;
+use std::{cell::RefCell, ops::Range, rc::Rc};
 
 const ADDRESS_SPACE: usize = 0x10000;
 const PATTERN_TABLE_SIZE: u16 = 0x1000;
@@ -51,9 +51,9 @@ impl VRAM {
         }
     }
 
-    pub fn load_mapper(&mut self, mapper: &Box<dyn Mapper>) {
-        self.store_bytes(0, &mapper.get_chr_rom().to_vec());
-        self.mirroring = mapper.get_mirroring();
+    pub fn load_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
+        self.store_bytes(0, &mapper.borrow().get_chr_rom().to_vec());
+        self.mirroring = mapper.borrow().get_mirroring();
     }
 
     fn get_attribute_table(&self, table_index: u8) -> [u8; 64] {

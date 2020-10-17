@@ -8,7 +8,7 @@ mod cpu;
 mod cpu_ppu;
 mod io;
 mod keyboard;
-mod mapper;
+mod mappers;
 mod memory;
 mod nes;
 mod nes_file;

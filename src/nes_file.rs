@@ -1,5 +1,8 @@
+use std::{cell::RefCell, rc::Rc};
+
 use crate::common;
-use crate::mapper::{Mapper, Mapper0};
+use crate::mappers::Mapper;
+use crate::mappers::Mapper0;
 
 #[derive(PartialEq, Debug)]
 enum NesFormat {
@@ -78,7 +81,7 @@ fn read_to_array(array: &mut [u8], in_bytes: &[u8]) -> usize {
 }
 
 impl NesFile {
-    pub fn create_mapper(&self) -> Box<dyn Mapper> {
+    pub fn create_mapper(&self) -> Rc<RefCell<dyn Mapper>> {
         let mut prg_rom = Vec::<u8>::new();
         for prg_rom_chunk in &self.prg_rom {
             prg_rom.extend_from_slice(prg_rom_chunk);
@@ -90,7 +93,7 @@ impl NesFile {
         }
 
         match self.mapper_number {
-            0 => Box::new(Mapper0::new(prg_rom, chr_rom, self.mirroring)),
+            0 => Rc::new(RefCell::new(Mapper0::new(prg_rom, chr_rom, self.mirroring))),
             _ => panic!("Unsupported mapper {}", self.mapper_number),
         }
     }
