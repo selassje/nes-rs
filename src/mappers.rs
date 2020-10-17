@@ -1,10 +1,12 @@
 use crate::common::Mirroring;
 
 mod mapper0;
+mod mapper2;
 
 const CHR_DATA_SIZE: usize = 0x2000;
 
 pub use self::mapper0::Mapper0;
+pub use self::mapper2::Mapper2;
 
 pub trait Mapper {
     fn get_chr_byte(&mut self, _: u16) -> u8;

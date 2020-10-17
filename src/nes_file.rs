@@ -3,6 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use crate::common;
 use crate::mappers::Mapper;
 use crate::mappers::Mapper0;
+use crate::mappers::Mapper2;
 
 #[derive(PartialEq, Debug)]
 enum NesFormat {
@@ -94,6 +95,7 @@ impl NesFile {
 
         match self.mapper_number {
             0 => Rc::new(RefCell::new(Mapper0::new(prg_rom, chr_rom, self.mirroring))),
+            2 => Rc::new(RefCell::new(Mapper2::new(prg_rom, chr_rom, self.mirroring))),
             _ => panic!("Unsupported mapper {}", self.mapper_number),
         }
     }
