@@ -13,14 +13,13 @@ impl Mapper0 {
         if final_prg_rom.len() <= 16384 {
             final_prg_rom.extend_from_slice(prg_rom.as_slice())
         }
+        let mut mapper_internal = MapperInternal::new(final_prg_rom, chr_rom);
+        mapper_internal.set_prg_bank_size(PrgRomBankSize::_16KB);
+        mapper_internal.set_chr_bank_size(ChrRomBankSize::_8KB);
+
         Self {
-            mapper_internal: MapperInternal::new(
-                final_prg_rom,
-                chr_rom,
-                PrgRomBankSize::_16KB,
-                ChrRomBankSize::_8KB,
-            ),
             mirroring,
+            mapper_internal,
         }
     }
 }

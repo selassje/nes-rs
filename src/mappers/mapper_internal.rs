@@ -20,17 +20,7 @@ pub struct MapperInternal {
     chr_bank_size: usize,
 }
 impl MapperInternal {
-    pub fn new(
-        prg_rom: Vec<u8>,
-        chr_rom: Vec<u8>,
-        prg_bank_size: PrgRomBankSize,
-        chr_bank_size: ChrRomBankSize,
-    ) -> Self {
-        let prg_bank_size = prg_bank_size as usize * PRG_ROM_UNIT_SIZE;
-        let chr_bank_size = chr_bank_size as usize * CHR_ROM_UNIT_SIZE;
-
-        assert!(prg_rom.len() % prg_bank_size == 0);
-        assert!(chr_rom.len() % chr_bank_size == 0);
+    pub fn new(prg_rom: Vec<u8>, chr_rom: Vec<u8>) -> Self {
         let mut chr = Box::new([0; CHR_DATA_SIZE]);
         let mut prg = Box::new([0; PRG_DATA_SIZE]);
 
@@ -41,8 +31,8 @@ impl MapperInternal {
             chr_org: chr_rom,
             chr,
             prg,
-            prg_bank_size,
-            chr_bank_size,
+            prg_bank_size: 0,
+            chr_bank_size: 0,
         }
     }
 
@@ -65,5 +55,12 @@ impl MapperInternal {
 
     pub fn store_chr_byte(&mut self, address: u16, byte: u8) {
         self.chr[address as usize] = byte;
+    }
+
+    pub fn set_prg_bank_size(&mut self, size: PrgRomBankSize) {
+        self.prg_bank_size = size as usize * PRG_ROM_UNIT_SIZE;
+    }
+    pub fn set_chr_bank_size(&mut self, size: ChrRomBankSize) {
+        self.chr_bank_size = size as usize * CHR_ROM_UNIT_SIZE;
     }
 }

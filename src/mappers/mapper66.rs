@@ -13,13 +13,11 @@ pub struct Mapper66 {
 
 impl Mapper66 {
     pub fn new(prg_rom: Vec<u8>, chr_rom: Vec<u8>, mirroring: Mirroring) -> Self {
+        let mut mapper_internal = MapperInternal::new(prg_rom, chr_rom);
+        mapper_internal.set_prg_bank_size(PrgRomBankSize::_32KB);
+        mapper_internal.set_chr_bank_size(ChrRomBankSize::_8KB);
         Self {
-            mapper_internal: MapperInternal::new(
-                prg_rom,
-                chr_rom,
-                PrgRomBankSize::_32KB,
-                ChrRomBankSize::_8KB,
-            ),
+            mapper_internal,
             mirroring,
             prg_bank: 0,
             chr_bank: 0,
