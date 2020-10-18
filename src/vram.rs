@@ -163,7 +163,7 @@ impl Memory for VRAM {
     }
 
     fn get_byte(&self, addr: u16) -> u8 {
-        let byte = (self as &VRAM).get_byte_internal(addr);
+        let byte = self.get_byte_internal(addr);
         if PALETTES_RANGE.contains(&addr) {
             *self.read_buffer.borrow_mut() = byte;
             byte
