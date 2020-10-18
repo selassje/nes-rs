@@ -388,13 +388,15 @@ impl CPU {
                 if extra_cycle_on_page_crossing && b0_u16 + x_u16 > 0xFF {
                     extra_cycle = 1
                 }
-                Address::RAM(b0_u16 + x_u16 + (b1_u16 << 8))
+                let address = b0_u16 as u32 + x_u16 as u32 + (b1_u16 << 8) as u32;
+                Address::RAM(address as u16)
             }
             AddressingMode::AbsoluteY => {
                 if extra_cycle_on_page_crossing && b0_u16 + y_u16 > 0xFF {
                     extra_cycle = 1
                 }
-                Address::RAM(b0_u16 + y_u16 + (b1_u16 << 8))
+                let address = b0_u16 as u32 + y_u16 as u32 + (b1_u16 << 8) as u32;
+                Address::RAM(address as u16)
             }
             AddressingMode::IndexedIndirectX => {
                 let indexed_indirect = convert_2u8_to_u16(
@@ -408,7 +410,7 @@ impl CPU {
                     self.ram.borrow().get_byte(b0_u16),
                     self.ram.borrow().get_byte((b0_u16 + 1) & 0xFF),
                 );
-                let indirect_indexed = indirect + y_u16;
+                let indirect_indexed = (indirect as u32 + y_u16 as u32) as u16;
                 if extra_cycle_on_page_crossing && indirect_indexed & 0xFF00 != indirect & 0xFF00 {
                     extra_cycle = 1;
                 }

@@ -98,10 +98,6 @@ impl Memory for RAM {
         }
     }
 
-    fn get_word(&self, addr: u16) -> u16 {
-        common::convert_2u8_to_u16(self.get_byte(addr), self.get_byte(addr + 1))
-    }
-
     fn store_byte(&mut self, addr: u16, byte: u8) {
         let addr = if PPU_REGISTERS_RANGE.contains(&addr) {
             PPU_REGISTERS_START + addr % PPU_REGISTERS_MIRROR_SIZE
@@ -137,17 +133,6 @@ impl Memory for RAM {
         } else {
             self.memory[addr as usize] = byte;
         }
-    }
-
-    fn store_bytes(&mut self, addr: u16, bytes: &Vec<u8>) {
-        for (i, b) in bytes.iter().enumerate() {
-            self.memory[(addr as usize) + i] = *b;
-        }
-    }
-
-    fn store_word(&mut self, addr: u16, bytes: u16) {
-        self.store_byte(addr, (bytes & 0x00FF) as u8);
-        self.store_byte(addr + 1, ((bytes & 0xFF00) >> 8) as u8);
     }
 }
 

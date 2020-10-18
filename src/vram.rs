@@ -1,5 +1,8 @@
 use self::AttributeDataQuadrantMask::*;
-use crate::common::{self, Mirroring};
+use crate::{
+    common::{self, Mirroring},
+    memory::Memory,
+};
 use crate::{mappers::Mapper, memory::VideoMemory};
 
 use std::{cell::RefCell, ops::Range, rc::Rc};
@@ -39,7 +42,7 @@ const ATTRIBUTE_DATA_QUADRANT_MASKS: [u8; 4] = [
 pub struct VRAM {
     memory: [u8; ADDRESS_SPACE],
     mapper: Rc<RefCell<dyn Mapper>>,
-    read_buffer: u8,
+    read_buffer: RefCell<u8>,
 }
 
 impl VRAM {
@@ -47,7 +50,7 @@ impl VRAM {
         VRAM {
             memory: [0; ADDRESS_SPACE],
             mapper,
-            read_buffer: 0,
+            read_buffer: RefCell::new(0),
         }
     }
 
@@ -64,7 +67,7 @@ impl VRAM {
         attribute_table
     }
 
-    fn get_byte(&self, address: u16) -> u8 {
+    fn get_byte_internal(&self, address: u16) -> u8 {
         if address < NAMETABLES_START {
             self.mapper.borrow_mut().get_chr_byte(address)
         } else {
@@ -74,9 +77,9 @@ impl VRAM {
 
     fn get_palette(&self, start_addres: u16) -> [u8; 3] {
         [
-            self.get_byte(start_addres),
-            self.get_byte(start_addres + 1),
-            self.get_byte(start_addres + 2),
+            self.get_byte_internal(start_addres),
+            self.get_byte_internal(start_addres + 1),
+            self.get_byte_internal(start_addres + 2),
         ]
     }
 
@@ -140,53 +143,7 @@ impl VRAM {
     }
 }
 
-impl VideoMemory for VRAM {
-    fn get_background_pallete_index(
-        &self,
-        table_index: u8,
-        color_tile_x: u8,
-        color_tile_y: u8,
-    ) -> u8 {
-        let attribute_table = self.get_attribute_table(table_index);
-        let attribute_index = (color_tile_y / 2) * 8 + color_tile_x / 2;
-        let attribute_data = attribute_table[attribute_index as usize];
-        let quadrant: u8 = (color_tile_y % 2) * 2 + (color_tile_x % 2);
-        (attribute_data & ATTRIBUTE_DATA_QUADRANT_MASKS[quadrant as usize] as u8) >> (2 * quadrant)
-    }
-
-    fn get_nametable_tile_index(&self, table_index: u8, tile_x: u8, tile_y: u8) -> u8 {
-        let name_table_addr = NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE;
-        let tile_index = 32 * tile_y as u16 + tile_x as u16;
-        self.get_byte(name_table_addr + tile_index)
-    }
-
-    fn get_pattern_table_tile_data(&self, table_index: u8, tile_index: u8) -> [u8; 16] {
-        let mut tile_data = [0; 16];
-        let pattern_table_addr = table_index as u16 * PATTERN_TABLE_SIZE;
-        for i in 0..16 {
-            tile_data[i] = self.get_byte(pattern_table_addr + 16 * tile_index as u16 + i as u16);
-        }
-        tile_data
-    }
-
-    fn get_universal_background_color(&self) -> u8 {
-        self.get_byte(PALETTES_START)
-    }
-
-    fn get_background_palette(&self, palette_index: u8) -> [u8; 3] {
-        self.get_palette(0x3F01 + 4 * palette_index as u16)
-    }
-
-    fn get_sprite_palette(&self, palette_index: u8) -> [u8; 3] {
-        self.get_palette(0x3F11 + 4 * palette_index as u16)
-    }
-
-    fn store_bytes(&mut self, addr: u16, bytes: &Vec<u8>) {
-        for (i, b) in bytes.iter().enumerate() {
-            self.store_byte(addr + i as u16, *b);
-        }
-    }
-
+impl Memory for VRAM {
     fn store_byte(&mut self, addr: u16, byte: u8) {
         if addr < NAMETABLES_START {
             self.mapper.borrow_mut().store_chr_byte(addr, byte);
@@ -205,15 +162,57 @@ impl VideoMemory for VRAM {
         }
     }
 
-    fn get_byte(&mut self, addr: u16) -> u8 {
-        let byte = (self as &VRAM).get_byte(addr);
+    fn get_byte(&self, addr: u16) -> u8 {
+        let byte = (self as &VRAM).get_byte_internal(addr);
         if PALETTES_RANGE.contains(&addr) {
-            self.read_buffer = byte;
+            *self.read_buffer.borrow_mut() = byte;
             byte
         } else {
-            let read_buffer = self.read_buffer;
-            self.read_buffer = byte;
+            let read_buffer = *self.read_buffer.borrow();
+            *self.read_buffer.borrow_mut() = byte;
             read_buffer
         }
+    }
+}
+impl VideoMemory for VRAM {
+    fn get_background_pallete_index(
+        &self,
+        table_index: u8,
+        color_tile_x: u8,
+        color_tile_y: u8,
+    ) -> u8 {
+        let attribute_table = self.get_attribute_table(table_index);
+        let attribute_index = (color_tile_y / 2) * 8 + color_tile_x / 2;
+        let attribute_data = attribute_table[attribute_index as usize];
+        let quadrant: u8 = (color_tile_y % 2) * 2 + (color_tile_x % 2);
+        (attribute_data & ATTRIBUTE_DATA_QUADRANT_MASKS[quadrant as usize] as u8) >> (2 * quadrant)
+    }
+
+    fn get_nametable_tile_index(&self, table_index: u8, tile_x: u8, tile_y: u8) -> u8 {
+        let name_table_addr = NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE;
+        let tile_index = 32 * tile_y as u16 + tile_x as u16;
+        self.get_byte_internal(name_table_addr + tile_index)
+    }
+
+    fn get_pattern_table_tile_data(&self, table_index: u8, tile_index: u8) -> [u8; 16] {
+        let mut tile_data = [0; 16];
+        let pattern_table_addr = table_index as u16 * PATTERN_TABLE_SIZE;
+        for i in 0..16 {
+            tile_data[i] =
+                self.get_byte_internal(pattern_table_addr + 16 * tile_index as u16 + i as u16);
+        }
+        tile_data
+    }
+
+    fn get_universal_background_color(&self) -> u8 {
+        self.get_byte_internal(PALETTES_START)
+    }
+
+    fn get_background_palette(&self, palette_index: u8) -> [u8; 3] {
+        self.get_palette(0x3F01 + 4 * palette_index as u16)
+    }
+
+    fn get_sprite_palette(&self, palette_index: u8) -> [u8; 3] {
+        self.get_palette(0x3F11 + 4 * palette_index as u16)
     }
 }
