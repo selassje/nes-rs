@@ -91,6 +91,7 @@ impl Memory for RAM {
                 "Attempting to read from a Apu write access register {:#X}",
                 addr
             );
+            0
         } else if CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)) {
             self.mapper.borrow_mut().get_pgr_byte(addr)
         } else {
@@ -158,7 +159,11 @@ impl DmcMemory for RAM {
 
     fn get_next_sample_byte(&mut self) -> u8 {
         let byte = self.get_byte(self.dmc_sample_address as u16);
-        self.dmc_sample_address = (self.dmc_sample_address + 1) % 0x8000;
+        self.dmc_sample_address = if self.dmc_sample_address == 0xFFFF {
+            0x8000
+        } else {
+            self.dmc_sample_address + 1
+        };
         byte
     }
 }

@@ -427,12 +427,11 @@ impl PPU {
                     self.background_palletes = self.get_palettes(true);
                     self.sprite_palettes = self.get_palettes(false);
 
-                    self.vbl_flag_supressed = false;
-
                     self.pattern_tables = [
                         PatternTable::new(&*self.vram.borrow(), 0),
                         PatternTable::new(&*self.vram.borrow(), 1),
                     ];
+                    self.vbl_flag_supressed = false;
 
                     self.status_reg
                         .set_flag(StatusRegisterFlag::VerticalBlankStarted, false);

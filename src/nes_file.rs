@@ -4,6 +4,7 @@ use crate::common;
 use crate::mappers::Mapper;
 use crate::mappers::Mapper0;
 use crate::mappers::Mapper2;
+use crate::mappers::Mapper66;
 
 #[derive(PartialEq, Debug)]
 enum NesFormat {
@@ -96,6 +97,11 @@ impl NesFile {
         match self.mapper_number {
             0 => Rc::new(RefCell::new(Mapper0::new(prg_rom, chr_rom, self.mirroring))),
             2 => Rc::new(RefCell::new(Mapper2::new(prg_rom, chr_rom, self.mirroring))),
+            66 => Rc::new(RefCell::new(Mapper66::new(
+                prg_rom,
+                chr_rom,
+                self.mirroring,
+            ))),
             _ => panic!("Unsupported mapper {}", self.mapper_number),
         }
     }
@@ -202,7 +208,22 @@ impl NesFile {
             }
         }
 
-        let mapper_number = ((header.ho_n_mapper_number << 4) + header.lo_n_mapper_number) as u32;
+        let ho_n_mapper_number = if in_bytes[12] as u32
+            + in_bytes[13] as u32
+            + in_bytes[14] as u32
+            + in_bytes[15] as u32
+            != 0
+        {
+            0
+        } else {
+            header.ho_n_mapper_number as u32
+        };
+
+        let mapper_number = (ho_n_mapper_number << 4) + header.lo_n_mapper_number as u32;
+        println!(
+            "Mapper number {} flag6 {:X} flag7 {:X}",
+            mapper_number, header.lo_n_mapper_number, ho_n_mapper_number
+        );
         NesFile {
             trainer,
             prg_rom,

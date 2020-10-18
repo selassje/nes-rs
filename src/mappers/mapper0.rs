@@ -1,4 +1,4 @@
-use super::Mapper;
+use super::{mapper_internal::ChrRomBankSize, mapper_internal::PrgRomBankSize, Mapper};
 use crate::common::Mirroring;
 use crate::mappers::mapper_internal::MapperInternal;
 
@@ -14,7 +14,12 @@ impl Mapper0 {
             final_prg_rom.extend_from_slice(prg_rom.as_slice())
         }
         Self {
-            mapper_internal: MapperInternal::new(final_prg_rom, chr_rom),
+            mapper_internal: MapperInternal::new(
+                final_prg_rom,
+                chr_rom,
+                PrgRomBankSize::_16KB,
+                ChrRomBankSize::_8KB,
+            ),
             mirroring,
         }
     }
@@ -22,7 +27,7 @@ impl Mapper0 {
 
 impl Mapper for Mapper0 {
     fn get_chr_byte(&mut self, address: u16) -> u8 {
-        self.mapper_internal.get_chr_byte(address)
+        self.mapper_internal.get_chr_byte(address, 0)
     }
 
     fn get_pgr_byte(&mut self, address: u16) -> u8 {

@@ -6,20 +6,20 @@ use sdl2::{
 use super::{RgbColor, VideoAccess, FRAME_HEIGHT, FRAME_WIDTH, PIXEL_SIZE};
 
 const FRAME_SIZE: usize = FRAME_HEIGHT * FRAME_WIDTH * PIXEL_SIZE;
-type Frame2 = [u8; FRAME_SIZE];
+type Frame = [u8; FRAME_SIZE];
 pub(super) struct IOInternal {
-    frame: Frame2,
+    frame: Box<Frame>,
 }
 
 impl IOInternal {
     pub fn new() -> Self {
         IOInternal {
-            frame: [0; FRAME_SIZE],
+            frame: Box::new([0; FRAME_SIZE]),
         }
     }
 
     pub fn get_pixels_slice(&self) -> &[u8] {
-        &self.frame
+        self.frame.as_ref()
     }
     pub(super) fn dump_frame(&self, path: &str) {
         let mut bitmap = sdl2::surface::Surface::new(

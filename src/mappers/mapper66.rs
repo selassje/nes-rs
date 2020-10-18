@@ -3,46 +3,44 @@ use super::{
     mapper_internal::PrgRomBankSize, Mapper,
 };
 use crate::common::Mirroring;
-pub struct Mapper2 {
+
+pub struct Mapper66 {
     mapper_internal: MapperInternal,
     mirroring: Mirroring,
-    switchable_bank_0: usize,
+    prg_bank: usize,
+    chr_bank: usize,
 }
 
-impl Mapper2 {
+impl Mapper66 {
     pub fn new(prg_rom: Vec<u8>, chr_rom: Vec<u8>, mirroring: Mirroring) -> Self {
         Self {
             mapper_internal: MapperInternal::new(
                 prg_rom,
                 chr_rom,
-                PrgRomBankSize::_16KB,
+                PrgRomBankSize::_32KB,
                 ChrRomBankSize::_8KB,
             ),
             mirroring,
-            switchable_bank_0: 0,
+            prg_bank: 0,
+            chr_bank: 0,
         }
     }
 }
-
-impl Mapper for Mapper2 {
+impl Mapper for Mapper66 {
     fn get_chr_byte(&mut self, address: u16) -> u8 {
-        self.mapper_internal.get_chr_byte(address, 0)
+        self.mapper_internal.get_chr_byte(address, self.chr_bank)
     }
 
     fn get_mirroring(&self) -> Mirroring {
         self.mirroring
     }
     fn get_pgr_byte(&mut self, address: u16) -> u8 {
-        let bank = if address < 0xC000 {
-            self.switchable_bank_0
-        } else {
-            self.mapper_internal.get_pgr_bank_count() - 1
-        };
-        self.mapper_internal.get_pgr_byte(address, bank)
+        self.mapper_internal.get_pgr_byte(address, self.prg_bank)
     }
 
     fn reset(&mut self) {
-        self.switchable_bank_0 = 0;
+        self.prg_bank = 0;
+        self.chr_bank = 0;
         self.mapper_internal.reset();
     }
 
@@ -51,6 +49,7 @@ impl Mapper for Mapper2 {
     }
 
     fn store_pgr_byte(&mut self, _: u16, byte: u8) {
-        self.switchable_bank_0 = byte as usize;
+        self.chr_bank = (byte & 3) as usize;
+        self.prg_bank = ((byte & 0b00110000) >> 4) as usize;
     }
 }
