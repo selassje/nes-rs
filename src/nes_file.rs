@@ -220,10 +220,6 @@ impl NesFile {
         };
 
         let mapper_number = (ho_n_mapper_number << 4) + header.lo_n_mapper_number as u32;
-        println!(
-            "Mapper number {} flag6 {:X} flag7 {:X}",
-            mapper_number, header.lo_n_mapper_number, ho_n_mapper_number
-        );
         NesFile {
             trainer,
             prg_rom,

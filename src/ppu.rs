@@ -134,30 +134,16 @@ impl Tile {
         (2 * hi_bit + lo_bit) as usize
     }
 }
-
 struct PatternTable {
-    tiles: [Tile; 256],
+    tiles: [Option<Tile>; 256],
 }
 
 impl Default for PatternTable {
     fn default() -> Self {
-        PatternTable {
-            tiles: [Default::default(); 256],
-        }
+        PatternTable { tiles: [None; 256] }
     }
 }
 
-impl PatternTable {
-    fn new(vram: &dyn VideoMemory, table_index: u8) -> Self {
-        let mut pattern_table: PatternTable = Default::default();
-        for i in 0..pattern_table.tiles.len() {
-            pattern_table.tiles[i] = Tile {
-                data: vram.get_pattern_table_tile_data(table_index, i as u8),
-            }
-        }
-        pattern_table
-    }
-}
 type Palette = [RgbColor; 4];
 type Palettes = [Palette; 4];
 
@@ -298,7 +284,7 @@ pub struct PPU {
     status_reg: StatusRegister,
     oam_address: u8,
     oam: OAM,
-    pattern_tables: [PatternTable; 2],
+    pattern_tables: [RefCell<PatternTable>; 2],
     ppu_cycle: u16,
     scanline: i16,
     scanline_sprites: Vec<Sprite>,
@@ -350,10 +336,7 @@ impl PPU {
         self.status_reg.value = 0;
         self.oam_address = 0;
         self.oam = [0; 256];
-        self.pattern_tables = [
-            PatternTable::new(&*self.vram.borrow(), 0),
-            PatternTable::new(&*self.vram.borrow(), 1),
-        ];
+        self.pattern_tables = [Default::default(), Default::default()];
         self.ppu_cycle = 27;
         self.scanline = 0;
         self.scanline_sprites.clear();
@@ -427,10 +410,6 @@ impl PPU {
                     self.background_palletes = self.get_palettes(true);
                     self.sprite_palettes = self.get_palettes(false);
 
-                    self.pattern_tables = [
-                        PatternTable::new(&*self.vram.borrow(), 0),
-                        PatternTable::new(&*self.vram.borrow(), 1),
-                    ];
                     self.vbl_flag_supressed = false;
 
                     self.status_reg
@@ -556,9 +535,21 @@ impl PPU {
         (final_color, sprite0_hit)
     }
 
+    fn get_pattern_tile(&self, table_index: u8, tile_index: u8, x: usize, y: usize) -> Tile {
+        let pattern_table = &self.pattern_tables[table_index as usize];
+        let tiles = &mut pattern_table.borrow_mut().tiles;
+        if (x % 8 == 0 && y % 8 == 0) || tiles[tile_index as usize].is_none() {
+            tiles[tile_index as usize] = Some(Tile {
+                data: self
+                    .vram
+                    .borrow_mut()
+                    .get_pattern_table_tile_data(table_index as u8, tile_index as u8),
+            });
+        }
+        tiles[tile_index as usize].unwrap()
+    }
     fn get_background_color_index(&mut self, x: usize) -> (u8, u8) {
         let bg_pattern_table_index = self.control_reg.get_background_pattern_table_index();
-        let bg_pattern_table = &self.pattern_tables[bg_pattern_table_index as usize];
         let scrolled_x = self.get_scrolled_x(x % 8);
         let scrolled_y = self.get_scrolled_y();
         let name_table_index = (2 * (scrolled_y / FRAME_HEIGHT) + (scrolled_x / FRAME_WIDTH)) as u8;
@@ -586,13 +577,19 @@ impl PPU {
                 self.vram
                     .borrow()
                     .get_nametable_tile_index(name_table_index, bg_tile_x, bg_tile_y);
-            let bg_tile = bg_pattern_table.tiles[bg_tile_index as usize];
+
+            let bg_tile = self.get_pattern_tile(
+                bg_pattern_table_index,
+                bg_tile_index,
+                scrolled_x,
+                scrolled_y,
+            );
             bg_color_index = bg_tile.get_color_index(scrolled_x % 8, scrolled_y % 8);
         }
         (bg_color_index as u8, bg_palette_index)
     }
 
-    fn get_sprite_color_index(&self, x: u8) -> (u8, Sprite) {
+    fn get_sprite_color_index(&mut self, x: u8) -> (u8, Sprite) {
         if self.mask_reg.is_flag_enabled(MaskRegisterFlag::ShowSprites)
             && (self
                 .mask_reg
@@ -608,7 +605,6 @@ impl PPU {
                         self.control_reg
                             .get_sprite_pattern_table_index_for_8x8_mode()
                     };
-                    let pattern_table = &self.pattern_tables[pattern_table_index as usize];
                     let mut tile_index = sprite.get_tile_index(is_sprite_mode_8x16);
                     if self.scanline as u8 > sprite.get_y() + 7 {
                         tile_index += 1;
@@ -632,7 +628,12 @@ impl PPU {
                         y = 7 - y;
                     }
 
-                    let tile = pattern_table.tiles[tile_index as usize];
+                    let tile = self.get_pattern_tile(
+                        pattern_table_index,
+                        tile_index,
+                        x as usize,
+                        y as usize,
+                    );
                     let color_index = tile.get_color_index(x as usize, y as usize);
                     if color_index != 0 {
                         return (color_index as u8, *sprite);

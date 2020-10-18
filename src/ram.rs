@@ -91,7 +91,6 @@ impl Memory for RAM {
                 "Attempting to read from a Apu write access register {:#X}",
                 addr
             );
-            0
         } else if CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)) {
             self.mapper.borrow_mut().get_pgr_byte(addr)
         } else {
