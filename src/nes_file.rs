@@ -5,6 +5,8 @@ use crate::mappers::Mapper;
 use crate::mappers::Mapper0;
 use crate::mappers::Mapper2;
 use crate::mappers::Mapper66;
+use crate::mappers::Mapper227;
+
 
 #[derive(PartialEq, Debug)]
 enum NesFormat {
@@ -102,6 +104,7 @@ impl NesFile {
                 chr_rom,
                 self.mirroring,
             ))),
+            227 => Rc::new(RefCell::new(Mapper227::new(prg_rom, chr_rom))),
             _ => panic!("Unsupported mapper {}", self.mapper_number),
         }
     }

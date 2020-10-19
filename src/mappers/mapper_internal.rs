@@ -1,8 +1,8 @@
 use crate::common::{CHR_ROM_UNIT_SIZE, PRG_ROM_UNIT_SIZE};
 
 const CHR_DATA_SIZE: usize = 0x8000;
-const PRG_DATA_SIZE: usize = 0x20000;
-
+const PRG_DATA_SIZE: usize = 0x80000;
+#[derive(PartialEq)]
 pub enum PrgRomBankSize {
     _16KB = 1,
     _32KB = 2,
