@@ -1,8 +1,8 @@
 use std::ops::Range;
 
-pub const PRG_ROM_UNIT_SIZE: usize = 16384;
-pub const CHR_ROM_UNIT_SIZE: usize = 8192;
-pub const PRG_RAM_UNIT_SIZE: usize = 8192;
+pub const PRG_ROM_UNIT_SIZE: usize = 0x4000;
+pub const CHR_ROM_UNIT_SIZE: usize = 0x2000;
+pub const PRG_RAM_UNIT_SIZE: usize = 0x2000;
 
 pub const CPU_CYCLES_PER_FRAME: usize = 29780;
 pub const FPS: usize = 60;

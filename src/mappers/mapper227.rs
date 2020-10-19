@@ -58,9 +58,7 @@ pub struct Mapper227 {
 
 impl Mapper227 {
     pub fn new(prg_rom: Vec<u8>, chr_rom: Vec<u8>) -> Self {
-        let mut mapper_internal = MapperInternal::new(prg_rom, chr_rom);
-        mapper_internal.set_chr_bank_size(ChrRomBankSize::_8KB);
-        mapper_internal.set_prg_bank_size(PrgRomBankSize::_16KB);
+        let mapper_internal = MapperInternal::new(prg_rom, chr_rom);
         Self {
             mapper_internal,
             register: 0,
@@ -96,13 +94,6 @@ impl Mapper227 {
     }
 }
 impl Mapper for Mapper227 {
-    fn get_chr_byte(&mut self, address: u16) -> u8 {
-        self.mapper_internal.get_chr_byte(address, 0)
-    }
-
-    fn get_mirroring(&self) -> Mirroring {
-        self.register.get_mirroring()
-    }
     fn get_pgr_byte(&mut self, address: u16) -> u8 {
         let bank = if (self.register.get_pgr_bank_size() == PrgRomBankSize::_32KB
             && self.register.is_mode_1_enabled())
@@ -112,24 +103,33 @@ impl Mapper for Mapper227 {
         } else {
             self.bank_2
         };
-        self.mapper_internal.get_pgr_byte(address, bank)
+        self.mapper_internal
+            .get_pgr_byte(address, bank, self.register.get_pgr_bank_size() as usize)
+    }
+
+    fn store_pgr_byte(&mut self, address: u16, _: u8) {
+        self.register = address;
+        self.update_banks();
+    }
+
+    fn get_chr_byte(&mut self, address: u16) -> u8 {
+        self.mapper_internal
+            .get_chr_byte(address, 0, ChrRomBankSize::_8KB as usize)
+    }
+
+    fn store_chr_byte(&mut self, address: u16, byte: u8) {
+        if !self.register.is_mode_1_enabled() {
+            self.mapper_internal
+                .store_chr_byte(address, 0, ChrRomBankSize::_8KB as usize, byte)
+        }
+    }
+
+    fn get_mirroring(&self) -> Mirroring {
+        self.register.get_mirroring()
     }
 
     fn reset(&mut self) {
         self.register = 0;
         self.mapper_internal.reset();
-    }
-
-    fn store_chr_byte(&mut self, address: u16, byte: u8) {
-        if !self.register.is_mode_1_enabled() {
-            self.mapper_internal.store_chr_byte(address, byte)
-        }
-    }
-
-    fn store_pgr_byte(&mut self, address: u16, _: u8) {
-        self.register = address;
-        self.mapper_internal
-            .set_prg_bank_size(self.register.get_pgr_bank_size());
-        self.update_banks();
     }
 }

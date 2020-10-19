@@ -13,9 +13,7 @@ impl Mapper0 {
         if final_prg_rom.len() <= 16384 {
             final_prg_rom.extend_from_slice(prg_rom.as_slice())
         }
-        let mut mapper_internal = MapperInternal::new(final_prg_rom, chr_rom);
-        mapper_internal.set_prg_bank_size(PrgRomBankSize::_16KB);
-        mapper_internal.set_chr_bank_size(ChrRomBankSize::_8KB);
+        let mapper_internal = MapperInternal::new(final_prg_rom, chr_rom);
 
         Self {
             mirroring,
@@ -26,19 +24,23 @@ impl Mapper0 {
 
 impl Mapper for Mapper0 {
     fn get_chr_byte(&mut self, address: u16) -> u8 {
-        self.mapper_internal.get_chr_byte(address, 0)
+        self.mapper_internal
+            .get_chr_byte(address, 0, ChrRomBankSize::_8KB as usize)
     }
 
     fn get_pgr_byte(&mut self, address: u16) -> u8 {
         if address < 0xC000 {
-            self.mapper_internal.get_pgr_byte(address, 0)
+            self.mapper_internal
+                .get_pgr_byte(address, 0, PrgRomBankSize::_16KB as usize)
         } else {
-            self.mapper_internal.get_pgr_byte(address, 1)
+            self.mapper_internal
+                .get_pgr_byte(address, 1, PrgRomBankSize::_16KB as usize)
         }
     }
 
     fn store_chr_byte(&mut self, address: u16, byte: u8) {
-        self.mapper_internal.store_chr_byte(address, byte)
+        self.mapper_internal
+            .store_chr_byte(address, 0, ChrRomBankSize::_8KB as usize, byte)
     }
 
     fn store_pgr_byte(&mut self, address: u16, _: u8) {

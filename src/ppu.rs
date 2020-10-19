@@ -52,7 +52,7 @@ impl ControlRegister {
     }
 
     fn get_sprite_pattern_table_index_for_8x8_mode(&self) -> u8 {
-        (self.value & ControlRegisterFlag::SpritePattern8x8 as u8) >> 4
+        (self.value & ControlRegisterFlag::SpritePattern8x8 as u8) >> 3
     }
 
     fn get_background_pattern_table_index(&self) -> u8 {
