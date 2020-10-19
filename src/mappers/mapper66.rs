@@ -33,7 +33,7 @@ impl Mapper for Mapper66 {
     }
     fn get_pgr_byte(&mut self, address: u16) -> u8 {
         self.mapper_internal
-            .get_pgr_byte(address, self.prg_bank, PrgRomBankSize::_16KB as usize)
+            .get_pgr_byte(address, self.prg_bank, PrgRomBankSize::_32KB as usize)
     }
 
     fn reset(&mut self) {
