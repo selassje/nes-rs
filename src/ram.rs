@@ -25,6 +25,8 @@ const PPU_REGISTERS_RANGE: Range<u16> = Range {
     end: PPU_REGISTERS_END,
 };
 
+const CPU_TEST_MODE_SPACE_START: u16 = 0x4018;
+
 const CARTRIDGE_SPACE_START: u32 = 0x4020;
 const CARTRIDGE_SPACE_END: u32 = 0xFFFF + 1;
 
@@ -34,7 +36,7 @@ const CARTRIDGE_SPACE_RANGE: Range<u32> = Range {
 };
 
 pub struct RAM {
-    memory: [u8; 0x4020],
+    memory: [u8; 0x0808],
     mapper: Rc<RefCell<dyn Mapper>>,
     ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>,
     controller_access: Rc<RefCell<dyn ControllerPortsAccess>>,
@@ -50,7 +52,7 @@ impl RAM {
         mapper: Rc<RefCell<dyn Mapper>>,
     ) -> RAM {
         RAM {
-            memory: [0; 0x4020],
+            memory: [0; 0x0808],
             mapper: mapper,
             ppu_access: ppu_access,
             controller_access: controller_access,
@@ -62,6 +64,7 @@ impl RAM {
     pub fn reset(&mut self) {
         self.memory.iter_mut().for_each(|m| *m = 0);
     }
+
     fn get_real_address(&self, address: u16) -> u16 {
         if PPU_REGISTERS_RANGE.contains(&address) {
             PPU_REGISTERS_START + (address % PPU_REGISTERS_MIRROR_SIZE)
@@ -96,7 +99,10 @@ impl Memory for RAM {
             );
         } else if CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)) {
             self.mapper.borrow_mut().get_prg_byte(addr)
+        } else if addr >= CPU_TEST_MODE_SPACE_START {
+            self.memory[(INTERNAL_MIRROR_SIZE + addr - CPU_TEST_MODE_SPACE_START) as usize]
         } else {
+            assert!(addr < INTERNAL_MIRROR_SIZE);
             self.memory[addr as usize]
         }
     }
@@ -111,7 +117,6 @@ impl Memory for RAM {
                 let page_adress = (byte as u16) << 8;
                 *e = self.get_byte(page_adress + i as u16);
             }
-            self.memory[addr as usize] = byte;
             self.ppu_access.borrow_mut().write_oam_dma(dma_data);
         } else if let Ok(output_port) = OutputPort::try_from(addr) {
             self.controller_access.borrow_mut().write(output_port, byte);
@@ -124,7 +129,10 @@ impl Memory for RAM {
             //panic!("Attempting to write to a read Apu register");
         } else if CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)) {
             self.mapper.borrow_mut().store_prg_byte(addr, byte)
+        } else if addr >= CPU_TEST_MODE_SPACE_START {
+            self.memory[(INTERNAL_MIRROR_SIZE + addr - CPU_TEST_MODE_SPACE_START) as usize];
         } else {
+            assert!(addr < INTERNAL_MIRROR_SIZE);
             self.memory[addr as usize] = byte;
         }
     }
