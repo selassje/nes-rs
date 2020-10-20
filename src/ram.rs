@@ -34,7 +34,7 @@ const CARTRIDGE_SPACE_RANGE: Range<u32> = Range {
 };
 
 pub struct RAM {
-    memory: [u8; 65536],
+    memory: [u8; 0x4020],
     mapper: Rc<RefCell<dyn Mapper>>,
     ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>,
     controller_access: Rc<RefCell<dyn ControllerPortsAccess>>,
@@ -50,7 +50,7 @@ impl RAM {
         mapper: Rc<RefCell<dyn Mapper>>,
     ) -> RAM {
         RAM {
-            memory: [0; 65536],
+            memory: [0; 0x4020],
             mapper: mapper,
             ppu_access: ppu_access,
             controller_access: controller_access,

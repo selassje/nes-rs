@@ -43,9 +43,7 @@ impl Mapper for Mapper0 {
             .store_chr_byte(address, 0, ChrRomBankSize::_8KB as usize, byte)
     }
 
-    fn store_prg_byte(&mut self, address: u16, _: u8) {
-        //todo!("address {:X}", address);
-    }
+    fn store_prg_byte(&mut self, _: u16, _: u8) {}
 
     fn get_mirroring(&self) -> Mirroring {
         self.mirroring

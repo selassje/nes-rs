@@ -4,7 +4,6 @@ use crate::{mappers::Mapper, memory::VideoMemory};
 
 use std::{cell::RefCell, ops::Range, rc::Rc};
 
-const ADDRESS_SPACE: usize = 0x10000;
 const PATTERN_TABLE_SIZE: u16 = 0x1000;
 const NAMETABLE_SIZE: u16 = 0x400;
 const NAMETABLE_MIRROR_SIZE: u16 = 0x1000;
@@ -37,7 +36,7 @@ const ATTRIBUTE_DATA_QUADRANT_MASKS: [u8; 4] = [
 ];
 
 pub struct VRAM {
-    memory: [u8; ADDRESS_SPACE],
+    memory: [u8; 0x1020],
     mapper: Rc<RefCell<dyn Mapper>>,
     read_buffer: RefCell<u8>,
 }
@@ -45,7 +44,7 @@ pub struct VRAM {
 impl VRAM {
     pub fn new(mapper: Rc<RefCell<dyn Mapper>>) -> Self {
         VRAM {
-            memory: [0; ADDRESS_SPACE],
+            memory: [0; 0x1020],
             mapper,
             read_buffer: RefCell::new(0),
         }
@@ -55,12 +54,11 @@ impl VRAM {
         self.memory.iter_mut().for_each(|m| *m = 0);
     }
 
-    fn get_real_address(&self, address: u16) -> u16 {
+    fn get_memory_index(&self, address: u16) -> usize {
         if NAMETABLES_RANGE.contains(&address) {
             let nametable_mirror_offset = address % NAMETABLE_MIRROR_SIZE;
-            NAMETABLES_START
-                + (address % NAMETABLE_SIZE)
-                + match self.mapper.borrow_mut().get_mirroring() {
+            (address % NAMETABLE_SIZE) as usize
+                + match self.mapper.borrow().get_mirroring() {
                     Mirroring::Vertical => match nametable_mirror_offset {
                         0x0000..=0x03FF => 0x0000,
                         0x0400..=0x07FF => 0x0400,
@@ -79,7 +77,7 @@ impl VRAM {
                     Mirroring::SingleScreenUpperBank => 0x0400,
                 }
         } else if PALETTES_RANGE.contains(&address) {
-            let palettes_mirror_offset = address % 0x20;
+            let palettes_mirror_offset = (address as usize) % 0x20;
             let maybe_internal_mirror = match palettes_mirror_offset {
                 0x10 => Some(0x00),
                 0x14 => Some(0x04),
@@ -87,23 +85,21 @@ impl VRAM {
                 0x1C => Some(0x0C),
                 _ => None,
             };
-            PALETTES_START
+            0x1000
                 + if let Some(mirror) = maybe_internal_mirror {
                     mirror
                 } else {
                     palettes_mirror_offset
                 }
         } else {
-            address
+            panic!("Incorrect address! {:X}", address)
         }
     }
     fn get_attribute_table(&self, table_index: u8) -> [u8; 64] {
         let mut attribute_table = [0; 64];
         let attrib_table_addr =
-            self.get_real_address(NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE + 960);
-        attribute_table.copy_from_slice(
-            &self.memory[attrib_table_addr as usize..attrib_table_addr as usize + 64],
-        );
+            self.get_memory_index(NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE + 960);
+        attribute_table.copy_from_slice(&self.memory[attrib_table_addr..attrib_table_addr + 64]);
         attribute_table
     }
 
@@ -111,7 +107,7 @@ impl VRAM {
         if address < NAMETABLES_START {
             self.mapper.borrow_mut().get_chr_byte(address)
         } else {
-            self.memory[self.get_real_address(address) as usize]
+            self.memory[self.get_memory_index(address)]
         }
     }
 
@@ -129,7 +125,7 @@ impl Memory for VRAM {
         if addr < NAMETABLES_START {
             self.mapper.borrow_mut().store_chr_byte(addr, byte);
         } else {
-            self.memory[self.get_real_address(addr) as usize] = byte;
+            self.memory[self.get_memory_index(addr)] = byte;
         }
     }
 
