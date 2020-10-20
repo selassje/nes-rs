@@ -1,4 +1,3 @@
-use crate::common;
 use crate::ram_apu;
 use crate::ram_controllers::*;
 use crate::ram_ppu::*;
@@ -63,16 +62,20 @@ impl RAM {
     pub fn reset(&mut self) {
         self.memory.iter_mut().for_each(|m| *m = 0);
     }
+    fn get_real_address(&self, address: u16) -> u16 {
+        if PPU_REGISTERS_RANGE.contains(&address) {
+            PPU_REGISTERS_START + (address % PPU_REGISTERS_MIRROR_SIZE)
+        } else if INTERNAL_RAM_RANGE.contains(&address) {
+            INTERNAL_START + (address % INTERNAL_MIRROR_SIZE)
+        } else {
+            address
+        }
+    }
 }
 
 impl Memory for RAM {
-    fn get_byte(&self, addr: u16) -> u8 {
-        let addr = if PPU_REGISTERS_RANGE.contains(&addr) {
-            PPU_REGISTERS_START + addr % PPU_REGISTERS_MIRROR_SIZE
-        } else {
-            addr
-        };
-
+    fn get_byte(&self, address: u16) -> u8 {
+        let addr = self.get_real_address(address);
         if let Ok(reg) = ReadAccessRegister::try_from(addr) {
             self.ppu_access.borrow_mut().read(reg)
         } else if let Ok(reg) = ram_apu::ReadAccessRegister::try_from(addr) {
@@ -98,12 +101,8 @@ impl Memory for RAM {
         }
     }
 
-    fn store_byte(&mut self, addr: u16, byte: u8) {
-        let addr = if PPU_REGISTERS_RANGE.contains(&addr) {
-            PPU_REGISTERS_START + addr % PPU_REGISTERS_MIRROR_SIZE
-        } else {
-            addr
-        };
+    fn store_byte(&mut self, address: u16, byte: u8) {
+        let addr = self.get_real_address(address);
         if let Ok(reg) = WriteAccessRegister::try_from(addr) {
             self.ppu_access.borrow_mut().write(reg, byte);
         } else if let Ok(_) = DmaWriteAccessRegister::try_from(addr) {
@@ -123,11 +122,6 @@ impl Memory for RAM {
             //panic!("Attempting to write to a read Ppu register");
         } else if let Ok(_) = ram_apu::ReadAccessRegister::try_from(addr) {
             //panic!("Attempting to write to a read Apu register");
-        } else if INTERNAL_RAM_RANGE.contains(&addr) {
-            let mirrors = common::get_mirrors(addr, INTERNAL_MIRROR_SIZE, INTERNAL_RAM_RANGE);
-            for m in mirrors {
-                self.memory[m as usize] = byte;
-            }
         } else if CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)) {
             self.mapper.borrow_mut().store_pgr_byte(addr, byte)
         } else {

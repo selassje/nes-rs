@@ -86,7 +86,7 @@ impl Nes {
         let mut one_second_timer = Instant::now();
 
         let mut io_control = IOControl {
-            fps: common::FPS as u8,
+            fps: common::FPS as u16,
         };
 
         while (duration == None
@@ -107,7 +107,7 @@ impl Nes {
                                 as u64,
                         );
                     }
-                    io_control.fps = fps as u8;
+                    io_control.fps = fps as u16;
                     fps = 1;
                 }
             }

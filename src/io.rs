@@ -15,7 +15,7 @@ pub struct IOState {
 
 #[derive(Copy, Clone)]
 pub struct IOControl {
-    pub fps: u8,
+    pub fps: u16,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]

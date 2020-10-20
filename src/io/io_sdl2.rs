@@ -51,7 +51,7 @@ impl SampleBuffer {
         }
     }
 
-    fn reset(&mut self, fps: u8) {
+    fn reset(&mut self, fps: u16) {
         self.index = 0;
         self.sum = 0.0;
         self.bucket_size = 0.0;
@@ -147,7 +147,7 @@ impl IOSdl2 {
         }
     }
 
-    fn draw_fps(&mut self, fps: u8) {
+    fn draw_fps(&mut self, fps: u16) {
         let font_data = include_bytes!("../../res/OpenSans-Regular.ttf");
         let r = RWops::from_bytes(font_data).unwrap();
         let mut font = self.ttf_context.load_font_from_rwops(r, 14).unwrap();
