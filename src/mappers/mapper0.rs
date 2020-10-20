@@ -28,7 +28,7 @@ impl Mapper for Mapper0 {
             .get_chr_byte(address, 0, ChrRomBankSize::_8KB as usize)
     }
 
-    fn get_pgr_byte(&mut self, address: u16) -> u8 {
+    fn get_prg_byte(&mut self, address: u16) -> u8 {
         if address < 0xC000 {
             self.mapper_internal
                 .get_pgr_byte(address, 0, PrgRomBankSize::_16KB as usize)
@@ -43,8 +43,8 @@ impl Mapper for Mapper0 {
             .store_chr_byte(address, 0, ChrRomBankSize::_8KB as usize, byte)
     }
 
-    fn store_pgr_byte(&mut self, address: u16, _: u8) {
-        unimplemented!("address {:X}", address);
+    fn store_prg_byte(&mut self, address: u16, _: u8) {
+        //todo!("address {:X}", address);
     }
 
     fn get_mirroring(&self) -> Mirroring {

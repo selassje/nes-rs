@@ -75,7 +75,7 @@ impl Mapper for Mapper1 {
         self.mapper_internal.get_chr_byte(address, bank, bank_size)
     }
 
-    fn get_pgr_byte(&mut self, address: u16) -> u8 {
+    fn get_prg_byte(&mut self, address: u16) -> u8 {
         if self.control.get_prg_bank_mode() < 2 {
             self.mapper_internal.get_pgr_byte(
                 address,
@@ -97,7 +97,7 @@ impl Mapper for Mapper1 {
             .store_chr_byte(address, bank, bank_size, byte)
     }
 
-    fn store_pgr_byte(&mut self, address: u16, byte: u8) {
+    fn store_prg_byte(&mut self, address: u16, byte: u8) {
         if byte & 0b1000_0000 != 0 {
             self.shift_register = Default::default();
             self.control |= 0x0C;

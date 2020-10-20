@@ -25,7 +25,7 @@ const PPU_REGISTERS_RANGE: Range<u16> = Range {
     end: PPU_REGISTERS_END,
 };
 
-const CARTRIDGE_SPACE_START: u32 = 0x8000;
+const CARTRIDGE_SPACE_START: u32 = 0x4020;
 const CARTRIDGE_SPACE_END: u32 = 0xFFFF + 1;
 
 const CARTRIDGE_SPACE_RANGE: Range<u32> = Range {
@@ -95,7 +95,7 @@ impl Memory for RAM {
                 addr
             );
         } else if CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)) {
-            self.mapper.borrow_mut().get_pgr_byte(addr)
+            self.mapper.borrow_mut().get_prg_byte(addr)
         } else {
             self.memory[addr as usize]
         }
@@ -123,7 +123,7 @@ impl Memory for RAM {
         } else if let Ok(_) = ram_apu::ReadAccessRegister::try_from(addr) {
             //panic!("Attempting to write to a read Apu register");
         } else if CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)) {
-            self.mapper.borrow_mut().store_pgr_byte(addr, byte)
+            self.mapper.borrow_mut().store_prg_byte(addr, byte)
         } else {
             self.memory[addr as usize] = byte;
         }

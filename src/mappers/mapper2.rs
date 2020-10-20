@@ -29,7 +29,7 @@ impl Mapper for Mapper2 {
     fn get_mirroring(&self) -> Mirroring {
         self.mirroring
     }
-    fn get_pgr_byte(&mut self, address: u16) -> u8 {
+    fn get_prg_byte(&mut self, address: u16) -> u8 {
         let bank = if address < 0xC000 {
             self.switchable_bank_0
         } else {
@@ -51,7 +51,7 @@ impl Mapper for Mapper2 {
             .store_chr_byte(address, 0, ChrRomBankSize::_8KB as usize, byte)
     }
 
-    fn store_pgr_byte(&mut self, _: u16, byte: u8) {
+    fn store_prg_byte(&mut self, _: u16, byte: u8) {
         self.switchable_bank_0 = byte as usize;
     }
 }

@@ -66,6 +66,7 @@ impl Mapper227 {
             bank_2: 0,
         }
     }
+
     fn update_banks(&mut self) {
         let is_bank_size_32kb = self.register.get_pgr_bank_size() == PrgRomBankSize::_32KB;
         let bank = self.register.get_prg_bank();
@@ -94,7 +95,7 @@ impl Mapper227 {
     }
 }
 impl Mapper for Mapper227 {
-    fn get_pgr_byte(&mut self, address: u16) -> u8 {
+    fn get_prg_byte(&mut self, address: u16) -> u8 {
         let bank = if (self.register.get_pgr_bank_size() == PrgRomBankSize::_32KB
             && self.register.is_mode_1_enabled())
             || address < 0xC000
@@ -107,7 +108,7 @@ impl Mapper for Mapper227 {
             .get_pgr_byte(address, bank, self.register.get_pgr_bank_size() as usize)
     }
 
-    fn store_pgr_byte(&mut self, address: u16, _: u8) {
+    fn store_prg_byte(&mut self, address: u16, _: u8) {
         self.register = address;
         self.update_banks();
     }

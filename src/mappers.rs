@@ -18,8 +18,8 @@ pub trait Mapper {
     fn get_chr_byte(&mut self, _: u16) -> u8;
     fn store_chr_byte(&mut self, _: u16, _: u8);
 
-    fn get_pgr_byte(&mut self, _: u16) -> u8;
-    fn store_pgr_byte(&mut self, _: u16, _: u8);
+    fn get_prg_byte(&mut self, _: u16) -> u8;
+    fn store_prg_byte(&mut self, _: u16, _: u8);
 
     fn get_mirroring(&self) -> Mirroring;
     fn reset(&mut self);
