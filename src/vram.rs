@@ -1,8 +1,5 @@
 use self::AttributeDataQuadrantMask::*;
-use crate::{
-    common::{self, Mirroring},
-    memory::Memory,
-};
+use crate::{common::Mirroring, memory::Memory};
 use crate::{mappers::Mapper, memory::VideoMemory};
 
 use std::{cell::RefCell, ops::Range, rc::Rc};
@@ -58,9 +55,52 @@ impl VRAM {
         self.memory.iter_mut().for_each(|m| *m = 0);
     }
 
+    fn get_real_address(&self, address: u16) -> u16 {
+        if NAMETABLES_RANGE.contains(&address) {
+            let nametable_mirror_offset = address % NAMETABLE_MIRROR_SIZE;
+            NAMETABLES_START
+                + (address % NAMETABLE_SIZE)
+                + match self.mapper.borrow_mut().get_mirroring() {
+                    Mirroring::Vertical => match nametable_mirror_offset {
+                        0x0000..=0x03FF => 0x0000,
+                        0x0400..=0x07FF => 0x0400,
+                        0x0800..=0x0BFF => 0x0000,
+                        0x0C00..=0x0FFF => 0x0400,
+                        _ => panic!("Unexpected nametable offset {:X}", nametable_mirror_offset),
+                    },
+                    Mirroring::Horizontal => match nametable_mirror_offset {
+                        0x0000..=0x03FF => 0x0000,
+                        0x0400..=0x07FF => 0x0000,
+                        0x0800..=0x0BFF => 0x0800,
+                        0x0C00..=0x0FFF => 0x0800,
+                        _ => panic!("Unexpected nametable offset {:X}", nametable_mirror_offset),
+                    },
+                    Mirroring::SingleScreenLowerBank => 0x0000,
+                    Mirroring::SingleScreenUpperBank => 0x0400,
+                }
+        } else if PALETTES_RANGE.contains(&address) {
+            let palettes_mirror_offset = address % 0x20;
+            let maybe_internal_mirror = match palettes_mirror_offset {
+                0x10 => Some(0x00),
+                0x14 => Some(0x04),
+                0x18 => Some(0x08),
+                0x1C => Some(0x0C),
+                _ => None,
+            };
+            PALETTES_START
+                + if let Some(mirror) = maybe_internal_mirror {
+                    mirror
+                } else {
+                    palettes_mirror_offset
+                }
+        } else {
+            address
+        }
+    }
     fn get_attribute_table(&self, table_index: u8) -> [u8; 64] {
         let mut attribute_table = [0; 64];
-        let attrib_table_addr = NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE + 960;
+        let attrib_table_addr =
+            self.get_real_address(NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE + 960);
         attribute_table.copy_from_slice(
             &self.memory[attrib_table_addr as usize..attrib_table_addr as usize + 64],
         );
@@ -71,7 +111,7 @@ impl VRAM {
         if address < NAMETABLES_START {
             self.mapper.borrow_mut().get_chr_byte(address)
         } else {
-            self.memory[address as usize]
+            self.memory[self.get_real_address(address) as usize]
         }
     }
 
@@ -82,90 +122,22 @@ impl VRAM {
             self.get_byte_internal(start_addres + 2),
         ]
     }
-
-    fn get_nametable_mirrors(&self, addr: u16) -> Vec<u16> {
-        let mut mirrors = common::get_mirrors(
-            addr,
-            NAMETABLE_MIRROR_SIZE,
-            Range {
-                start: NAMETABLES_START,
-                end: PALETTES_END,
-            },
-        );
-        assert!(mirrors.len() == 2);
-        let namespace_region_offset = addr % NAMETABLE_MIRROR_SIZE;
-        let internal_mirror_offset = match self.mapper.borrow_mut().get_mirroring() {
-            Mirroring::VERTICAL => match namespace_region_offset {
-                0x0000..=0x03FF => 0x0800,
-                0x0400..=0x07FF => 0x0C00,
-                0x0800..=0x0BFF => 0x0000,
-                0x0C00..=0x0FFF => 0x0400,
-                _ => panic!("Unexpected nametable offset {:X}", namespace_region_offset),
-            },
-            Mirroring::HORIZONTAL => match namespace_region_offset {
-                0x0000..=0x03FF => 0x0400,
-                0x0400..=0x07FF => 0x0000,
-                0x0800..=0x0BFF => 0x0C00,
-                0x0C00..=0x0FFF => 0x0800,
-                _ => panic!("Unexpected nametable offset {:X}", namespace_region_offset),
-            },
-        } + namespace_region_offset % NAMETABLE_SIZE;
-        for i in 0..2 {
-            let m = NAMETABLES_START + i * NAMETABLE_MIRROR_SIZE + internal_mirror_offset;
-            if m < NAMETABLES_END {
-                mirrors.push(m);
-            }
-        }
-        mirrors
-    }
-
-    fn get_pallete_mirrors(&self, addr: u16) -> Vec<u16> {
-        const MIRROR_SIZE: u16 = 0x20;
-        let mut mirrors = common::get_mirrors(addr, MIRROR_SIZE, PALETTES_RANGE);
-        let maybe_offset = match addr % MIRROR_SIZE {
-            0x00 => Some(0x10),
-            0x10 => Some(0x00),
-            0x04 => Some(0x14),
-            0x14 => Some(0x04),
-            0x08 => Some(0x18),
-            0x18 => Some(0x08),
-            0x0C => Some(0x1C),
-            0x1C => Some(0x0C),
-            _ => None,
-        };
-
-        if let Some(offset) = maybe_offset {
-            for i in 0..8 {
-                mirrors.push(PALETTES_START + i * MIRROR_SIZE + offset);
-            }
-        }
-        mirrors
-    }
 }
 
 impl Memory for VRAM {
     fn store_byte(&mut self, addr: u16, byte: u8) {
         if addr < NAMETABLES_START {
             self.mapper.borrow_mut().store_chr_byte(addr, byte);
-        } else if NAMETABLES_RANGE.contains(&addr) {
-            let mirrors = self.get_nametable_mirrors(addr);
-            for m in mirrors {
-                self.memory[m as usize] = byte;
-            }
-            self.memory[addr as usize] = byte;
-        } else if PALETTES_RANGE.contains(&addr) {
-            let mirrors = self.get_pallete_mirrors(addr);
-            for m in mirrors {
-                self.memory[m as usize] = byte;
-            }
-            self.memory[addr as usize] = byte;
+        } else {
+            self.memory[self.get_real_address(addr) as usize] = byte;
         }
     }
 
     fn get_byte(&self, addr: u16) -> u8 {
         let byte = self.get_byte_internal(addr);
         if PALETTES_RANGE.contains(&addr) {
-            *self.read_buffer.borrow_mut() = byte;
+            *self.read_buffer.borrow_mut() =
+                self.get_byte_internal(NAMETABLES_START + (addr % NAMETABLE_MIRROR_SIZE));
             byte
         } else {
             let read_buffer = *self.read_buffer.borrow();

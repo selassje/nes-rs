@@ -9,8 +9,10 @@ pub const FPS: usize = 60;
 
 #[derive(Copy, Clone, Debug)]
 pub enum Mirroring {
-    VERTICAL,
-    HORIZONTAL,
+    Vertical,
+    Horizontal,
+    SingleScreenLowerBank,
+    SingleScreenUpperBank,
 }
 
 pub fn convert_2u8_to_u16(b0: u8, b1: u8) -> u16 {

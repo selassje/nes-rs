@@ -153,9 +153,9 @@ impl NesFile {
         };
 
         let mirroring = if header.flag_6 & HeaderFlag6::MirroringVertical as u8 != 0 {
-            common::Mirroring::VERTICAL
+            common::Mirroring::Vertical
         } else {
-            common::Mirroring::HORIZONTAL
+            common::Mirroring::Horizontal
         };
         read_index = 16;
         let mut trainer = Option::None;

@@ -12,9 +12,10 @@ impl ControlRegister for u8 {
     fn get_mirroring(&self) -> Mirroring {
         let mirroring = self & 3;
         match mirroring {
-            0 => Mirroring::VERTICAL,
-            2 => Mirroring::VERTICAL,
-            3 => Mirroring::HORIZONTAL,
+            0 => Mirroring::SingleScreenLowerBank,
+            1 => Mirroring::SingleScreenUpperBank,
+            2 => Mirroring::Vertical,
+            3 => Mirroring::Horizontal,
             _ => panic!("Unsupported mirroring {}", mirroring),
         }
     }
