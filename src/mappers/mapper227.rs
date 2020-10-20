@@ -1,15 +1,15 @@
-use super::{
-    mapper_internal::ChrRomBankSize, mapper_internal::MapperInternal,
-    mapper_internal::PrgRomBankSize, Mapper,
-};
+use super::Mapper;
 use crate::common::Mirroring;
+use crate::mappers::mapper_internal::BankSize;
+use crate::mappers::mapper_internal::BankSize::*;
+use crate::mappers::mapper_internal::MapperInternal;
 
 trait Register {
     fn is_last_prg_page_mode(&self) -> bool;
     fn get_prg_bank(&self) -> usize;
     fn is_mode_1_enabled(&self) -> bool;
     fn get_mirroring(&self) -> Mirroring;
-    fn get_pgr_bank_size(&self) -> PrgRomBankSize;
+    fn get_prg_bank_size(&self) -> BankSize;
     fn is_menu_selection_mode(&self) -> bool;
 }
 
@@ -36,11 +36,11 @@ impl Register for u16 {
         }
     }
 
-    fn get_pgr_bank_size(&self) -> PrgRomBankSize {
+    fn get_prg_bank_size(&self) -> BankSize {
         if self & 0b00000000_00000001 != 0 {
-            PrgRomBankSize::_32KB
+            _32KB
         } else {
-            PrgRomBankSize::_16KB
+            _16KB
         }
     }
 
@@ -68,7 +68,7 @@ impl Mapper227 {
     }
 
     fn update_banks(&mut self) {
-        let is_bank_size_32kb = self.register.get_pgr_bank_size() == PrgRomBankSize::_32KB;
+        let is_bank_size_32kb = self.register.get_prg_bank_size() == _32KB;
         let bank = self.register.get_prg_bank();
         let is_last_prg_page_mode = self.register.is_last_prg_page_mode();
         let is_mode_1 = self.register.is_mode_1_enabled();
@@ -96,7 +96,7 @@ impl Mapper227 {
 }
 impl Mapper for Mapper227 {
     fn get_prg_byte(&mut self, address: u16) -> u8 {
-        let bank = if (self.register.get_pgr_bank_size() == PrgRomBankSize::_32KB
+        let bank = if (self.register.get_prg_bank_size() == _32KB
             && self.register.is_mode_1_enabled())
             || address < 0xC000
         {
@@ -105,7 +105,7 @@ impl Mapper for Mapper227 {
             self.bank_2
         };
         self.mapper_internal
-            .get_pgr_byte(address, bank, self.register.get_pgr_bank_size() as usize)
+            .get_prg_rom_byte(address, bank, self.register.get_prg_bank_size())
     }
 
     fn store_prg_byte(&mut self, address: u16, _: u8) {
@@ -114,14 +114,12 @@ impl Mapper for Mapper227 {
     }
 
     fn get_chr_byte(&mut self, address: u16) -> u8 {
-        self.mapper_internal
-            .get_chr_byte(address, 0, ChrRomBankSize::_8KB as usize)
+        self.mapper_internal.get_chr_byte(address, 0, _8KB)
     }
 
     fn store_chr_byte(&mut self, address: u16, byte: u8) {
         if !self.register.is_mode_1_enabled() {
-            self.mapper_internal
-                .store_chr_byte(address, 0, ChrRomBankSize::_8KB as usize, byte)
+            self.mapper_internal.store_chr_byte(address, 0, _8KB, byte)
         }
     }
 

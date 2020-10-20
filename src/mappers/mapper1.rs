@@ -1,7 +1,8 @@
-use super::{mapper_internal::ChrRomBankSize, mapper_internal::PrgRomBankSize, Mapper};
+use super::Mapper;
 use crate::common::Mirroring;
+use crate::mappers::mapper_internal::BankSize;
+use crate::mappers::mapper_internal::BankSize::*;
 use crate::mappers::mapper_internal::MapperInternal;
-
 trait ControlRegister {
     fn get_prg_bank_mode(&self) -> u8;
     fn get_chr_bank_mode(&self) -> u8;
@@ -56,13 +57,13 @@ impl Mapper1 {
         }
     }
 
-    fn get_chr_bank_info_from_address(&self, address: u16) -> (usize, usize) {
+    fn get_chr_bank_info_from_address(&self, address: u16) -> (usize, BankSize) {
         if self.control.get_chr_bank_mode() == 0 {
-            (self.chr_bank_0 as usize >> 1, ChrRomBankSize::_8KB as usize)
+            (self.chr_bank_0 as usize >> 1, _8KB)
         } else {
             match address {
-                0x0000..=0x0FFF => (self.chr_bank_0 as usize, ChrRomBankSize::_4KB as usize),
-                0x1000..=0x1FFF => (self.chr_bank_1 as usize, ChrRomBankSize::_4KB as usize),
+                0x0000..=0x0FFF => (self.chr_bank_0 as usize, _4KB),
+                0x1000..=0x1FFF => (self.chr_bank_1 as usize, _4KB),
                 _ => panic!("Incorrect CHR address {:x}", address),
             }
         }
@@ -77,17 +78,11 @@ impl Mapper for Mapper1 {
 
     fn get_prg_byte(&mut self, address: u16) -> u8 {
         if self.control.get_prg_bank_mode() < 2 {
-            self.mapper_internal.get_pgr_byte(
-                address,
-                self.prg_bank as usize & 0xF >> 1,
-                PrgRomBankSize::_32KB as usize,
-            )
+            self.mapper_internal
+                .get_prg_rom_byte(address, self.prg_bank as usize & 0xF >> 1, _32KB)
         } else {
-            self.mapper_internal.get_pgr_byte(
-                address,
-                self.prg_bank as usize & 0xF,
-                PrgRomBankSize::_16KB as usize,
-            )
+            self.mapper_internal
+                .get_prg_rom_byte(address, self.prg_bank as usize & 0xF, _16KB)
         }
     }
 

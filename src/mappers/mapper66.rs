@@ -1,9 +1,7 @@
-use super::{
-    mapper_internal::ChrRomBankSize, mapper_internal::MapperInternal,
-    mapper_internal::PrgRomBankSize, Mapper,
-};
+use super::Mapper;
 use crate::common::Mirroring;
-
+use crate::mappers::mapper_internal::BankSize::*;
+use crate::mappers::mapper_internal::MapperInternal;
 pub struct Mapper66 {
     mapper_internal: MapperInternal,
     mirroring: Mirroring,
@@ -25,15 +23,16 @@ impl Mapper66 {
 impl Mapper for Mapper66 {
     fn get_chr_byte(&mut self, address: u16) -> u8 {
         self.mapper_internal
-            .get_chr_byte(address, self.chr_bank, ChrRomBankSize::_8KB as usize)
+            .get_chr_byte(address, self.chr_bank, _8KB)
     }
 
     fn get_mirroring(&self) -> Mirroring {
         self.mirroring
     }
+
     fn get_prg_byte(&mut self, address: u16) -> u8 {
         self.mapper_internal
-            .get_pgr_byte(address, self.prg_bank, PrgRomBankSize::_32KB as usize)
+            .get_prg_rom_byte(address, self.prg_bank, _32KB)
     }
 
     fn reset(&mut self) {
@@ -43,8 +42,7 @@ impl Mapper for Mapper66 {
     }
 
     fn store_chr_byte(&mut self, address: u16, byte: u8) {
-        self.mapper_internal
-            .store_chr_byte(address, 0, ChrRomBankSize::_8KB as usize, byte)
+        self.mapper_internal.store_chr_byte(address, 0, _8KB, byte)
     }
 
     fn store_prg_byte(&mut self, _: u16, byte: u8) {
