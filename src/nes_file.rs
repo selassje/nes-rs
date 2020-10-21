@@ -5,6 +5,7 @@ use crate::mappers::Mapper;
 use crate::mappers::Mapper0;
 use crate::mappers::Mapper1;
 use crate::mappers::Mapper2;
+use crate::mappers::Mapper4;
 use crate::mappers::Mapper227;
 use crate::mappers::Mapper66;
 
@@ -100,6 +101,7 @@ impl NesFile {
             0 => Rc::new(RefCell::new(Mapper0::new(prg_rom, chr_rom, self.mirroring))),
             1 => Rc::new(RefCell::new(Mapper1::new(prg_rom, chr_rom))),
             2 => Rc::new(RefCell::new(Mapper2::new(prg_rom, chr_rom, self.mirroring))),
+            4 => Rc::new(RefCell::new(Mapper4::new(prg_rom, chr_rom))),
             66 => Rc::new(RefCell::new(Mapper66::new(
                 prg_rom,
                 chr_rom,

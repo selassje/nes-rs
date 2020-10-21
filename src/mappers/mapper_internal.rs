@@ -1,4 +1,4 @@
-const CHR_DATA_SIZE: usize = 0x8000;
+const CHR_DATA_SIZE: usize = 0x40000;
 const PRG_ROM_DATA_SIZE: usize = 0x80000;
 const PRG_RAM_DATA_SIZE: usize = 0x20000;
 
@@ -12,7 +12,7 @@ pub enum BankSize {
     _32KB = 0x8000,
 }
 
-pub struct MapperInternal {
+pub(super) struct MapperInternal {
     prg_ram: Box<[u8; PRG_RAM_DATA_SIZE]>,
     prg_rom: Box<[u8; PRG_ROM_DATA_SIZE]>,
     prg_rom_size: usize,
