@@ -3,13 +3,28 @@ const PRG_ROM_DATA_SIZE: usize = 0x80000;
 const PRG_RAM_DATA_SIZE: usize = 0x20000;
 
 #[derive(Clone, Copy, PartialEq)]
-pub enum BankSize {
+pub(super) enum BankSize {
     _1KB = 0x0400,
     _2KB = 0x0800,
     _4KB = 0x1000,
     _8KB = 0x2000,
     _16KB = 0x4000,
     _32KB = 0x8000,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct BankSelect {
+    pub size: BankSize,
+    pub bank: usize,
+}
+
+impl Default for BankSelect {
+    fn default() -> Self {
+        Self {
+            size: BankSize::_1KB,
+            bank: 0,
+        }
+    }
 }
 
 pub(super) struct MapperInternal {
@@ -62,7 +77,7 @@ impl MapperInternal {
         self.chr[self.get_address_index(address, bank, chr_bank_size)] = byte;
     }
 
-    pub fn get_prg_rom_bank_count(&mut self, prg_bank_size: BankSize) -> usize {
+    pub fn get_prg_rom_bank_count(&self, prg_bank_size: BankSize) -> usize {
         self.prg_rom_size / prg_bank_size as usize
     }
 

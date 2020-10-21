@@ -1,8 +1,15 @@
+use std::ops::Range;
+
 use super::Mapper;
 use crate::common::Mirroring;
-use crate::mappers::mapper_internal::BankSize;
+use crate::mappers::mapper_internal::BankSelect;
 use crate::mappers::mapper_internal::BankSize::*;
 use crate::mappers::mapper_internal::MapperInternal;
+
+const PRG_RAM_RANGE: Range<u16> = Range {
+    start: 0x6000,
+    end: 0x8000,
+};
 
 #[allow(dead_code)]
 pub(super) enum MMC3_6Variant {
@@ -12,71 +19,104 @@ pub(super) enum MMC3_6Variant {
     MMC6,
 }
 
-trait ControlRegister {
-    fn get_prg_bank_mode(&self) -> u8;
-    fn get_chr_bank_mode(&self) -> u8;
-    fn get_mirroring(&self) -> Mirroring;
+trait BankSelectRegister {
+    fn get_selected_bank(&self) -> usize;
+    fn get_prg_rom_mode(&self) -> u8;
+    fn get_chr_inversion_mode(&self) -> u8;
 }
 
-impl ControlRegister for u8 {
-    fn get_mirroring(&self) -> Mirroring {
-        let mirroring = self & 3;
-        match mirroring {
-            0 => Mirroring::SingleScreenLowerBank,
-            1 => Mirroring::SingleScreenUpperBank,
-            2 => Mirroring::Vertical,
-            3 => Mirroring::Horizontal,
-            _ => panic!("Unsupported mirroring {}", mirroring),
-        }
+impl BankSelectRegister for u8 {
+    fn get_selected_bank(&self) -> usize {
+        (self & 0b0000_0111) as usize
     }
 
-    fn get_prg_bank_mode(&self) -> u8 {
-        (self & 0b01100) >> 2
+    fn get_prg_rom_mode(&self) -> u8 {
+        (self & 0b0100_0000) >> 6
     }
 
-    fn get_chr_bank_mode(&self) -> u8 {
-        (self & 0b10000) >> 4
+    fn get_chr_inversion_mode(&self) -> u8 {
+        (self & 0b1000_0000) >> 7
     }
 }
-#[derive(Default)]
-struct ShiftRegister {
-    value: u8,
-    write_count: u8,
-}
-
 #[allow(dead_code)]
 pub(super) struct MMC3_6 {
     mapper_internal: MapperInternal,
-    shift_register: ShiftRegister,
-    control: u8,
-    chr_bank_0: u8,
-    chr_bank_1: u8,
-    prg_bank: u8,
     variant: MMC3_6Variant,
+    prg_rom_banks: [BankSelect; 4],
+    chr_rom_banks: [BankSelect; 8],
+    prg_rom_banks_count: usize,
+    bank_select: u8,
+    bank_data: u8,
+    mirroring: u8,
+    prg_ram_protect: u8,
+    reload_irq_counter_at_zero: u8,
+    reload_irq_counter_at_next_edge: Option<u8>,
+    irq_enabled: bool,
 }
 
 impl MMC3_6 {
     pub fn new(prg_rom: Vec<u8>, chr_rom: Vec<u8>, variant: MMC3_6Variant) -> Self {
         let mapper_internal = MapperInternal::new(prg_rom, chr_rom);
+        let prg_rom_banks_count = mapper_internal.get_prg_rom_bank_count(_8KB);
         Self {
             mapper_internal,
-            shift_register: Default::default(),
-            control: 0,
-            chr_bank_0: 0,
-            chr_bank_1: 0,
-            prg_bank: 0,
             variant,
+            prg_rom_banks: [BankSelect {
+                size: _8KB,
+                bank: prg_rom_banks_count - 1,
+            }; 4],
+            chr_rom_banks: [Default::default(); 8],
+            prg_rom_banks_count,
+            bank_select: 0,
+            bank_data: 0,
+            mirroring: 0,
+            prg_ram_protect: 0,
+            reload_irq_counter_at_zero: 0,
+            reload_irq_counter_at_next_edge: None,
+            irq_enabled: false,
         }
     }
 
-    fn get_chr_bank_info_from_address(&self, address: u16) -> (usize, BankSize) {
-        if self.control.get_chr_bank_mode() == 0 {
-            (self.chr_bank_0 as usize >> 1, _8KB)
+    fn update_bank_selection(&mut self) {
+        //println!("Bank select");
+        let selected_bank = self.bank_select.get_selected_bank();
+        if selected_bank < 6 {
+            let mode = self.bank_select.get_chr_inversion_mode() as usize;
+            let _1kb_bank = (self.bank_data) as usize;
+            let _2kb_bank = (self.bank_data & 0b1111_1110) as usize;
+
+            const CHR_MAP: [[(usize, usize); 2]; 6] = [
+                [(0, 1), (4, 5)],
+                [(2, 3), (6, 7)],
+                [(4, 4), (0, 0)],
+                [(5, 5), (1, 1)],
+                [(5, 5), (2, 2)],
+                [(6, 6), (3, 3)],
+            ];
+
+            let (bank_index_1, bank_index_2) = CHR_MAP[selected_bank][mode];
+            if bank_index_1 != bank_index_2 {
+                self.chr_rom_banks[bank_index_1].size = _2KB;
+                self.chr_rom_banks[bank_index_1].bank = _2kb_bank;
+                self.chr_rom_banks[bank_index_2].size = _2KB;
+                self.chr_rom_banks[bank_index_2].bank = _2kb_bank;
+            } else {
+                self.chr_rom_banks[bank_index_1].size = _1KB;
+                self.chr_rom_banks[bank_index_1].bank = _1kb_bank;
+            }
         } else {
-            match address {
-                0x0000..=0x0FFF => (self.chr_bank_0 as usize, _4KB),
-                0x1000..=0x1FFF => (self.chr_bank_1 as usize, _4KB),
-                _ => panic!("Incorrect CHR address {:x}", address),
+            let mode = self.bank_select.get_prg_rom_mode() as usize;
+            let bank = (self.bank_data & 0b00111111) as usize;
+            if selected_bank == 6 {
+                if mode == 0 {
+                    self.prg_rom_banks[0].bank = bank;
+                    self.prg_rom_banks[2].bank = self.prg_rom_banks_count - 2;
+                } else {
+                    self.prg_rom_banks[0].bank = self.prg_rom_banks_count - 2;
+                    self.prg_rom_banks[2].bank = bank;
+                }
+            } else {
+                self.prg_rom_banks[1].bank = self.bank_data as usize;
             }
         }
     }
@@ -84,58 +124,87 @@ impl MMC3_6 {
 
 impl Mapper for MMC3_6 {
     fn get_chr_byte(&mut self, address: u16) -> u8 {
-        let (bank, bank_size) = self.get_chr_bank_info_from_address(address);
-        self.mapper_internal.get_chr_byte(address, bank, bank_size)
+        let bank_select = self.chr_rom_banks[address as usize / _1KB as usize];
+        self.mapper_internal
+            .get_chr_byte(address, bank_select.bank, bank_select.size)
     }
 
     fn get_prg_byte(&mut self, address: u16) -> u8 {
-        if self.control.get_prg_bank_mode() < 2 {
-            self.mapper_internal
-                .get_prg_rom_byte(address, self.prg_bank as usize & 0xF >> 1, _32KB)
+        if PRG_RAM_RANGE.contains(&address) {
+            self.mapper_internal.get_prg_ram_byte(address, 0, _8KB)
         } else {
+            let bank_select =
+                self.prg_rom_banks[(address - PRG_RAM_RANGE.end) as usize / _8KB as usize];
+            //panic!("get at {:X} index {}", address,bank_select.bank);
             self.mapper_internal
-                .get_prg_rom_byte(address, self.prg_bank as usize & 0xF, _16KB)
+                .get_prg_rom_byte(address, bank_select.bank, bank_select.size)
         }
     }
 
-    fn store_chr_byte(&mut self, address: u16, byte: u8) {
-        let (bank, bank_size) = self.get_chr_bank_info_from_address(address);
-        self.mapper_internal
-            .store_chr_byte(address, bank, bank_size, byte)
+    fn store_chr_byte(&mut self, _: u16, _: u8) {
+        panic!("")
     }
 
     fn store_prg_byte(&mut self, address: u16, byte: u8) {
-        if byte & 0b1000_0000 != 0 {
-            self.shift_register = Default::default();
-            self.control |= 0x0C;
+        //println!("store at {:X}", address);
+        if PRG_RAM_RANGE.contains(&address) {
+            self.mapper_internal
+                .store_prg_ram_byte(address, 0, _8KB, byte)
         } else {
-            self.shift_register.value <<= 1;
-            self.shift_register.value |= byte & 1;
-            self.shift_register.write_count += 1;
-
-            if self.shift_register.write_count == 5 {
-                let register = &mut match address {
-                    0x8000..=0x9FFF => self.control,
-                    0xA000..=0xBFFF => self.chr_bank_0,
-                    0xC000..=0xDFFF => self.chr_bank_1,
-                    0xE000..=0xFFFF => self.prg_bank,
-                    _ => panic!("Incorrect address"),
-                };
-                *register = byte;
-                self.shift_register = Default::default();
+            let is_even = address % 2 == 0;
+            match address {
+                0x8000..=0x9FFF => {
+                    if is_even {
+                        self.bank_select = byte;
+                        self.update_bank_selection();
+                    } else {
+                        self.bank_data = byte;
+                        self.update_bank_selection();
+                    }
+                }
+                0xA000..=0xBFFF => {
+                    if is_even {
+                        self.mirroring = byte;
+                    } else {
+                        self.prg_ram_protect = byte;
+                    }
+                }
+                0xC000..=0xDFFF => {
+                    if is_even {
+                        self.reload_irq_counter_at_zero = byte;
+                    } else {
+                        self.reload_irq_counter_at_next_edge = Some(byte)
+                    }
+                }
+                0xE000..=0xFFFF => {
+                    self.irq_enabled = !is_even;
+                }
+                _ => panic!("Incorrect address {:X}", address),
             }
         }
     }
 
     fn get_mirroring(&self) -> Mirroring {
-        self.control.get_mirroring()
+        if self.mirroring & 1 == 1 {
+            Mirroring::Horizontal
+        } else {
+            Mirroring::Vertical
+        }
     }
 
     fn reset(&mut self) {
         self.mapper_internal.reset();
-        self.chr_bank_0 = 0;
-        self.chr_bank_1 = 0;
-        self.shift_register.value = 0;
-        self.shift_register.write_count = 0;
+        self.prg_rom_banks = [BankSelect {
+            size: _8KB,
+            bank: self.prg_rom_banks_count - 1,
+        }; 4];
+        self.chr_rom_banks = [Default::default(); 8];
+        self.bank_select = 0;
+        self.bank_data = 0;
+        self.mirroring = 0;
+        self.prg_ram_protect = 0;
+        self.reload_irq_counter_at_next_edge = None;
+        self.reload_irq_counter_at_zero = 0;
+        self.irq_enabled = false;
     }
 }
