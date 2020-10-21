@@ -77,15 +77,15 @@ impl RAM {
 }
 
 impl Memory for RAM {
-    fn get_byte(&self, address: u16) -> u8 {
-        let addr = self.get_real_address(address);
+    fn get_byte(&self, address_org: u16) -> u8 {
+        let addr = self.get_real_address(address_org);
         if let Ok(reg) = ReadAccessRegister::try_from(addr) {
             self.ppu_access.borrow_mut().read(reg)
         } else if let Ok(reg) = ram_apu::ReadAccessRegister::try_from(addr) {
             self.apu_access.borrow_mut().read(reg)
         } else if let Ok(input_port) = InputPort::try_from(addr) {
             self.controller_access.borrow_mut().read(input_port)
-        } else if let Ok(_) = ReadAccessRegister::try_from(addr) {
+        } else if let Ok(_) = WriteAccessRegister::try_from(addr) {
             0
         } else if let Ok(_) = OutputPort::try_from(addr) {
             panic!(
@@ -101,9 +101,10 @@ impl Memory for RAM {
             self.mapper.borrow_mut().get_prg_byte(addr)
         } else if addr >= CPU_TEST_MODE_SPACE_START {
             self.memory[(INTERNAL_MIRROR_SIZE + addr - CPU_TEST_MODE_SPACE_START) as usize]
-        } else {
-            assert!(addr < INTERNAL_MIRROR_SIZE);
+        } else if addr < INTERNAL_MIRROR_SIZE {
             self.memory[addr as usize]
+        } else {
+            panic!("Address org {:X} real {:X}", address_org, addr);
         }
     }
 

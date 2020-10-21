@@ -122,6 +122,7 @@ impl VRAM {
 
 impl Memory for VRAM {
     fn store_byte(&mut self, addr: u16, byte: u8) {
+        let addr = addr & 0x3FFF;
         if addr < NAMETABLES_START {
             self.mapper.borrow_mut().store_chr_byte(addr, byte);
         } else {
@@ -130,6 +131,7 @@ impl Memory for VRAM {
     }
 
     fn get_byte(&self, addr: u16) -> u8 {
+        let addr = addr & 0x3FFF;
         let byte = self.get_byte_internal(addr);
         if PALETTES_RANGE.contains(&addr) {
             *self.read_buffer.borrow_mut() =

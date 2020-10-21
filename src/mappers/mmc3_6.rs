@@ -21,8 +21,8 @@ pub(super) enum MMC3_6Variant {
 
 trait BankSelectRegister {
     fn get_selected_bank(&self) -> usize;
-    fn get_prg_rom_mode(&self) -> u8;
-    fn get_chr_inversion_mode(&self) -> u8;
+    fn get_prg_rom_mode(&self) -> usize;
+    fn get_chr_inversion_mode(&self) -> usize;
 }
 
 impl BankSelectRegister for u8 {
@@ -30,12 +30,12 @@ impl BankSelectRegister for u8 {
         (self & 0b0000_0111) as usize
     }
 
-    fn get_prg_rom_mode(&self) -> u8 {
-        (self & 0b0100_0000) >> 6
+    fn get_prg_rom_mode(&self) -> usize {
+        ((self & 0b0100_0000) >> 6) as usize
     }
 
-    fn get_chr_inversion_mode(&self) -> u8 {
-        (self & 0b1000_0000) >> 7
+    fn get_chr_inversion_mode(&self) -> usize {
+        ((self & 0b1000_0000) >> 7) as usize
     }
 }
 #[allow(dead_code)]
@@ -46,6 +46,7 @@ pub(super) struct MMC3_6 {
     chr_rom_banks: [BankSelect; 8],
     prg_rom_banks_count: usize,
     bank_select: u8,
+    is_bank_select_initialized: bool,
     bank_data: u8,
     mirroring: u8,
     prg_ram_protect: u8,
@@ -68,6 +69,7 @@ impl MMC3_6 {
             chr_rom_banks: [Default::default(); 8],
             prg_rom_banks_count,
             bank_select: 0,
+            is_bank_select_initialized: false,
             bank_data: 0,
             mirroring: 0,
             prg_ram_protect: 0,
@@ -77,21 +79,25 @@ impl MMC3_6 {
         }
     }
 
-    fn update_bank_selection(&mut self) {
-        //println!("Bank select");
-        let selected_bank = self.bank_select.get_selected_bank();
+    fn init_all_banks(&mut self) {
+        for i in 0..8 {
+            self.update_selected_bank(i);
+        }
+    }
+
+    fn update_selected_bank(&mut self, selected_bank: usize) {
         if selected_bank < 6 {
             let mode = self.bank_select.get_chr_inversion_mode() as usize;
             let _1kb_bank = (self.bank_data) as usize;
             let _2kb_bank = (self.bank_data & 0b1111_1110) as usize;
-
+            let _2kb_bank = (self.bank_data >> 1) as usize;
             const CHR_MAP: [[(usize, usize); 2]; 6] = [
                 [(0, 1), (4, 5)],
                 [(2, 3), (6, 7)],
                 [(4, 4), (0, 0)],
                 [(5, 5), (1, 1)],
-                [(5, 5), (2, 2)],
-                [(6, 6), (3, 3)],
+                [(6, 6), (2, 2)],
+                [(7, 7), (3, 3)],
             ];
 
             let (bank_index_1, bank_index_2) = CHR_MAP[selected_bank][mode];
@@ -125,8 +131,19 @@ impl MMC3_6 {
 impl Mapper for MMC3_6 {
     fn get_chr_byte(&mut self, address: u16) -> u8 {
         let bank_select = self.chr_rom_banks[address as usize / _1KB as usize];
-        self.mapper_internal
-            .get_chr_byte(address, bank_select.bank, bank_select.size)
+        let val = self
+            .mapper_internal
+            .get_chr_byte(address, bank_select.bank, bank_select.size);
+
+        if false {
+            println!(
+                "bank size {:?} bank {:?} real {:X}",
+                bank_select.size,
+                bank_select.bank,
+                bank_select.bank as usize * bank_select.size as usize
+            );
+        }
+        val
     }
 
     fn get_prg_byte(&mut self, address: u16) -> u8 {
@@ -141,12 +158,9 @@ impl Mapper for MMC3_6 {
         }
     }
 
-    fn store_chr_byte(&mut self, _: u16, _: u8) {
-        panic!("")
-    }
+    fn store_chr_byte(&mut self, _: u16, _: u8) {}
 
     fn store_prg_byte(&mut self, address: u16, byte: u8) {
-        //println!("store at {:X}", address);
         if PRG_RAM_RANGE.contains(&address) {
             self.mapper_internal
                 .store_prg_ram_byte(address, 0, _8KB, byte)
@@ -156,10 +170,13 @@ impl Mapper for MMC3_6 {
                 0x8000..=0x9FFF => {
                     if is_even {
                         self.bank_select = byte;
-                        self.update_bank_selection();
+                        if !self.is_bank_select_initialized {
+                            self.init_all_banks();
+                            self.is_bank_select_initialized = true;
+                        }
                     } else {
                         self.bank_data = byte;
-                        self.update_bank_selection();
+                        self.update_selected_bank(self.bank_select.get_selected_bank());
                     }
                 }
                 0xA000..=0xBFFF => {
@@ -200,6 +217,7 @@ impl Mapper for MMC3_6 {
         }; 4];
         self.chr_rom_banks = [Default::default(); 8];
         self.bank_select = 0;
+        self.is_bank_select_initialized = false;
         self.bank_data = 0;
         self.mirroring = 0;
         self.prg_ram_protect = 0;

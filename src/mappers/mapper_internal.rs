@@ -2,7 +2,7 @@ const CHR_DATA_SIZE: usize = 0x40000;
 const PRG_ROM_DATA_SIZE: usize = 0x80000;
 const PRG_RAM_DATA_SIZE: usize = 0x20000;
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) enum BankSize {
     _1KB = 0x0400,
     _2KB = 0x0800,
@@ -12,7 +12,7 @@ pub(super) enum BankSize {
     _32KB = 0x8000,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub(super) struct BankSelect {
     pub size: BankSize,
     pub bank: usize,
@@ -70,7 +70,9 @@ impl MapperInternal {
     }
 
     pub fn get_chr_byte(&mut self, address: u16, bank: usize, chr_bank_size: BankSize) -> u8 {
-        self.chr[self.get_address_index(address, bank, chr_bank_size)]
+        let index = self.get_address_index(address, bank, chr_bank_size);
+        assert!(index < self.chr_rom.len());
+        self.chr[index]
     }
 
     pub fn store_chr_byte(&mut self, address: u16, bank: usize, chr_bank_size: BankSize, byte: u8) {
