@@ -584,6 +584,20 @@ impl PPU {
                 scrolled_x,
                 scrolled_y,
             );
+            // x == 0 && self.scanline == 24 * 8
+            if false {
+                println!(
+                    "sx {} sy {} ti {:X} tx {} ty {} nm {} coarseY {}",
+                    scrolled_x,
+                    scrolled_y,
+                    bg_tile_index,
+                    bg_tile_x,
+                    bg_tile_y,
+                    name_table_index,
+                    self.t_vram_address.get(COARSE_Y)
+                );
+            }
+
             bg_color_index = bg_tile.get_color_index(scrolled_x % 8, scrolled_y % 8);
         }
         (bg_color_index as u8, bg_palette_index)

@@ -71,7 +71,7 @@ impl MapperInternal {
 
     pub fn get_chr_byte(&mut self, address: u16, bank: usize, chr_bank_size: BankSize) -> u8 {
         let index = self.get_address_index(address, bank, chr_bank_size);
-        assert!(index < self.chr_rom.len());
+        assert!(self.chr_rom.len() == 0 || index < self.chr_rom.len());
         self.chr[index]
     }
 
