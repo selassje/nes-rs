@@ -11,6 +11,8 @@ pub(super) struct OpCode {
 }
 
 pub(super) const NMI_OPCODE: usize = 0x02;
+pub(super) const IRQ_OPCODE: usize = 0x32;
+
 pub(super) type OpCodes = [Option<OpCode>; 256];
 
 macro_rules! fill_opcodes {
@@ -29,6 +31,8 @@ macro_rules! fill_opcodes {
 #[allow(unused_assignments, unused_mut)]
 pub(super) fn get_opcodes() -> OpCodes {
     fill_opcodes!(
+        (NMI_OPCODE, nmi, Implicit, 7),
+        (IRQ_OPCODE, irq, Implicit, 7),
         /*BRK*/
         (0x00, brk, Implicit, 7),
         /*ADC*/
@@ -212,7 +216,6 @@ pub(super) fn get_opcodes() -> OpCodes {
         (0x8A, txa, Implicit, 2),
         (0x9A, txs, Implicit, 2),
         (0x98, tya, Implicit, 2),
-        (NMI_OPCODE, nmi, Implicit, 7),
         /*ILLEGAL OPPCODES */
         (0x87, aax, ZeroPage, 3),
         (0x97, aax, ZeroPageY, 4),

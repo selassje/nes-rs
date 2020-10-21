@@ -13,8 +13,8 @@ mod mapper_internal;
 pub use self::mapper0::Mapper0;
 pub use self::mapper1::Mapper1;
 pub use self::mapper2::Mapper2;
-pub use self::mapper4::Mapper4;
 pub use self::mapper227::Mapper227;
+pub use self::mapper4::Mapper4;
 pub use self::mapper66::Mapper66;
 
 pub trait Mapper {
@@ -26,4 +26,10 @@ pub trait Mapper {
 
     fn get_mirroring(&self) -> Mirroring;
     fn reset(&mut self);
+
+    fn maybe_fetch_irq(&mut self) -> bool {
+        false
+    }
+
+    fn ppu_a12_rising_edge_triggered(&mut self) {}
 }

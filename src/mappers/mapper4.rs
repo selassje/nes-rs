@@ -37,4 +37,12 @@ impl Mapper for Mapper4 {
     fn store_prg_byte(&mut self, address: u16, byte: u8) {
         self.mmc3.store_prg_byte(address, byte)
     }
+
+    fn ppu_a12_rising_edge_triggered(&mut self) {
+        self.mmc3.ppu_a12_rising_edge_triggered()
+    }
+
+    fn maybe_fetch_irq(&mut self) -> bool {
+        self.mmc3.maybe_fetch_irq()
+    }
 }

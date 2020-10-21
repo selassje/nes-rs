@@ -1,9 +1,9 @@
 mod opcodes;
 
-use self::AddressingMode::*;
-use crate::cpu_ppu::{Nmi, PpuState};
-use crate::ram_ppu::DmaWriteAccessRegister::OamDma;
+use self::{opcodes::IRQ_OPCODE, AddressingMode::*};
+use crate::cpu_ppu::{Nmi, PpuState, PpuTime};
 use crate::{common::*, memory::Memory};
+use crate::{mappers::Mapper, ram_ppu::DmaWriteAccessRegister::OamDma};
 use opcodes::{get_opcodes, OpCodes, NMI_OPCODE};
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter, Result};
@@ -101,13 +101,18 @@ pub struct CPU {
     address: Address,
     ram: Rc<RefCell<dyn Memory>>,
     ppu_state: Rc<RefCell<dyn PpuState>>,
+    mapper: Rc<RefCell<dyn Mapper>>,
     code_segment: (u16, u16),
     opcodes: OpCodes,
     nmi: Option<Nmi>,
 }
 
 impl CPU {
-    pub fn new(ram: Rc<RefCell<dyn Memory>>, ppu_state: Rc<RefCell<dyn PpuState>>) -> CPU {
+    pub fn new(
+        ram: Rc<RefCell<dyn Memory>>,
+        ppu_state: Rc<RefCell<dyn PpuState>>,
+        mapper: Rc<RefCell<dyn Mapper>>,
+    ) -> CPU {
         CPU {
             pc: 0,
             sp: 0xFD,
@@ -117,9 +122,10 @@ impl CPU {
             y: 0,
             cycle: 0,
             instruction: None,
-            ram: ram,
+            ram,
             code_segment: (0, 0),
-            ppu_state: ppu_state,
+            ppu_state,
+            mapper,
             nmi: None,
             address: Address::Implicit,
             opcodes: get_opcodes(),
@@ -236,15 +242,28 @@ impl CPU {
         }
     }
 
+    fn check_for_interrupts(&mut self, ppu_time: &PpuTime) -> Option<u8> {
+        if self.nmi.is_none() {
+            self.nmi = self.ppu_state.borrow_mut().maybe_take_nmi();
+        }
+        if self.nmi.is_some() && ppu_time.cycle >= self.nmi.unwrap().cycle + 3 {
+            self.nmi = None;
+            Some(NMI_OPCODE as u8)
+        } else if self.mapper.borrow_mut().maybe_fetch_irq() {
+            Some(IRQ_OPCODE as u8)
+        } else {
+            None
+        }
+    }
+
     fn fetch_next_instruction(&mut self) {
         if self.nmi.is_none() {
             self.nmi = self.ppu_state.borrow_mut().maybe_take_nmi();
         }
 
         let ppu_time = self.ppu_state.borrow_mut().get_time();
-        let op = if self.nmi.is_some() && ppu_time.cycle >= self.nmi.unwrap().cycle + 3 {
-            self.nmi = None;
-            NMI_OPCODE as u8
+        let op = if let Some(op) = self.check_for_interrupts(&ppu_time) {
+            op
         } else {
             self.ram.borrow().get_byte(self.pc)
         };
@@ -555,6 +574,16 @@ impl CPU {
         let mut ps = self.ps;
         ps |= ProcessorFlag::BFlagBit4 as u8;
         ps |= ProcessorFlag::BFlagBit5 as u8;
+        self.push_u8(ps);
+        self.pc = self.ram.borrow().get_word(0xFFFE) - 1;
+    }
+
+    fn irq(&mut self) {
+        self.push_u16(self.pc + 1);
+        let mut ps = self.ps;
+        println!("IRQ");
+        ps |= ProcessorFlag::BFlagBit4 as u8;
+        ps &= !(ProcessorFlag::BFlagBit5 as u8);
         self.push_u8(ps);
         self.pc = self.ram.borrow().get_word(0xFFFE) - 1;
     }

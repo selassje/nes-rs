@@ -41,7 +41,7 @@ impl Nes {
         let controllers = Rc::new(RefCell::new(Controllers::new(controller_1, controller_2)));
         let mapper = nes_file.create_mapper();
         let vram = Rc::new(RefCell::new(VRAM::new(mapper.clone())));
-        let ppu = Rc::new(RefCell::new(PPU::new(vram.clone(), io.clone())));
+        let ppu = Rc::new(RefCell::new(PPU::new(vram.clone(), io.clone(),mapper.clone())));
         let apu = Rc::new(RefCell::new(APU::new(io.clone())));
         let ram = Rc::new(RefCell::new(RAM::new(
             ppu.clone(),
@@ -51,7 +51,7 @@ impl Nes {
         )));
 
         apu.borrow_mut().set_dmc_memory(ram.clone());
-        let cpu = CPU::new(ram.clone(), ppu.clone());
+        let cpu = CPU::new(ram.clone(), ppu.clone(), mapper.clone());
 
         Nes {
             cpu,

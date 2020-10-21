@@ -50,9 +50,11 @@ pub(super) struct MMC3_6 {
     bank_data: u8,
     mirroring: u8,
     prg_ram_protect: u8,
-    reload_irq_counter_at_zero: u8,
-    reload_irq_counter_at_next_edge: Option<u8>,
+    irq_counter_reload_value: u8,
+    reload_irq_counter_at_next_edge: bool,
     irq_enabled: bool,
+    irq_triggered: bool,
+    irq_counter: u8,
 }
 
 impl MMC3_6 {
@@ -73,9 +75,11 @@ impl MMC3_6 {
             bank_data: 0,
             mirroring: 0,
             prg_ram_protect: 0,
-            reload_irq_counter_at_zero: 0,
-            reload_irq_counter_at_next_edge: None,
+            irq_counter_reload_value: 0,
+            reload_irq_counter_at_next_edge: false,
             irq_enabled: false,
+            irq_triggered: false,
+            irq_counter: 0,
         }
     }
 
@@ -152,7 +156,6 @@ impl Mapper for MMC3_6 {
         } else {
             let bank_select =
                 self.prg_rom_banks[(address - PRG_RAM_RANGE.end) as usize / _8KB as usize];
-            //panic!("get at {:X} index {}", address,bank_select.bank);
             self.mapper_internal
                 .get_prg_rom_byte(address, bank_select.bank, bank_select.size)
         }
@@ -188,9 +191,9 @@ impl Mapper for MMC3_6 {
                 }
                 0xC000..=0xDFFF => {
                     if is_even {
-                        self.reload_irq_counter_at_zero = byte;
+                        self.irq_counter_reload_value = byte;
                     } else {
-                        self.reload_irq_counter_at_next_edge = Some(byte)
+                        self.reload_irq_counter_at_next_edge = true;
                     }
                 }
                 0xE000..=0xFFFF => {
@@ -209,6 +212,34 @@ impl Mapper for MMC3_6 {
         }
     }
 
+    fn ppu_a12_rising_edge_triggered(&mut self) {
+        if self.irq_counter == 0 || self.reload_irq_counter_at_next_edge {
+            if self.reload_irq_counter_at_next_edge {
+                //    println!("Counter remaining {}", self.irq_counter);
+            }
+            self.irq_triggered = self.irq_counter == 0 && self.irq_enabled;
+            self.reload_irq_counter_at_next_edge = false;
+            self.irq_counter = self.irq_counter_reload_value;
+
+            if self.irq_triggered {
+                //  panic!("MMC3 triggered IRQ");
+            }
+        } else {
+            assert!(self.irq_counter > 0);
+            self.irq_counter -= 1;
+            //println!("Counter decremented {}", self.irq_counter);
+        }
+    }
+
+    fn maybe_fetch_irq(&mut self) -> bool {
+        if self.irq_triggered {
+            self.irq_triggered = false;
+            true
+        } else {
+            false
+        }
+    }
+
     fn reset(&mut self) {
         self.mapper_internal.reset();
         self.prg_rom_banks = [BankSelect {
@@ -221,8 +252,10 @@ impl Mapper for MMC3_6 {
         self.bank_data = 0;
         self.mirroring = 0;
         self.prg_ram_protect = 0;
-        self.reload_irq_counter_at_next_edge = None;
-        self.reload_irq_counter_at_zero = 0;
+        self.reload_irq_counter_at_next_edge = false;
+        self.irq_counter_reload_value = 0;
         self.irq_enabled = false;
+        self.irq_triggered = false;
+        self.irq_counter = 0;
     }
 }
