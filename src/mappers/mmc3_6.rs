@@ -177,7 +177,9 @@ impl Mapper for MMC3_6 {
         }
     }
 
-    fn store_chr_byte(&mut self, _: u16, _: u8) {}
+    fn store_chr_byte(&mut self, address: u16, byte: u8) {
+        self.mapper_internal.store_chr_byte(address, 0, _1KB, byte);
+    }
 
     fn store_prg_byte(&mut self, address: u16, byte: u8) {
         if PRG_RAM_RANGE.contains(&address) {

@@ -1,7 +1,7 @@
-const CHR_DATA_SIZE: usize = 0x40000;
-const PRG_ROM_DATA_SIZE: usize = 0x80000;
 const PRG_RAM_DATA_SIZE: usize = 0x20000;
-
+const PRG_ROM_DATA_SIZE: usize = 0x80000;
+const CHR_ROM_DATA_SIZE: usize = 0x40000;
+const CHR_RAM_DATA_SIZE: usize = 0x2000;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) enum BankSize {
     _1KB = 0x0400,
@@ -31,23 +31,24 @@ pub(super) struct MapperInternal {
     prg_ram: Box<[u8; PRG_RAM_DATA_SIZE]>,
     prg_rom: Box<[u8; PRG_ROM_DATA_SIZE]>,
     prg_rom_size: usize,
-    chr_rom: Vec<u8>,
-    chr: Box<[u8; CHR_DATA_SIZE]>,
+    chr_rom: Box<[u8; CHR_ROM_DATA_SIZE]>,
+    chr_rom_size: usize,
+    chr_ram: Box<[u8; CHR_RAM_DATA_SIZE]>,
 }
 
 impl MapperInternal {
-    pub fn new(_prg_rom: Vec<u8>, chr_rom: Vec<u8>) -> Self {
-        let mut chr = Box::new([0; CHR_DATA_SIZE]);
+    pub fn new(_prg_rom: Vec<u8>, _chr_rom: Vec<u8>) -> Self {
         let mut prg_rom = Box::new([0; PRG_ROM_DATA_SIZE]);
-        chr[..chr_rom.len()].copy_from_slice(chr_rom.as_slice());
+        let mut chr_rom = Box::new([0; CHR_ROM_DATA_SIZE]);
+        chr_rom[.._chr_rom.len()].copy_from_slice(_chr_rom.as_slice());
         prg_rom[.._prg_rom.len()].copy_from_slice(_prg_rom.as_slice());
-        let prg_rom_size = _prg_rom.len();
         Self {
             prg_ram: Box::new([0; PRG_RAM_DATA_SIZE]),
             prg_rom,
-            prg_rom_size,
+            prg_rom_size: _prg_rom.len(),
+            chr_ram: Box::new([0; CHR_RAM_DATA_SIZE]),
             chr_rom,
-            chr,
+            chr_rom_size: _chr_rom.len(),
         }
     }
 
@@ -70,13 +71,16 @@ impl MapperInternal {
     }
 
     pub fn get_chr_byte(&mut self, address: u16, bank: usize, chr_bank_size: BankSize) -> u8 {
-        let index = self.get_address_index(address, bank, chr_bank_size);
-        assert!(self.chr_rom.len() == 0 || index < self.chr_rom.len());
-        self.chr[index]
+        if self.chr_rom_size == 0 {
+            self.chr_ram[address as usize]
+        } else {
+            let index = self.get_address_index(address, bank, chr_bank_size);
+            self.chr_rom[index]
+        }
     }
 
-    pub fn store_chr_byte(&mut self, address: u16, bank: usize, chr_bank_size: BankSize, byte: u8) {
-        self.chr[self.get_address_index(address, bank, chr_bank_size)] = byte;
+    pub fn store_chr_byte(&mut self, address: u16, _: usize, _: BankSize, byte: u8) {
+        self.chr_ram[address as usize] = byte;
     }
 
     pub fn get_prg_rom_bank_count(&self, prg_bank_size: BankSize) -> usize {
@@ -84,8 +88,7 @@ impl MapperInternal {
     }
 
     pub fn reset(&mut self) {
-        self.chr.iter_mut().for_each(|m| *m = 0);
+        self.chr_ram.iter_mut().for_each(|m| *m = 0);
         self.prg_ram.iter_mut().for_each(|m| *m = 0);
-        self.chr[..self.chr_rom.len()].copy_from_slice(self.chr_rom.as_slice());
     }
 }

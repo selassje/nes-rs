@@ -22,6 +22,9 @@ path = "tests/apu_tests.rs"
 [[test]]
 name = "sprite_0_hit_tests"
 path = "tests/sprite_0_hit_tests.rs"
+[[test]]
+name = "mmc3_irq_tests"
+path = "tests/mmc3_irq_tests.rs"
 
 [profile.release] 
 debug = true
