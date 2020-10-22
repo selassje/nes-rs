@@ -578,7 +578,7 @@ impl CPU {
     }
 
     fn irq(&mut self) {
-        self.push_u16(self.pc + 1);
+        self.push_u16(self.pc);
         let mut ps = self.ps;
         ps &= !(ProcessorFlag::BFlagBit4 as u8);
         ps |= ProcessorFlag::BFlagBit5 as u8;
