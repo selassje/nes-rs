@@ -401,9 +401,7 @@ impl PPU {
         if self.ppu_cycle == ACTIVE_PIXELS_CYCLE_END + 1 {
             if self.is_rendering_in_progress() {
                 self.vram_address.inc_y();
-                if self.vram_address.get(BIT_12) == 1 {
-                    self.mapper.borrow_mut().ppu_a12_rising_edge_triggered();
-                }
+                self.mapper.borrow_mut().ppu_a12_rising_edge_triggered();
 
                 self.vram_address
                     .set(COARSE_X, self.t_vram_address.get(COARSE_X));
@@ -780,7 +778,12 @@ impl WritePpuRegisters for PPU {
                     self.vram
                         .borrow_mut()
                         .store_byte(self.vram_address.address, value);
+                    let old_bit12 = self.vram_address.get(BIT_12);
                     self.vram_address.address += self.control_reg.get_vram_increment();
+                    let new_bit12 = self.vram_address.get(BIT_12);
+                    if old_bit12 != new_bit12 && new_bit12 != 0 {
+                        self.mapper.borrow_mut().ppu_a12_rising_edge_triggered();
+                    }
                 }
             }
 
@@ -826,8 +829,12 @@ impl ReadPpuRegisters for PPU {
             }
             ReadAccessRegister::PpuData => {
                 let val = self.vram.borrow_mut().get_byte(self.vram_address.address);
-                //assert!(!self.is_rendering_in_progress());
+                let old_bit12 = self.vram_address.get(BIT_12);
                 self.vram_address.address += self.control_reg.get_vram_increment();
+                let new_bit12 = self.vram_address.get(BIT_12);
+                if old_bit12 != new_bit12 && new_bit12 != 0 {
+                    self.mapper.borrow_mut().ppu_a12_rising_edge_triggered();
+                }
                 val
             }
             ReadAccessRegister::OamData => {
