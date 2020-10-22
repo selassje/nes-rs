@@ -244,12 +244,14 @@ impl CPU {
 
     fn check_for_interrupts(&mut self, ppu_time: &PpuTime) -> Option<u8> {
         if self.nmi.is_none() {
-            self.nmi = self.ppu_state.borrow_mut().maybe_take_nmi();
+            self.nmi = self.ppu_state.borrow_mut().nmi_pending();
         }
         if self.nmi.is_some() && ppu_time.cycle >= self.nmi.unwrap().cycle + 3 {
             self.nmi = None;
             Some(NMI_OPCODE as u8)
-        } else if self.mapper.borrow_mut().maybe_fetch_irq() {
+        } else if !self.get_flag(ProcessorFlag::InterruptDisable)
+            && self.mapper.borrow_mut().irq_pending()
+        {
             Some(IRQ_OPCODE as u8)
         } else {
             None
@@ -257,10 +259,6 @@ impl CPU {
     }
 
     fn fetch_next_instruction(&mut self) {
-        if self.nmi.is_none() {
-            self.nmi = self.ppu_state.borrow_mut().maybe_take_nmi();
-        }
-
         let ppu_time = self.ppu_state.borrow_mut().get_time();
         let op = if let Some(op) = self.check_for_interrupts(&ppu_time) {
             op
@@ -575,16 +573,17 @@ impl CPU {
         ps |= ProcessorFlag::BFlagBit4 as u8;
         ps |= ProcessorFlag::BFlagBit5 as u8;
         self.push_u8(ps);
+        self.set_flag(ProcessorFlag::InterruptDisable);
         self.pc = self.ram.borrow().get_word(0xFFFE) - 1;
     }
 
     fn irq(&mut self) {
         self.push_u16(self.pc + 1);
         let mut ps = self.ps;
-        println!("IRQ");
-        ps |= ProcessorFlag::BFlagBit4 as u8;
-        ps &= !(ProcessorFlag::BFlagBit5 as u8);
+        ps &= !(ProcessorFlag::BFlagBit4 as u8);
+        ps |= ProcessorFlag::BFlagBit5 as u8;
         self.push_u8(ps);
+        self.set_flag(ProcessorFlag::InterruptDisable);
         self.pc = self.ram.borrow().get_word(0xFFFE) - 1;
     }
 
@@ -594,6 +593,7 @@ impl CPU {
         ps &= !(ProcessorFlag::BFlagBit4 as u8);
         ps |= ProcessorFlag::BFlagBit5 as u8;
         self.push_u8(ps);
+        self.set_flag(ProcessorFlag::InterruptDisable);
         self.pc = self.ram.borrow().get_word(0xFFFA) - 1;
     }
 

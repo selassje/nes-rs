@@ -46,22 +46,21 @@ pub(super) struct MMC3_6 {
     chr_rom_banks: [BankSelect; 8],
     prg_rom_banks_count: usize,
     bank_select: u8,
-    is_bank_select_initialized: bool,
     bank_data: u8,
     mirroring: u8,
     prg_ram_protect: u8,
-    irq_counter_reload_value: u8,
-    reload_irq_counter_at_next_edge: bool,
+    scanline_counter_reload_value: u8,
+    reload_scanline_counter_at_next_edge: bool,
     irq_enabled: bool,
     irq_triggered: bool,
-    irq_counter: u8,
+    scanline_counter: u8,
 }
 
 impl MMC3_6 {
     pub fn new(prg_rom: Vec<u8>, chr_rom: Vec<u8>, variant: MMC3_6Variant) -> Self {
         let mapper_internal = MapperInternal::new(prg_rom, chr_rom);
         let prg_rom_banks_count = mapper_internal.get_prg_rom_bank_count(_8KB);
-        Self {
+        let mut mapper = Self {
             mapper_internal,
             variant,
             prg_rom_banks: [BankSelect {
@@ -71,22 +70,45 @@ impl MMC3_6 {
             chr_rom_banks: [Default::default(); 8],
             prg_rom_banks_count,
             bank_select: 0,
-            is_bank_select_initialized: false,
             bank_data: 0,
             mirroring: 0,
             prg_ram_protect: 0,
-            irq_counter_reload_value: 0,
-            reload_irq_counter_at_next_edge: false,
+            scanline_counter_reload_value: 0,
+            reload_scanline_counter_at_next_edge: false,
             irq_enabled: false,
             irq_triggered: false,
-            irq_counter: 0,
-        }
+            scanline_counter: 0,
+        };
+        mapper.init_bank_mapping();
+        mapper
     }
 
-    fn init_all_banks(&mut self) {
-        for i in 0..8 {
-            self.update_selected_bank(i);
-        }
+    fn init_bank_mapping(&mut self) {
+        self.prg_rom_banks[0].bank = 0;
+        self.prg_rom_banks[0].size = _8KB;
+        self.prg_rom_banks[1].bank = 1;
+        self.prg_rom_banks[1].size = _8KB;
+        self.prg_rom_banks[2].bank = 2;
+        self.prg_rom_banks[2].size = _8KB;
+        self.prg_rom_banks[3].bank = self.prg_rom_banks_count - 1;
+        self.prg_rom_banks[3].size = _8KB;
+
+        self.chr_rom_banks[0].bank = 0;
+        self.chr_rom_banks[0].size = _2KB;
+        self.chr_rom_banks[1].bank = 0;
+        self.chr_rom_banks[1].size = _2KB;
+        self.chr_rom_banks[2].bank = 1;
+        self.chr_rom_banks[2].size = _2KB;
+        self.chr_rom_banks[3].bank = 1;
+        self.chr_rom_banks[3].size = _2KB;
+        self.chr_rom_banks[4].bank = 4;
+        self.chr_rom_banks[4].size = _1KB;
+        self.chr_rom_banks[5].bank = 5;
+        self.chr_rom_banks[5].size = _1KB;
+        self.chr_rom_banks[6].bank = 6;
+        self.chr_rom_banks[6].size = _1KB;
+        self.chr_rom_banks[7].bank = 7;
+        self.chr_rom_banks[7].size = _1KB;
     }
 
     fn update_selected_bank(&mut self, selected_bank: usize) {
@@ -103,8 +125,8 @@ impl MMC3_6 {
                 [(6, 6), (2, 2)],
                 [(7, 7), (3, 3)],
             ];
-
             let (bank_index_1, bank_index_2) = CHR_MAP[selected_bank][mode];
+
             if bank_index_1 != bank_index_2 {
                 self.chr_rom_banks[bank_index_1].size = _2KB;
                 self.chr_rom_banks[bank_index_1].bank = _2kb_bank;
@@ -139,25 +161,19 @@ impl Mapper for MMC3_6 {
             .mapper_internal
             .get_chr_byte(address, bank_select.bank, bank_select.size);
 
-        if false {
-            println!(
-                "bank size {:?} bank {:?} real {:X}",
-                bank_select.size,
-                bank_select.bank,
-                bank_select.bank as usize * bank_select.size as usize
-            );
-        }
         val
     }
 
     fn get_prg_byte(&mut self, address: u16) -> u8 {
         if PRG_RAM_RANGE.contains(&address) {
             self.mapper_internal.get_prg_ram_byte(address, 0, _8KB)
-        } else {
+        } else if address >= PRG_RAM_RANGE.end {
             let bank_select =
                 self.prg_rom_banks[(address - PRG_RAM_RANGE.end) as usize / _8KB as usize];
             self.mapper_internal
                 .get_prg_rom_byte(address, bank_select.bank, bank_select.size)
+        } else {
+            0
         }
     }
 
@@ -173,10 +189,6 @@ impl Mapper for MMC3_6 {
                 0x8000..=0x9FFF => {
                     if is_even {
                         self.bank_select = byte;
-                        if !self.is_bank_select_initialized {
-                            self.init_all_banks();
-                            self.is_bank_select_initialized = true;
-                        }
                     } else {
                         self.bank_data = byte;
                         self.update_selected_bank(self.bank_select.get_selected_bank());
@@ -191,15 +203,20 @@ impl Mapper for MMC3_6 {
                 }
                 0xC000..=0xDFFF => {
                     if is_even {
-                        self.irq_counter_reload_value = byte;
+                        self.scanline_counter_reload_value = byte;
                     } else {
-                        self.reload_irq_counter_at_next_edge = true;
+                        self.scanline_counter = 0;
+                        self.reload_scanline_counter_at_next_edge = true;
                     }
                 }
                 0xE000..=0xFFFF => {
                     self.irq_enabled = !is_even;
+                    if !self.irq_enabled {
+                        self.irq_triggered = false;
+                    } else {
+                    }
                 }
-                _ => panic!("Incorrect address {:X}", address),
+                _ => {}
             }
         }
     }
@@ -213,49 +230,33 @@ impl Mapper for MMC3_6 {
     }
 
     fn ppu_a12_rising_edge_triggered(&mut self) {
-        if self.irq_counter == 0 || self.reload_irq_counter_at_next_edge {
-            if self.reload_irq_counter_at_next_edge {
-                //    println!("Counter remaining {}", self.irq_counter);
-            }
-            self.irq_triggered = self.irq_counter == 0 && self.irq_enabled;
-            self.reload_irq_counter_at_next_edge = false;
-            self.irq_counter = self.irq_counter_reload_value;
-
-            if self.irq_triggered {
-                //  panic!("MMC3 triggered IRQ");
-            }
+        if self.reload_scanline_counter_at_next_edge || self.scanline_counter == 0 {
+            self.scanline_counter = self.scanline_counter_reload_value;
         } else {
-            assert!(self.irq_counter > 0);
-            self.irq_counter -= 1;
-            //println!("Counter decremented {}", self.irq_counter);
+            self.scanline_counter -= 1;
+        }
+        self.reload_scanline_counter_at_next_edge = false;
+
+        if self.scanline_counter == 0 && self.irq_enabled {
+            self.irq_triggered = true;
         }
     }
 
-    fn maybe_fetch_irq(&mut self) -> bool {
-        if self.irq_triggered {
-            self.irq_triggered = false;
-            true
-        } else {
-            false
-        }
+    fn irq_pending(&mut self) -> bool {
+        self.irq_triggered
     }
 
     fn reset(&mut self) {
         self.mapper_internal.reset();
-        self.prg_rom_banks = [BankSelect {
-            size: _8KB,
-            bank: self.prg_rom_banks_count - 1,
-        }; 4];
-        self.chr_rom_banks = [Default::default(); 8];
+        self.init_bank_mapping();
         self.bank_select = 0;
-        self.is_bank_select_initialized = false;
         self.bank_data = 0;
         self.mirroring = 0;
         self.prg_ram_protect = 0;
-        self.reload_irq_counter_at_next_edge = false;
-        self.irq_counter_reload_value = 0;
+        self.reload_scanline_counter_at_next_edge = false;
+        self.scanline_counter_reload_value = 0;
         self.irq_enabled = false;
         self.irq_triggered = false;
-        self.irq_counter = 0;
+        self.scanline_counter = 0;
     }
 }

@@ -6,7 +6,7 @@ use crate::{cpu_ppu::Nmi, cpu_ppu::PpuState};
 use crate::{io::VideoAccess, memory::VideoMemory};
 use crate::{mappers::Mapper, ram_ppu::*};
 
-use std::{cell::RefCell, cmp::min, default::Default, fmt::Display, rc::Rc};
+use std::{cell::RefCell, default::Default, fmt::Display, rc::Rc};
 
 enum ControlRegisterFlag {
     BaseNametableAddress = 0b00000011,
@@ -202,6 +202,7 @@ const NM_TABLE: VRAMAddressFlag = (0b00001100_00000000, 10);
 const NM_TABLE_X: VRAMAddressFlag = (0b00000100_00000000, 10);
 const NM_TABLE_Y: VRAMAddressFlag = (0b00001000_00000000, 11);
 const FINE_Y: VRAMAddressFlag = (0b01110000_00000000, 12);
+const BIT_12: VRAMAddressFlag = (0b00010000_00000000, 12);
 const BIT_14: VRAMAddressFlag = (0b01000000_00000000, 14);
 const BITS_8_13: VRAMAddressFlag = (0b00111111_00000000, 8);
 const LOW_BYTE: VRAMAddressFlag = (0b00000000_11111111, 0);
@@ -288,7 +289,6 @@ pub struct PPU {
     ppu_cycle: u16,
     scanline: i16,
     scanline_sprites: Vec<Sprite>,
-    same_pattern_table_for_all_sprites: Option<u8>,
     frame: u128,
     color_mapper: Box<dyn ColorMapper>,
     write_toggle: bool,
@@ -331,7 +331,6 @@ impl PPU {
             sprite_palettes: Default::default(),
             background_palletes: Default::default(),
             mapper,
-            same_pattern_table_for_all_sprites: None,
         }
     }
 
@@ -352,7 +351,6 @@ impl PPU {
         self.write_toggle = false;
         self.nmi = None;
         self.vbl_flag_supressed = false;
-        self.same_pattern_table_for_all_sprites = None;
     }
 
     fn render_pixel(&mut self) {
@@ -403,6 +401,10 @@ impl PPU {
         if self.ppu_cycle == ACTIVE_PIXELS_CYCLE_END + 1 {
             if self.is_rendering_in_progress() {
                 self.vram_address.inc_y();
+                if self.vram_address.get(BIT_12) == 1 {
+                    self.mapper.borrow_mut().ppu_a12_rising_edge_triggered();
+                }
+
                 self.vram_address
                     .set(COARSE_X, self.t_vram_address.get(COARSE_X));
                 self.vram_address
@@ -447,19 +449,9 @@ impl PPU {
             FIRST_VISIBLE_SCANLINE..=LAST_VISIBLE_SCANLINE => match self.ppu_cycle {
                 0 => {
                     self.scanline_sprites.clear();
-                    let (sprites, is_overflow_detected, same_pattern_table) =
+                    let (sprites, is_overflow_detected) =
                         self.get_sprites_for_scanline_and_check_for_overflow();
                     self.scanline_sprites = sprites;
-
-                    self.same_pattern_table_for_all_sprites =
-                        if self.control_reg.get_sprite_size_height() == 8 {
-                            Some(
-                                self.control_reg
-                                    .get_sprite_pattern_table_index_for_8x8_mode(),
-                            )
-                        } else {
-                            same_pattern_table
-                        };
 
                     if !self.status_reg.get_flag(StatusRegisterFlag::SpriteOverflow)
                         && is_overflow_detected
@@ -490,15 +482,6 @@ impl PPU {
 
             _ => {}
         };
-
-        //if let Some(sprites_pattern_table) = self.same_pattern_table_for_all_sprites {
-        if self.is_rendering_in_progress() && self.ppu_cycle == 260
-        //&& sprites_pattern_table == sprites_pattern_table
-        {
-            self.mapper.borrow_mut().ppu_a12_rising_edge_triggered();
-            // panic!("aasdad");
-        }
-        //}
 
         self.ppu_cycle += 1;
         if self.ppu_cycle == PPU_CYCLES_PER_SCANLINE {
@@ -609,7 +592,6 @@ impl PPU {
                 scrolled_x,
                 scrolled_y,
             );
-            // x == 0 && self.scanline == 24 * 8
             if false {
                 println!(
                     "sx {} sy {} ti {:X} tx {} ty {} nm {} coarseY {}",
@@ -682,8 +664,7 @@ impl PPU {
         }
         (0, Default::default())
     }
-
-    fn get_sprites_for_scanline_and_check_for_overflow(&self) -> (Sprites, bool, Option<u8>) {
+    fn get_sprites_for_scanline_and_check_for_overflow(&self) -> (Sprites, bool) {
         let sprites = self.oam.chunks(4).enumerate().map(|(i, s)| Sprite {
             oam_index: i as u8,
             data: [s[0], s[1], s[2], s[3]],
@@ -693,35 +674,8 @@ impl PPU {
                 && (self.scanline as u8)
                     < sprite.get_y() + self.control_reg.get_sprite_size_height()
         });
-        let sprite_count = sprites.clone().count();
-        let if_overflow = sprite_count > 8;
-        let sprites = sprites.take(8);
-
-        let mut sprites_clone = sprites.clone();
-        let mut same_pattern_table: Option<u8> = None;
-        if sprite_count > 0 && self.control_reg.get_sprite_size_height() == 16 {
-            same_pattern_table = Some(
-                sprites_clone
-                    .next()
-                    .unwrap()
-                    .get_pattern_table_index_for_8x16_mode(),
-            );
-
-            for _ in 0..min(8, sprite_count) - 1 {
-                if same_pattern_table
-                    != Some(
-                        sprites_clone
-                            .next()
-                            .unwrap()
-                            .get_pattern_table_index_for_8x16_mode(),
-                    )
-                {
-                    break;
-                }
-            }
-        }
-
-        (sprites.collect(), if_overflow, same_pattern_table)
+        let if_overflow = sprites.clone().count() > 8;
+        (sprites.take(8).collect(), if_overflow)
     }
 
     fn get_palettes(&self, for_background: bool) -> Palettes {
@@ -808,6 +762,11 @@ impl WritePpuRegisters for PPU {
             WriteAccessRegister::PpuAddr => {
                 if self.write_toggle {
                     self.t_vram_address.set(LOW_BYTE, value as u16);
+                    let old_bit12 = self.vram_address.get(BIT_12);
+                    let new_bit12 = self.t_vram_address.get(BIT_12);
+                    if old_bit12 != new_bit12 && new_bit12 != 0 {
+                        self.mapper.borrow_mut().ppu_a12_rising_edge_triggered();
+                    }
                     self.vram_address.address = self.t_vram_address.address;
                 } else {
                     self.t_vram_address
@@ -881,7 +840,7 @@ impl ReadPpuRegisters for PPU {
 impl PpuRegisterAccess for PPU {}
 
 impl PpuState for PPU {
-    fn maybe_take_nmi(&mut self) -> Option<crate::cpu_ppu::Nmi> {
+    fn nmi_pending(&mut self) -> Option<crate::cpu_ppu::Nmi> {
         self.nmi.take()
     }
 

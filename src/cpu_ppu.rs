@@ -10,6 +10,6 @@ pub struct PpuTime {
 }
 
 pub trait PpuState {
-    fn maybe_take_nmi(&mut self) -> Option<Nmi>;
+    fn nmi_pending(&mut self) -> Option<Nmi>;
     fn get_time(&self) -> PpuTime;
 }
