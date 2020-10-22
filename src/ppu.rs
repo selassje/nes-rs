@@ -696,6 +696,13 @@ impl PPU {
         palletes
     }
 
+    fn check_for_a12_rising_toggle(&mut self, old_vram_address: VRAMAddress) {
+        let old_bit12 = old_vram_address.get(BIT_12);
+        let new_bit12 = self.vram_address.get(BIT_12);
+        if old_bit12 != new_bit12 && new_bit12 != 0 {
+            self.mapper.borrow_mut().ppu_a12_rising_edge_triggered();
+        }
+    }
     fn is_rendering_in_progress(&self) -> bool {
         self.is_rendering_enabled() && self.is_scanline_visible_or_pre_render()
     }
@@ -760,12 +767,9 @@ impl WritePpuRegisters for PPU {
             WriteAccessRegister::PpuAddr => {
                 if self.write_toggle {
                     self.t_vram_address.set(LOW_BYTE, value as u16);
-                    let old_bit12 = self.vram_address.get(BIT_12);
-                    let new_bit12 = self.t_vram_address.get(BIT_12);
-                    if old_bit12 != new_bit12 && new_bit12 != 0 {
-                        self.mapper.borrow_mut().ppu_a12_rising_edge_triggered();
-                    }
+                    let old_vram_address = self.vram_address;
                     self.vram_address.address = self.t_vram_address.address;
+                    self.check_for_a12_rising_toggle(old_vram_address);
                 } else {
                     self.t_vram_address
                         .set(BITS_8_13, (value & 0b00111111) as u16);
@@ -778,12 +782,9 @@ impl WritePpuRegisters for PPU {
                     self.vram
                         .borrow_mut()
                         .store_byte(self.vram_address.address, value);
-                    let old_bit12 = self.vram_address.get(BIT_12);
+                    let old_vram_address = self.vram_address;
                     self.vram_address.address += self.control_reg.get_vram_increment();
-                    let new_bit12 = self.vram_address.get(BIT_12);
-                    if old_bit12 != new_bit12 && new_bit12 != 0 {
-                        self.mapper.borrow_mut().ppu_a12_rising_edge_triggered();
-                    }
+                    self.check_for_a12_rising_toggle(old_vram_address);
                 }
             }
 
@@ -829,12 +830,9 @@ impl ReadPpuRegisters for PPU {
             }
             ReadAccessRegister::PpuData => {
                 let val = self.vram.borrow_mut().get_byte(self.vram_address.address);
-                let old_bit12 = self.vram_address.get(BIT_12);
+                let old_vram_address = self.vram_address;
                 self.vram_address.address += self.control_reg.get_vram_increment();
-                let new_bit12 = self.vram_address.get(BIT_12);
-                if old_bit12 != new_bit12 && new_bit12 != 0 {
-                    self.mapper.borrow_mut().ppu_a12_rising_edge_triggered();
-                }
+                self.check_for_a12_rising_toggle(old_vram_address);
                 val
             }
             ReadAccessRegister::OamData => {
