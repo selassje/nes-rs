@@ -1,6 +1,6 @@
 use crate::{
     colors::{ColorMapper, DefaultColorMapper, RgbColor},
-    io::{FRAME_HEIGHT, FRAME_WIDTH},
+    io::FRAME_WIDTH,
 };
 use crate::{cpu_ppu::Nmi, cpu_ppu::PpuState};
 use crate::{io::VideoAccess, memory::VideoMemory};
@@ -17,7 +17,6 @@ enum ControlRegisterFlag {
     _PpuMasterSlaveSelect = 0b01000000,
     GenerateNMI = 0b10000000,
 }
-const TILE_SIDE_LENGTH: usize = 8;
 
 const PPU_CYCLES_PER_SCANLINE: u16 = 341;
 const PRE_RENDER_SCANLINE: i16 = -1;
@@ -26,8 +25,13 @@ const LAST_VISIBLE_SCANLINE: i16 = 239;
 const POST_RENDER_SCANLINE: i16 = 240;
 const VBLANK_START_SCANLINE: i16 = 241;
 
-const ACTIVE_PIXELS_CYCLE_START: u16 = 4;
+const ACTIVE_PIXELS_CYCLE_START: u16 = 1;
 const ACTIVE_PIXELS_CYCLE_END: u16 = ACTIVE_PIXELS_CYCLE_START + FRAME_WIDTH as u16 - 1;
+
+const FETCH_NAMETABLE_DATA_CYCLE_OFFSET: u16 = ACTIVE_PIXELS_CYCLE_START;
+const FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET: u16 = FETCH_NAMETABLE_DATA_CYCLE_OFFSET + 2;
+const FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET: u16 = FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET + 2;
+const FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET: u16 = FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET + 2;
 
 const CPU_PPU_ALIGNMENT: u16 = 2;
 const VBLANK_START_ONE_CYCLE_BEFORE: u16 = 1 + CPU_PPU_ALIGNMENT;
@@ -212,6 +216,14 @@ struct VRAMAddress {
     address: u16,
 }
 
+#[derive(Default, Copy, Clone, Debug)]
+struct TileData {
+    index: u8,
+    attribute_byte: u8,
+    low_bg_pattern_byte: u8,
+    high_bg_pattern_byte: u8,
+}
+
 impl VRAMAddress {
     fn get(&self, flag: VRAMAddressFlag) -> u16 {
         let (mask, shift) = flag;
@@ -300,6 +312,7 @@ pub struct PPU {
     sprite_palettes: Palettes,
     background_palletes: Palettes,
     mapper: Rc<RefCell<dyn Mapper>>,
+    tile_data: [TileData; 3],
 }
 
 impl PPU {
@@ -331,6 +344,7 @@ impl PPU {
             sprite_palettes: Default::default(),
             background_palletes: Default::default(),
             mapper,
+            tile_data: [Default::default(); 3],
         }
     }
 
@@ -351,6 +365,54 @@ impl PPU {
         self.write_toggle = false;
         self.nmi = None;
         self.vbl_flag_supressed = false;
+    }
+
+    fn fetch_next_tile_data(&mut self) {
+        let fetch_offset = self.ppu_cycle % 8;
+
+        let nametable_index = self.vram_address.get(NM_TABLE) as u8;
+        let tile_x = self.vram_address.get(COARSE_X) as u8;
+        let tile_y = self.vram_address.get(COARSE_Y) as u8;
+        let fine_y = self.vram_address.get(FINE_Y);
+        let pattern_table_index = self.control_reg.get_background_pattern_table_index();
+
+        match self.ppu_cycle % 8 {
+            FETCH_NAMETABLE_DATA_CYCLE_OFFSET => {
+                self.tile_data[2].index = self.vram.borrow_mut().get_nametable_tile_index(
+                    nametable_index,
+                    tile_x,
+                    tile_y,
+                );
+            }
+            FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET => {
+                self.tile_data[2].attribute_byte = self.vram.borrow_mut().get_attribute_data(
+                    nametable_index,
+                    tile_x / 2,
+                    tile_y / 2,
+                )
+            }
+            FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET => {
+                self.tile_data[2].low_bg_pattern_byte = self.vram.borrow_mut().get_low_pattern_data(
+                    pattern_table_index,
+                    self.tile_data[2].index,
+                    fine_y as u8,
+                )
+            }
+            FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET => {
+                self.tile_data[2].high_bg_pattern_byte =
+                    self.vram.borrow_mut().get_high_pattern_data(
+                        pattern_table_index,
+                        self.tile_data[2].index,
+                        fine_y as u8,
+                    )
+            }
+            _ => {}
+        }
+        if fetch_offset == 0 {
+            self.tile_data[0] = self.tile_data[1];
+            self.tile_data[1] = self.tile_data[2];
+            self.vram_address.inc_coarse_x();
+        }
     }
 
     fn render_pixel(&mut self) {
@@ -391,13 +453,6 @@ impl PPU {
     }
 
     fn run_single_ppu_cycle(&mut self) -> () {
-        if self.ppu_cycle > ACTIVE_PIXELS_CYCLE_START && self.ppu_cycle <= ACTIVE_PIXELS_CYCLE_END {
-            let x = self.ppu_cycle - ACTIVE_PIXELS_CYCLE_START;
-            if self.is_rendering_in_progress() && (x as usize % TILE_SIDE_LENGTH == 0) {
-                self.vram_address.inc_coarse_x();
-            }
-        }
-
         if self.ppu_cycle == ACTIVE_PIXELS_CYCLE_END + 1 {
             if self.is_rendering_in_progress() {
                 self.vram_address.inc_y();
@@ -425,14 +480,25 @@ impl PPU {
                     self.status_reg
                         .set_flag(StatusRegisterFlag::Sprite0Hit, false);
                 }
+                ACTIVE_PIXELS_CYCLE_START..=ACTIVE_PIXELS_CYCLE_END => {
+                    if self.is_rendering_enabled() {
+                        self.fetch_next_tile_data();
+                    }
+                }
                 280 => {
-                    if self.is_rendering_in_progress() {
+                    if self.is_rendering_enabled() {
                         self.vram_address
                             .set(FINE_Y, self.t_vram_address.get(FINE_Y));
                         self.vram_address
                             .set(COARSE_Y, self.t_vram_address.get(COARSE_Y));
                         self.vram_address
                             .set(NM_TABLE_Y, self.t_vram_address.get(NM_TABLE_Y));
+                    }
+                }
+
+                321..=336 => {
+                    if self.is_rendering_enabled() {
+                        self.fetch_next_tile_data()
                     }
                 }
 
@@ -460,8 +526,18 @@ impl PPU {
                 }
 
                 ACTIVE_PIXELS_CYCLE_START..=ACTIVE_PIXELS_CYCLE_END => {
-                    self.render_pixel();
+                    if self.is_rendering_enabled() {
+                        self.render_pixel();
+                        self.fetch_next_tile_data();
+                    }
                 }
+
+                321..=336 => {
+                    if self.is_rendering_enabled() {
+                        self.fetch_next_tile_data()
+                    }
+                }
+
                 _ => (),
             },
             VBLANK_START_SCANLINE => {
@@ -498,20 +574,6 @@ impl PPU {
         };
     }
 
-    fn get_scrolled_x(&self, x: usize) -> usize {
-        ((self.fine_x_scroll as usize + x)
-            + (self.vram_address.get(COARSE_X) * TILE_SIDE_LENGTH as u16) as usize
-            + (self.vram_address.get(NM_TABLE_X) as usize) * FRAME_WIDTH as usize)
-            % (2 * FRAME_WIDTH)
-    }
-
-    fn get_scrolled_y(&self) -> usize {
-        ((self.vram_address.get(FINE_Y) as usize)
-            + (self.vram_address.get(COARSE_Y) * (TILE_SIDE_LENGTH as u16)) as usize
-            + ((self.vram_address.get(NM_TABLE_Y) as usize) * FRAME_HEIGHT))
-            % (2 * FRAME_HEIGHT)
-    }
-
     fn determine_pixel_color_and_check_for_sprite0_hit(
         &self,
         bg_color_index: u8,
@@ -541,10 +603,10 @@ impl PPU {
         (final_color, sprite0_hit)
     }
 
-    fn get_pattern_tile(&self, table_index: u8, tile_index: u8, x: usize, y: usize) -> Tile {
+    fn get_pattern_tile(&self, table_index: u8, tile_index: u8) -> Tile {
         let pattern_table = &self.pattern_tables[table_index as usize];
         let tiles = &mut pattern_table.borrow_mut().tiles;
-        if (x % 8 == 0 && y % 8 == 0) || tiles[tile_index as usize].is_none() {
+        if true {
             tiles[tile_index as usize] = Some(Tile {
                 data: self
                     .vram
@@ -555,20 +617,8 @@ impl PPU {
         tiles[tile_index as usize].unwrap()
     }
     fn get_background_color_index(&mut self, x: usize) -> (u8, u8) {
-        let bg_pattern_table_index = self.control_reg.get_background_pattern_table_index();
-        let scrolled_x = self.get_scrolled_x(x % 8);
-        let scrolled_y = self.get_scrolled_y();
-        let name_table_index = (2 * (scrolled_y / FRAME_HEIGHT) + (scrolled_x / FRAME_WIDTH)) as u8;
-        let scrolled_x = scrolled_x % FRAME_WIDTH;
-        let scrolled_y = scrolled_y % FRAME_HEIGHT;
-        let bg_color_tile_y = (scrolled_y / 16) as u8;
-        let bg_color_tile_x = (scrolled_x / 16) as u8;
-        let bg_palette_index = self.vram.borrow().get_background_pallete_index(
-            name_table_index,
-            bg_color_tile_x,
-            bg_color_tile_y,
-        );
         let mut bg_color_index = 0;
+        let mut bg_palette_index = 0;
         if self
             .mask_reg
             .is_flag_enabled(MaskRegisterFlag::ShowBackground)
@@ -577,33 +627,14 @@ impl PPU {
                 .is_flag_enabled(MaskRegisterFlag::ShowBackgroundInLeftMost8Pixels)
                 || x >= 8)
         {
-            let bg_tile_y = (scrolled_y / 8) as u8;
-            let bg_tile_x = (scrolled_x / 8) as u8;
-            let bg_tile_index =
-                self.vram
-                    .borrow()
-                    .get_nametable_tile_index(name_table_index, bg_tile_x, bg_tile_y);
+            let scrolled_x = (x % 8) as u8 + self.fine_x_scroll;
+            let x = 7 - (scrolled_x % 8);
 
-            let bg_tile = self.get_pattern_tile(
-                bg_pattern_table_index,
-                bg_tile_index,
-                scrolled_x,
-                scrolled_y,
-            );
-            if false {
-                println!(
-                    "sx {} sy {} ti {:X} tx {} ty {} nm {} coarseY {}",
-                    scrolled_x,
-                    scrolled_y,
-                    bg_tile_index,
-                    bg_tile_x,
-                    bg_tile_y,
-                    name_table_index,
-                    self.t_vram_address.get(COARSE_Y)
-                );
-            }
-
-            bg_color_index = bg_tile.get_color_index(scrolled_x % 8, scrolled_y % 8);
+            let tile_data = &self.tile_data[scrolled_x as usize / 8];
+            let color_index_lo = (tile_data.low_bg_pattern_byte & (1 << x)) >> x;
+            let color_index_hi = (tile_data.high_bg_pattern_byte & (1 << x)) >> x;
+            bg_color_index = 2 * color_index_hi + color_index_lo;
+            bg_palette_index = tile_data.attribute_byte;
         }
         (bg_color_index as u8, bg_palette_index)
     }
@@ -647,12 +678,7 @@ impl PPU {
                         y = 7 - y;
                     }
 
-                    let tile = self.get_pattern_tile(
-                        pattern_table_index,
-                        tile_index,
-                        x as usize,
-                        y as usize,
-                    );
+                    let tile = self.get_pattern_tile(pattern_table_index, tile_index);
                     let color_index = tile.get_color_index(x as usize, y as usize);
                     if color_index != 0 {
                         return (color_index as u8, *sprite);

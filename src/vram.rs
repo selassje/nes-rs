@@ -95,13 +95,6 @@ impl VRAM {
             panic!("Incorrect address! {:X}", address)
         }
     }
-    fn get_attribute_table(&self, table_index: u8) -> [u8; 64] {
-        let mut attribute_table = [0; 64];
-        let attrib_table_addr =
-            self.get_memory_index(NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE + 960);
-        attribute_table.copy_from_slice(&self.memory[attrib_table_addr..attrib_table_addr + 64]);
-        attribute_table
-    }
 
     fn get_byte_internal(&self, address: u16) -> u8 {
         if address < NAMETABLES_START {
@@ -151,9 +144,16 @@ impl VideoMemory for VRAM {
         color_tile_x: u8,
         color_tile_y: u8,
     ) -> u8 {
-        let attribute_table = self.get_attribute_table(table_index);
+        let attribute_data = self.get_attribute_data(table_index, color_tile_x, color_tile_y);
+        let quadrant: u8 = (color_tile_y % 2) * 2 + (color_tile_x % 2);
+        (attribute_data & ATTRIBUTE_DATA_QUADRANT_MASKS[quadrant as usize] as u8) >> (2 * quadrant)
+    }
+
+    fn get_attribute_data(&self, table_index: u8, color_tile_x: u8, color_tile_y: u8) -> u8 {
+        let attrib_table_addr =
+            self.get_memory_index(NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE + 960);
         let attribute_index = (color_tile_y / 2) * 8 + color_tile_x / 2;
-        let attribute_data = attribute_table[attribute_index as usize];
+        let attribute_data = self.memory[attrib_table_addr + attribute_index as usize];
         let quadrant: u8 = (color_tile_y % 2) * 2 + (color_tile_x % 2);
         (attribute_data & ATTRIBUTE_DATA_QUADRANT_MASKS[quadrant as usize] as u8) >> (2 * quadrant)
     }
@@ -184,5 +184,15 @@ impl VideoMemory for VRAM {
 
     fn get_sprite_palette(&self, palette_index: u8) -> [u8; 3] {
         self.get_palette(0x3F11 + 4 * palette_index as u16)
+    }
+
+    fn get_low_pattern_data(&self, table_index: u8, tile_index: u8, y: u8) -> u8 {
+        let pattern_table_addr = table_index as u16 * PATTERN_TABLE_SIZE;
+        self.get_byte_internal(pattern_table_addr + 16 * tile_index as u16 + y as u16)
+    }
+
+    fn get_high_pattern_data(&self, table_index: u8, tile_index: u8, y: u8) -> u8 {
+        let pattern_table_addr = table_index as u16 * PATTERN_TABLE_SIZE;
+        self.get_byte_internal(pattern_table_addr + 16 * tile_index as u16 + 8 as u16 + y as u16)
     }
 }
