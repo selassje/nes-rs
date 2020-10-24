@@ -174,6 +174,11 @@ impl CPU {
         }
     }
 
+    fn pop_byte(&mut self) -> u8 {
+        self.sp = ((self.sp as u16 + 1) & 0xFF) as u8;
+        self.ram.borrow().get_byte(self.sp as u16 + STACK_PAGE)
+    }
+
     fn push_byte(&mut self, val: u8) {
         self.ram
             .borrow_mut()
@@ -181,55 +186,15 @@ impl CPU {
         self.sp = ((self.sp as i16 - 1) & 0xFF) as u8;
     }
 
-    fn pop_byte(&mut self) -> u8 {
-        self.sp = ((self.sp as u16 + 1) & 0xFF) as u8;
-        self.ram.borrow().get_byte(self.sp as u16 + STACK_PAGE)
-    }
-
     fn push_word(&mut self, val: u16) {
-        // self.push_byte((val & 0x00FF) as u8);
-        // self.push_byte((val & 0xFF00) as u8);
-        let (addr_lo, addr_hi) = if self.sp == 0 {
-            (0xFF, 0x00)
-        } else {
-            (self.sp - 1, self.sp)
-        };
-        self.ram
-            .borrow_mut()
-            .store_byte(addr_lo as u16 + STACK_PAGE, (val & 0x00FF) as u8);
-        self.ram
-            .borrow_mut()
-            .store_byte(addr_hi as u16 + STACK_PAGE, ((val & 0xFF00) >> 8) as u8);
-        if self.sp == 1 {
-            self.sp = 0xFF
-        } else if self.sp == 0 {
-            self.sp = 0xFE
-        } else {
-            self.sp -= 2;
-        }
+        self.push_byte(((val & 0xFF00) >> 8) as u8);
+        self.push_byte((val & 0x00FF) as u8);
     }
 
     fn pop_word(&mut self) -> u16 {
-        // let high_byte = self.pop_byte();
-        // let low_byte = self.pop_byte();
-        // convert_2u8_to_u16(low_byte, high_byte)
-        if self.sp == 0xFF {
-            self.sp = 1;
-        } else if self.sp == 0xFE {
-            self.sp = 0;
-        } else {
-            self.sp += 2;
-        }
-        let (addr_lo, addr_hi) = if self.sp == 0 {
-            (0xFF, 0x00)
-        } else {
-            (self.sp - 1, self.sp)
-        };
-
-        convert_2u8_to_u16(
-            self.ram.borrow().get_byte(addr_lo as u16 + STACK_PAGE),
-            self.ram.borrow().get_byte(addr_hi as u16 + STACK_PAGE),
-        )
+        let low_byte = self.pop_byte();
+        let high_byte = self.pop_byte();
+        convert_2u8_to_u16(low_byte, high_byte)
     }
     pub fn maybe_fetch_next_instruction(&mut self) -> bool {
         if self.instruction.is_none() {
