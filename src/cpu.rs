@@ -174,18 +174,21 @@ impl CPU {
         }
     }
 
-    fn push_u8(&mut self, val: u8) {
+    fn push_byte(&mut self, val: u8) {
         self.ram
             .borrow_mut()
             .store_byte(self.sp as u16 + STACK_PAGE, val);
-        if self.sp == 0 {
-            self.sp = 0xFF;
-        } else {
-            self.sp -= 1;
-        }
+        self.sp = ((self.sp as i16 - 1) & 0xFF) as u8;
     }
 
-    fn push_u16(&mut self, val: u16) {
+    fn pop_byte(&mut self) -> u8 {
+        self.sp = ((self.sp as u16 + 1) & 0xFF) as u8;
+        self.ram.borrow().get_byte(self.sp as u16 + STACK_PAGE)
+    }
+
+    fn push_word(&mut self, val: u16) {
+        // self.push_byte((val & 0x00FF) as u8);
+        // self.push_byte((val & 0xFF00) as u8);
         let (addr_lo, addr_hi) = if self.sp == 0 {
             (0xFF, 0x00)
         } else {
@@ -206,16 +209,10 @@ impl CPU {
         }
     }
 
-    fn pop_u8(&mut self) -> u8 {
-        if self.sp == 0xFF {
-            self.sp = 1;
-        } else {
-            self.sp += 1;
-        }
-        self.ram.borrow().get_byte(self.sp as u16 + STACK_PAGE)
-    }
-
-    fn pop_u16(&mut self) -> u16 {
+    fn pop_word(&mut self) -> u16 {
+        // let high_byte = self.pop_byte();
+        // let low_byte = self.pop_byte();
+        // convert_2u8_to_u16(low_byte, high_byte)
         if self.sp == 0xFF {
             self.sp = 1;
         } else if self.sp == 0xFE {
@@ -228,6 +225,7 @@ impl CPU {
         } else {
             (self.sp - 1, self.sp)
         };
+
         convert_2u8_to_u16(
             self.ram.borrow().get_byte(addr_lo as u16 + STACK_PAGE),
             self.ram.borrow().get_byte(addr_hi as u16 + STACK_PAGE),
@@ -336,7 +334,7 @@ impl CPU {
         let mut extra_cycles = 0;
         if self.address == Address::RAM(OamDma as u16) {
             extra_cycles = 513;
-            if self.cycle % 2 != 0 {
+            if self.cycle % 2 == 1 {
                 extra_cycles += 1;
             }
         }
@@ -568,51 +566,51 @@ impl CPU {
     fn nop(&mut self) {}
 
     fn brk(&mut self) {
-        self.push_u16(self.pc + 1);
+        self.push_word(self.pc + 2);
         let mut ps = self.ps;
         ps |= ProcessorFlag::BFlagBit4 as u8;
         ps |= ProcessorFlag::BFlagBit5 as u8;
-        self.push_u8(ps);
+        self.push_byte(ps);
         self.set_flag(ProcessorFlag::InterruptDisable);
         self.pc = self.ram.borrow().get_word(0xFFFE) - 1;
     }
 
     fn irq(&mut self) {
-        self.push_u16(self.pc);
+        self.push_word(self.pc);
         let mut ps = self.ps;
         ps &= !(ProcessorFlag::BFlagBit4 as u8);
         ps |= ProcessorFlag::BFlagBit5 as u8;
-        self.push_u8(ps);
+        self.push_byte(ps);
         self.set_flag(ProcessorFlag::InterruptDisable);
         self.pc = self.ram.borrow().get_word(0xFFFE) - 1;
     }
 
     fn nmi(&mut self) {
-        self.push_u16(self.pc);
+        self.push_word(self.pc);
         let mut ps = self.ps;
         ps &= !(ProcessorFlag::BFlagBit4 as u8);
         ps |= ProcessorFlag::BFlagBit5 as u8;
-        self.push_u8(ps);
+        self.push_byte(ps);
         self.set_flag(ProcessorFlag::InterruptDisable);
         self.pc = self.ram.borrow().get_word(0xFFFA) - 1;
     }
 
     fn jsr(&mut self) {
-        self.push_u16(self.pc + 2);
+        self.push_word(self.pc + 2);
         self.pc = self.get_ram_address() - 3;
     }
 
     fn rts(&mut self) {
-        self.pc = self.pop_u16();
+        self.pc = self.pop_word();
     }
 
     fn rti(&mut self) {
         let b_flag_mask = ProcessorFlag::BFlagBit4 as u8 | ProcessorFlag::BFlagBit5 as u8;
         let b_flag_bits = self.ps & b_flag_mask;
-        self.ps = self.pop_u8();
+        self.ps = self.pop_byte();
         self.ps &= !b_flag_mask;
         self.ps |= b_flag_bits;
-        self.pc = self.pop_u16() - 1;
+        self.pc = self.pop_word() - 1;
     }
 
     fn jmp(&mut self) {
@@ -837,18 +835,18 @@ impl CPU {
     }
 
     fn pha(&mut self) {
-        self.push_u8(self.a);
+        self.push_byte(self.a);
     }
 
     fn php(&mut self) {
         let mut ps = self.ps;
         ps |= ProcessorFlag::BFlagBit4 as u8;
         ps |= ProcessorFlag::BFlagBit5 as u8;
-        self.push_u8(ps);
+        self.push_byte(ps);
     }
 
     fn pla(&mut self) {
-        self.a = self.pop_u8();
+        self.a = self.pop_byte();
         self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
@@ -856,7 +854,7 @@ impl CPU {
     fn plp(&mut self) {
         let b_flag_mask = ProcessorFlag::BFlagBit4 as u8 | ProcessorFlag::BFlagBit5 as u8;
         let b_flag_bits = self.ps & b_flag_mask;
-        self.ps = self.pop_u8();
+        self.ps = self.pop_byte();
         self.ps &= !b_flag_mask;
         self.ps |= b_flag_bits;
     }

@@ -36,7 +36,7 @@ const ATTRIBUTE_DATA_QUADRANT_MASKS: [u8; 4] = [
 ];
 
 pub struct VRAM {
-    memory: [u8; 0x1020],
+    memory: [u8; 0x0820],
     mapper: Rc<RefCell<dyn Mapper>>,
     read_buffer: RefCell<u8>,
 }
@@ -44,7 +44,7 @@ pub struct VRAM {
 impl VRAM {
     pub fn new(mapper: Rc<RefCell<dyn Mapper>>) -> Self {
         VRAM {
-            memory: [0; 0x1020],
+            memory: [0; 0x0820],
             mapper,
             read_buffer: RefCell::new(0),
         }
@@ -69,8 +69,8 @@ impl VRAM {
                     Mirroring::Horizontal => match nametable_mirror_offset {
                         0x0000..=0x03FF => 0x0000,
                         0x0400..=0x07FF => 0x0000,
-                        0x0800..=0x0BFF => 0x0800,
-                        0x0C00..=0x0FFF => 0x0800,
+                        0x0800..=0x0BFF => 0x0400,
+                        0x0C00..=0x0FFF => 0x0400,
                         _ => panic!("Unexpected nametable offset {:X}", nametable_mirror_offset),
                     },
                     Mirroring::SingleScreenLowerBank => 0x0000,
@@ -85,7 +85,7 @@ impl VRAM {
                 0x1C => Some(0x0C),
                 _ => None,
             };
-            0x1000
+            0x0800
                 + if let Some(mirror) = maybe_internal_mirror {
                     mirror
                 } else {
@@ -114,12 +114,12 @@ impl VRAM {
 }
 
 impl Memory for VRAM {
-    fn store_byte(&mut self, addr: u16, byte: u8) {
-        let addr = addr & 0x3FFF;
-        if addr < NAMETABLES_START {
-            self.mapper.borrow_mut().store_chr_byte(addr, byte);
+    fn store_byte(&mut self, address: u16, byte: u8) {
+        let adress = address & 0x3FFF;
+        if adress < NAMETABLES_START {
+            self.mapper.borrow_mut().store_chr_byte(adress, byte);
         } else {
-            self.memory[self.get_memory_index(addr)] = byte;
+            self.memory[self.get_memory_index(adress)] = byte;
         }
     }
 

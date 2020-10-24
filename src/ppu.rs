@@ -33,7 +33,7 @@ const FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET: u16 = FETCH_NAMETABLE_DATA_CYCLE_OFFSET
 const FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET: u16 = FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET + 2;
 const FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET: u16 = FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET + 2;
 
-const CPU_PPU_ALIGNMENT: u16 = 2;
+const CPU_PPU_ALIGNMENT: u16 = 0;
 const VBLANK_START_ONE_CYCLE_BEFORE: u16 = 1 + CPU_PPU_ALIGNMENT;
 const VBLANK_START_CYCLE: u16 = 1 + VBLANK_START_ONE_CYCLE_BEFORE;
 const VBLANK_START_ONE_CYCLE_AFTER: u16 = 1 + VBLANK_START_CYCLE;
@@ -368,8 +368,6 @@ impl PPU {
     }
 
     fn fetch_next_tile_data(&mut self) {
-        let fetch_offset = self.ppu_cycle % 8;
-
         let nametable_index = self.vram_address.get(NM_TABLE) as u8;
         let tile_x = self.vram_address.get(COARSE_X) as u8;
         let tile_y = self.vram_address.get(COARSE_Y) as u8;
@@ -377,6 +375,12 @@ impl PPU {
         let pattern_table_index = self.control_reg.get_background_pattern_table_index();
 
         match self.ppu_cycle % 8 {
+            0 => {
+                self.tile_data[0] = self.tile_data[1];
+                self.tile_data[1] = self.tile_data[2];
+                self.vram_address.inc_coarse_x();
+            }
+
             FETCH_NAMETABLE_DATA_CYCLE_OFFSET => {
                 self.tile_data[2].index = self.vram.borrow_mut().get_nametable_tile_index(
                     nametable_index,
@@ -407,11 +411,6 @@ impl PPU {
                     )
             }
             _ => {}
-        }
-        if fetch_offset == 0 {
-            self.tile_data[0] = self.tile_data[1];
-            self.tile_data[1] = self.tile_data[2];
-            self.vram_address.inc_coarse_x();
         }
     }
 
@@ -457,7 +456,6 @@ impl PPU {
             if self.is_rendering_in_progress() {
                 self.vram_address.inc_y();
                 self.mapper.borrow_mut().ppu_a12_rising_edge_triggered();
-
                 self.vram_address
                     .set(COARSE_X, self.t_vram_address.get(COARSE_X));
                 self.vram_address
@@ -470,20 +468,13 @@ impl PPU {
                 VBLANK_START_ONE_CYCLE_BEFORE => {
                     self.background_palletes = self.get_palettes(true);
                     self.sprite_palettes = self.get_palettes(false);
-
                     self.vbl_flag_supressed = false;
-
                     self.status_reg
                         .set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
                     self.status_reg
                         .set_flag(StatusRegisterFlag::SpriteOverflow, false);
                     self.status_reg
                         .set_flag(StatusRegisterFlag::Sprite0Hit, false);
-                }
-                ACTIVE_PIXELS_CYCLE_START..=ACTIVE_PIXELS_CYCLE_END => {
-                    if self.is_rendering_enabled() {
-                        self.fetch_next_tile_data();
-                    }
                 }
                 280 => {
                     if self.is_rendering_enabled() {
@@ -526,8 +517,8 @@ impl PPU {
                 }
 
                 ACTIVE_PIXELS_CYCLE_START..=ACTIVE_PIXELS_CYCLE_END => {
+                    self.render_pixel();
                     if self.is_rendering_enabled() {
-                        self.render_pixel();
                         self.fetch_next_tile_data();
                     }
                 }
@@ -811,6 +802,8 @@ impl WritePpuRegisters for PPU {
                     let old_vram_address = self.vram_address;
                     self.vram_address.address += self.control_reg.get_vram_increment();
                     self.check_for_a12_rising_toggle(old_vram_address);
+                } else {
+                    panic!("PPU Write during rendering!")
                 }
             }
 
