@@ -106,7 +106,7 @@ pub struct CPU {
     code_segment: (u16, u16),
     opcodes: OpCodes,
     interrupt: Option<u8>,
-    brk_or_irq_interrupted_by_nmi: bool,
+    is_brk_or_irq_hijacked_by_nmi: bool,
 }
 
 impl CPU {
@@ -133,7 +133,7 @@ impl CPU {
             interrupt: None,
             address: Address::Implicit,
             opcodes: get_opcodes(),
-            brk_or_irq_interrupted_by_nmi: false,
+            is_brk_or_irq_hijacked_by_nmi: false,
         }
     }
 
@@ -149,7 +149,7 @@ impl CPU {
         self.instruction = None;
         self.code_segment = (0, 0xFFFF);
         self.address = Address::Implicit;
-        self.brk_or_irq_interrupted_by_nmi = false;
+        self.is_brk_or_irq_hijacked_by_nmi = false;
     }
 
     fn set_flag(&mut self, flag: ProcessorFlag) {
@@ -212,30 +212,13 @@ impl CPU {
     }
 
     fn check_for_interrupts(&mut self) {
-        let ins = self.instruction.unwrap().fun as usize;
-        let cycle_in_instruction = self.instruction.unwrap().cycle;
-        let total_cycles = self.instruction.unwrap().total_cycles;
-        let is_brk_or_irq_executing = ins == Self::brk as usize || ins == Self::irq as usize;
-        let is_nmi_executing = ins == Self::nmi as usize;
         if self.ppu_state.borrow_mut().is_nmi_pending() {
-            if is_brk_or_irq_executing && cycle_in_instruction <= 4 {
-                println!(
-                    "BRK interrupted by NMI {} CPU {}",
-                    cycle_in_instruction,
-                    self.cycle + total_cycles as u128 - cycle_in_instruction as u128 + 1,
-                );
-                self.brk_or_irq_interrupted_by_nmi = true;
-            } else {
-                println!("NMI detected {}", self.cycle + 8);
-                self.interrupt = Some(NMI_OPCODE as u8);
-            }
-        } else if !is_brk_or_irq_executing
-            && !is_nmi_executing
-            && !self.get_flag(ProcessorFlag::InterruptDisable)
+            self.ppu_state.borrow_mut().clear_nmi_pending();
+            self.interrupt = Some(NMI_OPCODE as u8);
+        } else if !self.get_flag(ProcessorFlag::InterruptDisable)
             && (self.mapper.borrow_mut().is_irq_pending()
                 || self.apu_state.borrow().is_irq_pending())
         {
-            println!("BRQ/IRQ detected {}", self.cycle + 8);
             self.interrupt = Some(IRQ_OPCODE as u8)
         }
     }
@@ -311,6 +294,7 @@ impl CPU {
         let instruction = self.instruction.unwrap();
         let ins = instruction.fun as usize;
         let is_brk_or_irq_executing = ins == Self::brk as usize || ins == Self::irq as usize;
+        let is_nmi_executing = ins == Self::nmi as usize;
         if instruction.cycle == instruction.total_cycles {
             (instruction.fun)(self);
             self.pc += instruction.bytes as u16;
@@ -321,10 +305,15 @@ impl CPU {
                 self.cycle += instruction.total_cycles as u128;
             }
             self.instruction = None;
-        } else if (!is_brk_or_irq_executing && instruction.cycle == instruction.total_cycles - 1)
-            || (is_brk_or_irq_executing && instruction.cycle <= 4)
-        {
-            self.check_for_interrupts()
+        } else {
+            if is_brk_or_irq_executing {
+                if self.ppu_state.borrow_mut().is_nmi_pending() && instruction.cycle <= 4 {  
+                    self.is_brk_or_irq_hijacked_by_nmi = true;
+                    self.ppu_state.borrow_mut().clear_nmi_pending() 
+                }
+            } else if !is_nmi_executing && instruction.cycle == instruction.total_cycles - 1 {
+                self.check_for_interrupts()
+            }
         }
     }
 
@@ -564,24 +553,19 @@ impl CPU {
     fn nop(&mut self) {}
 
     fn update_pc_for_brk_or_irq(&mut self) {
-        self.pc = if self.brk_or_irq_interrupted_by_nmi {
+        self.pc = if self.is_brk_or_irq_hijacked_by_nmi {
             self.ram.borrow().get_word(0xFFFA)
         } else {
             self.ram.borrow().get_word(0xFFFE)
         } - 1;
-        self.brk_or_irq_interrupted_by_nmi = false;
+        self.is_brk_or_irq_hijacked_by_nmi = false;
     }
 
     fn brk(&mut self) {
         self.push_word(self.pc + 2);
         let mut ps = self.ps;
-        if true {
-            ps |= ProcessorFlag::BFlagBit4 as u8;
-            ps |= ProcessorFlag::BFlagBit5 as u8;
-        } else {
-            ps &= !(ProcessorFlag::BFlagBit4 as u8);
-            ps |= ProcessorFlag::BFlagBit5 as u8;
-        }
+        ps |= ProcessorFlag::BFlagBit4 as u8;
+        ps |= ProcessorFlag::BFlagBit5 as u8;
         self.push_byte(ps);
         self.set_flag(ProcessorFlag::InterruptDisable);
         self.update_pc_for_brk_or_irq();

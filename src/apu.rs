@@ -922,9 +922,6 @@ impl ReadAccessRegisters for APU {
 
                 let interrupt_set_cycles = vec![FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES, 0];
                 if !interrupt_set_cycles.contains(&self.cpu_cycle) {
-                    if self.frame_interrupt {
-                        println!("Acknowledging IRQ");
-                    }
                     self.frame_interrupt = false;
                 }
                 out.data

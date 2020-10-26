@@ -6,5 +6,6 @@ pub struct PpuTime {
 
 pub trait PpuState {
     fn is_nmi_pending(&mut self) -> bool;
+    fn clear_nmi_pending(&mut self);
     fn get_time(&self) -> PpuTime;
 }

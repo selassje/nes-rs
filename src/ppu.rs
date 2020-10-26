@@ -862,9 +862,7 @@ impl PpuState for PPU {
         if self.scanline == VBLANK_START_SCANLINE && self.ppu_cycle == VBLANK_START_CYCLE {
             self.update_vblank_flag_and_nmi()
         }
-        let nmi_pending = self.nmi_pending;
-        self.nmi_pending = false;
-        nmi_pending
+        self.nmi_pending
     }
 
     fn get_time(&self) -> crate::cpu_ppu::PpuTime {
@@ -873,5 +871,9 @@ impl PpuState for PPU {
             cycle: self.ppu_cycle,
             frame: self.frame,
         }
+    }
+
+    fn clear_nmi_pending(&mut self) {
+        self.nmi_pending = false;
     }
 }
