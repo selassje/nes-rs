@@ -37,7 +37,7 @@ impl SampleBuffer {
     fn add(&mut self, sample: SampleFormat) {
         if 1.0 + self.bucket_size >= self.target_bucket_size && self.index < BUFFER_SIZE {
             let bucket_diff = self.target_bucket_size - self.bucket_size;
-            assert!(bucket_diff >= 0.0 && bucket_diff <= 1.0);
+            //assert!(bucket_diff >= 0.0 && bucket_diff <= 1.0);
             let bucket_diff_comp = 1.0 - bucket_diff;
             self.sum += bucket_diff * sample;
             let target_sample = self.sum / self.target_bucket_size.floor();

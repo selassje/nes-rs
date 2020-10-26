@@ -107,7 +107,7 @@ impl Mapper for Mapper1 {
                     0xA000..=0xBFFF => self.chr_bank_0,
                     0xC000..=0xDFFF => self.chr_bank_1,
                     0xE000..=0xFFFF => self.prg_bank,
-                    _ => panic!("Incorrect address"),
+                    _ => panic!("Incorrect address {:X}", address),
                 };
                 *register = byte;
                 self.shift_register = Default::default();

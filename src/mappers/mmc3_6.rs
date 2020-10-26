@@ -232,6 +232,7 @@ impl Mapper for MMC3_6 {
     }
 
     fn ppu_a12_rising_edge_triggered(&mut self) {
+        println!("Clocking A12");
         if self.reload_scanline_counter_at_next_edge || self.scanline_counter == 0 {
             self.scanline_counter = self.scanline_counter_reload_value;
         } else {

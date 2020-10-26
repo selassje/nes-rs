@@ -104,7 +104,7 @@ pub struct CPU {
     mapper: Rc<RefCell<dyn Mapper>>,
     code_segment: (u16, u16),
     opcodes: OpCodes,
-    nmi: Option<Nmi>,
+    interrupt: Option<u8>,
 }
 
 impl CPU {
@@ -126,7 +126,7 @@ impl CPU {
             code_segment: (0, 0),
             ppu_state,
             mapper,
-            nmi: None,
+            interrupt: None,
             address: Address::Implicit,
             opcodes: get_opcodes(),
         }
@@ -205,25 +205,37 @@ impl CPU {
         }
     }
 
-    fn check_for_interrupts(&mut self, ppu_time: &PpuTime) -> Option<u8> {
-        if self.nmi.is_none() {
-            self.nmi = self.ppu_state.borrow_mut().nmi_pending();
-        }
-        if self.nmi.is_some() && ppu_time.cycle >= self.nmi.unwrap().cycle + 3 {
-            self.nmi = None;
-            Some(NMI_OPCODE as u8)
-        } else if !self.get_flag(ProcessorFlag::InterruptDisable)
-            && self.mapper.borrow_mut().irq_pending()
-        {
-            Some(IRQ_OPCODE as u8)
-        } else {
-            None
+    fn check_for_interrupts(&mut self) {
+        if self.interrupt.is_none() {
+            // println!(
+            //     "Checking for  interrupts {}  PPU {} FR {} Current PC {:X}",
+            //     self.cycle + 8,
+            //     self.ppu_state.borrow().get_time().cycle,
+            //     self.ppu_state.borrow().get_time().frame,
+            //     self.pc
+            // );
+            if self.ppu_state.borrow_mut().nmi_pending().is_some() {
+                println!(
+                    "NMI detected cycles {}  PPU {} FR {} Current PC {:X}",
+                    self.cycle + 8,
+                    self.ppu_state.borrow().get_time().cycle,
+                    self.ppu_state.borrow().get_time().frame,
+                    self.pc
+                );
+                self.interrupt = Some(NMI_OPCODE as u8);
+            } else if !self.get_flag(ProcessorFlag::InterruptDisable)
+                && self.mapper.borrow_mut().irq_pending()
+            {
+                println!("IRQ detected");
+                self.interrupt = Some(IRQ_OPCODE as u8)
+            }
         }
     }
 
     fn fetch_next_instruction(&mut self) {
         let ppu_time = self.ppu_state.borrow_mut().get_time();
-        let op = if let Some(op) = self.check_for_interrupts(&ppu_time) {
+        let op = if let Some(op) = self.interrupt {
+            self.interrupt = None;
             op
         } else {
             self.ram.borrow().get_byte(self.pc)
@@ -251,15 +263,17 @@ impl CPU {
             extra_cycles += self.get_extra_cycles_from_branching(opcode.instruction as usize)
                 as u16
                 + self.get_extra_cycles_from_oam_dma();
+            let total_cycles = opcode.base_cycles as u16 + extra_cycles;
             self.instruction = Some(Instruction {
-                total_cycles: opcode.base_cycles as u16 + extra_cycles,
+                total_cycles,
                 cycle: 0,
                 bytes: opcode.mode.get_bytes(),
                 fun: opcode.instruction,
             });
+
             if false {
                 println!(
-                    "{:X} {:X} {:X} {:X} \t\tA:{:X} X:{:X} Y:{:X} P:{:X} SP={:X} CYCLES={} SL={} PPU={} FR={}",
+                    "{:X} {:X} {:X} {:X} \t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CYC:{:<3} SL:{:<3} FC:{} Cycle:{}",
                     self.pc,
                     op,
                     operand_1,
@@ -269,10 +283,10 @@ impl CPU {
                     self.y,
                     self.ps,
                     self.sp,
-                    self.cycle,
-                    ppu_time.scanline,
                     ppu_time.cycle,
-                    ppu_time.frame
+                    ppu_time.scanline,
+                    ppu_time.frame,
+                    self.cycle,
                 );
             }
         } else {
@@ -293,6 +307,8 @@ impl CPU {
                 self.cycle += instruction.total_cycles as u128;
             }
             self.instruction = None;
+        } else if instruction.cycle == instruction.total_cycles - 1 {
+            self.check_for_interrupts()
         }
     }
     fn get_extra_cycles_from_oam_dma(&self) -> u16 {
@@ -542,6 +558,7 @@ impl CPU {
 
     fn irq(&mut self) {
         self.push_word(self.pc);
+        println!("Handling IRQ");
         let mut ps = self.ps;
         ps &= !(ProcessorFlag::BFlagBit4 as u8);
         ps |= ProcessorFlag::BFlagBit5 as u8;
