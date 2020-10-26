@@ -1,8 +1,8 @@
+use crate::cpu_ppu::PpuState;
 use crate::{
     colors::{ColorMapper, DefaultColorMapper, RgbColor},
     io::FRAME_WIDTH,
 };
-use crate::cpu_ppu::PpuState;
 use crate::{io::VideoAccess, memory::VideoMemory};
 use crate::{mappers::Mapper, ram_ppu::*};
 
@@ -33,7 +33,7 @@ const FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET: u16 = FETCH_NAMETABLE_DATA_CYCLE_OFFSET
 const FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET: u16 = FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET + 2;
 const FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET: u16 = FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET + 2;
 
-const VBLANK_START_CYCLE: u16 = 4;
+const VBLANK_START_CYCLE: u16 = 3;
 
 struct ControlRegister {
     value: u8,

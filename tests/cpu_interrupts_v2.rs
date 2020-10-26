@@ -6,12 +6,10 @@ fn cli_latency() {
     run_simple_short_test("tests/cpu_interrupts_v2/1-cli_latency.nes");
 }
 
-#[ignore]
 #[test]
 fn nmi_and_brk() {
     run_simple_short_test("tests/cpu_interrupts_v2/2-nmi_and_brk.nes");
 }
-#[ignore]
 #[test]
 fn nmi_and_irq() {
     run_simple_short_test("tests/cpu_interrupts_v2/3-nmi_and_irq.nes");
