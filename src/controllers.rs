@@ -48,7 +48,15 @@ struct ControllerState {
 impl ControllerState {
     fn read(&mut self, strobe: bool) -> u8 {
         if self.button < 8 {
-            let val = self.controller.is_button_pressed(self.button.into());
+            let button: Button = self.button.into();
+            let mut val = self.controller.is_button_pressed(button);
+            if val != 0
+                && ((button == Button::Left && self.controller.is_button_pressed(Button::Right) != 0)
+                    || button == Button::Down && self.controller.is_button_pressed(Button::Up) != 0)
+            {
+                val = 0;
+            }
+
             if !strobe {
                 self.button += 1;
             }
