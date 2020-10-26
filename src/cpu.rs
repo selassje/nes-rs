@@ -153,7 +153,7 @@ impl CPU {
         self.ps |= flag as u8;
     }
 
-    fn reset_flag(&mut self, flag: ProcessorFlag) {
+    fn clear_flag(&mut self, flag: ProcessorFlag) {
         self.ps &= !(flag as u8);
     }
 
@@ -161,11 +161,11 @@ impl CPU {
         (self.ps & (flag as u8)) != 0
     }
 
-    fn set_or_reset_flag(&mut self, flag: ProcessorFlag, cond: bool) {
+    fn set_or_clear_flag(&mut self, flag: ProcessorFlag, cond: bool) {
         if cond {
             self.set_flag(flag);
         } else {
-            self.reset_flag(flag);
+            self.clear_flag(flag);
         }
     }
 
@@ -209,14 +209,14 @@ impl CPU {
     }
 
     fn check_for_interrupts(&mut self) {
-        if self.interrupt.is_none() {
+        let ins = self.instruction.unwrap().fun as usize;
+        if ins != Self::brk as usize && ins != Self::nmi as usize && ins != Self::irq as usize {
             if self.ppu_state.borrow_mut().is_nmi_pending() {
                 self.interrupt = Some(NMI_OPCODE as u8);
             } else if !self.get_flag(ProcessorFlag::InterruptDisable)
                 && (self.mapper.borrow_mut().is_irq_pending()
                     || self.apu_state.borrow().is_irq_pending())
             {
-                self.set_flag(ProcessorFlag::InterruptDisable);
                 self.interrupt = Some(IRQ_OPCODE as u8)
             }
         }
@@ -224,8 +224,7 @@ impl CPU {
 
     fn fetch_next_instruction(&mut self) {
         let ppu_time = self.ppu_state.borrow_mut().get_time();
-        let op = if let Some(op) = self.interrupt {
-            self.interrupt = None;
+        let op = if let Some(op) = self.interrupt.take() {
             op
         } else {
             self.ram.borrow().get_byte(self.pc)
@@ -256,7 +255,7 @@ impl CPU {
             let total_cycles = opcode.base_cycles as u16 + extra_cycles;
 
             if opcode.instruction as usize == Self::rti as usize {
-                //self.reset_flag(ProcessorFlag::InterruptDisable);
+                self.rti_restore_ps();
             }
 
             self.instruction = Some(Instruction {
@@ -306,6 +305,7 @@ impl CPU {
             self.check_for_interrupts()
         }
     }
+
     fn get_extra_cycles_from_oam_dma(&self) -> u16 {
         let mut extra_cycles = 0;
         if self.address == Address::RAM(OamDma as u16) {
@@ -458,14 +458,14 @@ impl CPU {
 
     fn _adc(&mut self, m: u8) {
         let result = m as u16 + self.a as u16 + self.carry() as u16;
-        self.set_or_reset_flag(
+        self.set_or_clear_flag(
             ProcessorFlag::OverflowFlag,
             m & 0x80 == self.a & 0x80 && result & 0x80 != m as u16 & 0x80,
         );
         self.a = (result & 0x00FF) as u8;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, (self.a as i8) < 0);
-        self.set_or_reset_flag(ProcessorFlag::CarryFlag, result & 0xFF00 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, (self.a as i8) < 0);
+        self.set_or_clear_flag(ProcessorFlag::CarryFlag, result & 0xFF00 != 0);
     }
 
     fn adc(&mut self) {
@@ -482,31 +482,31 @@ impl CPU {
         let mut m = self.load_from_address();
         let old_bit_7 = m & 0x80;
         m = m << 1;
-        self.set_or_reset_flag(ProcessorFlag::CarryFlag, old_bit_7 != 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::CarryFlag, old_bit_7 != 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
         self.store_to_address(m);
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
     }
 
     fn and(&mut self) {
         let m = self.load_from_address();
         self.a &= m;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
     fn ora(&mut self) {
         let m = self.load_from_address();
         self.a |= m;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
     fn eor(&mut self) {
         let m = self.load_from_address();
         self.a ^= m;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
     fn ror(&mut self) {
@@ -514,9 +514,9 @@ impl CPU {
         let old_bit_0 = m & 0x1;
         m = m >> 1 | (self.carry() << 7);
         self.store_to_address(m);
-        self.set_or_reset_flag(ProcessorFlag::CarryFlag, old_bit_0 == 1);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_clear_flag(ProcessorFlag::CarryFlag, old_bit_0 == 1);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
     }
 
     fn rol(&mut self) {
@@ -524,9 +524,9 @@ impl CPU {
         let old_bit_7 = m & 0x80;
         m = m << 1 | self.carry();
         self.store_to_address(m);
-        self.set_or_reset_flag(ProcessorFlag::CarryFlag, old_bit_7 != 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_clear_flag(ProcessorFlag::CarryFlag, old_bit_7 != 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
     }
 
     fn lsr(&mut self) {
@@ -534,9 +534,9 @@ impl CPU {
         let old_bit_0 = m & 1;
         m >>= 1;
         self.store_to_address(m);
-        self.set_or_reset_flag(ProcessorFlag::CarryFlag, old_bit_0 == 1);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_clear_flag(ProcessorFlag::CarryFlag, old_bit_0 == 1);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
     }
 
     fn nop(&mut self) {}
@@ -557,6 +557,7 @@ impl CPU {
         ps &= !(ProcessorFlag::BFlagBit4 as u8);
         ps |= ProcessorFlag::BFlagBit5 as u8;
         self.push_byte(ps);
+        self.set_flag(ProcessorFlag::InterruptDisable);
         self.pc = self.ram.borrow().get_word(0xFFFE) - 1;
     }
 
@@ -579,12 +580,15 @@ impl CPU {
         self.pc = self.pop_word();
     }
 
-    fn rti(&mut self) {
+    fn rti_restore_ps(&mut self) {
         let b_flag_mask = ProcessorFlag::BFlagBit4 as u8 | ProcessorFlag::BFlagBit5 as u8;
         let b_flag_bits = self.ps & b_flag_mask;
         self.ps = self.pop_byte();
         self.ps &= !b_flag_mask;
         self.ps |= b_flag_bits;
+    }
+
+    fn rti(&mut self) {
         self.pc = self.pop_word() - 1;
     }
 
@@ -597,33 +601,33 @@ impl CPU {
     }
 
     fn cld(&mut self) {
-        self.reset_flag(ProcessorFlag::DecimalMode);
+        self.clear_flag(ProcessorFlag::DecimalMode);
     }
 
     fn cli(&mut self) {
-        self.reset_flag(ProcessorFlag::InterruptDisable);
+        self.clear_flag(ProcessorFlag::InterruptDisable);
     }
 
     fn clv(&mut self) {
-        self.reset_flag(ProcessorFlag::OverflowFlag);
+        self.clear_flag(ProcessorFlag::OverflowFlag);
     }
 
     fn lda(&mut self) {
         self.a = self.load_from_address();
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
     fn ldx(&mut self) {
         self.x = self.load_from_address();
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.x == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.x == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
     }
 
     fn ldy(&mut self) {
         self.y = self.load_from_address();
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.y == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.y & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.y == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.y & 0x80 != 0);
     }
 
     fn sta(&mut self) {
@@ -644,32 +648,32 @@ impl CPU {
 
     fn tsx(&mut self) {
         self.x = self.sp;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.x == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.x == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
     }
 
     fn txa(&mut self) {
         self.a = self.x;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
     fn tax(&mut self) {
         self.x = self.a;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.x == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.x == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
     }
 
     fn tya(&mut self) {
         self.a = self.y;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
     fn tay(&mut self) {
         self.y = self.a;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.y == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.y & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.y == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.y & 0x80 != 0);
     }
 
     fn branch_if(&mut self, condition: bool) {
@@ -748,33 +752,33 @@ impl CPU {
 
     fn bit(&mut self) {
         let m = self.load_from_address();
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a & m == 0);
-        self.set_or_reset_flag(ProcessorFlag::OverflowFlag, m & (1 << 6) != 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, m & (1 << 7) != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a & m == 0);
+        self.set_or_clear_flag(ProcessorFlag::OverflowFlag, m & (1 << 6) != 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & (1 << 7) != 0);
     }
 
     fn cmp(&mut self) {
         let m = self.load_from_address();
         let result = (self.a as i16 - m as i16) as u8;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == m);
-        self.set_or_reset_flag(ProcessorFlag::CarryFlag, self.a >= m);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == m);
+        self.set_or_clear_flag(ProcessorFlag::CarryFlag, self.a >= m);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);
     }
 
     fn cpx(&mut self) {
         let m = self.load_from_address();
         let result = (self.x as i16 - m as i16) as u8;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.x == m);
-        self.set_or_reset_flag(ProcessorFlag::CarryFlag, self.x >= m);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.x == m);
+        self.set_or_clear_flag(ProcessorFlag::CarryFlag, self.x >= m);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);
     }
 
     fn cpy(&mut self) {
         let m = self.load_from_address();
         let result = (self.y as i16 - m as i16) as u8;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.y == m);
-        self.set_or_reset_flag(ProcessorFlag::CarryFlag, self.y >= m);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.y == m);
+        self.set_or_clear_flag(ProcessorFlag::CarryFlag, self.y >= m);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);
     }
 
     fn dey(&mut self) {
@@ -783,8 +787,8 @@ impl CPU {
         } else {
             self.y = self.y - 1;
         }
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.y == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.y & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.y == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.y & 0x80 != 0);
     }
 
     fn dec(&mut self) {
@@ -794,8 +798,8 @@ impl CPU {
         } else {
             m = m - 1;
         }
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, m == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
         self.store_to_address(m);
     }
 
@@ -805,8 +809,8 @@ impl CPU {
         } else {
             self.x = self.x - 1;
         }
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.x == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.x == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
     }
 
     fn pha(&mut self) {
@@ -822,8 +826,8 @@ impl CPU {
 
     fn pla(&mut self) {
         self.a = self.pop_byte();
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.a == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
     fn plp(&mut self) {
@@ -838,27 +842,27 @@ impl CPU {
         let mut m = self.load_from_address();
         let result = m as u16 + 1;
         m = (result & 0xFF) as u8;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, m == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
         self.store_to_address(m);
     }
 
     fn inx(&mut self) {
         let result = self.x as u16 + 1;
         self.x = (result & 0xFF) as u8;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.x == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.x == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
     }
 
     fn iny(&mut self) {
         let result = self.y as u16 + 1;
         self.y = (result & 0xFF) as u8;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, self.y == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, self.y & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.y == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.y & 0x80 != 0);
     }
 
     fn clc(&mut self) {
-        self.reset_flag(ProcessorFlag::CarryFlag);
+        self.clear_flag(ProcessorFlag::CarryFlag);
     }
 
     fn sec(&mut self) {
@@ -873,8 +877,8 @@ impl CPU {
         let m = self.load_from_address();
         self.a = m;
         self.x = m;
-        self.set_or_reset_flag(ProcessorFlag::ZeroFlag, m == 0);
-        self.set_or_reset_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
     }
 
     fn aax(&mut self) {
@@ -890,7 +894,7 @@ impl CPU {
 
     fn anc(&mut self) {
         self.and();
-        self.set_or_reset_flag(
+        self.set_or_clear_flag(
             ProcessorFlag::CarryFlag,
             self.get_flag(ProcessorFlag::NegativeFlag),
         );
