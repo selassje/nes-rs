@@ -1,8 +1,8 @@
 mod opcodes;
 
 use self::{opcodes::IRQ_OPCODE, AddressingMode::*};
-use crate::cpu_ppu::PpuState;
 use crate::{common::*, memory::Memory};
+use crate::{cpu_apu::ApuState, cpu_ppu::PpuState};
 use crate::{mappers::Mapper, ram_ppu::DmaWriteAccessRegister::OamDma};
 use opcodes::{get_opcodes, OpCodes, NMI_OPCODE};
 use std::cell::RefCell;
@@ -102,6 +102,7 @@ pub struct CPU {
     ram: Rc<RefCell<dyn Memory>>,
     ppu_state: Rc<RefCell<dyn PpuState>>,
     mapper: Rc<RefCell<dyn Mapper>>,
+    apu_state: Rc<RefCell<dyn ApuState>>,
     code_segment: (u16, u16),
     opcodes: OpCodes,
     interrupt: Option<u8>,
@@ -111,6 +112,7 @@ impl CPU {
     pub fn new(
         ram: Rc<RefCell<dyn Memory>>,
         ppu_state: Rc<RefCell<dyn PpuState>>,
+        apu_state: Rc<RefCell<dyn ApuState>>,
         mapper: Rc<RefCell<dyn Mapper>>,
     ) -> CPU {
         CPU {
@@ -125,6 +127,7 @@ impl CPU {
             ram,
             code_segment: (0, 0),
             ppu_state,
+            apu_state,
             mapper,
             interrupt: None,
             address: Address::Implicit,
@@ -210,7 +213,8 @@ impl CPU {
             if self.ppu_state.borrow_mut().is_nmi_pending() {
                 self.interrupt = Some(NMI_OPCODE as u8);
             } else if !self.get_flag(ProcessorFlag::InterruptDisable)
-                && self.mapper.borrow_mut().is_irq_pending()
+                && (self.mapper.borrow_mut().is_irq_pending()
+                    || self.apu_state.borrow().is_irq_pending())
             {
                 self.set_flag(ProcessorFlag::InterruptDisable);
                 self.interrupt = Some(IRQ_OPCODE as u8)
@@ -250,6 +254,11 @@ impl CPU {
                 as u16
                 + self.get_extra_cycles_from_oam_dma();
             let total_cycles = opcode.base_cycles as u16 + extra_cycles;
+
+            if opcode.instruction as usize == Self::rti as usize {
+                //self.reset_flag(ProcessorFlag::InterruptDisable);
+            }
+
             self.instruction = Some(Instruction {
                 total_cycles,
                 cycle: 0,

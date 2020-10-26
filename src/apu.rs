@@ -1,5 +1,5 @@
 use self::StatusRegisterFlag::*;
-use crate::{io::AudioAccess, memory::DmcMemory, ram_apu::*};
+use crate::{cpu_apu::ApuState, io::AudioAccess, memory::DmcMemory, ram_apu::*};
 use std::{cell::RefCell, default::Default, rc::Rc};
 
 use crate::io::SampleFormat;
@@ -931,3 +931,9 @@ impl ReadAccessRegisters for APU {
 }
 
 impl ApuRegisterAccess for APU {}
+
+impl ApuState for APU {
+    fn is_irq_pending(&self) -> bool {
+        self.frame_interrupt || self.dmc.interrupt
+    }
+}
