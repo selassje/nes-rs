@@ -1,7 +1,7 @@
 mod opcodes;
 
 use self::{opcodes::IRQ_OPCODE, AddressingMode::*};
-use crate::cpu_ppu::{Nmi, PpuState, PpuTime};
+use crate::cpu_ppu::PpuState;
 use crate::{common::*, memory::Memory};
 use crate::{mappers::Mapper, ram_ppu::DmaWriteAccessRegister::OamDma};
 use opcodes::{get_opcodes, OpCodes, NMI_OPCODE};
@@ -207,26 +207,12 @@ impl CPU {
 
     fn check_for_interrupts(&mut self) {
         if self.interrupt.is_none() {
-            // println!(
-            //     "Checking for  interrupts {}  PPU {} FR {} Current PC {:X}",
-            //     self.cycle + 8,
-            //     self.ppu_state.borrow().get_time().cycle,
-            //     self.ppu_state.borrow().get_time().frame,
-            //     self.pc
-            // );
-            if self.ppu_state.borrow_mut().nmi_pending().is_some() {
-                println!(
-                    "NMI detected cycles {}  PPU {} FR {} Current PC {:X}",
-                    self.cycle + 8,
-                    self.ppu_state.borrow().get_time().cycle,
-                    self.ppu_state.borrow().get_time().frame,
-                    self.pc
-                );
+            if self.ppu_state.borrow_mut().is_nmi_pending() {
                 self.interrupt = Some(NMI_OPCODE as u8);
             } else if !self.get_flag(ProcessorFlag::InterruptDisable)
-                && self.mapper.borrow_mut().irq_pending()
+                && self.mapper.borrow_mut().is_irq_pending()
             {
-                println!("IRQ detected");
+                self.set_flag(ProcessorFlag::InterruptDisable);
                 self.interrupt = Some(IRQ_OPCODE as u8)
             }
         }
@@ -558,12 +544,10 @@ impl CPU {
 
     fn irq(&mut self) {
         self.push_word(self.pc);
-        println!("Handling IRQ");
         let mut ps = self.ps;
         ps &= !(ProcessorFlag::BFlagBit4 as u8);
         ps |= ProcessorFlag::BFlagBit5 as u8;
         self.push_byte(ps);
-        self.set_flag(ProcessorFlag::InterruptDisable);
         self.pc = self.ram.borrow().get_word(0xFFFE) - 1;
     }
 

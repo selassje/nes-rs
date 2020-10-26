@@ -2,7 +2,7 @@ use crate::{
     colors::{ColorMapper, DefaultColorMapper, RgbColor},
     io::FRAME_WIDTH,
 };
-use crate::{cpu_ppu::Nmi, cpu_ppu::PpuState};
+use crate::cpu_ppu::PpuState;
 use crate::{io::VideoAccess, memory::VideoMemory};
 use crate::{mappers::Mapper, ram_ppu::*};
 
@@ -33,10 +33,7 @@ const FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET: u16 = FETCH_NAMETABLE_DATA_CYCLE_OFFSET
 const FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET: u16 = FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET + 2;
 const FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET: u16 = FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET + 2;
 
-const CPU_PPU_ALIGNMENT: u16 = 0;
-const VBLANK_START_ONE_CYCLE_BEFORE: u16 = 2;
-const VBLANK_START_CYCLE: u16 = 1 + VBLANK_START_ONE_CYCLE_BEFORE;
-const VBLANK_START_ONE_CYCLE_AFTER: u16 = 1 + VBLANK_START_CYCLE;
+const VBLANK_START_CYCLE: u16 = 4;
 
 struct ControlRegister {
     value: u8,
@@ -304,7 +301,7 @@ pub struct PPU {
     frame: u128,
     color_mapper: Box<dyn ColorMapper>,
     write_toggle: bool,
-    nmi: Option<Nmi>,
+    nmi_pending: bool,
     vbl_flag_supressed: bool,
     vram_address: VRAMAddress,
     t_vram_address: VRAMAddress,
@@ -338,7 +335,7 @@ impl PPU {
             t_vram_address: Default::default(),
             fine_x_scroll: 0,
             write_toggle: false,
-            nmi: None,
+            nmi_pending: false,
             vbl_flag_supressed: false,
             video_access,
             sprite_palettes: Default::default(),
@@ -363,7 +360,7 @@ impl PPU {
         self.t_vram_address = Default::default();
         self.fine_x_scroll = 0;
         self.write_toggle = false;
-        self.nmi = None;
+        self.nmi_pending = false;
         self.vbl_flag_supressed = false;
     }
 
@@ -533,16 +530,7 @@ impl PPU {
             },
             VBLANK_START_SCANLINE => {
                 if self.ppu_cycle == VBLANK_START_CYCLE {
-                    if !self.vbl_flag_supressed {
-                        self.status_reg
-                            .set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
-                        if self.control_reg.is_generate_nmi_enabled() {
-                            // println!("Setting NMI at CYC {} FC {}", self.ppu_cycle, self.frame);
-                            self.nmi = Some(Nmi {
-                                cycle: self.ppu_cycle,
-                            });
-                        }
-                    }
+                    self.update_vblank_flag_and_nmi()
                 }
             }
 
@@ -734,6 +722,17 @@ impl PPU {
     fn is_scanline_visible_or_pre_render(&self) -> bool {
         self.scanline >= PRE_RENDER_SCANLINE && self.scanline <= LAST_VISIBLE_SCANLINE
     }
+
+    fn update_vblank_flag_and_nmi(&mut self) {
+        if !self.vbl_flag_supressed {
+            self.status_reg
+                .set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
+            if self.control_reg.is_generate_nmi_enabled() {
+                self.vbl_flag_supressed = true;
+                self.nmi_pending = true;
+            }
+        }
+    }
 }
 
 impl WritePpuRegisters for PPU {
@@ -750,20 +749,14 @@ impl WritePpuRegisters for PPU {
                             && (self.ppu_cycle == VBLANK_START_CYCLE + 1
                                 || self.ppu_cycle == VBLANK_START_CYCLE + 2)))
                 {
-                    println!("Suppressing from Write CTRL");
-                    self.nmi = None;
+                    self.nmi_pending = false;
                 } else if self
                     .status_reg
                     .get_flag(StatusRegisterFlag::VerticalBlankStarted)
                     && (new_control_register.is_generate_nmi_enabled()
-                        && !self.control_reg.is_generate_nmi_enabled()
-                        && !(self.scanline == PRE_RENDER_SCANLINE && true))
-                // (self.ppu_cycle == VBLANK_START_ONE_CYCLE_BEFORE)))
+                        && !self.control_reg.is_generate_nmi_enabled())
                 {
-                    // println!("Immediate occurence");
-                    self.nmi = Some(Nmi {
-                        cycle: self.ppu_cycle,
-                    });
+                    self.nmi_pending = true;
                 }
 
                 self.control_reg.value = value;
@@ -831,36 +824,19 @@ impl ReadPpuRegisters for PPU {
     fn read(&mut self, register: ReadAccessRegister) -> u8 {
         match register {
             ReadAccessRegister::PpuStatus => {
-                let mut current_status = self.status_reg;
-                if self.scanline == VBLANK_START_SCANLINE && (self.ppu_cycle == VBLANK_START_CYCLE)
-                {
-                    if current_status.get_flag(StatusRegisterFlag::VerticalBlankStarted) {
-                        // println!("Suppressing VBL flag {}", self.ppu_cycle);
-                    }
-                    if self.ppu_cycle == VBLANK_START_CYCLE {
-                        self.vbl_flag_supressed = true;
-                    }
-                    current_status.set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
+                if self.scanline == VBLANK_START_SCANLINE && self.ppu_cycle == VBLANK_START_CYCLE {
+                    self.vbl_flag_supressed = true;
                 }
 
                 if self.scanline == VBLANK_START_SCANLINE
                     && (self.ppu_cycle == VBLANK_START_CYCLE + 1
                         || self.ppu_cycle == VBLANK_START_CYCLE + 2)
                 {
-                    if self.nmi.is_some() {
-                        println!("Suppressing NMI  PPU {} FR {}", self.ppu_cycle, self.frame);
-                        self.nmi = None;
-                    }
-                }
-
-                if current_status.get_flag(StatusRegisterFlag::VerticalBlankStarted) {
-                    // println!(
-                    //     "Reading VBL as set CYCLE {} SL {} FR {}",
-                    //     self.ppu_cycle, self.scanline, self.frame
-                    // );
+                    self.nmi_pending = false;
                 }
 
                 self.write_toggle = false;
+                let current_status = self.status_reg;
                 self.status_reg
                     .set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
                 current_status.value
@@ -882,27 +858,13 @@ impl ReadPpuRegisters for PPU {
 impl PpuRegisterAccess for PPU {}
 
 impl PpuState for PPU {
-    fn nmi_pending(&mut self) -> Option<crate::cpu_ppu::Nmi> {
-        //return self.nmi.take();
-        //if true {
-        if false {
-            self.nmi.take();
-        } else if self.nmi.is_none() {
-            if self.ppu_cycle == VBLANK_START_CYCLE && self.scanline == VBLANK_START_SCANLINE {
-                if !self.vbl_flag_supressed {
-                    self.status_reg
-                        .set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
-                    if self.control_reg.is_generate_nmi_enabled() {
-                        //  println!("Setting NMI at CYC {} FC {}", self.ppu_cycle, self.frame);
-                        self.vbl_flag_supressed = true;
-                        self.nmi = Some(Nmi {
-                            cycle: self.ppu_cycle,
-                        });
-                    }
-                }
-            }
+    fn is_nmi_pending(&mut self) -> bool {
+        if self.scanline == VBLANK_START_SCANLINE && self.ppu_cycle == VBLANK_START_CYCLE {
+            self.update_vblank_flag_and_nmi()
         }
-        self.nmi.take()
+        let nmi_pending = self.nmi_pending;
+        self.nmi_pending = false;
+        nmi_pending
     }
 
     fn get_time(&self) -> crate::cpu_ppu::PpuTime {
