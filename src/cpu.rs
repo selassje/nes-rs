@@ -107,8 +107,7 @@ pub struct CPU {
     opcodes: OpCodes,
     interrupt: Option<u8>,
     is_brk_or_irq_hijacked_by_nmi: bool,
-    is_oam_dma_in_progress: bool,
-    oam_dma_initial_write_cycles: u16,
+    oam_dma_in_progress: Option<u16>,
 }
 
 impl CPU {
@@ -136,8 +135,7 @@ impl CPU {
             address: Address::Implicit,
             opcodes: get_opcodes(),
             is_brk_or_irq_hijacked_by_nmi: false,
-            is_oam_dma_in_progress: false,
-            oam_dma_initial_write_cycles: 0,
+            oam_dma_in_progress: None,
         }
     }
 
@@ -154,8 +152,7 @@ impl CPU {
         self.code_segment = (0, 0xFFFF);
         self.address = Address::Implicit;
         self.is_brk_or_irq_hijacked_by_nmi = false;
-        self.is_oam_dma_in_progress = false;
-        self.oam_dma_initial_write_cycles = 0;
+        self.oam_dma_in_progress = None;
     }
 
     fn set_flag(&mut self, flag: ProcessorFlag) {
@@ -219,22 +216,12 @@ impl CPU {
 
     fn check_for_interrupts(&mut self) {
         if self.ppu_state.borrow_mut().is_nmi_pending() {
-            println!(
-                "NMI occured at {} instr {}",
-                self.cycle + 8,
-                self.instruction.unwrap().fun as usize
-            );
             self.ppu_state.borrow_mut().clear_nmi_pending();
             self.interrupt = Some(NMI_OPCODE as u8);
         } else if !self.get_flag(ProcessorFlag::InterruptDisable)
             && (self.mapper.borrow_mut().is_irq_pending()
                 || self.apu_state.borrow().is_irq_pending())
         {
-            println!(
-                "IRQ occured at {} instr {}",
-                self.cycle + 11,
-                self.instruction.unwrap().fun as usize
-            );
             self.interrupt = Some(IRQ_OPCODE as u8)
         }
     }
@@ -259,18 +246,33 @@ impl CPU {
                 operand_2 = self.ram.borrow().get_byte(self.pc + 2);
             }
 
-            let (address, mut extra_cycles) = self.get_address_and_extra_cycle_from_page_crossing(
-                operand_1,
-                operand_2,
-                opcode.mode,
-                opcode.extra_cycle_on_page_crossing,
-            );
+            let (address, extra_cycles_from_page_crossing) = self
+                .get_address_and_extra_cycle_from_page_crossing(
+                    operand_1,
+                    operand_2,
+                    opcode.mode,
+                    opcode.extra_cycle_on_page_crossing,
+                );
             self.address = address;
-            self.oam_dma_initial_write_cycles = extra_cycles + opcode.base_cycles as u16;
-            extra_cycles += self.get_extra_cycles_from_branching(opcode.instruction as usize)
-                as u16
-                + self.get_extra_cycles_from_oam_dma();
-            let total_cycles = opcode.base_cycles as u16 + extra_cycles;
+
+            let extra_cycles_from_branching =
+                self.get_extra_cycles_from_branching(opcode.instruction as usize);
+
+            let extra_cycles_from_oam_dma = self.get_extra_cycles_from_oam_dma();
+            if extra_cycles_from_oam_dma != 0 {
+                self.oam_dma_in_progress = Some(
+                    opcode.base_cycles as u16
+                        + extra_cycles_from_page_crossing
+                        + extra_cycles_from_branching,
+                )
+            } else {
+                self.oam_dma_in_progress = None;
+            }
+
+            let total_cycles = opcode.base_cycles as u16
+                + extra_cycles_from_page_crossing
+                + extra_cycles_from_branching
+                + extra_cycles_from_oam_dma;
 
             self.instruction = Some(Instruction {
                 total_cycles,
@@ -327,11 +329,14 @@ impl CPU {
                     self.is_brk_or_irq_hijacked_by_nmi = true;
                     self.ppu_state.borrow_mut().clear_nmi_pending()
                 }
-            } else if !is_nmi_executing
-               // && !(self.is_oam_dma_in_progress && instruction.cycle > 100)
-                && ((instruction.cycle == instruction.total_cycles - 1 && !self.is_oam_dma_in_progress) || (self.is_oam_dma_in_progress && instruction.cycle == self.oam_dma_initial_write_cycles - 1))
-            {
-                self.check_for_interrupts()
+            } else if !is_nmi_executing {
+                if (self.oam_dma_in_progress.is_some()
+                    && instruction.cycle == self.oam_dma_in_progress.unwrap() - 1)
+                    || (self.oam_dma_in_progress.is_none()
+                        && instruction.cycle == instruction.total_cycles - 1)
+                {
+                    self.check_for_interrupts()
+                }
             }
         }
     }
@@ -339,14 +344,10 @@ impl CPU {
     fn get_extra_cycles_from_oam_dma(&mut self) -> u16 {
         let mut extra_cycles = 0;
         if self.address == Address::RAM(OamDma as u16) {
-            println!("OAM Dma detected");
-            self.is_oam_dma_in_progress = true;
             extra_cycles = 513;
             if self.cycle % 2 == 1 {
                 extra_cycles += 1;
             }
-        } else {
-            self.is_oam_dma_in_progress = false;
         }
         extra_cycles
     }
