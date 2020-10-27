@@ -14,7 +14,6 @@ fn nmi_and_brk() {
 fn nmi_and_irq() {
     run_simple_short_test("tests/cpu_interrupts_v2/3-nmi_and_irq.nes");
 }
-#[ignore]
 #[test]
 fn irq_and_dma() {
     run_simple_short_test("tests/cpu_interrupts_v2/4-irq_and_dma.nes");
