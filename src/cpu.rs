@@ -283,7 +283,7 @@ impl CPU {
 
             if false {
                 println!(
-                    "{:X} {:X} {:X} {:X} \t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CYC:{:<3} SL:{:<3} FC:{} Cycle:{}",
+                    "{:X} {:X} {:X} {:X} \t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CYC:{:<3} SL:{:<3} FC:{} CPU Cycle:{}",
                     self.pc,
                     op,
                     operand_1,
@@ -313,6 +313,7 @@ impl CPU {
         let ins = instruction.fun as usize;
         let is_brk_or_irq_executing = ins == Self::brk as usize || ins == Self::irq as usize;
         let is_nmi_executing = ins == Self::nmi as usize;
+        let is_branching_executing = self.is_current_instruction_branching();
         if instruction.cycle == instruction.total_cycles {
             (instruction.fun)(self);
             self.pc += instruction.bytes as u16;
@@ -328,6 +329,10 @@ impl CPU {
                 if self.ppu_state.borrow_mut().is_nmi_pending() && instruction.cycle <= 4 {
                     self.is_brk_or_irq_hijacked_by_nmi = true;
                     self.ppu_state.borrow_mut().clear_nmi_pending()
+                }
+            } else if is_branching_executing {
+                if instruction.cycle == 1 || instruction.cycle == 3 {
+                    self.check_for_interrupts();
                 }
             } else if !is_nmi_executing {
                 if (self.oam_dma_in_progress.is_some()
@@ -350,6 +355,27 @@ impl CPU {
             }
         }
         extra_cycles
+    }
+
+    fn is_current_instruction_branching(&self) -> bool {
+        let ins = self.instruction.unwrap().fun as usize;
+        let bcc_fn: usize = CPU::bcc as usize;
+        let bcs_fn: usize = CPU::bcs as usize;
+        let bpl_fn: usize = CPU::bpl as usize;
+        let bmi_fn: usize = CPU::bmi as usize;
+        let bne_fn: usize = CPU::bne as usize;
+        let beq_fn: usize = CPU::beq as usize;
+        let bvc_fn: usize = CPU::bvc as usize;
+        let bvs_fn: usize = CPU::bvs as usize;
+
+        ins == bcc_fn
+            || ins == bcs_fn
+            || ins == bpl_fn
+            || ins == bmi_fn
+            || ins == bne_fn
+            || ins == beq_fn
+            || ins == bvc_fn
+            || ins == bvs_fn
     }
 
     fn get_extra_cycles_from_branching(&self, ins: usize) -> u16 {
