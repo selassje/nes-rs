@@ -22,7 +22,6 @@ fn irq_and_dma() {
     run_simple_short_test("tests/cpu_interrupts_v2/4-irq_and_dma.nes");
 }
 
-#[ignore]
 #[test]
 fn branch_delay_irq() {
     run_simple_test(

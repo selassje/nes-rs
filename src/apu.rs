@@ -621,6 +621,7 @@ pub struct APU {
     noise: Noise,
     dmc: DMC,
     cpu_cycle: u16,
+    is_during_apu_cycle: bool,
     frame_interrupt: bool,
     frame: u128,
     pending_reset_cycle: Option<u16>,
@@ -637,7 +638,8 @@ impl APU {
             triangle: TriangleWave::default(),
             noise: Noise::new(),
             dmc: DMC::new(),
-            cpu_cycle: 0,
+            cpu_cycle: 8,
+            is_during_apu_cycle: false,
             frame_interrupt: false,
             audio_access,
             frame: 1,
@@ -750,6 +752,8 @@ impl APU {
             }
         }
 
+        self.is_during_apu_cycle = !self.is_during_apu_cycle;
+
         let sample = Self::get_mixer_output(
             self.pulse_1.get_sample(),
             self.pulse_2.get_sample(),
@@ -784,7 +788,7 @@ impl APU {
     }
 
     fn is_half_frame_reached(&self) -> bool {
-        let next_cpu_cycle = self.cpu_cycle + 1;
+        let next_cpu_cycle = self.cpu_cycle;
         if next_cpu_cycle == FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES {
             return true;
         } else if self.frame_counter.get_sequencer_mode() == 0
@@ -800,14 +804,13 @@ impl APU {
     }
 
     fn is_quarter_frame_reached(&self) -> bool {
-        let next_cpu_cycle = self.cpu_cycle + 1;
         if self.is_half_frame_reached() {
             return true;
         } else {
-            if next_cpu_cycle == FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES {
+            if self.cpu_cycle == FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES {
                 return true;
             }
-            if next_cpu_cycle == FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES {
+            if self.cpu_cycle == FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES {
                 return true;
             }
         }
@@ -887,7 +890,7 @@ impl WriteAcessRegisters for APU {
                 self.dmc.interrupt = false;
             }
             WriteAccessRegister::FrameCounter => {
-                let shift = if self.cpu_cycle % 2 == 0 { 3 } else { 2 };
+                let shift = if self.is_during_apu_cycle { 2 } else { 3 };
                 self.frame_counter.data = value;
                 if self.frame_counter.is_interrupt_inhibit_flag_set() {
                     self.frame_interrupt = false;
@@ -903,6 +906,7 @@ impl ReadAccessRegisters for APU {
         match register {
             ReadAccessRegister::Status => {
                 let mut out = StatusRegister { data: 0 };
+
                 out.set_flag_status(StatusRegisterFlag::FrameInterrupt, self.frame_interrupt);
                 out.set_flag_status(StatusRegisterFlag::DMCInterrupt, self.dmc.interrupt);
                 out.set_flag_status(
@@ -920,10 +924,8 @@ impl ReadAccessRegisters for APU {
                 set_status(StatusRegisterFlag::Pulse1Enabled);
                 set_status(StatusRegisterFlag::Pulse2Enabled);
 
-                let interrupt_set_cycles = vec![FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES, 0];
-                if !interrupt_set_cycles.contains(&self.cpu_cycle) {
-                    self.frame_interrupt = false;
-                }
+                self.frame_interrupt = false;
+
                 out.data
             }
         }

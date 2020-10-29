@@ -310,6 +310,7 @@ pub struct PPU {
     background_palletes: Palettes,
     mapper: Rc<RefCell<dyn Mapper>>,
     tile_data: [TileData; 3],
+    last_byte_written_to_a_register: u8,
 }
 
 impl PPU {
@@ -342,6 +343,7 @@ impl PPU {
             background_palletes: Default::default(),
             mapper,
             tile_data: [Default::default(); 3],
+            last_byte_written_to_a_register: 0,
         }
     }
 
@@ -678,7 +680,7 @@ impl PPU {
                 && (self.scanline as u8)
                     < sprite.get_y() + self.control_reg.get_sprite_size_height()
         });
-        let if_overflow = sprites.clone().count() > 8;
+        let if_overflow = sprites.clone().count() > 8 && self.is_rendering_enabled();
         (sprites.take(8).collect(), if_overflow)
     }
 
@@ -736,7 +738,7 @@ impl PPU {
 }
 
 impl WritePpuRegisters for PPU {
-    fn write(&mut self, register: WriteAccessRegister, value: u8) -> () {
+    fn write(&mut self, register: WriteAccessRegister, value: u8) {
         match register {
             WriteAccessRegister::PpuCtrl => {
                 let new_control_register = ControlRegister { value };
@@ -809,7 +811,7 @@ impl WritePpuRegisters for PPU {
                 self.oam_address = ((self.oam_address as u16 + 1) % 256) as u8;
             }
         }
-        ()
+        self.last_byte_written_to_a_register = value;
     }
 }
 
@@ -834,12 +836,13 @@ impl ReadPpuRegisters for PPU {
                 {
                     self.nmi_pending = false;
                 }
-
+                let low_5_bits = 0b00011111;
                 self.write_toggle = false;
-                let current_status = self.status_reg;
+                let mut current_status = self.status_reg.value & !low_5_bits;
+                current_status |= self.last_byte_written_to_a_register & low_5_bits;
                 self.status_reg
                     .set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
-                current_status.value
+                current_status
             }
             ReadAccessRegister::PpuData => {
                 let val = self.vram.borrow_mut().get_byte(self.vram_address.address);
