@@ -31,6 +31,7 @@ impl Mapper for Mapper71 {
         self.mirroring
     }
     fn get_prg_byte(&mut self, address: u16) -> u8 {
+        assert!(address >= 0x8000);
         let bank = if address < 0xC000 {
             self.switchable_prg_rom_bank
         } else {
@@ -51,14 +52,14 @@ impl Mapper for Mapper71 {
     fn store_prg_byte(&mut self, address: u16, byte: u8) {
         match address {
             0x9000..=0x9FFF => {
-                self.mirroring = if byte & 0x1F != 0 {
+                self.mirroring = if byte & 0x10 != 0 {
                     Mirroring::SingleScreenUpperBank
                 } else {
                     Mirroring::SingleScreenLowerBank
                 }
             }
             0xC000..=0xFFFF => {
-                self.switchable_prg_rom_bank = (byte & 0x0F) as usize;
+                self.switchable_prg_rom_bank = (byte & self.last_prg_rom_bank as u8) as usize;
             }
             _ => (),
         }

@@ -465,7 +465,6 @@ impl PPU {
         match self.scanline {
             PRE_RENDER_SCANLINE => match self.ppu_cycle {
                 VBLANK_START_CYCLE => {
-                    self.background_palletes = self.get_palettes(true);
                     self.sprite_palettes = self.get_palettes(false);
                     self.vbl_flag_supressed = false;
                     self.status_reg
@@ -506,7 +505,7 @@ impl PPU {
                     let (sprites, is_overflow_detected) =
                         self.get_sprites_for_scanline_and_check_for_overflow();
                     self.scanline_sprites = sprites;
-
+                    self.background_palletes = self.get_palettes(true);
                     if !self.status_reg.get_flag(StatusRegisterFlag::SpriteOverflow)
                         && is_overflow_detected
                     {
