@@ -51,7 +51,8 @@ impl ControllerState {
             let button: Button = self.button.into();
             let mut val = self.controller.is_button_pressed(button);
             if val != 0
-                && ((button == Button::Left && self.controller.is_button_pressed(Button::Right) != 0)
+                && ((button == Button::Left
+                    && self.controller.is_button_pressed(Button::Right) != 0)
                     || button == Button::Down && self.controller.is_button_pressed(Button::Up) != 0)
             {
                 val = 0;
@@ -83,18 +84,18 @@ impl Controllers {
     }
 }
 
-impl ReadInputPorts for Controllers {
-    fn read(&mut self, port: InputPort) -> u8 {
+impl ReadInputRegisters for Controllers {
+    fn read(&mut self, port: InputRegister) -> u8 {
         0x40 | match port {
-            InputPort::Controller1 => self.controller_1.read(self.strobe),
-            InputPort::Controller2 => self.controller_2.read(self.strobe),
+            InputRegister::Controller1 => self.controller_1.read(self.strobe),
+            InputRegister::Controller2 => self.controller_2.read(self.strobe),
         }
     }
 }
 
-impl WriteOutputPorts for Controllers {
-    fn write(&mut self, port: OutputPort, value: u8) {
-        assert!(port == OutputPort::Controllers1And2);
+impl WriteOutputRegisters for Controllers {
+    fn write(&mut self, port: OutputRegister, value: u8) {
+        assert!(port == OutputRegister::Controllers1And2);
         self.strobe = (1 & value) != 0;
         if self.strobe {
             self.controller_1.button = A as u8;
@@ -103,4 +104,4 @@ impl WriteOutputPorts for Controllers {
     }
 }
 
-impl ControllerPortsAccess for Controllers {}
+impl ControllerRegisterAccess for Controllers {}

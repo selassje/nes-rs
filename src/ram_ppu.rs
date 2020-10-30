@@ -18,7 +18,7 @@ pub enum DmaWriteAccessRegister {
     OamDma = 0x4014,
 }
 
-#[derive(Copy, Clone, TryFromPrimitive)]
+#[derive(Copy, Clone, PartialEq, TryFromPrimitive)]
 #[TryFromPrimitiveType = "u16"]
 pub enum ReadAccessRegister {
     PpuStatus = 0x2002,

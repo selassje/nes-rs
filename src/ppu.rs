@@ -310,7 +310,6 @@ pub struct PPU {
     background_palletes: Palettes,
     mapper: Rc<RefCell<dyn Mapper>>,
     tile_data: [TileData; 3],
-    last_byte_written_to_a_register: u8,
 }
 
 impl PPU {
@@ -343,7 +342,6 @@ impl PPU {
             background_palletes: Default::default(),
             mapper,
             tile_data: [Default::default(); 3],
-            last_byte_written_to_a_register: 0,
         }
     }
 
@@ -810,7 +808,6 @@ impl WritePpuRegisters for PPU {
                 self.oam_address = ((self.oam_address as u16 + 1) % 256) as u8;
             }
         }
-        self.last_byte_written_to_a_register = value;
     }
 }
 
@@ -835,10 +832,8 @@ impl ReadPpuRegisters for PPU {
                 {
                     self.nmi_pending = false;
                 }
-                let low_5_bits = 0b00011111;
                 self.write_toggle = false;
-                let mut current_status = self.status_reg.value & !low_5_bits;
-                current_status |= self.last_byte_written_to_a_register & low_5_bits;
+                let current_status = self.status_reg.value;
                 self.status_reg
                     .set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
                 current_status
