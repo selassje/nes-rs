@@ -331,7 +331,9 @@ impl CPU {
                     self.ppu_state.borrow_mut().clear_nmi_pending()
                 }
             } else if is_branching_executing {
-                if instruction.cycle == 1 || instruction.cycle == 3 {
+                if instruction.cycle == 1
+                    || (instruction.cycle == 3 && instruction.total_cycles == 4)
+                {
                     self.check_for_interrupts();
                 }
             } else if !is_nmi_executing {
@@ -545,8 +547,8 @@ impl CPU {
         m = m << 1;
         self.set_or_clear_flag(ProcessorFlag::CarryFlag, old_bit_7 != 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
         self.store_to_address(m);
-        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
     }
 
     fn and(&mut self) {
@@ -577,7 +579,7 @@ impl CPU {
         self.store_to_address(m);
         self.set_or_clear_flag(ProcessorFlag::CarryFlag, old_bit_0 == 1);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
-        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
     }
 
     fn rol(&mut self) {
@@ -587,7 +589,7 @@ impl CPU {
         self.store_to_address(m);
         self.set_or_clear_flag(ProcessorFlag::CarryFlag, old_bit_7 != 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
-        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
     }
 
     fn lsr(&mut self) {
@@ -597,7 +599,7 @@ impl CPU {
         self.store_to_address(m);
         self.set_or_clear_flag(ProcessorFlag::CarryFlag, old_bit_0 == 1);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
-        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
     }
 
     fn nop(&mut self) {}

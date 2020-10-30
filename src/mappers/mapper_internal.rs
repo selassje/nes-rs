@@ -57,15 +57,15 @@ impl MapperInternal {
     }
 
     pub fn get_prg_rom_byte(&mut self, address: u16, bank: usize, prg_bank_size: BankSize) -> u8 {
-        self.prg_rom[self.get_address_index(address, bank, prg_bank_size)]
+        let index = self.get_address_index(address, bank, prg_bank_size);
+        //assert!(index < self.prg_rom_size);
+        self.prg_rom[index]
     }
 
-    #[allow(dead_code)]
     pub fn get_prg_ram_byte(&mut self, address: u16, bank: usize, bank_size: BankSize) -> u8 {
         self.prg_ram[self.get_address_index(address, bank, bank_size)]
     }
 
-    #[allow(dead_code)]
     pub fn store_prg_ram_byte(&mut self, address: u16, bank: usize, bank_size: BankSize, byte: u8) {
         self.prg_ram[self.get_address_index(address, bank, bank_size)] = byte
     }

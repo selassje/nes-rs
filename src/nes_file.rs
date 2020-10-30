@@ -102,6 +102,7 @@ impl NesFile {
                 chr_rom,
                 self.mirroring,
             ))),
+            71 => Rc::new(RefCell::new(Mapper71::new(prg_rom, self.mirroring))),
             227 => Rc::new(RefCell::new(Mapper227::new(prg_rom, chr_rom))),
             _ => panic!("Unsupported mapper {}", self.mapper_number),
         }
