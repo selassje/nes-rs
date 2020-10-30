@@ -142,6 +142,12 @@ impl SweepUnit {
         }
     }
 
+    fn power_cycle(&mut self) {
+        self.reload_flag = false;
+        self.divider = 0;
+        self.is_muting = false;
+    }
+
     fn get_target_period(
         &self,
         raw_period: u16,
@@ -200,6 +206,23 @@ impl PulseWave {
         }
     }
 
+    fn power_cycle(&mut self) {
+        self.data = [0; 4];
+        self.length_counter = 0;
+        self.timer_tick = 0;
+        self.current_period = 0;
+        self.sequencer_position = 0;
+        self.envelope = Envelope::default();
+        self.sweep_unit.power_cycle();
+    }
+
+    fn reset_phase_and_units(&mut self) {
+        self.sequencer_position = 0;
+        self.current_period = self.get_raw_timer_period();
+        self.envelope.start_flag = true;
+        self.sweep_unit.reload_flag = true;
+    }
+
     fn get_duty_cycle(&self) -> u8 {
         (self.data[0] & 0b11000000) >> 6
     }
@@ -235,13 +258,6 @@ impl PulseWave {
     fn get_raw_timer_period(&self) -> u16 {
         let timer_hi = ((self.data[3] & 0x7) as u16) << 8;
         self.data[2] as u16 + timer_hi
-    }
-
-    fn reset(&mut self) {
-        self.sequencer_position = 0;
-        self.current_period = self.get_raw_timer_period();
-        self.envelope.start_flag = true;
-        self.sweep_unit.reload_flag = true;
     }
 
     fn clock_timer(&mut self) {
@@ -326,6 +342,15 @@ struct TriangleWave {
 }
 
 impl TriangleWave {
+    fn power_cycle(&mut self) {
+        self.data = [0; 4];
+        self.length_counter = 0;
+        self.timer_tick = 0;
+        self.linear_counter = 0;
+        self.linear_counter_reload_flag = false;
+        self.sequencer_position = 0;
+    }
+
     fn is_control_flag_set(&self) -> bool {
         (self.data[0] & 0b10000000) != 0
     }
@@ -410,7 +435,15 @@ impl Noise {
         }
     }
 
-    fn reset(&mut self) {
+    fn power_cycle(&mut self) {
+        self.data = [0; 4];
+        self.envelope = Default::default();
+        self.length_counter = 0;
+        self.shift_register = 1;
+        self.timer_tick = 0;
+    }
+
+    fn reset_envelope(&mut self) {
         self.envelope.start_flag = true;
     }
 
@@ -518,6 +551,19 @@ impl DMC {
             start_pending: false,
             interrupt: false,
         }
+    }
+
+    fn power_cycle(&mut self) {
+        self.data = [0; 4];
+        self.timer_tick = 0;
+        self.bits_counter = 0;
+        self.bytes_remaining = 0;
+        self.next_bytes_remaining = 0;
+        self.silence_flag = false;
+        self.shift_register = 0;
+        self.output_value = 0;
+        self.start_pending = false;
+        self.interrupt = false;
     }
 
     fn start_sample(&mut self) {
@@ -646,6 +692,22 @@ impl APU {
             pending_reset_cycle: None,
             irq_flag_setting_in_progress: false,
         }
+    }
+
+    pub fn power_cycle(&mut self) {
+        self.frame_counter.data = 0;
+        self.status.data = 0;
+        self.pulse_1.power_cycle();
+        self.pulse_2.power_cycle();
+        self.triangle.power_cycle();
+        self.noise.power_cycle();
+        self.dmc.power_cycle();
+        self.cpu_cycle = 8;
+        self.is_during_apu_cycle = false;
+        self.frame_interrupt = false;
+        self.frame = 1;
+        self.pending_reset_cycle = None;
+        self.irq_flag_setting_in_progress = false;
     }
 
     pub fn set_dmc_memory(&mut self, dmc_memory: Rc<RefCell<dyn DmcMemory>>) {
@@ -829,7 +891,7 @@ impl WriteAcessRegisters for APU {
             WriteAccessRegister::Pulse1_2 => self.pulse_1.data[2] = value,
             WriteAccessRegister::Pulse1_3 => {
                 self.pulse_1.data[3] = value;
-                self.pulse_1.reset();
+                self.pulse_1.reset_phase_and_units();
                 self.reload_length_counter_if_enabled(StatusRegisterFlag::Pulse1Enabled);
             }
 
@@ -841,7 +903,7 @@ impl WriteAcessRegisters for APU {
             WriteAccessRegister::Pulse2_2 => self.pulse_2.data[2] = value,
             WriteAccessRegister::Pulse2_3 => {
                 self.pulse_2.data[3] = value;
-                self.pulse_2.reset();
+                self.pulse_2.reset_phase_and_units();
                 self.reload_length_counter_if_enabled(StatusRegisterFlag::Pulse2Enabled);
             }
 
@@ -858,7 +920,7 @@ impl WriteAcessRegisters for APU {
             WriteAccessRegister::Noise2 => self.noise.data[2] = value,
             WriteAccessRegister::Noise3 => {
                 self.noise.data[3] = value;
-                self.noise.reset();
+                self.noise.reset_envelope();
                 self.reload_length_counter_if_enabled(StatusRegisterFlag::NoiseEnabled);
             }
             WriteAccessRegister::DMC0 => {

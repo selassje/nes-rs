@@ -29,7 +29,7 @@ pub trait Mapper {
     fn store_prg_byte(&mut self, _: u16, _: u8);
 
     fn get_mirroring(&self) -> Mirroring;
-    fn reset(&mut self);
+    fn power_cycle(&mut self);
 
     fn is_irq_pending(&mut self) -> bool {
         false

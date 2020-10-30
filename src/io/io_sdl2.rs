@@ -175,6 +175,7 @@ impl IO for IOSdl2 {
         let mut io_state: IOState = Default::default();
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
         io_state.quit = *self.keyboard_state.get(&Scancode::Escape).unwrap();
+        io_state.reset = *self.keyboard_state.get(&Scancode::R).unwrap();
         self.events.pump_events();
         let texture_creator = self.canvas.texture_creator();
         let mut streaming_texture = texture_creator

@@ -35,11 +35,11 @@ impl Mapper for Mapper7 {
             let bank = (self.register & 7) as usize;
             self.mapper_internal.get_prg_rom_byte(address, bank, _32KB)
         } else {
-            0            
+            0
         }
     }
 
-    fn reset(&mut self) {
+    fn power_cycle(&mut self) {
         self.register = 0;
         self.mapper_internal.reset();
     }

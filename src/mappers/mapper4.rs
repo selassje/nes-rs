@@ -26,8 +26,8 @@ impl Mapper for Mapper4 {
         self.mmc3.get_prg_byte(address)
     }
 
-    fn reset(&mut self) {
-        self.mmc3.reset();
+    fn power_cycle(&mut self) {
+        self.mmc3.power_cycle();
     }
 
     fn store_chr_byte(&mut self, address: u16, byte: u8) {

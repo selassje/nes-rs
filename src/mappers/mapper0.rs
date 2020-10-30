@@ -45,7 +45,7 @@ impl Mapper for Mapper0 {
         self.mirroring
     }
 
-    fn reset(&mut self) {
+    fn power_cycle(&mut self) {
         self.mapper_internal.reset();
     }
 }

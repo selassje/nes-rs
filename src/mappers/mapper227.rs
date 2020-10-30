@@ -127,7 +127,7 @@ impl Mapper for Mapper227 {
         self.register.get_mirroring()
     }
 
-    fn reset(&mut self) {
+    fn power_cycle(&mut self) {
         self.register = 0;
         self.mapper_internal.reset();
     }

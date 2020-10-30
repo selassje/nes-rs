@@ -345,7 +345,7 @@ impl PPU {
         }
     }
 
-    pub fn reset(&mut self) {
+    pub fn power_cycle(&mut self) {
         self.control_reg.value = 0;
         self.mask_reg.value = 0;
         self.status_reg.value = 0;

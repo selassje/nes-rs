@@ -119,7 +119,7 @@ impl Mapper for Mapper1 {
         self.control.get_mirroring()
     }
 
-    fn reset(&mut self) {
+    fn power_cycle(&mut self) {
         self.mapper_internal.reset();
         self.chr_bank_0 = 0;
         self.chr_bank_1 = 0;

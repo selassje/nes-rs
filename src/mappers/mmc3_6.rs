@@ -248,7 +248,7 @@ impl Mapper for MMC3_6 {
         self.irq_triggered
     }
 
-    fn reset(&mut self) {
+    fn power_cycle(&mut self) {
         self.mapper_internal.reset();
         self.init_bank_mapping();
         self.bank_select = 0;

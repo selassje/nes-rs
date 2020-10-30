@@ -68,11 +68,12 @@ impl Nes {
         }
     }
 
-    pub fn reset(&mut self) {
-        self.vram.borrow_mut().reset();
-        self.ppu.borrow_mut().reset();
-        self.ram.borrow_mut().reset();
-        self.mapper.borrow_mut().reset();
+    pub fn power_cycle(&mut self) {
+        self.vram.borrow_mut().power_cycle();
+        self.ppu.borrow_mut().power_cycle();
+        self.apu.borrow_mut().power_cycle();
+        self.ram.borrow_mut().power_cycle();
+        self.mapper.borrow_mut().power_cycle();
         self.cpu.reset();
     }
 
@@ -116,6 +117,11 @@ impl Nes {
                 }
             }
             io_state = self.io.borrow_mut().present_frame(io_control);
+
+            if io_state.reset {
+                self.power_cycle();
+            }
+
             let elapsed_time_since_frame_start = frame_start.elapsed();
             if duration.is_none() && elapsed_time_since_frame_start < frame_duration {
                 std::thread::sleep(frame_duration - elapsed_time_since_frame_start);

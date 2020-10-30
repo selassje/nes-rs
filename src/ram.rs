@@ -71,7 +71,7 @@ impl RAM {
         }
     }
 
-    pub fn reset(&mut self) {
+    pub fn power_cycle(&mut self) {
         self.memory.iter_mut().for_each(|m| *m = 0);
         *self.ppu_register_latch.borrow_mut() = 0;
         *self.apu_register_latch.borrow_mut() = 0;

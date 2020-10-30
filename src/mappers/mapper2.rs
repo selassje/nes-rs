@@ -36,7 +36,7 @@ impl Mapper for Mapper2 {
         self.mapper_internal.get_prg_rom_byte(address, bank, _16KB)
     }
 
-    fn reset(&mut self) {
+    fn power_cycle(&mut self) {
         self.switchable_bank_0 = 0;
         self.mapper_internal.reset();
     }
