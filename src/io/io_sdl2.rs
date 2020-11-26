@@ -29,6 +29,9 @@ const INITIAL_SAMPLE_BUCKET_SIZE: f32 =
 const BUFFER_SIZE: usize = 10000;
 
 const DISPLAY_SCALING: usize = 2;
+const DISPLAY_WIDTH: usize = DISPLAY_SCALING * FRAME_WIDTH;
+const DISPLAY_HEIGHT: usize = DISPLAY_SCALING * FRAME_HEIGHT;
+const MENU_BAR_HEIGHT: usize = 20;
 
 struct SampleBuffer {
     index: usize,
@@ -77,6 +80,7 @@ pub struct IOSdl2 {
     window: Window,
     renderer: imgui_opengl_renderer::Renderer,
     _gl_context: GLContext,
+    emulation_texture: GLuint,
 }
 
 fn keycode_to_sdl2_scancode(key: KeyCode) -> Scancode {
@@ -126,17 +130,19 @@ impl IOSdl2 {
         let window = video_subsys
             .window(
                 title,
-                (FRAME_WIDTH * DISPLAY_SCALING) as u32,
-                (FRAME_HEIGHT * DISPLAY_SCALING) as u32,
+                DISPLAY_WIDTH as _,
+                (DISPLAY_HEIGHT + MENU_BAR_HEIGHT) as _,
             )
             .position_centered()
             .opengl()
+            .resizable()
             .build()
             .unwrap();
 
         let _gl_context = window
             .gl_create_context()
             .expect("Couldn't create GL context");
+
         gl::load_with(|s| video_subsys.gl_get_proc_address(s) as _);
 
         let _ = video_subsys.gl_set_swap_interval(0);
@@ -151,6 +157,14 @@ impl IOSdl2 {
             video_subsys.gl_get_proc_address(s) as _
         });
 
+        let mut emulation_texture: GLuint = 0;
+        unsafe {
+            gl::GenTextures(1, &mut emulation_texture);
+            gl::BindTexture(gl::TEXTURE_2D, emulation_texture);
+            gl::PixelStorei(gl::PACK_ROW_LENGTH, FRAME_WIDTH as _);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+        }
         IOSdl2 {
             io_internal: IOInternal::new(),
             sample_buffer: SampleBuffer {
@@ -169,10 +183,16 @@ impl IOSdl2 {
             imgui_sdl2,
             renderer,
             _gl_context,
+            emulation_texture,
         }
     }
 
-    fn show_gui(ui: &mut Ui) {
+    fn prepare_menu_bar(ui: &mut Ui) {
+        let styles = ui.push_style_vars(&[
+            imgui::StyleVar::WindowRounding(0.0),
+            imgui::StyleVar::WindowBorderSize(0.0),
+            imgui::StyleVar::WindowPadding([0.0, 0.0]),
+        ]);
         if let Some(menu_bar_token) = ui.begin_main_menu_bar() {
             if let Some(menu_token) = ui.begin_menu(im_str!("File"), true) {
                 MenuItem::new(im_str!("Load Rom"))
@@ -185,17 +205,31 @@ impl IOSdl2 {
         } else {
             panic!("Could not render main_menu bar");
         }
+        styles.pop(ui);
     }
-    fn show_pixels(ui: &mut Ui, id: TextureId) {
-        Image::new(
-            id,
-            [
-                (DISPLAY_SCALING * FRAME_WIDTH) as f32,
-                (DISPLAY_SCALING * FRAME_HEIGHT) as f32,
-            ],
-        )
-        .build(ui)
+
+    fn prepare_emulation_texture(emulation_texture: TextureId, ui: &mut Ui) {
+        let styles = ui.push_style_vars(&[
+            imgui::StyleVar::WindowRounding(0.0),
+            imgui::StyleVar::WindowBorderSize(0.0),
+            imgui::StyleVar::WindowPadding([0.0, 0.0]),
+        ]);
+
+        let window = imgui::Window::new(im_str!("emulation"))
+            .scrollable(false)
+            .no_decoration()
+            .position([0.0, MENU_BAR_HEIGHT as _], imgui::Condition::Always)
+            .size(
+                [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _],
+                imgui::Condition::Always,
+            );
+        if let Some(window_token) = window.begin(ui) {
+            Image::new(emulation_texture, [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _]).build(ui);
+            window_token.end(ui);
+        }
+        styles.pop(&ui);
     }
+
     fn draw_fps(&mut self, fps: u16) {
         //   V  let font_data = include_bytes!("../../res/OpenSans-Regular.ttf");
         //     let r = RWops::from_bytes(font_data).unwrap();
@@ -233,12 +267,7 @@ impl IO for IOSdl2 {
             }
         }
 
-        let mut id: GLuint = 0;
         unsafe {
-            gl::GenTextures(1, &mut id);
-            gl::BindTexture(gl::TEXTURE_2D, id);
-            gl::PixelStorei(gl::PACK_ROW_LENGTH, FRAME_WIDTH as _);
-
             gl::TexImage2D(
                 gl::TEXTURE_2D,
                 0,
@@ -250,12 +279,10 @@ impl IO for IOSdl2 {
                 gl::UNSIGNED_BYTE,
                 self.io_internal.get_pixels_slice().as_ptr() as _,
             );
-
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
         };
 
         self.draw_fps(control.fps);
+
         self.imgui_sdl2.prepare_frame(
             self.imgui.io_mut(),
             &self.window,
@@ -263,8 +290,9 @@ impl IO for IOSdl2 {
         );
 
         let mut ui = self.imgui.frame();
-        Self::show_gui(&mut ui);
-        Self::show_pixels(&mut ui, TextureId::from(id as usize));
+
+        Self::prepare_menu_bar(&mut ui);
+        Self::prepare_emulation_texture(TextureId::from(self.emulation_texture as usize), &mut ui);
 
         unsafe {
             gl::ClearColor(0.2, 0.2, 0.2, 1.0);
