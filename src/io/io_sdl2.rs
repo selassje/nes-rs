@@ -1,26 +1,29 @@
+use std::collections::HashMap;
 use std::iter::FromIterator;
-use std::{collections::HashMap, time::Instant};
+
+extern crate gl;
 
 use crate::{
     common,
     io::{
         AudioAccess, IOControl, IOState, KeyCode, KeyboardAccess, RgbColor, SampleFormat,
-        VideoAccess, FRAME_HEIGHT, FRAME_WIDTH, IO, PIXEL_SIZE,
+        VideoAccess, FRAME_HEIGHT, FRAME_WIDTH, IO,
     },
 };
 
-use imgui::{im_str, Context, ImStr, MenuItem, Textures, Ui};
-use imgui_sdl2::ImguiSdl2;
-use sdl2::{
-    audio::AudioQueue, audio::AudioSpecDesired, keyboard::Scancode, pixels::Color,
-    pixels::PixelFormatEnum, rect::Rect, render::Canvas, render::TextureQuery, rwops::RWops,
-    ttf::Sdl2TtfContext, video::GLContext, video::Window, EventPump,
-};
+use gl::types::*;
 
 use super::io_internal::IOInternal;
 
+use imgui::{im_str, Context, Image, MenuItem, TextureId, Ui};
+use imgui_sdl2::ImguiSdl2;
+use sdl2::{
+    audio::AudioQueue, audio::AudioSpecDesired, keyboard::Scancode, ttf::Sdl2TtfContext,
+    video::GLContext, video::Window, EventPump,
+};
+
 const SAMPLE_RATE: usize = 44100;
-const SAMPLE_RATE_ADJ: usize = (SAMPLE_RATE as f32 * 1.0101) as usize;
+const SAMPLE_RATE_ADJ: usize = (SAMPLE_RATE as f32 * 1.0000) as usize;
 const INITIAL_SAMPLE_BUCKET_SIZE: f32 =
     (common::FPS * common::CPU_CYCLES_PER_FRAME) as f32 / SAMPLE_RATE_ADJ as f32;
 const BUFFER_SIZE: usize = 10000;
@@ -72,11 +75,8 @@ pub struct IOSdl2 {
     imgui: Context,
     imgui_sdl2: ImguiSdl2,
     window: Window,
-    last_frame: std::time::Instant,
-    //canvas: Canvas<Window>,
     renderer: imgui_opengl_renderer::Renderer,
     _gl_context: GLContext,
-    //textures: Textures<Textures<>,
 }
 
 fn keycode_to_sdl2_scancode(key: KeyCode) -> Scancode {
@@ -114,7 +114,7 @@ impl IOSdl2 {
         let audio_queue: AudioQueue<SampleFormat> =
             sdl_audio.open_queue(None, &desired_spec).unwrap();
 
-        //audio_queue.resume();
+        audio_queue.resume();
 
         let video_subsys = sdl_context.video().unwrap();
         {
@@ -122,16 +122,16 @@ impl IOSdl2 {
             gl_attr.set_context_profile(sdl2::video::GLProfile::Core);
             gl_attr.set_context_version(3, 0);
         }
+
         let window = video_subsys
             .window(
-                "rust-imgui-sdl2 demo",
+                title,
                 (FRAME_WIDTH * DISPLAY_SCALING) as u32,
                 (FRAME_HEIGHT * DISPLAY_SCALING) as u32,
             )
             .position_centered()
             .opengl()
             .build()
-            .map_err(|e| e.to_string())
             .unwrap();
 
         let _gl_context = window
@@ -139,24 +139,17 @@ impl IOSdl2 {
             .expect("Couldn't create GL context");
         gl::load_with(|s| video_subsys.gl_get_proc_address(s) as _);
 
+        let _ = video_subsys.gl_set_swap_interval(0);
+
         let mut imgui = imgui::Context::create();
         imgui.set_ini_filename(None);
 
         let imgui_sdl2 = imgui_sdl2::ImguiSdl2::new(&mut imgui, &window);
-        // let mut canvas = window
-        //     .into_canvas()
-        //     .build()
-        //     .map_err(|e| e.to_string())
-        //     .unwrap();
 
         let events = sdl_context.event_pump().unwrap();
         let renderer = imgui_opengl_renderer::Renderer::new(&mut imgui, |s| {
             video_subsys.gl_get_proc_address(s) as _
         });
-
-        let last_frame = Instant::now();
-
-        // let renderer = imgui_glium_renderer::Renderer::init(&mut imgui, &_gl_context);
 
         IOSdl2 {
             io_internal: IOInternal::new(),
@@ -175,12 +168,11 @@ impl IOSdl2 {
             window,
             imgui_sdl2,
             renderer,
-            last_frame,
             _gl_context,
         }
     }
 
-    pub fn show_gui(ui: &mut Ui) {
+    fn show_gui(ui: &mut Ui) {
         if let Some(menu_bar_token) = ui.begin_main_menu_bar() {
             if let Some(menu_token) = ui.begin_menu(im_str!("File"), true) {
                 MenuItem::new(im_str!("Load Rom"))
@@ -191,8 +183,18 @@ impl IOSdl2 {
             }
             menu_bar_token.end(ui);
         } else {
-            // println!("Menu bar failed");
+            panic!("Could not render main_menu bar");
         }
+    }
+    fn show_pixels(ui: &mut Ui, id: TextureId) {
+        Image::new(
+            id,
+            [
+                (DISPLAY_SCALING * FRAME_WIDTH) as f32,
+                (DISPLAY_SCALING * FRAME_HEIGHT) as f32,
+            ],
+        )
+        .build(ui)
     }
     fn draw_fps(&mut self, fps: u16) {
         //   V  let font_data = include_bytes!("../../res/OpenSans-Regular.ttf");
@@ -223,51 +225,46 @@ impl IO for IOSdl2 {
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
         io_state.quit = *self.keyboard_state.get(&Scancode::Escape).unwrap();
         io_state.reset = *self.keyboard_state.get(&Scancode::R).unwrap();
+
         for event in self.events.poll_iter() {
             self.imgui_sdl2.handle_event(&mut self.imgui, &event);
             if self.imgui_sdl2.ignore_event(&event) {
                 continue;
             }
         }
-        //self.events.pump_events();
-        //self.renderer
 
-        // let texture_creator = self.canvas.texture_creator();
-        // let mut streaming_texture = texture_creator
-        //     .create_texture_streaming(
-        //         PixelFormatEnum::RGB24,
-        //         FRAME_WIDTH as u32,
-        //         FRAME_HEIGHT as u32,
-        //     )
-        //     .unwrap();
+        let mut id: GLuint = 0;
+        unsafe {
+            gl::GenTextures(1, &mut id);
+            gl::BindTexture(gl::TEXTURE_2D, id);
+            gl::PixelStorei(gl::PACK_ROW_LENGTH, FRAME_WIDTH as _);
 
-        // let _ = streaming_texture.update(
-        //     Rect::new(0, 0, FRAME_WIDTH as u32, FRAME_HEIGHT as u32),
-        //     self.io_internal.get_pixels_slice(),
-        //     FRAME_WIDTH * PIXEL_SIZE,
-        // );
+            gl::TexImage2D(
+                gl::TEXTURE_2D,
+                0,
+                gl::RGB8 as _,
+                FRAME_WIDTH as _,
+                FRAME_HEIGHT as _,
+                0,
+                gl::RGB,
+                gl::UNSIGNED_BYTE,
+                self.io_internal.get_pixels_slice().as_ptr() as _,
+            );
 
-        // let _ = self.canvas.copy(&streaming_texture, None, None);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
+        };
 
-        //self.draw_fps(control.fps);
+        self.draw_fps(control.fps);
         self.imgui_sdl2.prepare_frame(
             self.imgui.io_mut(),
             &self.window,
             &self.events.mouse_state(),
         );
-        let now = Instant::now();
-        let delta = now - self.last_frame;
-        let delta_s = delta.as_secs() as f32 + delta.subsec_nanos() as f32 / 1_000_000_000.0;
-        self.last_frame = now;
-        self.imgui.io_mut().delta_time = delta_s;
+
         let mut ui = self.imgui.frame();
         Self::show_gui(&mut ui);
-        //ui.text(text)
-        // let mut system = support::init(file!());
-        // let texture = Texture2D
-
-        //ui.show_demo_window(&mut true);
-        //ui.text("Hello World");
+        Self::show_pixels(&mut ui, TextureId::from(id as usize));
 
         unsafe {
             gl::ClearColor(0.2, 0.2, 0.2, 1.0);
@@ -278,14 +275,11 @@ impl IO for IOSdl2 {
         self.renderer.render(ui);
         self.window.gl_swap_window();
 
-        //self.canvas.present();
-
-        // self.audio_queue
-        //   .queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);
+        self.audio_queue
+            .queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);
 
         self.sample_buffer.reset(control.fps);
 
-        ::std::thread::sleep(::std::time::Duration::new(0, 1_000_000_000u32 / 60));
         io_state
     }
 }

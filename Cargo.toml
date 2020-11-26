@@ -37,7 +37,6 @@ enum-tryfrom = "0.2.1"
 enum-tryfrom-derive = "0.2.1"
 imgui = "0.5.0"
 imgui-opengl-renderer = "0.9"
-imgui-glium-renderer = "0.5"
 imgui-sdl2 = "0.12"
 gl = "0.10.0"
 
