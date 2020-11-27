@@ -40,7 +40,9 @@ fn read_rom(file_name: &str) -> nes_file::NesFile {
 
 fn run_rom(path: &str) {
     let nes_file = read_rom(path);
-    let io = Rc::new(RefCell::new(io::io_sdl2::IOSdl2::new(path)));
+    let io = Rc::new(RefCell::new(
+        io::io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl::new(path),
+    ));
     let controller_1 =
         Rc::new(keyboard::KeyboardController::get_default_keyboard_controller_player1(io.clone()));
     let controller_2 =

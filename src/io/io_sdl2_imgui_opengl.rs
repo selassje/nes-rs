@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 use std::iter::FromIterator;
 
-extern crate gl;
-
+use super::io_internal::IOInternal;
 use crate::{
     common,
     io::{
@@ -10,16 +9,12 @@ use crate::{
         VideoAccess, FRAME_HEIGHT, FRAME_WIDTH, IO,
     },
 };
-
 use gl::types::*;
-
-use super::io_internal::IOInternal;
-
 use imgui::{im_str, Context, Image, MenuItem, TextureId, Ui};
 use imgui_sdl2::ImguiSdl2;
 use sdl2::{
-    audio::AudioQueue, audio::AudioSpecDesired, keyboard::Scancode, ttf::Sdl2TtfContext,
-    video::GLContext, video::Window, EventPump,
+    audio::AudioQueue, audio::AudioSpecDesired, keyboard::Scancode, video::GLContext,
+    video::Window, EventPump,
 };
 
 const SAMPLE_RATE: usize = 44100;
@@ -68,19 +63,19 @@ impl SampleBuffer {
     }
 }
 
-pub struct IOSdl2 {
+pub struct IOSdl2ImGuiOpenGl {
     io_internal: IOInternal,
     sample_buffer: SampleBuffer,
     audio_queue: AudioQueue<SampleFormat>,
     events: EventPump,
     keyboard_state: HashMap<Scancode, bool>,
-    ttf_context: Sdl2TtfContext,
     imgui: Context,
     imgui_sdl2: ImguiSdl2,
     window: Window,
     renderer: imgui_opengl_renderer::Renderer,
     _gl_context: GLContext,
-    emulation_texture: GLuint,
+    emulation_texture: TextureId,
+    fps_counter_font_id: imgui::FontId,
 }
 
 fn keycode_to_sdl2_scancode(key: KeyCode) -> Scancode {
@@ -104,7 +99,7 @@ fn keycode_to_sdl2_scancode(key: KeyCode) -> Scancode {
     }
 }
 
-impl IOSdl2 {
+impl IOSdl2ImGuiOpenGl {
     pub fn new(title: &str) -> Self {
         let sdl_context = sdl2::init().unwrap();
         let sdl_audio = sdl_context.audio().unwrap();
@@ -150,6 +145,18 @@ impl IOSdl2 {
         let mut imgui = imgui::Context::create();
         imgui.set_ini_filename(None);
 
+        let fps_counter_font_source = imgui::FontSource::TtfData {
+            data: include_bytes!("../../res/OpenSans-Regular.ttf"),
+            size_pixels: 30.0,
+            config: None,
+        };
+
+        imgui
+            .fonts()
+            .add_font(&[imgui::FontSource::DefaultFontData { config: None }]);
+
+        let fps_counter_font_id = imgui.fonts().add_font(&[fps_counter_font_source]);
+
         let imgui_sdl2 = imgui_sdl2::ImguiSdl2::new(&mut imgui, &window);
 
         let events = sdl_context.event_pump().unwrap();
@@ -161,11 +168,12 @@ impl IOSdl2 {
         unsafe {
             gl::GenTextures(1, &mut emulation_texture);
             gl::BindTexture(gl::TEXTURE_2D, emulation_texture);
-            gl::PixelStorei(gl::PACK_ROW_LENGTH, FRAME_WIDTH as _);
+            gl::PixelStorei(gl::UNPACK_ROW_LENGTH, FRAME_WIDTH as _);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
         }
-        IOSdl2 {
+
+        IOSdl2ImGuiOpenGl {
             io_internal: IOInternal::new(),
             sample_buffer: SampleBuffer {
                 index: 0,
@@ -177,13 +185,13 @@ impl IOSdl2 {
             audio_queue,
             events,
             keyboard_state: HashMap::new(),
-            ttf_context: sdl2::ttf::init().unwrap(),
             imgui,
             window,
             imgui_sdl2,
             renderer,
             _gl_context,
-            emulation_texture,
+            emulation_texture: TextureId::from(emulation_texture as usize),
+            fps_counter_font_id,
         }
     }
 
@@ -218,6 +226,7 @@ impl IOSdl2 {
         let window = imgui::Window::new(im_str!("emulation"))
             .scrollable(false)
             .no_decoration()
+            .bring_to_front_on_focus(false)
             .position([0.0, MENU_BAR_HEIGHT as _], imgui::Condition::Always)
             .size(
                 [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _],
@@ -230,30 +239,40 @@ impl IOSdl2 {
         styles.pop(&ui);
     }
 
-    fn draw_fps(&mut self, fps: u16) {
-        //   V  let font_data = include_bytes!("../../res/OpenSans-Regular.ttf");
-        //     let r = RWops::from_bytes(font_data).unwrap();
-        //     let mut font = self.ttf_context.load_font_from_rwops(r, 14).unwrap();
-        //     font.set_style(sdl2::ttf::FontStyle::BOLD);
-        //     let texture_creator = self.canvas.texture_creator();
-        //     let surface = font
-        //         .render(&format!("FPS {}", fps))
-        //         .blended(Color::RGBA(255, 255, 255, 255))
-        //         .map_err(|e| e.to_string())
-        //         .unwrap();
+    fn prepare_fps_counter(fps: u16, font_id: imgui::FontId, ui: &mut Ui) {
+        let styles = ui.push_style_vars(&[
+            imgui::StyleVar::WindowRounding(0.0),
+            imgui::StyleVar::WindowBorderSize(0.0),
+            imgui::StyleVar::WindowPadding([0.0, 0.0]),
+        ]);
+        let font = ui.push_font(font_id);
+        let text = format!("FPS {}", fps);
 
-        //     let texture = texture_creator
-        //         .create_texture_from_surface(&surface)
-        //         .map_err(|e| e.to_string())
-        //         .unwrap();
-        //     let TextureQuery { width, height, .. } = texture.query();
-        //     let x = DISPLAY_SCALING * FRAME_WIDTH as i16 - width as i16;
-        //     let target = Rect::new(x as i32, 0, width, height as u32);
-        //     // let _ = self.canvas.copy(&texture, None, Some(target));
+        let text_size = ui.calc_text_size(
+            imgui::ImString::new(text.clone()).as_ref(),
+            false,
+            DISPLAY_WIDTH as _,
+        );
+        let fps_counter = imgui::Window::new(im_str!("fps"))
+            .scrollable(false)
+            .no_decoration()
+            .bg_alpha(0.0)
+            .position(
+                [DISPLAY_WIDTH as f32 - text_size[0], MENU_BAR_HEIGHT as _],
+                imgui::Condition::Always,
+            )
+            .size(text_size, imgui::Condition::Always);
+
+        if let Some(token) = fps_counter.begin(ui) {
+            ui.text(text);
+            token.end(ui);
+        }
+        styles.pop(&ui);
+        font.pop(&ui);
     }
 }
 
-impl IO for IOSdl2 {
+impl IO for IOSdl2ImGuiOpenGl {
     fn present_frame(&mut self, control: IOControl) -> IOState {
         let mut io_state: IOState = Default::default();
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
@@ -281,8 +300,6 @@ impl IO for IOSdl2 {
             );
         };
 
-        self.draw_fps(control.fps);
-
         self.imgui_sdl2.prepare_frame(
             self.imgui.io_mut(),
             &self.window,
@@ -292,12 +309,9 @@ impl IO for IOSdl2 {
         let mut ui = self.imgui.frame();
 
         Self::prepare_menu_bar(&mut ui);
-        Self::prepare_emulation_texture(TextureId::from(self.emulation_texture as usize), &mut ui);
-
-        unsafe {
-            gl::ClearColor(0.2, 0.2, 0.2, 1.0);
-            gl::Clear(gl::COLOR_BUFFER_BIT);
-        }
+        Self::prepare_emulation_texture(self.emulation_texture, &mut ui);
+        Self::prepare_fps_counter(control.fps, self.fps_counter_font_id, &mut ui);
+        // ui.show_demo_window(&mut true);
 
         self.imgui_sdl2.prepare_render(&ui, &self.window);
         self.renderer.render(ui);
@@ -312,19 +326,19 @@ impl IO for IOSdl2 {
     }
 }
 
-impl VideoAccess for IOSdl2 {
+impl VideoAccess for IOSdl2ImGuiOpenGl {
     fn set_pixel(&mut self, x: usize, y: usize, color: RgbColor) {
         self.io_internal.set_pixel(x, y, color);
     }
 }
 
-impl AudioAccess for IOSdl2 {
+impl AudioAccess for IOSdl2ImGuiOpenGl {
     fn add_sample(&mut self, sample: SampleFormat) {
         self.sample_buffer.add(sample);
     }
 }
 
-impl KeyboardAccess for IOSdl2 {
+impl KeyboardAccess for IOSdl2ImGuiOpenGl {
     fn is_key_pressed(&self, key: crate::io::KeyCode) -> bool {
         let sdl2_scancode = keycode_to_sdl2_scancode(key);
         let key_state = self.keyboard_state.get(&sdl2_scancode);

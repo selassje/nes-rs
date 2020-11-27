@@ -1,5 +1,5 @@
 mod io_internal;
-pub mod io_sdl2;
+pub mod io_sdl2_imgui_opengl;
 pub mod io_test;
 
 pub type SampleFormat = f32;
