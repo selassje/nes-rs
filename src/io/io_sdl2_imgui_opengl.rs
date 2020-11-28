@@ -38,12 +38,19 @@ macro_rules! add_font_from_ttf {
         $imgui.fonts().add_font(&[font_source])
     }};
 }
-
 macro_rules! with_font {
     ($font:expr, $ui:ident, $code:expr) => {{
         let font_token = $ui.push_font($font);
         $code
         font_token.pop($ui);
+    }};
+}
+macro_rules! with_token {
+    ($ui:expr, $token_function:expr, $code:expr) => {{
+        if let Some(token) = $token_function {
+            $code
+            token.end($ui);
+        }
     }};
 }
 struct SampleBuffer {
@@ -246,7 +253,7 @@ impl IOSdl2ImGuiOpenGl {
         ]);
 
         with_font!(font_id, ui, {
-            if let Some(menu_bar_token) = ui.begin_main_menu_bar() {
+            with_token!(ui, ui.begin_main_menu_bar(), {
                 if let Some(menu_token) = ui.begin_menu(im_str!("File"), true) {
                     MenuItem::new(im_str!("Load Rom"))
                         .selected(false)
@@ -254,10 +261,7 @@ impl IOSdl2ImGuiOpenGl {
                         .build(ui);
                     menu_token.end(ui);
                 }
-                menu_bar_token.end(ui);
-            } else {
-                panic!("Could not render main_menu bar");
-            }
+            });
         });
         styles.pop(ui);
     }
