@@ -46,8 +46,8 @@ macro_rules! with_font {
     }};
 }
 macro_rules! with_token {
-    ($ui:expr, $token_function:expr, $code:expr) => {{
-        if let Some(token) = $token_function {
+    ($ui:expr, $token_function:ident, ($($arg:expr),*), $code:expr) => {{
+        if let Some(token) = $ui.$token_function($($arg),*) {
             $code
             token.end($ui);
         }
@@ -253,14 +253,13 @@ impl IOSdl2ImGuiOpenGl {
         ]);
 
         with_font!(font_id, ui, {
-            with_token!(ui, ui.begin_main_menu_bar(), {
-                if let Some(menu_token) = ui.begin_menu(im_str!("File"), true) {
+            with_token!(ui, begin_main_menu_bar, (), {
+                with_token!(ui, begin_menu, (im_str!("File"), true), {
                     MenuItem::new(im_str!("Load Rom"))
                         .selected(false)
                         .enabled(true)
                         .build(ui);
-                    menu_token.end(ui);
-                }
+                });
             });
         });
         styles.pop(ui);
