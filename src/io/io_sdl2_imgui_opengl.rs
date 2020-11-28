@@ -26,7 +26,18 @@ const BUFFER_SIZE: usize = 10000;
 const DISPLAY_SCALING: usize = 2;
 const DISPLAY_WIDTH: usize = DISPLAY_SCALING * FRAME_WIDTH;
 const DISPLAY_HEIGHT: usize = DISPLAY_SCALING * FRAME_HEIGHT;
-const MENU_BAR_HEIGHT: usize = 20;
+const MENU_BAR_HEIGHT: usize = 18;
+
+macro_rules! add_font_from_ttf {
+    ($font_path:literal,$size:expr, $imgui:ident) => {{
+        let font_source = imgui::FontSource::TtfData {
+            data: include_bytes!($font_path),
+            size_pixels: $size,
+            config: None,
+        };
+        $imgui.fonts().add_font(&[font_source])
+    }};
+}
 
 struct SampleBuffer {
     index: usize,
@@ -35,6 +46,15 @@ struct SampleBuffer {
     target_bucket_size: f32,
     buffer: [SampleFormat; BUFFER_SIZE],
 }
+
+enum GuiFont {
+    _Default = 0,
+    FpsCounter,
+    MenuBar,
+    FontsCount,
+}
+
+type GuiFonts = [imgui::FontId; GuiFont::FontsCount as usize];
 
 impl SampleBuffer {
     fn add(&mut self, sample: SampleFormat) {
@@ -75,7 +95,7 @@ pub struct IOSdl2ImGuiOpenGl {
     renderer: imgui_opengl_renderer::Renderer,
     _gl_context: GLContext,
     emulation_texture: TextureId,
-    fps_counter_font_id: imgui::FontId,
+    fonts: GuiFonts,
 }
 
 fn keycode_to_sdl2_scancode(key: KeyCode) -> Scancode {
@@ -126,11 +146,10 @@ impl IOSdl2ImGuiOpenGl {
             .window(
                 title,
                 DISPLAY_WIDTH as _,
-                (DISPLAY_HEIGHT + MENU_BAR_HEIGHT) as _,
+                MENU_BAR_HEIGHT as u32 + DISPLAY_HEIGHT as u32,
             )
             .position_centered()
             .opengl()
-            .resizable()
             .build()
             .unwrap();
 
@@ -145,17 +164,7 @@ impl IOSdl2ImGuiOpenGl {
         let mut imgui = imgui::Context::create();
         imgui.set_ini_filename(None);
 
-        let fps_counter_font_source = imgui::FontSource::TtfData {
-            data: include_bytes!("../../res/OpenSans-Regular.ttf"),
-            size_pixels: 30.0,
-            config: None,
-        };
-
-        imgui
-            .fonts()
-            .add_font(&[imgui::FontSource::DefaultFontData { config: None }]);
-
-        let fps_counter_font_id = imgui.fonts().add_font(&[fps_counter_font_source]);
+        let fonts = Self::prepare_fonts(&mut imgui);
 
         let imgui_sdl2 = imgui_sdl2::ImguiSdl2::new(&mut imgui, &window);
 
@@ -165,6 +174,7 @@ impl IOSdl2ImGuiOpenGl {
         });
 
         let mut emulation_texture: GLuint = 0;
+
         unsafe {
             gl::GenTextures(1, &mut emulation_texture);
             gl::BindTexture(gl::TEXTURE_2D, emulation_texture);
@@ -191,16 +201,33 @@ impl IOSdl2ImGuiOpenGl {
             renderer,
             _gl_context,
             emulation_texture: TextureId::from(emulation_texture as usize),
-            fps_counter_font_id,
+            fonts,
         }
     }
 
-    fn prepare_menu_bar(ui: &mut Ui) {
+    fn prepare_fonts(imgui: &mut Context) -> GuiFonts {
+        let default_font = imgui
+            .fonts()
+            .add_font(&[imgui::FontSource::DefaultFontData { config: None }]);
+
+        let mut fonts = [default_font; 3];
+        fonts[GuiFont::FpsCounter as usize] =
+            add_font_from_ttf!("../../res/OpenSans-Regular.ttf", 30.0, imgui);
+
+        fonts[GuiFont::MenuBar as usize] =
+            add_font_from_ttf!("../../res/Roboto-Regular.ttf", 20.0, imgui);
+        fonts
+    }
+
+    fn prepare_menu_bar(font_id: imgui::FontId, ui: &mut Ui) {
         let styles = ui.push_style_vars(&[
             imgui::StyleVar::WindowRounding(0.0),
             imgui::StyleVar::WindowBorderSize(0.0),
             imgui::StyleVar::WindowPadding([0.0, 0.0]),
         ]);
+
+        let font = ui.push_font(font_id);
+
         if let Some(menu_bar_token) = ui.begin_main_menu_bar() {
             if let Some(menu_token) = ui.begin_menu(im_str!("File"), true) {
                 MenuItem::new(im_str!("Load Rom"))
@@ -213,6 +240,7 @@ impl IOSdl2ImGuiOpenGl {
         } else {
             panic!("Could not render main_menu bar");
         }
+        font.pop(ui);
         styles.pop(ui);
     }
 
@@ -222,7 +250,6 @@ impl IOSdl2ImGuiOpenGl {
             imgui::StyleVar::WindowBorderSize(0.0),
             imgui::StyleVar::WindowPadding([0.0, 0.0]),
         ]);
-
         let window = imgui::Window::new(im_str!("emulation"))
             .scrollable(false)
             .no_decoration()
@@ -307,11 +334,13 @@ impl IO for IOSdl2ImGuiOpenGl {
         );
 
         let mut ui = self.imgui.frame();
-
-        Self::prepare_menu_bar(&mut ui);
+        Self::prepare_menu_bar(self.fonts[GuiFont::MenuBar as usize], &mut ui);
         Self::prepare_emulation_texture(self.emulation_texture, &mut ui);
-        Self::prepare_fps_counter(control.fps, self.fps_counter_font_id, &mut ui);
-        // ui.show_demo_window(&mut true);
+        Self::prepare_fps_counter(
+            control.fps,
+            self.fonts[GuiFont::FpsCounter as usize],
+            &mut ui,
+        );
 
         self.imgui_sdl2.prepare_render(&ui, &self.window);
         self.renderer.render(ui);
