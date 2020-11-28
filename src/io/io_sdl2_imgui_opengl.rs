@@ -53,6 +53,13 @@ macro_rules! with_token {
         }
     }};
 }
+macro_rules! with_styles {
+    ($ui:expr, ($($style:expr),*), $code:expr) => {{
+        let styles_token = $ui.push_style_vars(&[$($style),*]);
+        $code
+        styles_token.pop($ui);
+}};
+}
 struct SampleBuffer {
     index: usize,
     sum: f32,
@@ -245,13 +252,7 @@ impl IOSdl2ImGuiOpenGl {
         fonts
     }
 
-    fn prepare_menu_bar(font_id: imgui::FontId, ui: &mut Ui) {
-        let styles = ui.push_style_vars(&[
-            imgui::StyleVar::WindowRounding(0.0),
-            imgui::StyleVar::WindowBorderSize(0.0),
-            imgui::StyleVar::WindowPadding([0.0, 0.0]),
-        ]);
-
+    fn build_menu_bar(font_id: imgui::FontId, ui: &mut Ui) {
         with_font!(font_id, ui, {
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("File"), true), {
@@ -262,15 +263,9 @@ impl IOSdl2ImGuiOpenGl {
                 });
             });
         });
-        styles.pop(ui);
     }
 
-    fn prepare_emulation_texture(emulation_texture: TextureId, ui: &mut Ui) {
-        let styles = ui.push_style_vars(&[
-            imgui::StyleVar::WindowRounding(0.0),
-            imgui::StyleVar::WindowBorderSize(0.0),
-            imgui::StyleVar::WindowPadding([0.0, 0.0]),
-        ]);
+    fn build_emulation_window(emulation_texture: TextureId, ui: &mut Ui) {
         Self::create_simple_window(
             im_str!("emulation"),
             [0.0, MENU_BAR_HEIGHT as _],
@@ -280,15 +275,9 @@ impl IOSdl2ImGuiOpenGl {
         .build(ui, || {
             Image::new(emulation_texture, [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _]).build(ui);
         });
-        styles.pop(&ui);
     }
 
-    fn prepare_fps_counter(fps: u16, font_id: imgui::FontId, ui: &mut Ui) {
-        let styles = ui.push_style_vars(&[
-            imgui::StyleVar::WindowRounding(0.0),
-            imgui::StyleVar::WindowBorderSize(0.0),
-            imgui::StyleVar::WindowPadding([0.0, 0.0]),
-        ]);
+    fn build_fps_counter(fps: u16, font_id: imgui::FontId, ui: &mut Ui) {
         with_font!(font_id, ui, {
             let text = format!("FPS {}", fps);
             let text_size = ui.calc_text_size(
@@ -306,7 +295,6 @@ impl IOSdl2ImGuiOpenGl {
                 ui.text(text);
             });
         });
-        styles.pop(&ui);
     }
 }
 
@@ -345,14 +333,23 @@ impl IO for IOSdl2ImGuiOpenGl {
         );
 
         let mut ui = self.imgui.frame();
-        Self::prepare_menu_bar(self.fonts[GuiFont::MenuBar as usize], &mut ui);
-        Self::prepare_emulation_texture(self.emulation_texture, &mut ui);
-        Self::prepare_fps_counter(
-            control.fps,
-            self.fonts[GuiFont::FpsCounter as usize],
+        with_styles!(
             &mut ui,
+            (
+                imgui::StyleVar::WindowRounding(0.0),
+                imgui::StyleVar::WindowBorderSize(0.0),
+                imgui::StyleVar::WindowPadding([0.0, 0.0])
+            ),
+            {
+                Self::build_menu_bar(self.fonts[GuiFont::MenuBar as usize], &mut ui);
+                Self::build_emulation_window(self.emulation_texture, &mut ui);
+                Self::build_fps_counter(
+                    control.fps,
+                    self.fonts[GuiFont::FpsCounter as usize],
+                    &mut ui,
+                );
+            }
         );
-
         self.imgui_sdl2.prepare_render(&ui, &self.window);
         self.renderer.render(ui);
         self.window.gl_swap_window();
