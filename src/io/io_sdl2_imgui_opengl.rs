@@ -1,21 +1,12 @@
 use std::collections::HashMap;
 use std::iter::FromIterator;
 
-use super::io_internal::IOInternal;
-use crate::{
-    common,
-    io::{
-        AudioAccess, IOControl, IOState, KeyCode, KeyboardAccess, RgbColor, SampleFormat,
-        VideoAccess, FRAME_HEIGHT, FRAME_WIDTH, IO,
-    },
-};
+use super::io_internal;
+use crate::common;
+use crate::io;
+
 use gl::types::*;
-use imgui::{im_str, Context, Image, MenuItem, TextureId, Ui};
-use imgui_sdl2::ImguiSdl2;
-use sdl2::{
-    audio::AudioQueue, audio::AudioSpecDesired, keyboard::Scancode, video::GLContext,
-    video::Window, EventPump,
-};
+use imgui::im_str;
 
 const SAMPLE_RATE: usize = 44100;
 const SAMPLE_RATE_ADJ: usize = (SAMPLE_RATE as f32 * 1.0000) as usize;
@@ -24,8 +15,8 @@ const INITIAL_SAMPLE_BUCKET_SIZE: f32 =
 const BUFFER_SIZE: usize = 10000;
 
 const DISPLAY_SCALING: usize = 2;
-const DISPLAY_WIDTH: usize = DISPLAY_SCALING * FRAME_WIDTH;
-const DISPLAY_HEIGHT: usize = DISPLAY_SCALING * FRAME_HEIGHT;
+const DISPLAY_WIDTH: usize = DISPLAY_SCALING * io::FRAME_WIDTH;
+const DISPLAY_HEIGHT: usize = DISPLAY_SCALING * io::FRAME_HEIGHT;
 const MENU_BAR_HEIGHT: usize = 18;
 
 macro_rules! add_font_from_ttf {
@@ -65,7 +56,7 @@ struct SampleBuffer {
     sum: f32,
     bucket_size: f32,
     target_bucket_size: f32,
-    buffer: [SampleFormat; BUFFER_SIZE],
+    buffer: [io::SampleFormat; BUFFER_SIZE],
 }
 
 enum GuiFont {
@@ -78,7 +69,7 @@ enum GuiFont {
 type GuiFonts = [imgui::FontId; GuiFont::FontsCount as usize];
 
 impl SampleBuffer {
-    fn add(&mut self, sample: SampleFormat) {
+    fn add(&mut self, sample: io::SampleFormat) {
         if 1.0 + self.bucket_size >= self.target_bucket_size && self.index < BUFFER_SIZE {
             let bucket_diff = self.target_bucket_size - self.bucket_size;
             //assert!(bucket_diff >= 0.0 && bucket_diff <= 1.0);
@@ -105,21 +96,23 @@ impl SampleBuffer {
 }
 
 pub struct IOSdl2ImGuiOpenGl {
-    io_internal: IOInternal,
+    io_internal: io_internal::IOInternal,
     sample_buffer: SampleBuffer,
-    audio_queue: AudioQueue<SampleFormat>,
-    events: EventPump,
-    keyboard_state: HashMap<Scancode, bool>,
-    imgui: Context,
-    imgui_sdl2: ImguiSdl2,
-    window: Window,
+    audio_queue: sdl2::audio::AudioQueue<io::SampleFormat>,
+    events: sdl2::EventPump,
+    keyboard_state: HashMap<sdl2::keyboard::Scancode, bool>,
+    imgui: imgui::Context,
+    imgui_sdl2: imgui_sdl2::ImguiSdl2,
+    window: sdl2::video::Window,
     renderer: imgui_opengl_renderer::Renderer,
-    _gl_context: GLContext,
-    emulation_texture: TextureId,
+    _gl_context: sdl2::video::GLContext,
+    emulation_texture: imgui::TextureId,
     fonts: GuiFonts,
 }
 
-fn keycode_to_sdl2_scancode(key: KeyCode) -> Scancode {
+fn keycode_to_sdl2_scancode(key: io::KeyCode) -> sdl2::keyboard::Scancode {
+    use io::KeyCode;
+    use sdl2::keyboard::Scancode;
     match key {
         KeyCode::Q => Scancode::Q,
         KeyCode::E => Scancode::E,
@@ -145,13 +138,13 @@ impl IOSdl2ImGuiOpenGl {
         let sdl_context = sdl2::init().unwrap();
         let sdl_audio = sdl_context.audio().unwrap();
 
-        let desired_spec = AudioSpecDesired {
+        let desired_spec = sdl2::audio::AudioSpecDesired {
             freq: Some(SAMPLE_RATE as i32),
             channels: Some(1),
             samples: Some(BUFFER_SIZE as u16),
         };
 
-        let audio_queue: AudioQueue<SampleFormat> =
+        let audio_queue: sdl2::audio::AudioQueue<io::SampleFormat> =
             sdl_audio.open_queue(None, &desired_spec).unwrap();
 
         audio_queue.resume();
@@ -199,13 +192,13 @@ impl IOSdl2ImGuiOpenGl {
         unsafe {
             gl::GenTextures(1, &mut emulation_texture);
             gl::BindTexture(gl::TEXTURE_2D, emulation_texture);
-            gl::PixelStorei(gl::UNPACK_ROW_LENGTH, FRAME_WIDTH as _);
+            gl::PixelStorei(gl::UNPACK_ROW_LENGTH, io::FRAME_WIDTH as _);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
         }
 
         IOSdl2ImGuiOpenGl {
-            io_internal: IOInternal::new(),
+            io_internal: io_internal::IOInternal::new(),
             sample_buffer: SampleBuffer {
                 index: 0,
                 sum: 0.0,
@@ -221,7 +214,7 @@ impl IOSdl2ImGuiOpenGl {
             imgui_sdl2,
             renderer,
             _gl_context,
-            emulation_texture: TextureId::from(emulation_texture as usize),
+            emulation_texture: imgui::TextureId::from(emulation_texture as usize),
             fonts,
         }
     }
@@ -238,7 +231,7 @@ impl IOSdl2ImGuiOpenGl {
             .size(size, imgui::Condition::Always)
     }
 
-    fn prepare_fonts(imgui: &mut Context) -> GuiFonts {
+    fn prepare_fonts(imgui: &mut imgui::Context) -> GuiFonts {
         let default_font = imgui
             .fonts()
             .add_font(&[imgui::FontSource::DefaultFontData { config: None }]);
@@ -252,11 +245,11 @@ impl IOSdl2ImGuiOpenGl {
         fonts
     }
 
-    fn build_menu_bar(font_id: imgui::FontId, ui: &mut Ui) {
+    fn build_menu_bar(font_id: imgui::FontId, ui: &mut imgui::Ui) {
         with_font!(font_id, ui, {
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("File"), true), {
-                    MenuItem::new(im_str!("Load Rom"))
+                    imgui::MenuItem::new(im_str!("Load Rom"))
                         .selected(false)
                         .enabled(true)
                         .build(ui);
@@ -265,7 +258,7 @@ impl IOSdl2ImGuiOpenGl {
         });
     }
 
-    fn build_emulation_window(emulation_texture: TextureId, ui: &mut Ui) {
+    fn build_emulation_window(emulation_texture: imgui::TextureId, ui: &mut imgui::Ui) {
         Self::create_simple_window(
             im_str!("emulation"),
             [0.0, MENU_BAR_HEIGHT as _],
@@ -273,11 +266,12 @@ impl IOSdl2ImGuiOpenGl {
         )
         .bring_to_front_on_focus(false)
         .build(ui, || {
-            Image::new(emulation_texture, [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _]).build(ui);
+            imgui::Image::new(emulation_texture, [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _])
+                .build(ui);
         });
     }
 
-    fn build_fps_counter(fps: u16, font_id: imgui::FontId, ui: &mut Ui) {
+    fn build_fps_counter(fps: u16, font_id: imgui::FontId, ui: &mut imgui::Ui) {
         with_font!(font_id, ui, {
             let text = format!("FPS {}", fps);
             let text_size = ui.calc_text_size(
@@ -298,12 +292,18 @@ impl IOSdl2ImGuiOpenGl {
     }
 }
 
-impl IO for IOSdl2ImGuiOpenGl {
-    fn present_frame(&mut self, control: IOControl) -> IOState {
-        let mut io_state: IOState = Default::default();
+impl io::IO for IOSdl2ImGuiOpenGl {
+    fn present_frame(&mut self, control: io::IOControl) -> io::IOState {
+        let mut io_state: io::IOState = Default::default();
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
-        io_state.quit = *self.keyboard_state.get(&Scancode::Escape).unwrap();
-        io_state.reset = *self.keyboard_state.get(&Scancode::R).unwrap();
+        io_state.quit = *self
+            .keyboard_state
+            .get(&sdl2::keyboard::Scancode::Escape)
+            .unwrap();
+        io_state.reset = *self
+            .keyboard_state
+            .get(&sdl2::keyboard::Scancode::R)
+            .unwrap();
 
         for event in self.events.poll_iter() {
             self.imgui_sdl2.handle_event(&mut self.imgui, &event);
@@ -317,8 +317,8 @@ impl IO for IOSdl2ImGuiOpenGl {
                 gl::TEXTURE_2D,
                 0,
                 gl::RGB8 as _,
-                FRAME_WIDTH as _,
-                FRAME_HEIGHT as _,
+                io::FRAME_WIDTH as _,
+                io::FRAME_HEIGHT as _,
                 0,
                 gl::RGB,
                 gl::UNSIGNED_BYTE,
@@ -363,19 +363,19 @@ impl IO for IOSdl2ImGuiOpenGl {
     }
 }
 
-impl VideoAccess for IOSdl2ImGuiOpenGl {
-    fn set_pixel(&mut self, x: usize, y: usize, color: RgbColor) {
+impl io::VideoAccess for IOSdl2ImGuiOpenGl {
+    fn set_pixel(&mut self, x: usize, y: usize, color: io::RgbColor) {
         self.io_internal.set_pixel(x, y, color);
     }
 }
 
-impl AudioAccess for IOSdl2ImGuiOpenGl {
-    fn add_sample(&mut self, sample: SampleFormat) {
+impl io::AudioAccess for IOSdl2ImGuiOpenGl {
+    fn add_sample(&mut self, sample: io::SampleFormat) {
         self.sample_buffer.add(sample);
     }
 }
 
-impl KeyboardAccess for IOSdl2ImGuiOpenGl {
+impl io::KeyboardAccess for IOSdl2ImGuiOpenGl {
     fn is_key_pressed(&self, key: crate::io::KeyCode) -> bool {
         let sdl2_scancode = keycode_to_sdl2_scancode(key);
         let key_state = self.keyboard_state.get(&sdl2_scancode);
