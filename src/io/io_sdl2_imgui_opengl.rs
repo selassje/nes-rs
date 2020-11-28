@@ -205,6 +205,18 @@ impl IOSdl2ImGuiOpenGl {
         }
     }
 
+    fn create_simple_window(
+        name: &imgui::ImStr,
+        position: [f32; 2],
+        size: [f32; 2],
+    ) -> imgui::Window {
+        imgui::Window::new(name)
+            .scrollable(false)
+            .no_decoration()
+            .position(position, imgui::Condition::Always)
+            .size(size, imgui::Condition::Always)
+    }
+
     fn prepare_fonts(imgui: &mut Context) -> GuiFonts {
         let default_font = imgui
             .fonts()
@@ -250,15 +262,13 @@ impl IOSdl2ImGuiOpenGl {
             imgui::StyleVar::WindowBorderSize(0.0),
             imgui::StyleVar::WindowPadding([0.0, 0.0]),
         ]);
-        let window = imgui::Window::new(im_str!("emulation"))
-            .scrollable(false)
-            .no_decoration()
-            .bring_to_front_on_focus(false)
-            .position([0.0, MENU_BAR_HEIGHT as _], imgui::Condition::Always)
-            .size(
-                [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _],
-                imgui::Condition::Always,
-            );
+        let window = Self::create_simple_window(
+            im_str!("emulation"),
+            [0.0, MENU_BAR_HEIGHT as _],
+            [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _],
+        )
+        .bring_to_front_on_focus(false);
+
         if let Some(window_token) = window.begin(ui) {
             Image::new(emulation_texture, [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _]).build(ui);
             window_token.end(ui);
@@ -274,23 +284,19 @@ impl IOSdl2ImGuiOpenGl {
         ]);
         let font = ui.push_font(font_id);
         let text = format!("FPS {}", fps);
-
         let text_size = ui.calc_text_size(
             imgui::ImString::new(text.clone()).as_ref(),
             false,
             DISPLAY_WIDTH as _,
         );
-        let fps_counter = imgui::Window::new(im_str!("fps"))
-            .scrollable(false)
-            .no_decoration()
-            .bg_alpha(0.0)
-            .position(
-                [DISPLAY_WIDTH as f32 - text_size[0], MENU_BAR_HEIGHT as _],
-                imgui::Condition::Always,
-            )
-            .size(text_size, imgui::Condition::Always);
+        let window = Self::create_simple_window(
+            im_str!("fps"),
+            [DISPLAY_WIDTH as f32 - text_size[0], MENU_BAR_HEIGHT as _],
+            text_size,
+        )
+        .bg_alpha(0.0);
 
-        if let Some(token) = fps_counter.begin(ui) {
+        if let Some(token) = window.begin(ui) {
             ui.text(text);
             token.end(ui);
         }
