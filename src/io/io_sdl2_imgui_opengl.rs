@@ -39,6 +39,13 @@ macro_rules! add_font_from_ttf {
     }};
 }
 
+macro_rules! with_font {
+    ($font:expr, $ui:ident, $code:expr) => {{
+        let font_token = $ui.push_font($font);
+        $code
+        font_token.pop($ui);
+    }};
+}
 struct SampleBuffer {
     index: usize,
     sum: f32,
@@ -238,21 +245,20 @@ impl IOSdl2ImGuiOpenGl {
             imgui::StyleVar::WindowPadding([0.0, 0.0]),
         ]);
 
-        let font = ui.push_font(font_id);
-
-        if let Some(menu_bar_token) = ui.begin_main_menu_bar() {
-            if let Some(menu_token) = ui.begin_menu(im_str!("File"), true) {
-                MenuItem::new(im_str!("Load Rom"))
-                    .selected(false)
-                    .enabled(true)
-                    .build(ui);
-                menu_token.end(ui);
+        with_font!(font_id, ui, {
+            if let Some(menu_bar_token) = ui.begin_main_menu_bar() {
+                if let Some(menu_token) = ui.begin_menu(im_str!("File"), true) {
+                    MenuItem::new(im_str!("Load Rom"))
+                        .selected(false)
+                        .enabled(true)
+                        .build(ui);
+                    menu_token.end(ui);
+                }
+                menu_bar_token.end(ui);
+            } else {
+                panic!("Could not render main_menu bar");
             }
-            menu_bar_token.end(ui);
-        } else {
-            panic!("Could not render main_menu bar");
-        }
-        font.pop(ui);
+        });
         styles.pop(ui);
     }
 
@@ -262,17 +268,15 @@ impl IOSdl2ImGuiOpenGl {
             imgui::StyleVar::WindowBorderSize(0.0),
             imgui::StyleVar::WindowPadding([0.0, 0.0]),
         ]);
-        let window = Self::create_simple_window(
+        Self::create_simple_window(
             im_str!("emulation"),
             [0.0, MENU_BAR_HEIGHT as _],
             [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _],
         )
-        .bring_to_front_on_focus(false);
-
-        if let Some(window_token) = window.begin(ui) {
+        .bring_to_front_on_focus(false)
+        .build(ui, || {
             Image::new(emulation_texture, [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _]).build(ui);
-            window_token.end(ui);
-        }
+        });
         styles.pop(&ui);
     }
 
@@ -282,26 +286,24 @@ impl IOSdl2ImGuiOpenGl {
             imgui::StyleVar::WindowBorderSize(0.0),
             imgui::StyleVar::WindowPadding([0.0, 0.0]),
         ]);
-        let font = ui.push_font(font_id);
-        let text = format!("FPS {}", fps);
-        let text_size = ui.calc_text_size(
-            imgui::ImString::new(text.clone()).as_ref(),
-            false,
-            DISPLAY_WIDTH as _,
-        );
-        let window = Self::create_simple_window(
-            im_str!("fps"),
-            [DISPLAY_WIDTH as f32 - text_size[0], MENU_BAR_HEIGHT as _],
-            text_size,
-        )
-        .bg_alpha(0.0);
-
-        if let Some(token) = window.begin(ui) {
-            ui.text(text);
-            token.end(ui);
-        }
+        with_font!(font_id, ui, {
+            let text = format!("FPS {}", fps);
+            let text_size = ui.calc_text_size(
+                imgui::ImString::new(text.clone()).as_ref(),
+                false,
+                DISPLAY_WIDTH as _,
+            );
+            Self::create_simple_window(
+                im_str!("fps"),
+                [DISPLAY_WIDTH as f32 - text_size[0], MENU_BAR_HEIGHT as _],
+                text_size,
+            )
+            .bg_alpha(0.0)
+            .build(ui, || {
+                ui.text(text);
+            });
+        });
         styles.pop(&ui);
-        font.pop(&ui);
     }
 }
 
