@@ -95,6 +95,74 @@ impl SampleBuffer {
     }
 }
 
+struct GuiBuilder {
+    emulation_texture: imgui::TextureId,
+    fonts: GuiFonts,
+}
+
+impl GuiBuilder {
+    fn create_simple_window(
+        name: &imgui::ImStr,
+        position: [f32; 2],
+        size: [f32; 2],
+    ) -> imgui::Window {
+        imgui::Window::new(name)
+            .scrollable(false)
+            .no_decoration()
+            .position(position, imgui::Condition::Always)
+            .size(size, imgui::Condition::Always)
+    }
+
+    fn build_menu_bar(&self, ui: &mut imgui::Ui) {
+        with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
+            with_token!(ui, begin_main_menu_bar, (), {
+                with_token!(ui, begin_menu, (im_str!("File"), true), {
+                    imgui::MenuItem::new(im_str!("Load Rom"))
+                        .selected(false)
+                        .enabled(true)
+                        .build(ui);
+                });
+            });
+        });
+    }
+
+    fn build_emulation_window(&self, ui: &mut imgui::Ui) {
+        Self::create_simple_window(
+            im_str!("emulation"),
+            [0.0, MENU_BAR_HEIGHT as _],
+            [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _],
+        )
+        .bring_to_front_on_focus(false)
+        .build(ui, || {
+            imgui::Image::new(
+                self.emulation_texture,
+                [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _],
+            )
+            .build(ui);
+        });
+    }
+
+    fn build_fps_counter(&self, fps: u16, ui: &mut imgui::Ui) {
+        with_font!(self.fonts[GuiFont::FpsCounter as usize], ui, {
+            let text = format!("FPS {}", fps);
+            let text_size = ui.calc_text_size(
+                imgui::ImString::new(text.clone()).as_ref(),
+                false,
+                DISPLAY_WIDTH as _,
+            );
+            Self::create_simple_window(
+                im_str!("fps"),
+                [DISPLAY_WIDTH as f32 - text_size[0], MENU_BAR_HEIGHT as _],
+                text_size,
+            )
+            .bg_alpha(0.0)
+            .build(ui, || {
+                ui.text(text);
+            });
+        });
+    }
+}
+
 pub struct IOSdl2ImGuiOpenGl {
     io_internal: io_internal::IOInternal,
     sample_buffer: SampleBuffer,
@@ -106,8 +174,7 @@ pub struct IOSdl2ImGuiOpenGl {
     window: sdl2::video::Window,
     renderer: imgui_opengl_renderer::Renderer,
     _gl_context: sdl2::video::GLContext,
-    emulation_texture: imgui::TextureId,
-    fonts: GuiFonts,
+    gui_builder: GuiBuilder,
 }
 
 fn keycode_to_sdl2_scancode(key: io::KeyCode) -> sdl2::keyboard::Scancode {
@@ -214,23 +281,12 @@ impl IOSdl2ImGuiOpenGl {
             imgui_sdl2,
             renderer,
             _gl_context,
-            emulation_texture: imgui::TextureId::from(emulation_texture as usize),
-            fonts,
+            gui_builder: GuiBuilder {
+                emulation_texture: imgui::TextureId::from(emulation_texture as usize),
+                fonts,
+            },
         }
     }
-
-    fn create_simple_window(
-        name: &imgui::ImStr,
-        position: [f32; 2],
-        size: [f32; 2],
-    ) -> imgui::Window {
-        imgui::Window::new(name)
-            .scrollable(false)
-            .no_decoration()
-            .position(position, imgui::Condition::Always)
-            .size(size, imgui::Condition::Always)
-    }
-
     fn prepare_fonts(imgui: &mut imgui::Context) -> GuiFonts {
         let default_font = imgui
             .fonts()
@@ -243,52 +299,6 @@ impl IOSdl2ImGuiOpenGl {
         fonts[GuiFont::MenuBar as usize] =
             add_font_from_ttf!("../../res/Roboto-Regular.ttf", 20.0, imgui);
         fonts
-    }
-
-    fn build_menu_bar(font_id: imgui::FontId, ui: &mut imgui::Ui) {
-        with_font!(font_id, ui, {
-            with_token!(ui, begin_main_menu_bar, (), {
-                with_token!(ui, begin_menu, (im_str!("File"), true), {
-                    imgui::MenuItem::new(im_str!("Load Rom"))
-                        .selected(false)
-                        .enabled(true)
-                        .build(ui);
-                });
-            });
-        });
-    }
-
-    fn build_emulation_window(emulation_texture: imgui::TextureId, ui: &mut imgui::Ui) {
-        Self::create_simple_window(
-            im_str!("emulation"),
-            [0.0, MENU_BAR_HEIGHT as _],
-            [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _],
-        )
-        .bring_to_front_on_focus(false)
-        .build(ui, || {
-            imgui::Image::new(emulation_texture, [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _])
-                .build(ui);
-        });
-    }
-
-    fn build_fps_counter(fps: u16, font_id: imgui::FontId, ui: &mut imgui::Ui) {
-        with_font!(font_id, ui, {
-            let text = format!("FPS {}", fps);
-            let text_size = ui.calc_text_size(
-                imgui::ImString::new(text.clone()).as_ref(),
-                false,
-                DISPLAY_WIDTH as _,
-            );
-            Self::create_simple_window(
-                im_str!("fps"),
-                [DISPLAY_WIDTH as f32 - text_size[0], MENU_BAR_HEIGHT as _],
-                text_size,
-            )
-            .bg_alpha(0.0)
-            .build(ui, || {
-                ui.text(text);
-            });
-        });
     }
 }
 
@@ -341,13 +351,9 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 imgui::StyleVar::WindowPadding([0.0, 0.0])
             ),
             {
-                Self::build_menu_bar(self.fonts[GuiFont::MenuBar as usize], &mut ui);
-                Self::build_emulation_window(self.emulation_texture, &mut ui);
-                Self::build_fps_counter(
-                    control.fps,
-                    self.fonts[GuiFont::FpsCounter as usize],
-                    &mut ui,
-                );
+                self.gui_builder.build_menu_bar(&mut ui);
+                self.gui_builder.build_emulation_window(&mut ui);
+                self.gui_builder.build_fps_counter(control.fps, &mut ui);
             }
         );
         self.imgui_sdl2.prepare_render(&ui, &self.window);
