@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::default::Default;
 use std::iter::FromIterator;
 
 use super::io_internal;
@@ -51,6 +52,23 @@ macro_rules! with_styles {
         styles_token.pop($ui);
 }};
 }
+macro_rules! create_simple_window {
+    ($name:tt, $position:expr, $size:expr) => {{
+        imgui::Window::new(im_str!($name))
+            .scrollable(false)
+            .no_decoration()
+            .position($position, imgui::Condition::Always)
+            .size($size, imgui::Condition::Always)
+    }};
+}
+macro_rules! create_menu_item {
+    ($name:tt, $shortcut:tt) => {{
+        imgui::MenuItem::new(im_str!($name))
+            .selected(false)
+            .enabled(true)
+            .shortcut(im_str!($shortcut))
+    }};
+}
 struct SampleBuffer {
     index: usize,
     sum: f32,
@@ -64,6 +82,13 @@ enum GuiFont {
     FpsCounter,
     MenuBar,
     FontsCount,
+}
+#[derive(PartialEq)]
+enum MenuBarItem {
+    LoadRom,
+    Quit,
+    PowerCycle,
+    None,
 }
 
 type GuiFonts = [imgui::FontId; GuiFont::FontsCount as usize];
@@ -98,39 +123,42 @@ impl SampleBuffer {
 struct GuiBuilder {
     emulation_texture: imgui::TextureId,
     fonts: GuiFonts,
+    menu_bar_item_selected: [bool; MenuBarItem::None as usize],
 }
 
 impl GuiBuilder {
-    fn create_simple_window(
-        name: &imgui::ImStr,
-        position: [f32; 2],
-        size: [f32; 2],
-    ) -> imgui::Window {
-        imgui::Window::new(name)
-            .scrollable(false)
-            .no_decoration()
-            .position(position, imgui::Condition::Always)
-            .size(size, imgui::Condition::Always)
+    fn is_menu_item_selected(&self, ui: &mut imgui::Ui) -> bool {
+        ui.is_item_clicked(imgui::MouseButton::Left)
+            || (ui.is_item_focused() && ui.is_key_pressed(sdl2::keyboard::Scancode::Return as _))
     }
 
-    fn build_menu_bar(&self, ui: &mut imgui::Ui) {
+    fn build_menu_bar_and_check_for_mouse_events(&mut self, ui: &mut imgui::Ui) {
         with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("File"), true), {
-                    imgui::MenuItem::new(im_str!("Load Rom"))
-                        .selected(false)
-                        .enabled(true)
-                        .build(ui);
+                    create_menu_item!("Load Rom", "Ctrl + O").build(ui);
+                    self.menu_bar_item_selected[MenuBarItem::LoadRom as usize] =
+                        self.is_menu_item_selected(ui);
+                    create_menu_item!("Quit", "Esc").build(ui);
+                    self.menu_bar_item_selected[MenuBarItem::Quit as usize] =
+                        self.is_menu_item_selected(ui);
+                });
+            });
+            with_token!(ui, begin_main_menu_bar, (), {
+                with_token!(ui, begin_menu, (im_str!("Emulation"), true), {
+                    create_menu_item!("Power Cycle", "Ctrl + R").build(ui);
+                    self.menu_bar_item_selected[MenuBarItem::PowerCycle as usize] =
+                        self.is_menu_item_selected(ui);
                 });
             });
         });
     }
 
     fn build_emulation_window(&self, ui: &mut imgui::Ui) {
-        Self::create_simple_window(
-            im_str!("emulation"),
+        create_simple_window!(
+            "emulation",
             [0.0, MENU_BAR_HEIGHT as _],
-            [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _],
+            [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _]
         )
         .bring_to_front_on_focus(false)
         .build(ui, || {
@@ -150,16 +178,32 @@ impl GuiBuilder {
                 false,
                 DISPLAY_WIDTH as _,
             );
-            Self::create_simple_window(
-                im_str!("fps"),
+            create_simple_window!(
+                "fps",
                 [DISPLAY_WIDTH as f32 - text_size[0], MENU_BAR_HEIGHT as _],
-                text_size,
+                text_size
             )
             .bg_alpha(0.0)
             .build(ui, || {
                 ui.text(text);
             });
         });
+    }
+
+    fn build(&mut self, fps: u16, mut ui: &mut imgui::Ui) {
+        with_styles!(
+            &mut ui,
+            (
+                imgui::StyleVar::WindowRounding(0.0),
+                imgui::StyleVar::WindowBorderSize(0.0),
+                imgui::StyleVar::WindowPadding([0.0, 0.0])
+            ),
+            {
+                self.build_menu_bar_and_check_for_mouse_events(&mut ui);
+                self.build_emulation_window(&mut ui);
+                self.build_fps_counter(fps, &mut ui);
+            }
+        );
     }
 }
 
@@ -244,6 +288,10 @@ impl IOSdl2ImGuiOpenGl {
 
         let mut imgui = imgui::Context::create();
         imgui.set_ini_filename(None);
+        imgui
+            .io_mut()
+            .config_flags
+            .set(imgui::ConfigFlags::NAV_ENABLE_KEYBOARD, true);
 
         let fonts = Self::prepare_fonts(&mut imgui);
 
@@ -284,6 +332,7 @@ impl IOSdl2ImGuiOpenGl {
             gui_builder: GuiBuilder {
                 emulation_texture: imgui::TextureId::from(emulation_texture as usize),
                 fonts,
+                menu_bar_item_selected: Default::default(),
             },
         }
     }
@@ -300,26 +349,40 @@ impl IOSdl2ImGuiOpenGl {
             add_font_from_ttf!("../../res/Roboto-Regular.ttf", 20.0, imgui);
         fonts
     }
+
+    fn check_for_menu_bar_items(&self, io_state: &mut io::IOState) {
+        io_state.quit |= self.gui_builder.menu_bar_item_selected[MenuBarItem::Quit as usize];
+        io_state.power_cycle |=
+            self.gui_builder.menu_bar_item_selected[MenuBarItem::PowerCycle as usize];
+    }
+
+    fn check_for_keyboard_shortcuts(event: &sdl2::event::Event, io_state: &mut io::IOState) {
+        use sdl2::keyboard::Scancode;
+        match *event {
+            sdl2::event::Event::KeyDown {
+                scancode, keymod, ..
+            } => {
+                if let Some(scancode) = scancode {
+                    io_state.quit = scancode == Scancode::Escape;
+                    if sdl2::keyboard::Mod::LCTRLMOD & keymod == sdl2::keyboard::Mod::LCTRLMOD {
+                        io_state.power_cycle = scancode == Scancode::R;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 impl io::IO for IOSdl2ImGuiOpenGl {
     fn present_frame(&mut self, control: io::IOControl) -> io::IOState {
         let mut io_state: io::IOState = Default::default();
-        self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
-        io_state.quit = *self
-            .keyboard_state
-            .get(&sdl2::keyboard::Scancode::Escape)
-            .unwrap();
-        io_state.reset = *self
-            .keyboard_state
-            .get(&sdl2::keyboard::Scancode::R)
-            .unwrap();
+        self.gui_builder.menu_bar_item_selected = Default::default();
 
+        self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
         for event in self.events.poll_iter() {
+            Self::check_for_keyboard_shortcuts(&event, &mut io_state);
             self.imgui_sdl2.handle_event(&mut self.imgui, &event);
-            if self.imgui_sdl2.ignore_event(&event) {
-                continue;
-            }
         }
 
         unsafe {
@@ -343,21 +406,12 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         );
 
         let mut ui = self.imgui.frame();
-        with_styles!(
-            &mut ui,
-            (
-                imgui::StyleVar::WindowRounding(0.0),
-                imgui::StyleVar::WindowBorderSize(0.0),
-                imgui::StyleVar::WindowPadding([0.0, 0.0])
-            ),
-            {
-                self.gui_builder.build_menu_bar(&mut ui);
-                self.gui_builder.build_emulation_window(&mut ui);
-                self.gui_builder.build_fps_counter(control.fps, &mut ui);
-            }
-        );
         self.imgui_sdl2.prepare_render(&ui, &self.window);
+
+        self.gui_builder.build(control.fps, &mut ui);
+
         self.renderer.render(ui);
+        self.check_for_menu_bar_items(&mut io_state);
         self.window.gl_swap_window();
 
         self.audio_queue
@@ -382,7 +436,7 @@ impl io::AudioAccess for IOSdl2ImGuiOpenGl {
 }
 
 impl io::KeyboardAccess for IOSdl2ImGuiOpenGl {
-    fn is_key_pressed(&self, key: crate::io::KeyCode) -> bool {
+    fn is_key_pressed(&self, key: io::KeyCode) -> bool {
         let sdl2_scancode = keycode_to_sdl2_scancode(key);
         let key_state = self.keyboard_state.get(&sdl2_scancode);
         *key_state.unwrap_or(&false)

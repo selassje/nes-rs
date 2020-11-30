@@ -118,7 +118,7 @@ impl Nes {
             }
             io_state = self.io.borrow_mut().present_frame(io_control);
 
-            if io_state.reset {
+            if io_state.power_cycle {
                 self.power_cycle();
             }
 

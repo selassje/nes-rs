@@ -11,7 +11,7 @@ const PIXEL_SIZE: usize = std::mem::size_of::<RgbColor>();
 #[derive(Default)]
 pub struct IOState {
     pub quit: bool,
-    pub reset: bool,
+    pub power_cycle: bool,
 }
 
 #[derive(Copy, Clone)]
