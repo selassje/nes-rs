@@ -1,3 +1,6 @@
+mod imgui_file_explorer;
+
+use imgui_file_explorer::UiFileExplorer;
 use std::collections::HashMap;
 use std::default::Default;
 use std::iter::FromIterator;
@@ -53,14 +56,39 @@ macro_rules! with_styles {
 }};
 }
 macro_rules! create_simple_window {
-    ($name:tt, $position:expr, $size:expr) => {{
+    ($name:tt, $position:expr, $size:expr, $condition_pos:expr, $condition_size:expr) => {{
         imgui::Window::new(im_str!($name))
             .scrollable(false)
             .no_decoration()
-            .position($position, imgui::Condition::Always)
-            .size($size, imgui::Condition::Always)
+            .position($position, $condition_pos)
+            .size($size, $condition_size)
     }};
 }
+
+macro_rules! create_unmovable_simple_window {
+    ($name:tt, $position:expr, $size:expr) => {{
+        create_simple_window!(
+            $name,
+            $position,
+            $size,
+            imgui::Condition::Always,
+            imgui::Condition::Always
+        )
+    }};
+}
+
+macro_rules! create_movable_simple_window {
+    ($name:tt, $position:expr, $size:expr) => {{
+        create_simple_window!(
+            $name,
+            $position,
+            $size,
+            imgui::Condition::FirstUseEver,
+            imgui::Condition::Appearing
+        )
+    }};
+}
+
 macro_rules! create_menu_item {
     ($name:tt, $shortcut:tt) => {{
         imgui::MenuItem::new(im_str!($name))
@@ -124,6 +152,7 @@ struct GuiBuilder {
     emulation_texture: imgui::TextureId,
     fonts: GuiFonts,
     menu_bar_item_selected: [bool; MenuBarItem::None as usize],
+    build_load_rom_file_explorer: bool,
 }
 
 impl GuiBuilder {
@@ -139,6 +168,8 @@ impl GuiBuilder {
                     create_menu_item!("Load Rom", "Ctrl + O").build(ui);
                     self.menu_bar_item_selected[MenuBarItem::LoadRom as usize] =
                         self.is_menu_item_selected(ui);
+                    self.build_load_rom_file_explorer |=
+                        self.menu_bar_item_selected[MenuBarItem::LoadRom as usize];
                     create_menu_item!("Quit", "Esc").build(ui);
                     self.menu_bar_item_selected[MenuBarItem::Quit as usize] =
                         self.is_menu_item_selected(ui);
@@ -155,7 +186,7 @@ impl GuiBuilder {
     }
 
     fn build_emulation_window(&self, ui: &mut imgui::Ui) {
-        create_simple_window!(
+        create_unmovable_simple_window!(
             "emulation",
             [0.0, MENU_BAR_HEIGHT as _],
             [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _]
@@ -178,7 +209,7 @@ impl GuiBuilder {
                 false,
                 DISPLAY_WIDTH as _,
             );
-            create_simple_window!(
+            create_unmovable_simple_window!(
                 "fps",
                 [DISPLAY_WIDTH as f32 - text_size[0], MENU_BAR_HEIGHT as _],
                 text_size
@@ -186,6 +217,26 @@ impl GuiBuilder {
             .bg_alpha(0.0)
             .build(ui, || {
                 ui.text(text);
+            });
+        });
+    }
+
+    fn build_load_rom_file_explorer(&mut self, ui: &mut imgui::Ui) {
+        with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
+            create_movable_simple_window!(
+                "Load Rom",
+                [(DISPLAY_HEIGHT / 4) as _, (DISPLAY_HEIGHT / 4) as _],
+                [((2 * DISPLAY_WIDTH) / 3) as _, (DISPLAY_HEIGHT / 2) as _]
+            )
+            .scroll_bar(true)
+            .scrollable(true)
+            .title_bar(true)
+            .build(ui, || {
+                let file = ui.file_explorer("F:/", &["nes"]);
+                if let Ok(Some(file)) = file {
+                    println!("{:?}", file);
+                    self.build_load_rom_file_explorer = false;
+                }
             });
         });
     }
@@ -202,6 +253,9 @@ impl GuiBuilder {
                 self.build_menu_bar_and_check_for_mouse_events(&mut ui);
                 self.build_emulation_window(&mut ui);
                 self.build_fps_counter(fps, &mut ui);
+                if self.build_load_rom_file_explorer {
+                    self.build_load_rom_file_explorer(&mut ui);
+                }
             }
         );
     }
@@ -333,6 +387,7 @@ impl IOSdl2ImGuiOpenGl {
                 emulation_texture: imgui::TextureId::from(emulation_texture as usize),
                 fonts,
                 menu_bar_item_selected: Default::default(),
+                build_load_rom_file_explorer: false,
             },
         }
     }
@@ -350,22 +405,38 @@ impl IOSdl2ImGuiOpenGl {
         fonts
     }
 
-    fn check_for_menu_bar_items(&self, io_state: &mut io::IOState) {
+    fn check_for_menu_bar_items(&mut self, io_state: &mut io::IOState) {
         io_state.quit |= self.gui_builder.menu_bar_item_selected[MenuBarItem::Quit as usize];
         io_state.power_cycle |=
             self.gui_builder.menu_bar_item_selected[MenuBarItem::PowerCycle as usize];
+        self.gui_builder.build_load_rom_file_explorer |=
+            self.gui_builder.menu_bar_item_selected[MenuBarItem::LoadRom as usize];
     }
 
-    fn check_for_keyboard_shortcuts(event: &sdl2::event::Event, io_state: &mut io::IOState) {
+    fn check_for_keyboard_shortcuts(
+        event: &sdl2::event::Event,
+        io_state: &mut io::IOState,
+        gui_builder: &mut GuiBuilder,
+    ) {
         use sdl2::keyboard::Scancode;
         match *event {
             sdl2::event::Event::KeyDown {
                 scancode, keymod, ..
             } => {
                 if let Some(scancode) = scancode {
-                    io_state.quit = scancode == Scancode::Escape;
+                    if scancode == Scancode::Escape {
+                        if gui_builder.build_load_rom_file_explorer {
+                            gui_builder.build_load_rom_file_explorer = false;
+                        } else {
+                            io_state.quit = true;
+                        }
+                    }
                     if sdl2::keyboard::Mod::LCTRLMOD & keymod == sdl2::keyboard::Mod::LCTRLMOD {
                         io_state.power_cycle = scancode == Scancode::R;
+                        if scancode == Scancode::O {
+                            gui_builder.build_load_rom_file_explorer =
+                                !gui_builder.build_load_rom_file_explorer;
+                        }
                     }
                 }
             }
@@ -381,7 +452,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
 
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
         for event in self.events.poll_iter() {
-            Self::check_for_keyboard_shortcuts(&event, &mut io_state);
+            Self::check_for_keyboard_shortcuts(&event, &mut io_state, &mut self.gui_builder);
             self.imgui_sdl2.handle_event(&mut self.imgui, &event);
         }
 

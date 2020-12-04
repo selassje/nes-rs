@@ -26,6 +26,7 @@ extern crate enum_tryfrom;
 
 #[macro_use]
 extern crate enum_tryfrom_derive;
+extern crate cfg_if;
 
 fn read_rom(file_name: &str) -> nes_file::NesFile {
     let mut rom = Vec::new();

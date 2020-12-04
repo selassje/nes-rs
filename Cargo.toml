@@ -33,6 +33,7 @@ path = "tests/cpu_interrupts_v2.rs"
 debug = true
 
 [dependencies]
+cfg-if = "0.1"
 enum-tryfrom = "0.2.1"
 enum-tryfrom-derive = "0.2.1"
 imgui = "0.5.0"
