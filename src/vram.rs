@@ -50,6 +50,10 @@ impl VRAM {
         }
     }
 
+    pub fn set_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
+        self.mapper = mapper;
+    }
+
     pub fn power_cycle(&mut self) {
         self.memory.iter_mut().for_each(|m| *m = 0);
     }

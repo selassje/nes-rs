@@ -153,6 +153,7 @@ struct GuiBuilder {
     fonts: GuiFonts,
     menu_bar_item_selected: [bool; MenuBarItem::None as usize],
     build_load_rom_file_explorer: bool,
+    rom_path: Option<String>,
 }
 
 impl GuiBuilder {
@@ -234,8 +235,8 @@ impl GuiBuilder {
             .build(ui, || {
                 let file = ui.file_explorer("F:/", &["nes"]);
                 if let Ok(Some(file)) = file {
-                    println!("{:?}", file);
                     self.build_load_rom_file_explorer = false;
+                    self.rom_path = Some(file.to_str().unwrap().to_owned());
                 }
             });
         });
@@ -388,6 +389,7 @@ impl IOSdl2ImGuiOpenGl {
                 fonts,
                 menu_bar_item_selected: Default::default(),
                 build_load_rom_file_explorer: false,
+                rom_path: None,
             },
         }
     }
@@ -449,6 +451,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
     fn present_frame(&mut self, control: io::IOControl) -> io::IOState {
         let mut io_state: io::IOState = Default::default();
         self.gui_builder.menu_bar_item_selected = Default::default();
+        self.gui_builder.rom_path = None;
 
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
         for event in self.events.poll_iter() {
@@ -480,6 +483,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         self.imgui_sdl2.prepare_render(&ui, &self.window);
 
         self.gui_builder.build(control.fps, &mut ui);
+        io_state.load_rom = self.gui_builder.rom_path.take();
 
         self.renderer.render(ui);
         self.check_for_menu_bar_items(&mut io_state);

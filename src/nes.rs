@@ -31,7 +31,6 @@ pub struct Nes {
 impl Nes {
     pub fn new<T>(
         io: Rc<RefCell<T>>,
-        nes_file: &NesFile,
         controller_1: Rc<dyn Controller>,
         controller_2: Rc<dyn Controller>,
     ) -> Self
@@ -39,7 +38,7 @@ impl Nes {
         T: IO + VideoAccess + AudioAccess + KeyboardAccess + 'static,
     {
         let controllers = Rc::new(RefCell::new(Controllers::new(controller_1, controller_2)));
-        let mapper = nes_file.create_mapper();
+        let mapper = Rc::new(RefCell::new(crate::mappers::MapperNull::new()));
         let vram = Rc::new(RefCell::new(VRAM::new(mapper.clone())));
         let ppu = Rc::new(RefCell::new(PPU::new(
             vram.clone(),
@@ -68,13 +67,23 @@ impl Nes {
         }
     }
 
+    pub fn load(&mut self, nes_file: &NesFile) {
+        let mapper = nes_file.create_mapper();
+        self.vram.borrow_mut().set_mapper(mapper.clone());
+        self.ppu.borrow_mut().set_mapper(mapper.clone());
+        self.ram.borrow_mut().set_mapper(mapper.clone());
+        self.cpu.set_mapper(mapper.clone());
+        self.mapper = mapper;
+        self.power_cycle();
+    }
+
     pub fn power_cycle(&mut self) {
         self.vram.borrow_mut().power_cycle();
         self.ppu.borrow_mut().power_cycle();
         self.apu.borrow_mut().power_cycle();
         self.ram.borrow_mut().power_cycle();
         self.mapper.borrow_mut().power_cycle();
-        self.cpu.reset();
+        self.cpu.power_cycle();
     }
 
     pub fn run(&mut self, duration: Option<Duration>) {
@@ -131,7 +140,7 @@ impl Nes {
         }
     }
 
-    fn run_single_frame(&mut self) {
+    pub fn run_single_frame(&mut self) {
         for _ in 0..common::CPU_CYCLES_PER_FRAME {
             self.run_single_cpu_cycle();
         }

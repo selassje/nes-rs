@@ -36,7 +36,7 @@ impl NesTest {
             controller_1.get_key_mappings(),
             controller_2.get_key_mappings(),
         );
-        let mut nes = Nes::new(io_test.clone(), &nes_file, controller_1, controller_2);
+        let mut nes = Nes::new(io_test.clone(), controller_1, controller_2);
         let mut dir = PathBuf::from(rom_path);
         let mut test_name = dir.file_name().unwrap().to_str().unwrap().to_owned();
         if let Some(suffix) = suffix {
@@ -47,7 +47,7 @@ impl NesTest {
         dir.pop();
         let output_frame_path = Self::create_frame_path(&dir, &test_name, "");
         let expected_frame_path = Self::create_frame_path(&dir, &test_name, ".expected");
-        nes.power_cycle();
+        nes.load(&nes_file);
 
         NesTest {
             io_test,

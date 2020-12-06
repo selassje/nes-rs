@@ -139,7 +139,11 @@ impl CPU {
         }
     }
 
-    pub fn reset(&mut self) {
+    pub fn set_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
+        self.mapper = mapper;
+    }
+
+    pub fn power_cycle(&mut self) {
         self.pc = 0xC000;
         self.pc = self.ram.borrow().get_word(0xFFFC);
         self.sp = 0xFD;

@@ -345,6 +345,10 @@ impl PPU {
         }
     }
 
+    pub fn set_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
+        self.mapper = mapper;
+    }
+
     pub fn power_cycle(&mut self) {
         self.control_reg.value = 0;
         self.mask_reg.value = 0;

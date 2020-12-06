@@ -8,6 +8,7 @@ mod mapper4;
 mod mapper66;
 mod mapper7;
 mod mapper71;
+mod mapper_null;
 mod mmc3_6;
 
 mod mapper_internal;
@@ -20,6 +21,7 @@ pub use self::mapper4::Mapper4;
 pub use self::mapper66::Mapper66;
 pub use self::mapper7::Mapper7;
 pub use self::mapper71::Mapper71;
+pub use self::mapper_null::MapperNull;
 
 pub trait Mapper {
     fn get_chr_byte(&mut self, _: u16) -> u8;
