@@ -82,7 +82,7 @@ impl NesTest {
     }
 
     pub fn run_for(&mut self, duration: Duration) {
-        self.nes.run(Some(duration))
+        self.nes.run_for(duration)
     }
 
     pub fn press_player_1_start(&mut self) {

@@ -209,12 +209,9 @@ impl CPU {
         let high_byte = self.pop_byte();
         convert_2u8_to_u16(low_byte, high_byte)
     }
-    pub fn maybe_fetch_next_instruction(&mut self) -> bool {
+    pub fn maybe_fetch_next_instruction(&mut self) {
         if self.instruction.is_none() {
             self.fetch_next_instruction();
-            true
-        } else {
-            false
         }
     }
 

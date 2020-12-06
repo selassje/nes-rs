@@ -1,5 +1,5 @@
-use common::FPS;
-
+use crate::common;
+use crate::controllers;
 use crate::io::AudioAccess;
 use crate::io::KeyboardAccess;
 use crate::io::VideoAccess;
@@ -9,14 +9,11 @@ use crate::ppu::PPU;
 use crate::ram::RAM;
 use crate::vram::VRAM;
 use crate::{apu::APU, controllers::Controller};
-use crate::{common, io::IOState};
-use crate::{controllers::Controllers, io::IOControl};
 use crate::{cpu::CPU, mappers::Mapper};
 
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
-use std::time::Instant;
 
 pub struct Nes {
     cpu: CPU,
@@ -24,7 +21,6 @@ pub struct Nes {
     ppu: Rc<RefCell<PPU>>,
     vram: Rc<RefCell<VRAM>>,
     apu: Rc<RefCell<APU>>,
-    io: Rc<RefCell<dyn IO>>,
     mapper: Rc<RefCell<dyn Mapper>>,
 }
 
@@ -37,7 +33,10 @@ impl Nes {
     where
         T: IO + VideoAccess + AudioAccess + KeyboardAccess + 'static,
     {
-        let controllers = Rc::new(RefCell::new(Controllers::new(controller_1, controller_2)));
+        let controllers = Rc::new(RefCell::new(controllers::Controllers::new(
+            controller_1,
+            controller_2,
+        )));
         let mapper = Rc::new(RefCell::new(crate::mappers::MapperNull::new()));
         let vram = Rc::new(RefCell::new(VRAM::new(mapper.clone())));
         let ppu = Rc::new(RefCell::new(PPU::new(
@@ -62,7 +61,6 @@ impl Nes {
             ppu,
             vram,
             apu,
-            io,
             mapper,
         }
     }
@@ -86,56 +84,10 @@ impl Nes {
         self.cpu.power_cycle();
     }
 
-    pub fn run(&mut self, duration: Option<Duration>) {
-        let mut frame_duration: Duration =
-            Duration::from_nanos((Duration::from_secs(1).as_nanos() / (FPS) as u128) as u64);
-
-        let mut frame_duration_adjustment: i32 = 0;
-        let mut io_state: IOState = Default::default();
-        let mut elapsed_frames: u128 = 0;
-
-        let mut frame_start = Instant::now();
-
-        let mut fps = 0;
-        let mut one_second_timer = Instant::now();
-
-        let mut io_control = IOControl {
-            fps: common::FPS as u16,
-        };
-
-        while (duration == None
-            || elapsed_frames < duration.unwrap().as_secs() as u128 * FPS as u128)
-            && !io_state.quit
-        {
+    pub fn run_for(&mut self, duration: Duration) {
+        let mut elapsed_frames = 0;
+        while elapsed_frames < duration.as_secs() as u128 * common::FPS as u128 {
             self.run_single_frame();
-            if duration == None {
-                if one_second_timer.elapsed() < Duration::from_secs(1) {
-                    fps += 1;
-                } else {
-                    one_second_timer = Instant::now();
-                    if fps != FPS {
-                        frame_duration_adjustment += FPS as i32 - fps as i32;
-                        frame_duration = Duration::from_nanos(
-                            (Duration::from_secs(1).as_nanos()
-                                / ((FPS as i32 + frame_duration_adjustment) as u128))
-                                as u64,
-                        );
-                    }
-                    io_control.fps = fps as u16;
-                    fps = 1;
-                }
-            }
-            io_state = self.io.borrow_mut().present_frame(io_control);
-
-            if io_state.power_cycle {
-                self.power_cycle();
-            }
-
-            let elapsed_time_since_frame_start = frame_start.elapsed();
-            if duration.is_none() && elapsed_time_since_frame_start < frame_duration {
-                std::thread::sleep(frame_duration - elapsed_time_since_frame_start);
-            }
-            frame_start = Instant::now();
             elapsed_frames += 1;
         }
     }

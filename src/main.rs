@@ -1,5 +1,5 @@
-use nes_rs::run2;
+use nes_rs::run;
 
 fn main() {
-    run2(None);
+    run();
 }
