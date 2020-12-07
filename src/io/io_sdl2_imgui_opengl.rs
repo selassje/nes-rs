@@ -483,7 +483,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         self.imgui_sdl2.prepare_render(&ui, &self.window);
 
         self.gui_builder.build(control.fps, &mut ui);
-        io_state.load_rom = self.gui_builder.rom_path.take();
+        io_state.load_nes_file = self.gui_builder.rom_path.take();
 
         self.renderer.render(ui);
         self.check_for_menu_bar_items(&mut io_state);

@@ -30,7 +30,7 @@ extern crate enum_tryfrom;
 extern crate enum_tryfrom_derive;
 extern crate cfg_if;
 
-fn read_rom(file_name: &str) -> nes_file::NesFile {
+fn read_nes_file(file_name: &str) -> nes_file::NesFile {
     let mut rom = Vec::new();
     let mut file = File::open(&file_name).expect(&format!(
         "Unable to open ROM {} current dir {}",
@@ -52,15 +52,10 @@ pub fn run() {
 
     let mut nes = nes::Nes::new(io.clone(), controller_1.clone(), controller_2.clone());
 
-    let mut load_nes_file = |path| {
-        let nes_file = read_rom(path);
-        nes.load(&nes_file);
-    };
-
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
         let path = &args[1];
-        load_nes_file(path);
+        load(&mut nes, &path);
     };
 
     let mut frame_duration: std::time::Duration = std::time::Duration::from_nanos(
@@ -99,16 +94,8 @@ pub fn run() {
         }
 
         io_state = io.borrow_mut().present_frame(io_control);
-        if io_state.power_cycle {
-            nes.power_cycle();
-        }
 
-        if io_state.load_rom.is_some() {
-            let s = io_state.load_rom.clone().unwrap();
-            let x = s.as_str();
-            let nes_file = read_rom(x);
-            nes.load(&nes_file);
-        }
+        handle_io_state(&mut nes, &io_state);
 
         let elapsed_time_since_frame_start = frame_start.elapsed();
         if elapsed_time_since_frame_start < frame_duration {
@@ -117,4 +104,19 @@ pub fn run() {
 
         frame_start = std::time::Instant::now();
     }
+}
+
+fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState) {
+    if io_state.power_cycle {
+        nes.power_cycle();
+    }
+
+    if let Some(ref nes_file_path) = io_state.load_nes_file {
+        load(nes, nes_file_path.as_str());
+    }
+}
+
+fn load(nes: &mut nes::Nes, path: &str) {
+    let nes_file = read_nes_file(path);
+    nes.load(&nes_file);
 }

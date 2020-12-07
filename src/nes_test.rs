@@ -1,4 +1,4 @@
-use crate::{controllers::Button, io::io_test, keyboard, nes::Nes, read_rom};
+use crate::{controllers::Button, io::io_test, keyboard, nes::Nes, read_nes_file};
 use fs::File;
 use std::{cell::RefCell, fs, io::Read, path::Path, path::PathBuf, rc::Rc, time::Duration};
 
@@ -25,7 +25,7 @@ impl NesTest {
         test_fn: impl Fn(&mut NesTest) + 'static,
     ) -> Self {
         let io_test = Rc::new(RefCell::new(io_test::IOTest::new(rom_path)));
-        let nes_file = read_rom(rom_path);
+        let nes_file = read_nes_file(rom_path);
         let controller_1 = Rc::new(
             keyboard::KeyboardController::get_default_keyboard_controller_player1(io_test.clone()),
         );
