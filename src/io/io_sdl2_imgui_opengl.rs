@@ -1,6 +1,3 @@
-mod imgui_file_explorer;
-
-use imgui_file_explorer::UiFileExplorer;
 use std::collections::HashMap;
 use std::default::Default;
 use std::iter::FromIterator;
@@ -77,18 +74,6 @@ macro_rules! create_unmovable_simple_window {
     }};
 }
 
-macro_rules! create_movable_simple_window {
-    ($name:tt, $position:expr, $size:expr) => {{
-        create_simple_window!(
-            $name,
-            $position,
-            $size,
-            imgui::Condition::FirstUseEver,
-            imgui::Condition::Appearing
-        )
-    }};
-}
-
 macro_rules! create_menu_item {
     ($name:tt, $shortcut:tt) => {{
         imgui::MenuItem::new(im_str!($name))
@@ -97,6 +82,7 @@ macro_rules! create_menu_item {
             .shortcut(im_str!($shortcut))
     }};
 }
+
 struct SampleBuffer {
     index: usize,
     sum: f32,
@@ -113,7 +99,7 @@ enum GuiFont {
 }
 #[derive(PartialEq)]
 enum MenuBarItem {
-    LoadRom,
+    LoadNesFile,
     Quit,
     PowerCycle,
     None,
@@ -148,11 +134,18 @@ impl SampleBuffer {
     }
 }
 
+#[derive(Clone, Copy, Default)]
+struct KeyboardShortCuts {
+    load_nes_file: bool,
+    power_cycle: bool,
+    quit: bool,
+}
+
 struct GuiBuilder {
     emulation_texture: imgui::TextureId,
     fonts: GuiFonts,
     menu_bar_item_selected: [bool; MenuBarItem::None as usize],
-    build_load_rom_file_explorer: bool,
+    choose_nes_file: bool,
     rom_path: Option<String>,
 }
 
@@ -165,12 +158,12 @@ impl GuiBuilder {
     fn build_menu_bar_and_check_for_mouse_events(&mut self, ui: &mut imgui::Ui) {
         with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
             with_token!(ui, begin_main_menu_bar, (), {
-                with_token!(ui, begin_menu, (im_str!("File"), true), {
-                    create_menu_item!("Load Rom", "Ctrl + O").build(ui);
-                    self.menu_bar_item_selected[MenuBarItem::LoadRom as usize] =
+                with_token!(ui, begin_menu, (im_str!("File"), !self.choose_nes_file), {
+                    // create_menu_item!("Load Nes File", "Ctrl + O").build(ui);
+                    create_menu_item!("Load Nes File", "Ctrl + O").build(ui);
+                    self.menu_bar_item_selected[MenuBarItem::LoadNesFile as usize] =
                         self.is_menu_item_selected(ui);
-                    self.build_load_rom_file_explorer |=
-                        self.menu_bar_item_selected[MenuBarItem::LoadRom as usize];
+
                     create_menu_item!("Quit", "Esc").build(ui);
                     self.menu_bar_item_selected[MenuBarItem::Quit as usize] =
                         self.is_menu_item_selected(ui);
@@ -222,24 +215,17 @@ impl GuiBuilder {
         });
     }
 
-    fn build_load_rom_file_explorer(&mut self, ui: &mut imgui::Ui) {
-        with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
-            create_movable_simple_window!(
-                "Load Rom",
-                [(DISPLAY_HEIGHT / 4) as _, (DISPLAY_HEIGHT / 4) as _],
-                [((2 * DISPLAY_WIDTH) / 3) as _, (DISPLAY_HEIGHT / 2) as _]
-            )
-            .scroll_bar(true)
-            .scrollable(true)
-            .title_bar(true)
-            .build(ui, || {
-                let file = ui.file_explorer("F:/", &["nes"]);
-                if let Ok(Some(file)) = file {
-                    self.build_load_rom_file_explorer = false;
-                    self.rom_path = Some(file.to_str().unwrap().to_owned());
-                }
-            });
+    fn build_load_nes_file_explorer(&mut self) {
+        let result = nfd::open_file_dialog(None, None).unwrap_or_else(|e| {
+            panic!(e);
         });
+        match result {
+            nfd::Response::Okay(file_path) => {
+                self.rom_path = Some(file_path);
+            }
+            nfd::Response::Cancel => {}
+            _ => panic!("Unsupported file selection"),
+        }
     }
 
     fn build(&mut self, fps: u16, mut ui: &mut imgui::Ui) {
@@ -254,8 +240,8 @@ impl GuiBuilder {
                 self.build_menu_bar_and_check_for_mouse_events(&mut ui);
                 self.build_emulation_window(&mut ui);
                 self.build_fps_counter(fps, &mut ui);
-                if self.build_load_rom_file_explorer {
-                    self.build_load_rom_file_explorer(&mut ui);
+                if self.choose_nes_file {
+                    self.build_load_nes_file_explorer();
                 }
             }
         );
@@ -274,6 +260,7 @@ pub struct IOSdl2ImGuiOpenGl {
     renderer: imgui_opengl_renderer::Renderer,
     _gl_context: sdl2::video::GLContext,
     gui_builder: GuiBuilder,
+    keyboard_shortcuts: KeyboardShortCuts,
 }
 
 fn keycode_to_sdl2_scancode(key: io::KeyCode) -> sdl2::keyboard::Scancode {
@@ -388,9 +375,10 @@ impl IOSdl2ImGuiOpenGl {
                 emulation_texture: imgui::TextureId::from(emulation_texture as usize),
                 fonts,
                 menu_bar_item_selected: Default::default(),
-                build_load_rom_file_explorer: false,
+                choose_nes_file: false,
                 rom_path: None,
             },
+            keyboard_shortcuts: Default::default(),
         }
     }
     fn prepare_fonts(imgui: &mut imgui::Context) -> GuiFonts {
@@ -407,18 +395,18 @@ impl IOSdl2ImGuiOpenGl {
         fonts
     }
 
-    fn check_for_menu_bar_items(&mut self, io_state: &mut io::IOState) {
-        io_state.quit |= self.gui_builder.menu_bar_item_selected[MenuBarItem::Quit as usize];
-        io_state.power_cycle |=
-            self.gui_builder.menu_bar_item_selected[MenuBarItem::PowerCycle as usize];
-        self.gui_builder.build_load_rom_file_explorer |=
-            self.gui_builder.menu_bar_item_selected[MenuBarItem::LoadRom as usize];
+    fn update_io_state(&mut self, io_state: &mut io::IOState) {
+        io_state.quit = self.keyboard_shortcuts.quit
+            || self.gui_builder.menu_bar_item_selected[MenuBarItem::Quit as usize];
+        io_state.power_cycle = self.keyboard_shortcuts.power_cycle
+            || self.gui_builder.menu_bar_item_selected[MenuBarItem::PowerCycle as usize];
+        self.gui_builder.choose_nes_file = self.keyboard_shortcuts.load_nes_file
+            || self.gui_builder.menu_bar_item_selected[MenuBarItem::LoadNesFile as usize];
     }
 
     fn check_for_keyboard_shortcuts(
         event: &sdl2::event::Event,
-        io_state: &mut io::IOState,
-        gui_builder: &mut GuiBuilder,
+        keyboard_shortcuts: &mut KeyboardShortCuts,
     ) {
         use sdl2::keyboard::Scancode;
         match *event {
@@ -427,17 +415,12 @@ impl IOSdl2ImGuiOpenGl {
             } => {
                 if let Some(scancode) = scancode {
                     if scancode == Scancode::Escape {
-                        if gui_builder.build_load_rom_file_explorer {
-                            gui_builder.build_load_rom_file_explorer = false;
-                        } else {
-                            io_state.quit = true;
-                        }
+                        keyboard_shortcuts.quit = true;
                     }
                     if sdl2::keyboard::Mod::LCTRLMOD & keymod == sdl2::keyboard::Mod::LCTRLMOD {
-                        io_state.power_cycle = scancode == Scancode::R;
+                        keyboard_shortcuts.power_cycle = scancode == Scancode::R;
                         if scancode == Scancode::O {
-                            gui_builder.build_load_rom_file_explorer =
-                                !gui_builder.build_load_rom_file_explorer;
+                            keyboard_shortcuts.load_nes_file = true;
                         }
                     }
                 }
@@ -452,10 +435,11 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         let mut io_state: io::IOState = Default::default();
         self.gui_builder.menu_bar_item_selected = Default::default();
         self.gui_builder.rom_path = None;
+        self.keyboard_shortcuts = Default::default();
 
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
         for event in self.events.poll_iter() {
-            Self::check_for_keyboard_shortcuts(&event, &mut io_state, &mut self.gui_builder);
+            Self::check_for_keyboard_shortcuts(&event, &mut self.keyboard_shortcuts);
             self.imgui_sdl2.handle_event(&mut self.imgui, &event);
         }
 
@@ -482,12 +466,20 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         let mut ui = self.imgui.frame();
         self.imgui_sdl2.prepare_render(&ui, &self.window);
 
+        if self.gui_builder.choose_nes_file {
+            self.audio_queue.pause();
+            self.audio_queue.clear();
+        }
+
         self.gui_builder.build(control.fps, &mut ui);
+
         io_state.load_nes_file = self.gui_builder.rom_path.take();
 
         self.renderer.render(ui);
-        self.check_for_menu_bar_items(&mut io_state);
+        self.update_io_state(&mut io_state);
         self.window.gl_swap_window();
+
+        self.audio_queue.resume();
 
         self.audio_queue
             .queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);

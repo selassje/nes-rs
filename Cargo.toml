@@ -40,6 +40,7 @@ imgui = "0.5.0"
 imgui-opengl-renderer = "0.9"
 imgui-sdl2 = "0.12"
 gl = "0.10.0"
+nfd = "0.0.4"
 
 [dependencies.sdl2]
 version = "0.34"
