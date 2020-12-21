@@ -1,6 +1,6 @@
 language: rust
 before_install :
-          	- if [ "$TRAVIS_OS_NAME" = "bionic" ]; then sudo apt-get install libgtk2.0-dev ; fi
+     - if [ "$TRAVIS_OS_NAME" = "bionic" ]; then sudo apt-get install libgtk2.0-dev ; fi
 script:
      - cargo install cargo-vcpkg
      - cargo vcpkg build
