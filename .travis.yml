@@ -2,6 +2,7 @@ language: rust
 before_install :
      - sudo apt-get install libgtk2.0-dev
 script:
+     - echo $TRAVIS_OS_NAME
      - cargo install cargo-vcpkg
      - cargo vcpkg build
      - cargo test --release      
