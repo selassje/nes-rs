@@ -8,6 +8,6 @@ script:
 jobs:
     include:        
         - dist : bionic
-          before_install:
+          before_install :
           	- sudo apt-get install libgtk2.0-dev
         - os : windows 
