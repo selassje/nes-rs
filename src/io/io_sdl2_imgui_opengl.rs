@@ -405,7 +405,7 @@ impl IOSdl2ImGuiOpenGl {
     }
 
     fn update_io_state(&mut self, io_state: &mut io::IOState) {
-        io_state.quit = self.keyboard_shortcuts.quit
+        io_state.quit |= self.keyboard_shortcuts.quit
             || self.gui_builder.menu_bar_item_selected[MenuBarItem::Quit as usize];
         io_state.power_cycle = self.keyboard_shortcuts.power_cycle
             || self.gui_builder.menu_bar_item_selected[MenuBarItem::PowerCycle as usize];
@@ -457,6 +457,12 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
         for event in self.events.poll_iter() {
             Self::check_for_keyboard_shortcuts(&event, &mut self.keyboard_shortcuts);
+            match event {
+                sdl2::event::Event::Window { win_event, .. } => {
+                    io_state.quit = win_event == sdl2::event::WindowEvent::Close
+                }
+                _ => {}
+            };
             self.imgui_sdl2.handle_event(&mut self.imgui, &event);
         }
 
