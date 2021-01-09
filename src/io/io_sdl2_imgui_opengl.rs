@@ -102,6 +102,7 @@ enum MenuBarItem {
     LoadNesFile,
     Quit,
     PowerCycle,
+    Pause,
     None,
 }
 
@@ -139,6 +140,7 @@ struct KeyboardShortCuts {
     load_nes_file: bool,
     power_cycle: bool,
     quit: bool,
+    pause: bool,
 }
 
 struct GuiBuilder {
@@ -147,6 +149,7 @@ struct GuiBuilder {
     menu_bar_item_selected: [bool; MenuBarItem::None as usize],
     choose_nes_file: bool,
     rom_path: Option<String>,
+    paused: bool,
 }
 
 impl GuiBuilder {
@@ -159,7 +162,6 @@ impl GuiBuilder {
         with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("File"), !self.choose_nes_file), {
-                    // create_menu_item!("Load Nes File", "Ctrl + O").build(ui);
                     create_menu_item!("Load Nes File", "Ctrl + O").build(ui);
                     self.menu_bar_item_selected[MenuBarItem::LoadNesFile as usize] =
                         self.is_menu_item_selected(ui);
@@ -173,6 +175,12 @@ impl GuiBuilder {
                 with_token!(ui, begin_menu, (im_str!("Emulation"), true), {
                     create_menu_item!("Power Cycle", "Ctrl + R").build(ui);
                     self.menu_bar_item_selected[MenuBarItem::PowerCycle as usize] =
+                        self.is_menu_item_selected(ui);
+
+                    create_menu_item!("Pause", "Ctrl + P")
+                        .selected(self.paused)
+                        .build(ui);
+                    self.menu_bar_item_selected[MenuBarItem::Pause as usize] =
                         self.is_menu_item_selected(ui);
                 });
             });
@@ -377,6 +385,7 @@ impl IOSdl2ImGuiOpenGl {
                 menu_bar_item_selected: Default::default(),
                 choose_nes_file: false,
                 rom_path: None,
+                paused: false,
             },
             keyboard_shortcuts: Default::default(),
         }
@@ -402,6 +411,14 @@ impl IOSdl2ImGuiOpenGl {
             || self.gui_builder.menu_bar_item_selected[MenuBarItem::PowerCycle as usize];
         self.gui_builder.choose_nes_file = self.keyboard_shortcuts.load_nes_file
             || self.gui_builder.menu_bar_item_selected[MenuBarItem::LoadNesFile as usize];
+
+        if self.keyboard_shortcuts.pause
+            || self.gui_builder.menu_bar_item_selected[MenuBarItem::Pause as usize]
+        {
+            io_state.pause = !self.gui_builder.paused;
+        } else {
+            io_state.pause = self.gui_builder.paused;
+        }
     }
 
     fn check_for_keyboard_shortcuts(
@@ -419,9 +436,8 @@ impl IOSdl2ImGuiOpenGl {
                     }
                     if sdl2::keyboard::Mod::LCTRLMOD & keymod == sdl2::keyboard::Mod::LCTRLMOD {
                         keyboard_shortcuts.power_cycle = scancode == Scancode::R;
-                        if scancode == Scancode::O {
-                            keyboard_shortcuts.load_nes_file = true;
-                        }
+                        keyboard_shortcuts.load_nes_file = scancode == Scancode::O;
+                        keyboard_shortcuts.pause = scancode == Scancode::P;
                     }
                 }
             }
@@ -435,6 +451,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         let mut io_state: io::IOState = Default::default();
         self.gui_builder.menu_bar_item_selected = Default::default();
         self.gui_builder.rom_path = None;
+        self.gui_builder.paused = control.pause;
         self.keyboard_shortcuts = Default::default();
 
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
@@ -479,12 +496,16 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         self.update_io_state(&mut io_state);
         self.window.gl_swap_window();
 
-        self.audio_queue.resume();
+        if control.pause {
+            self.audio_queue.pause();
+        } else {
+            self.audio_queue.resume();
 
-        self.audio_queue
-            .queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);
+            self.audio_queue
+                .queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);
 
-        self.sample_buffer.reset(control.fps);
+            self.sample_buffer.reset(control.fps);
+        }
 
         io_state
     }

@@ -72,11 +72,13 @@ pub fn run() {
 
     let mut io_control = io::IOControl {
         fps: common::FPS as u16,
+        pause: false,
     };
 
     while !io_state.quit {
-        nes.run_single_frame();
-
+        if !io_state.pause {
+            nes.run_single_frame();
+        }
         if one_second_timer.elapsed() < std::time::Duration::from_secs(1) {
             fps += 1;
         } else {
@@ -94,6 +96,7 @@ pub fn run() {
         }
 
         io_state = io.borrow_mut().present_frame(io_control);
+        io_control.pause = io_state.pause;
 
         handle_io_state(&mut nes, &io_state);
 

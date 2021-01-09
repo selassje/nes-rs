@@ -13,11 +13,13 @@ pub struct IOState {
     pub quit: bool,
     pub power_cycle: bool,
     pub load_nes_file: Option<String>,
+    pub pause: bool,
 }
 
 #[derive(Copy, Clone)]
 pub struct IOControl {
     pub fps: u16,
+    pub pause: bool,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
