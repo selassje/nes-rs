@@ -250,6 +250,7 @@ impl GuiBuilder {
                 self.build_fps_counter(fps, &mut ui);
                 if self.choose_nes_file {
                     self.build_load_nes_file_explorer();
+                    self.paused = false;
                 }
             }
         );
@@ -419,6 +420,8 @@ impl IOSdl2ImGuiOpenGl {
         } else {
             io_state.pause = self.gui_builder.paused;
         }
+
+        io_state.pause |= self.gui_builder.choose_nes_file;
     }
 
     fn check_for_keyboard_shortcuts(
@@ -466,6 +469,17 @@ impl io::IO for IOSdl2ImGuiOpenGl {
             self.imgui_sdl2.handle_event(&mut self.imgui, &event);
         }
 
+        if control.pause {
+            self.audio_queue.pause();
+        } else {
+            self.audio_queue.resume();
+
+            self.audio_queue
+                .queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);
+
+            self.sample_buffer.reset(control.fps);
+        }
+
         unsafe {
             gl::TexImage2D(
                 gl::TEXTURE_2D,
@@ -501,17 +515,6 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         self.renderer.render(ui);
         self.update_io_state(&mut io_state);
         self.window.gl_swap_window();
-
-        if control.pause {
-            self.audio_queue.pause();
-        } else {
-            self.audio_queue.resume();
-
-            self.audio_queue
-                .queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);
-
-            self.sample_buffer.reset(control.fps);
-        }
 
         io_state
     }

@@ -78,21 +78,23 @@ pub fn run() {
     while !io_state.quit {
         if !io_state.pause {
             nes.run_single_frame();
-        }
-        if one_second_timer.elapsed() < std::time::Duration::from_secs(1) {
-            fps += 1;
-        } else {
-            one_second_timer = std::time::Instant::now();
-            if fps != common::FPS {
-                frame_duration_adjustment += common::FPS as i32 - fps as i32;
-                frame_duration = std::time::Duration::from_nanos(
-                    (std::time::Duration::from_secs(1).as_nanos()
-                        / ((common::FPS as i32 + frame_duration_adjustment) as u128))
-                        as u64,
-                );
+            if one_second_timer.elapsed() < std::time::Duration::from_secs(1) {
+                fps += 1;
+            } else {
+                one_second_timer = std::time::Instant::now();
+                if fps != common::FPS {
+                    frame_duration_adjustment += common::FPS as i32 - fps as i32;
+                    frame_duration = std::time::Duration::from_nanos(
+                        (std::time::Duration::from_secs(1).as_nanos()
+                            / ((common::FPS as i32 + frame_duration_adjustment) as u128))
+                            as u64,
+                    );
+                }
+                io_control.fps = fps as u16;
+                fps = 1;
             }
-            io_control.fps = fps as u16;
-            fps = 1;
+        } else {
+            //one_second_timer.
         }
 
         io_state = io.borrow_mut().present_frame(io_control);
@@ -100,12 +102,13 @@ pub fn run() {
 
         handle_io_state(&mut nes, &io_state);
 
-        let elapsed_time_since_frame_start = frame_start.elapsed();
-        if elapsed_time_since_frame_start < frame_duration {
-            std::thread::sleep(frame_duration - elapsed_time_since_frame_start);
+        if !io_state.pause {
+            let elapsed_time_since_frame_start = frame_start.elapsed();
+            if elapsed_time_since_frame_start < frame_duration {
+                std::thread::sleep(frame_duration - elapsed_time_since_frame_start);
+            }
+            frame_start = std::time::Instant::now();
         }
-
-        frame_start = std::time::Instant::now();
     }
 }
 
