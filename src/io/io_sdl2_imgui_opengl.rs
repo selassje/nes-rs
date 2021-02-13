@@ -299,16 +299,16 @@ impl IOSdl2ImGuiOpenGl {
     pub fn new(title: &str) -> Self {
         let sdl_context = sdl2::init().unwrap();
         let mut maybe_audio_queue = None;
-        // if let Ok(sdl_audio) = sdl_context.audio() {
-        //     let desired_spec = sdl2::audio::AudioSpecDesired {
-        //         freq: Some(SAMPLE_RATE as i32),
-        //         channels: Some(1),
-        //         samples: Some(BUFFER_SIZE as u16),
-        //     };
-        //     let audio_queue = sdl_audio.open_queue(None, &desired_spec).unwrap();
-        //     audio_queue.resume();
-        //     maybe_audio_queue = Some(audio_queue);
-        // }
+        if let Ok(sdl_audio) = sdl_context.audio() {
+            let desired_spec = sdl2::audio::AudioSpecDesired {
+                freq: Some(SAMPLE_RATE as i32),
+                channels: Some(1),
+                samples: Some(BUFFER_SIZE as u16),
+            };
+            let audio_queue = sdl_audio.open_queue(None, &desired_spec).unwrap();
+            audio_queue.resume();
+            maybe_audio_queue = Some(audio_queue);
+        }
 
         let video_subsys = sdl_context.video().unwrap();
         {
