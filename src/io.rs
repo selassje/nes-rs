@@ -18,7 +18,8 @@ pub struct IOState {
 
 #[derive(Copy, Clone)]
 pub struct IOControl {
-    pub fps: u16,
+    pub target_fps: u16,
+    pub current_fps: u16,
     pub pause: bool,
 }
 
@@ -52,6 +53,7 @@ pub trait VideoAccess {
 
 pub trait IO {
     fn present_frame(&mut self, control: IOControl) -> IOState;
+    fn is_audio_available(&self) -> bool;
 }
 
 pub trait KeyboardAccess {

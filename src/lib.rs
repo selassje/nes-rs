@@ -58,11 +58,10 @@ pub fn run() {
         load(&mut nes, &path);
     };
 
-    let mut frame_duration: std::time::Duration = std::time::Duration::from_nanos(
+    let frame_duration: std::time::Duration = std::time::Duration::from_nanos(
         (std::time::Duration::from_secs(1).as_nanos() / (common::FPS) as u128) as u64,
     );
 
-    let mut frame_duration_adjustment: i32 = 0;
     let mut io_state: io::IOState = Default::default();
 
     let mut frame_start = std::time::Instant::now();
@@ -71,9 +70,12 @@ pub fn run() {
     let mut one_second_timer = std::time::Instant::now();
 
     let mut io_control = io::IOControl {
-        fps: common::FPS as u16,
+        target_fps: common::FPS as u16,
+        current_fps: 0,
         pause: false,
     };
+
+    let is_audio_available = io.borrow().is_audio_available();
 
     while !io_state.quit {
         if !io_state.pause {
@@ -82,21 +84,10 @@ pub fn run() {
                 fps += 1;
             } else {
                 one_second_timer = std::time::Instant::now();
-                if fps != common::FPS {
-                    frame_duration_adjustment += common::FPS as i32 - fps as i32;
-                    frame_duration = std::time::Duration::from_nanos(
-                        (std::time::Duration::from_secs(1).as_nanos()
-                            / ((common::FPS as i32 + frame_duration_adjustment) as u128))
-                            as u64,
-                    );
-                }
-                io_control.fps = fps as u16;
+                io_control.current_fps = fps;
                 fps = 1;
             }
-        } else {
-            //one_second_timer.
         }
-
         io_state = io.borrow_mut().present_frame(io_control);
         io_control.pause = io_state.pause;
 
@@ -104,8 +95,10 @@ pub fn run() {
 
         if !io_state.pause {
             let elapsed_time_since_frame_start = frame_start.elapsed();
-            if elapsed_time_since_frame_start < frame_duration {
-                std::thread::sleep(frame_duration - elapsed_time_since_frame_start);
+            if !is_audio_available {
+                if elapsed_time_since_frame_start < frame_duration {
+                    std::thread::sleep(frame_duration - elapsed_time_since_frame_start);
+                }
             }
             frame_start = std::time::Instant::now();
         }

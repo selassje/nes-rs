@@ -8,12 +8,13 @@ use crate::io;
 
 use gl::types::*;
 use imgui::im_str;
+use io::SampleFormat;
 
 const SAMPLE_RATE: usize = 44100;
 const SAMPLE_RATE_ADJ: usize = (SAMPLE_RATE as f32 * 1.0000) as usize;
 const INITIAL_SAMPLE_BUCKET_SIZE: f32 =
     (common::FPS * common::CPU_CYCLES_PER_FRAME) as f32 / SAMPLE_RATE_ADJ as f32;
-const BUFFER_SIZE: usize = 10000;
+const BUFFER_SIZE: usize = 1470;
 
 const DISPLAY_SCALING: usize = 2;
 const DISPLAY_WIDTH: usize = DISPLAY_SCALING * io::FRAME_WIDTH;
@@ -112,7 +113,6 @@ impl SampleBuffer {
     fn add(&mut self, sample: io::SampleFormat) {
         if 1.0 + self.bucket_size >= self.target_bucket_size && self.index < BUFFER_SIZE {
             let bucket_diff = self.target_bucket_size - self.bucket_size;
-            //assert!(bucket_diff >= 0.0 && bucket_diff <= 1.0);
             let bucket_diff_comp = 1.0 - bucket_diff;
             self.sum += bucket_diff * sample;
             let target_sample = self.sum / self.target_bucket_size.floor();
@@ -260,7 +260,7 @@ impl GuiBuilder {
 pub struct IOSdl2ImGuiOpenGl {
     io_internal: io_internal::IOInternal,
     sample_buffer: SampleBuffer,
-    audio_queue: sdl2::audio::AudioQueue<io::SampleFormat>,
+    maybe_audio_queue: Option<sdl2::audio::AudioQueue<io::SampleFormat>>,
     events: sdl2::EventPump,
     keyboard_state: HashMap<sdl2::keyboard::Scancode, bool>,
     imgui: imgui::Context,
@@ -298,18 +298,17 @@ fn keycode_to_sdl2_scancode(key: io::KeyCode) -> sdl2::keyboard::Scancode {
 impl IOSdl2ImGuiOpenGl {
     pub fn new(title: &str) -> Self {
         let sdl_context = sdl2::init().unwrap();
-        let sdl_audio = sdl_context.audio().unwrap();
-
-        let desired_spec = sdl2::audio::AudioSpecDesired {
-            freq: Some(SAMPLE_RATE as i32),
-            channels: Some(1),
-            samples: Some(BUFFER_SIZE as u16),
-        };
-
-        let audio_queue: sdl2::audio::AudioQueue<io::SampleFormat> =
-            sdl_audio.open_queue(None, &desired_spec).unwrap();
-
-        audio_queue.resume();
+        let mut maybe_audio_queue = None;
+        // if let Ok(sdl_audio) = sdl_context.audio() {
+        //     let desired_spec = sdl2::audio::AudioSpecDesired {
+        //         freq: Some(SAMPLE_RATE as i32),
+        //         channels: Some(1),
+        //         samples: Some(BUFFER_SIZE as u16),
+        //     };
+        //     let audio_queue = sdl_audio.open_queue(None, &desired_spec).unwrap();
+        //     audio_queue.resume();
+        //     maybe_audio_queue = Some(audio_queue);
+        // }
 
         let video_subsys = sdl_context.video().unwrap();
         {
@@ -372,7 +371,7 @@ impl IOSdl2ImGuiOpenGl {
                 buffer: [0.0; BUFFER_SIZE],
                 target_bucket_size: INITIAL_SAMPLE_BUCKET_SIZE,
             },
-            audio_queue,
+            maybe_audio_queue: maybe_audio_queue,
             events,
             keyboard_state: HashMap::new(),
             imgui,
@@ -469,17 +468,19 @@ impl io::IO for IOSdl2ImGuiOpenGl {
             self.imgui_sdl2.handle_event(&mut self.imgui, &event);
         }
 
-        if control.pause {
-            self.audio_queue.pause();
-        } else {
-            self.audio_queue.resume();
-
-            self.audio_queue
-                .queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);
-
-            self.sample_buffer.reset(control.fps);
+        if let Some(ref audio_queue) = self.maybe_audio_queue {
+            if control.pause {
+                audio_queue.pause();
+            } else {
+                audio_queue.resume();
+                while audio_queue.size() as usize
+                    > std::mem::size_of::<SampleFormat>() * self.sample_buffer.index * 4
+                {
+                }
+                audio_queue.queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);
+                self.sample_buffer.reset(control.target_fps);
+            }
         }
-
         unsafe {
             gl::TexImage2D(
                 gl::TEXTURE_2D,
@@ -503,12 +504,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         let mut ui = self.imgui.frame();
         self.imgui_sdl2.prepare_render(&ui, &self.window);
 
-        if self.gui_builder.choose_nes_file {
-            self.audio_queue.pause();
-            self.audio_queue.clear();
-        }
-
-        self.gui_builder.build(control.fps, &mut ui);
+        self.gui_builder.build(control.current_fps, &mut ui);
 
         io_state.load_nes_file = self.gui_builder.rom_path.take();
 
@@ -517,6 +513,10 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         self.window.gl_swap_window();
 
         io_state
+    }
+
+    fn is_audio_available(&self) -> bool {
+        self.maybe_audio_queue.is_some()
     }
 }
 

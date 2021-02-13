@@ -54,6 +54,10 @@ impl IO for IOTest {
     fn present_frame(&mut self, _: IOControl) -> IOState {
         Default::default()
     }
+
+    fn is_audio_available(&self) -> bool {
+        true
+    }
 }
 
 impl AudioAccess for IOTest {
