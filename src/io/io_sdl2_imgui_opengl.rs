@@ -14,7 +14,7 @@ const SAMPLE_RATE: usize = 44100;
 const SAMPLE_RATE_ADJ: usize = (SAMPLE_RATE as f32 * 1.0000) as usize;
 const INITIAL_SAMPLE_BUCKET_SIZE: f32 =
     (common::FPS * common::CPU_CYCLES_PER_FRAME) as f32 / SAMPLE_RATE_ADJ as f32;
-const BUFFER_SIZE: usize = 1470;
+const BUFFER_SIZE: usize = 2000;
 
 const DISPLAY_SCALING: usize = 2;
 const DISPLAY_WIDTH: usize = DISPLAY_SCALING * io::FRAME_WIDTH;
@@ -104,6 +104,11 @@ enum MenuBarItem {
     Quit,
     PowerCycle,
     Pause,
+    SpeedNormal,
+    SpeedDouble,
+    SpeedHalf,
+    SpeedIncrease,
+    SpeedDecrease,
     None,
 }
 
@@ -141,6 +146,8 @@ struct KeyboardShortCuts {
     power_cycle: bool,
     quit: bool,
     pause: bool,
+    speed_increase: bool,
+    speed_decrease: bool,
 }
 
 struct GuiBuilder {
@@ -158,7 +165,7 @@ impl GuiBuilder {
             || (ui.is_item_focused() && ui.is_key_pressed(sdl2::keyboard::Scancode::Return as _))
     }
 
-    fn build_menu_bar_and_check_for_mouse_events(&mut self, ui: &mut imgui::Ui) {
+    fn build_menu_bar_and_check_for_mouse_events(&mut self, fps: u16, ui: &mut imgui::Ui) {
         with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("File"), !self.choose_nes_file), {
@@ -182,6 +189,30 @@ impl GuiBuilder {
                         .build(ui);
                     self.menu_bar_item_selected[MenuBarItem::Pause as usize] =
                         self.is_menu_item_selected(ui);
+
+                    with_token!(ui, begin_menu, (im_str!("Speed"), true), {
+                        create_menu_item!("Normal", "")
+                            .selected(fps as usize == common::FPS)
+                            .build(ui);
+                        self.menu_bar_item_selected[MenuBarItem::SpeedNormal as usize] =
+                            self.is_menu_item_selected(ui);
+                        create_menu_item!("Double", "")
+                            .selected(fps as usize == 2 * common::FPS)
+                            .build(ui);
+                        self.menu_bar_item_selected[MenuBarItem::SpeedDouble as usize] =
+                            self.is_menu_item_selected(ui);
+                        create_menu_item!("Half", "")
+                            .selected(fps as usize == common::FPS / 2)
+                            .build(ui);
+                        self.menu_bar_item_selected[MenuBarItem::SpeedHalf as usize] =
+                            self.is_menu_item_selected(ui);
+                        create_menu_item!("Increase", "Ctrl + +").build(ui);
+                        self.menu_bar_item_selected[MenuBarItem::SpeedIncrease as usize] =
+                            self.is_menu_item_selected(ui);
+                        create_menu_item!("Decrease", "Ctrl + -").build(ui);
+                        self.menu_bar_item_selected[MenuBarItem::SpeedDecrease as usize] =
+                            self.is_menu_item_selected(ui);
+                    });
                 });
             });
         });
@@ -203,9 +234,9 @@ impl GuiBuilder {
         });
     }
 
-    fn build_fps_counter(&self, fps: u16, ui: &mut imgui::Ui) {
+    fn build_fps_counter(&self, current_fps: u16, target_fps: u16, ui: &mut imgui::Ui) {
         with_font!(self.fonts[GuiFont::FpsCounter as usize], ui, {
-            let text = format!("FPS {}", fps);
+            let text = format!("FPS {}/{}", current_fps, target_fps);
             let text_size = ui.calc_text_size(
                 imgui::ImString::new(text.clone()).as_ref(),
                 false,
@@ -236,7 +267,7 @@ impl GuiBuilder {
         }
     }
 
-    fn build(&mut self, fps: u16, mut ui: &mut imgui::Ui) {
+    fn build(&mut self, current_fps: u16, target_fps: u16, mut ui: &mut imgui::Ui) {
         with_styles!(
             &mut ui,
             (
@@ -245,9 +276,9 @@ impl GuiBuilder {
                 imgui::StyleVar::WindowPadding([0.0, 0.0])
             ),
             {
-                self.build_menu_bar_and_check_for_mouse_events(&mut ui);
+                self.build_menu_bar_and_check_for_mouse_events(target_fps, &mut ui);
                 self.build_emulation_window(&mut ui);
-                self.build_fps_counter(fps, &mut ui);
+                self.build_fps_counter(current_fps, target_fps, &mut ui);
                 if self.choose_nes_file {
                     self.build_load_nes_file_explorer();
                     self.paused = false;
@@ -390,6 +421,7 @@ impl IOSdl2ImGuiOpenGl {
             keyboard_shortcuts: Default::default(),
         }
     }
+
     fn prepare_fonts(imgui: &mut imgui::Context) -> GuiFonts {
         let default_font = imgui
             .fonts()
@@ -411,6 +443,27 @@ impl IOSdl2ImGuiOpenGl {
             || self.gui_builder.menu_bar_item_selected[MenuBarItem::PowerCycle as usize];
         self.gui_builder.choose_nes_file = self.keyboard_shortcuts.load_nes_file
             || self.gui_builder.menu_bar_item_selected[MenuBarItem::LoadNesFile as usize];
+
+        io_state.speed = None;
+        if self.keyboard_shortcuts.speed_increase
+            || self.gui_builder.menu_bar_item_selected[MenuBarItem::SpeedIncrease as usize]
+        {
+            io_state.speed = Some(io::Speed::Increase);
+        }
+        if self.keyboard_shortcuts.speed_decrease
+            || self.gui_builder.menu_bar_item_selected[MenuBarItem::SpeedDecrease as usize]
+        {
+            io_state.speed = Some(io::Speed::Decrease);
+        }
+        if self.gui_builder.menu_bar_item_selected[MenuBarItem::SpeedNormal as usize] {
+            io_state.speed = Some(io::Speed::Normal)
+        }
+        if self.gui_builder.menu_bar_item_selected[MenuBarItem::SpeedDouble as usize] {
+            io_state.speed = Some(io::Speed::Double)
+        }
+        if self.gui_builder.menu_bar_item_selected[MenuBarItem::SpeedHalf as usize] {
+            io_state.speed = Some(io::Speed::Half)
+        }
 
         if self.keyboard_shortcuts.pause
             || self.gui_builder.menu_bar_item_selected[MenuBarItem::Pause as usize]
@@ -440,6 +493,8 @@ impl IOSdl2ImGuiOpenGl {
                         keyboard_shortcuts.power_cycle = scancode == Scancode::R;
                         keyboard_shortcuts.load_nes_file = scancode == Scancode::O;
                         keyboard_shortcuts.pause = scancode == Scancode::P;
+                        keyboard_shortcuts.speed_increase = scancode == Scancode::Equals;
+                        keyboard_shortcuts.speed_decrease = scancode == Scancode::Minus;
                     }
                 }
             }
@@ -474,7 +529,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
             } else {
                 audio_queue.resume();
                 while audio_queue.size() as usize
-                    > std::mem::size_of::<SampleFormat>() * self.sample_buffer.index * 4
+                    > std::mem::size_of::<SampleFormat>() * self.sample_buffer.index * 10
                 {
                 }
                 audio_queue.queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);
@@ -504,7 +559,8 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         let mut ui = self.imgui.frame();
         self.imgui_sdl2.prepare_render(&ui, &self.window);
 
-        self.gui_builder.build(control.current_fps, &mut ui);
+        self.gui_builder
+            .build(control.current_fps, control.target_fps, &mut ui);
 
         io_state.load_nes_file = self.gui_builder.rom_path.take();
 
