@@ -160,58 +160,53 @@ struct GuiBuilder {
 }
 
 impl GuiBuilder {
-    fn is_menu_item_selected(&self, ui: &mut imgui::Ui) -> bool {
-        ui.is_item_clicked(imgui::MouseButton::Left)
-            || (ui.is_item_focused() && ui.is_key_pressed(sdl2::keyboard::Scancode::Return as _))
+    fn update_menu_item_status(&mut self, ui: &mut imgui::Ui, item: MenuBarItem) {
+        self.menu_bar_item_selected[item as usize] = ui.is_item_clicked(imgui::MouseButton::Left)
+            || (ui.is_item_focused() && ui.is_key_pressed(sdl2::keyboard::Scancode::Return as _));
     }
 
     fn build_menu_bar_and_check_for_mouse_events(&mut self, fps: u16, ui: &mut imgui::Ui) {
+        use MenuBarItem::*;
         with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("File"), !self.choose_nes_file), {
                     create_menu_item!("Load Nes File", "Ctrl + O").build(ui);
-                    self.menu_bar_item_selected[MenuBarItem::LoadNesFile as usize] =
-                        self.is_menu_item_selected(ui);
+                    self.update_menu_item_status(ui, LoadNesFile);
 
                     create_menu_item!("Quit", "Esc").build(ui);
-                    self.menu_bar_item_selected[MenuBarItem::Quit as usize] =
-                        self.is_menu_item_selected(ui);
+                    self.update_menu_item_status(ui, Quit);
                 });
             });
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("Emulation"), true), {
                     create_menu_item!("Power Cycle", "Ctrl + R").build(ui);
-                    self.menu_bar_item_selected[MenuBarItem::PowerCycle as usize] =
-                        self.is_menu_item_selected(ui);
+                    self.update_menu_item_status(ui, PowerCycle);
 
                     create_menu_item!("Pause", "Ctrl + P")
                         .selected(self.paused)
                         .build(ui);
-                    self.menu_bar_item_selected[MenuBarItem::Pause as usize] =
-                        self.is_menu_item_selected(ui);
+                    self.update_menu_item_status(ui, Pause);
+
+                    let is_speed_selected =
+                        |ratio: f32| fps as usize == (common::FPS as f32 * ratio) as usize;
 
                     with_token!(ui, begin_menu, (im_str!("Speed"), true), {
                         create_menu_item!("Normal", "")
-                            .selected(fps as usize == common::FPS)
+                            .selected(is_speed_selected(1.0))
                             .build(ui);
-                        self.menu_bar_item_selected[MenuBarItem::SpeedNormal as usize] =
-                            self.is_menu_item_selected(ui);
+                        self.update_menu_item_status(ui, SpeedNormal);
                         create_menu_item!("Double", "")
-                            .selected(fps as usize == 2 * common::FPS)
+                            .selected(is_speed_selected(2.0))
                             .build(ui);
-                        self.menu_bar_item_selected[MenuBarItem::SpeedDouble as usize] =
-                            self.is_menu_item_selected(ui);
+                        self.update_menu_item_status(ui, SpeedDouble);
                         create_menu_item!("Half", "")
-                            .selected(fps as usize == common::FPS / 2)
+                            .selected(is_speed_selected(0.5))
                             .build(ui);
-                        self.menu_bar_item_selected[MenuBarItem::SpeedHalf as usize] =
-                            self.is_menu_item_selected(ui);
-                        create_menu_item!("Increase", "Ctrl + +").build(ui);
-                        self.menu_bar_item_selected[MenuBarItem::SpeedIncrease as usize] =
-                            self.is_menu_item_selected(ui);
+                        self.update_menu_item_status(ui, SpeedHalf);
+                        create_menu_item!("Increase", "Ctrl + =").build(ui);
+                        self.update_menu_item_status(ui, SpeedIncrease);
                         create_menu_item!("Decrease", "Ctrl + -").build(ui);
-                        self.menu_bar_item_selected[MenuBarItem::SpeedDecrease as usize] =
-                            self.is_menu_item_selected(ui);
+                        self.update_menu_item_status(ui, SpeedDecrease);
                     });
                 });
             });

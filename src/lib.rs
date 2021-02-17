@@ -121,7 +121,7 @@ fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut 
             io::Speed::Double => io_control.target_fps = (common::FPS * 2) as u16,
             io::Speed::Increase => io_control.target_fps += 5,
             io::Speed::Decrease => {
-                io_control.target_fps = std::cmp::max(0, io_control.target_fps - 5)
+                io_control.target_fps = std::cmp::max(0, io_control.target_fps as i32 - 5) as u16
             }
         }
     }
