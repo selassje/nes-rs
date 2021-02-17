@@ -59,7 +59,7 @@ pub fn run() {
     };
 
     let frame_duration: std::time::Duration = std::time::Duration::from_nanos(
-        (std::time::Duration::from_secs(1).as_nanos() / (common::FPS) as u128) as u64,
+        (std::time::Duration::from_secs(1).as_nanos() / (common::DEFAULT_FPS) as u128) as u64,
     );
 
     let mut io_state: io::IOState = Default::default();
@@ -70,7 +70,7 @@ pub fn run() {
     let mut one_second_timer = std::time::Instant::now();
 
     let mut io_control = io::IOControl {
-        target_fps: common::FPS as u16,
+        target_fps: common::DEFAULT_FPS as u16,
         current_fps: 0,
         pause: false,
     };
@@ -116,9 +116,9 @@ fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut 
 
     if let Some(ref speed) = io_state.speed {
         match speed {
-            io::Speed::Half => io_control.target_fps = (common::FPS / 2) as u16,
-            io::Speed::Normal => io_control.target_fps = common::FPS as u16,
-            io::Speed::Double => io_control.target_fps = (common::FPS * 2) as u16,
+            io::Speed::Half => io_control.target_fps = common::HALF_FPS,
+            io::Speed::Normal => io_control.target_fps = common::DEFAULT_FPS,
+            io::Speed::Double => io_control.target_fps = common::DOUBLE_FPS,
             io::Speed::Increase => io_control.target_fps += 5,
             io::Speed::Decrease => {
                 io_control.target_fps = std::cmp::max(0, io_control.target_fps as i32 - 5) as u16

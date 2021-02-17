@@ -13,7 +13,7 @@ use io::SampleFormat;
 const SAMPLE_RATE: usize = 44100;
 const SAMPLE_RATE_ADJ: usize = (SAMPLE_RATE as f32 * 1.0000) as usize;
 const INITIAL_SAMPLE_BUCKET_SIZE: f32 =
-    (common::FPS * common::CPU_CYCLES_PER_FRAME) as f32 / SAMPLE_RATE_ADJ as f32;
+    common::DEFAULT_FPS as f32 * common::CPU_CYCLES_PER_FRAME as f32 / SAMPLE_RATE_ADJ as f32;
 const BUFFER_SIZE: usize = 2000;
 
 const DISPLAY_SCALING: usize = 2;
@@ -136,7 +136,7 @@ impl SampleBuffer {
         self.sum = 0.0;
         self.bucket_size = 0.0;
         self.target_bucket_size =
-            (fps as usize * common::CPU_CYCLES_PER_FRAME) as f32 / SAMPLE_RATE_ADJ as f32;
+            (fps * common::CPU_CYCLES_PER_FRAME) as f32 / SAMPLE_RATE_ADJ as f32;
     }
 }
 
@@ -187,20 +187,19 @@ impl GuiBuilder {
                         .build(ui);
                     self.update_menu_item_status(ui, Pause);
 
-                    let is_speed_selected =
-                        |ratio: f32| fps as usize == (common::FPS as f32 * ratio) as usize;
+                    let is_speed_selected = |target_fps: u16| fps == target_fps;
 
                     with_token!(ui, begin_menu, (im_str!("Speed"), true), {
                         create_menu_item!("Normal", "")
-                            .selected(is_speed_selected(1.0))
+                            .selected(is_speed_selected(common::DEFAULT_FPS))
                             .build(ui);
                         self.update_menu_item_status(ui, SpeedNormal);
                         create_menu_item!("Double", "")
-                            .selected(is_speed_selected(2.0))
+                            .selected(is_speed_selected(common::DOUBLE_FPS))
                             .build(ui);
                         self.update_menu_item_status(ui, SpeedDouble);
                         create_menu_item!("Half", "")
-                            .selected(is_speed_selected(0.5))
+                            .selected(is_speed_selected(common::HALF_FPS))
                             .build(ui);
                         self.update_menu_item_status(ui, SpeedHalf);
                         create_menu_item!("Increase", "Ctrl + =").build(ui);
