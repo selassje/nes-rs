@@ -86,7 +86,7 @@ impl Nes {
 
     pub fn run_for(&mut self, duration: Duration) {
         let mut elapsed_frames = 0;
-        while elapsed_frames < duration.as_secs() as u128 * common::FPS as u128 {
+        while elapsed_frames < duration.as_secs() as u128 * common::DEFAULT_FPS as u128 {
             self.run_single_frame();
             elapsed_frames += 1;
         }

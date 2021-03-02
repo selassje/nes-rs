@@ -1,6 +1,6 @@
 use std::{cell::RefCell, env, fs::File, io::Read, rc::Rc};
 
-use io::IO;
+use io::{IOControl, IO};
 
 mod apu;
 mod colors;
@@ -59,7 +59,7 @@ pub fn run() {
     };
 
     let frame_duration: std::time::Duration = std::time::Duration::from_nanos(
-        (std::time::Duration::from_secs(1).as_nanos() / (common::FPS) as u128) as u64,
+        (std::time::Duration::from_secs(1).as_nanos() / (common::DEFAULT_FPS) as u128) as u64,
     );
 
     let mut io_state: io::IOState = Default::default();
@@ -70,7 +70,7 @@ pub fn run() {
     let mut one_second_timer = std::time::Instant::now();
 
     let mut io_control = io::IOControl {
-        target_fps: common::FPS as u16,
+        target_fps: common::DEFAULT_FPS as u16,
         current_fps: 0,
         pause: false,
     };
@@ -91,7 +91,7 @@ pub fn run() {
         io_state = io.borrow_mut().present_frame(io_control);
         io_control.pause = io_state.pause;
 
-        handle_io_state(&mut nes, &io_state);
+        handle_io_state(&mut nes, &io_state, &mut io_control);
 
         if !io_state.pause {
             let elapsed_time_since_frame_start = frame_start.elapsed();
@@ -105,13 +105,25 @@ pub fn run() {
     }
 }
 
-fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState) {
+fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut IOControl) {
     if io_state.power_cycle {
         nes.power_cycle();
     }
 
     if let Some(ref nes_file_path) = io_state.load_nes_file {
         load(nes, nes_file_path.as_str());
+    }
+
+    if let Some(ref speed) = io_state.speed {
+        match speed {
+            io::Speed::Half => io_control.target_fps = common::HALF_FPS,
+            io::Speed::Normal => io_control.target_fps = common::DEFAULT_FPS,
+            io::Speed::Double => io_control.target_fps = common::DOUBLE_FPS,
+            io::Speed::Increase => io_control.target_fps += 5,
+            io::Speed::Decrease => {
+                io_control.target_fps = std::cmp::max(0, io_control.target_fps as i32 - 5) as u16
+            }
+        }
     }
 }
 

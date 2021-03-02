@@ -8,12 +8,21 @@ pub const FRAME_HEIGHT: usize = 240;
 pub type RgbColor = (u8, u8, u8);
 const PIXEL_SIZE: usize = std::mem::size_of::<RgbColor>();
 
+pub enum Speed {
+    Half,
+    Normal,
+    Double,
+    Increase,
+    Decrease,
+}
+
 #[derive(Default)]
 pub struct IOState {
     pub quit: bool,
     pub power_cycle: bool,
     pub load_nes_file: Option<String>,
     pub pause: bool,
+    pub speed: Option<Speed>,
 }
 
 #[derive(Copy, Clone)]
