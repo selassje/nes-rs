@@ -10,10 +10,9 @@ use gl::types::*;
 use imgui::im_str;
 use io::SampleFormat;
 
-const SAMPLE_RATE: usize = 44100;
-const SAMPLE_RATE_ADJ: usize = (SAMPLE_RATE as f32 * 1.0000) as usize;
+const SAMPLING_RATE: usize = 44100;
 const INITIAL_SAMPLE_BUCKET_SIZE: f32 =
-    common::DEFAULT_FPS as f32 * common::CPU_CYCLES_PER_FRAME as f32 / SAMPLE_RATE_ADJ as f32;
+    (common::DEFAULT_FPS as f32 * common::CPU_CYCLES_PER_FRAME as f32) / SAMPLING_RATE as f32;
 const BUFFER_SIZE: usize = 2000;
 
 const DISPLAY_SCALING: usize = 2;
@@ -85,7 +84,7 @@ macro_rules! create_menu_item {
 }
 
 struct SampleBuffer {
-    index: usize,
+    size: usize,
     sum: f32,
     bucket_size: f32,
     target_bucket_size: f32,
@@ -116,13 +115,13 @@ type GuiFonts = [imgui::FontId; GuiFont::FontsCount as usize];
 
 impl SampleBuffer {
     fn add(&mut self, sample: io::SampleFormat) {
-        if 1.0 + self.bucket_size >= self.target_bucket_size && self.index < BUFFER_SIZE {
+        if 1.0 + self.bucket_size >= self.target_bucket_size && self.size < BUFFER_SIZE {
             let bucket_diff = self.target_bucket_size - self.bucket_size;
             let bucket_diff_comp = 1.0 - bucket_diff;
             self.sum += bucket_diff * sample;
             let target_sample = self.sum / self.target_bucket_size.floor();
-            self.buffer[self.index] = target_sample;
-            self.index += 1;
+            self.buffer[self.size] = target_sample;
+            self.size += 1;
             self.sum = bucket_diff_comp * sample;
             self.bucket_size = bucket_diff_comp;
         } else {
@@ -132,11 +131,11 @@ impl SampleBuffer {
     }
 
     fn reset(&mut self, fps: u16) {
-        self.index = 0;
+        self.size = 0;
         self.sum = 0.0;
         self.bucket_size = 0.0;
         self.target_bucket_size =
-            (fps * common::CPU_CYCLES_PER_FRAME) as f32 / SAMPLE_RATE_ADJ as f32;
+            (fps as f32 * common::CPU_CYCLES_PER_FRAME as f32) / SAMPLING_RATE as f32;
     }
 }
 
@@ -326,7 +325,7 @@ impl IOSdl2ImGuiOpenGl {
         let mut maybe_audio_queue = None;
         if let Ok(sdl_audio) = sdl_context.audio() {
             let desired_spec = sdl2::audio::AudioSpecDesired {
-                freq: Some(SAMPLE_RATE as i32),
+                freq: Some(SAMPLING_RATE as i32),
                 channels: Some(1),
                 samples: Some(BUFFER_SIZE as u16),
             };
@@ -390,7 +389,7 @@ impl IOSdl2ImGuiOpenGl {
         IOSdl2ImGuiOpenGl {
             io_internal: io_internal::IOInternal::new(),
             sample_buffer: SampleBuffer {
-                index: 0,
+                size: 0,
                 sum: 0.0,
                 bucket_size: 0.0,
                 buffer: [0.0; BUFFER_SIZE],
@@ -523,10 +522,10 @@ impl io::IO for IOSdl2ImGuiOpenGl {
             } else {
                 audio_queue.resume();
                 while audio_queue.size() as usize
-                    > std::mem::size_of::<SampleFormat>() * self.sample_buffer.index * 10
+                    > std::mem::size_of::<SampleFormat>() * self.sample_buffer.size * 10
                 {
                 }
-                audio_queue.queue(&self.sample_buffer.buffer[..self.sample_buffer.index]);
+                audio_queue.queue(&self.sample_buffer.buffer[..self.sample_buffer.size]);
                 self.sample_buffer.reset(control.target_fps);
             }
         }
