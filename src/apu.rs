@@ -148,14 +148,8 @@ impl SweepUnit {
         self.is_muting = false;
     }
 
-    fn get_target_period(
-        &self,
-        raw_period: u16,
-        current_period: u16,
-        shift: u8,
-        negate: bool,
-    ) -> u16 {
-        let change_amount = raw_period >> shift;
+    fn get_target_period(&self, current_period: u16, shift: u8, negate: bool) -> u16 {
+        let change_amount = current_period >> shift;
         if negate {
             if self.use_ones_complement {
                 (current_period as i32 - change_amount as i32 - 1) as u16
@@ -171,8 +165,8 @@ impl SweepUnit {
         self.is_muting = target_period > 0x7FF || current_period < 8;
     }
 
-    fn clock(&mut self, sweep_enabled: bool, sweep_period: u8) -> bool {
-        let adjust = self.divider == 0 && sweep_enabled && !self.is_muting;
+    fn clock(&mut self, sweep_enabled: bool, sweep_period: u8, shift: u8) -> bool {
+        let adjust = self.divider == 0 && sweep_enabled && shift != 0;
         if self.divider == 0 || self.reload_flag {
             self.divider = sweep_period;
             self.reload_flag = false;
@@ -216,9 +210,12 @@ impl PulseWave {
         self.sweep_unit.power_cycle();
     }
 
+    fn update_period(&mut self) {
+        self.current_period = self.get_raw_timer_period();
+    }
+
     fn reset_phase_and_units(&mut self) {
         self.sequencer_position = 0;
-        self.current_period = self.get_raw_timer_period();
         self.envelope.start_flag = true;
         self.sweep_unit.reload_flag = true;
     }
@@ -301,17 +298,17 @@ impl PulseWave {
         }
 
         let target_period = self.sweep_unit.get_target_period(
-            self.get_raw_timer_period(),
             self.current_period,
             self.get_sweep_shift(),
             self.is_sweep_negate_enabled(),
         );
         self.sweep_unit
             .update_muting_status(target_period, self.current_period);
-        if self
-            .sweep_unit
-            .clock(self.is_sweep_unit_enabled(), self.get_sweep_period())
-        {
+        if self.sweep_unit.clock(
+            self.is_sweep_unit_enabled(),
+            self.get_sweep_period(),
+            self.get_sweep_shift(),
+        ) {
             self.current_period = target_period;
         }
     }
@@ -888,9 +885,13 @@ impl WriteAcessRegisters for APU {
                 self.pulse_1.data[1] = value;
                 self.pulse_1.sweep_unit.reload_flag = true;
             }
-            WriteAccessRegister::Pulse1_2 => self.pulse_1.data[2] = value,
+            WriteAccessRegister::Pulse1_2 => {
+                self.pulse_1.data[2] = value;
+                self.pulse_1.update_period();
+            }
             WriteAccessRegister::Pulse1_3 => {
                 self.pulse_1.data[3] = value;
+                self.pulse_1.update_period();
                 self.pulse_1.reset_phase_and_units();
                 self.reload_length_counter_if_enabled(StatusRegisterFlag::Pulse1Enabled);
             }
@@ -900,9 +901,13 @@ impl WriteAcessRegisters for APU {
                 self.pulse_2.data[1] = value;
                 self.pulse_2.sweep_unit.reload_flag = true;
             }
-            WriteAccessRegister::Pulse2_2 => self.pulse_2.data[2] = value,
+            WriteAccessRegister::Pulse2_2 => {
+                self.pulse_2.data[2] = value;
+                self.pulse_2.update_period();
+            }
             WriteAccessRegister::Pulse2_3 => {
                 self.pulse_2.data[3] = value;
+                self.pulse_2.update_period();
                 self.pulse_2.reset_phase_and_units();
                 self.reload_length_counter_if_enabled(StatusRegisterFlag::Pulse2Enabled);
             }
