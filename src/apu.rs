@@ -125,21 +125,23 @@ impl Envelope {
     }
 }
 
+#[derive(Default)]
 struct SweepUnit {
+    enabled: bool,
     reload_flag: bool,
     divider: u8,
     use_ones_complement: bool,
+    period: u8,
+    shift: u8,
+    negate: bool,
     is_muting: bool,
 }
 
 impl SweepUnit {
     fn new(use_ones_complement: bool) -> Self {
-        SweepUnit {
-            reload_flag: false,
-            divider: 0,
-            use_ones_complement,
-            is_muting: false,
-        }
+        let mut sweep_unit = Self::default();
+        sweep_unit.use_ones_complement = use_ones_complement;
+        sweep_unit
     }
 
     fn power_cycle(&mut self) {
@@ -148,9 +150,9 @@ impl SweepUnit {
         self.is_muting = false;
     }
 
-    fn get_target_period(&self, current_period: u16, shift: u8, negate: bool) -> u16 {
-        let change_amount = current_period >> shift;
-        if negate {
+    fn get_target_period(&self, current_period: u16) -> u16 {
+        let change_amount = current_period >> self.shift;
+        if self.negate {
             if self.use_ones_complement {
                 (current_period as i32 - change_amount as i32 - 1) as u16
             } else {
@@ -165,15 +167,17 @@ impl SweepUnit {
         self.is_muting = target_period > 0x7FF || current_period < 8;
     }
 
-    fn clock(&mut self, sweep_enabled: bool, sweep_period: u8, shift: u8) -> bool {
-        let adjust = self.divider == 0 && sweep_enabled && shift != 0;
+    fn can_period_be_adjusted(&self) -> bool {
+        self.divider == 0 && self.enabled && self.shift != 0
+    }
+
+    fn clock(&mut self) {
         if self.divider == 0 || self.reload_flag {
-            self.divider = sweep_period;
+            self.divider = self.period;
             self.reload_flag = false;
         } else {
             self.divider -= 1;
         }
-        adjust
     }
 }
 
@@ -212,6 +216,14 @@ impl PulseWave {
 
     fn update_period(&mut self) {
         self.current_period = self.get_raw_timer_period();
+    }
+
+    fn update_sweep_unit(&mut self) {
+        self.sweep_unit.reload_flag = true;
+        self.sweep_unit.enabled = self.is_sweep_unit_enabled();
+        self.sweep_unit.period = self.get_sweep_period();
+        self.sweep_unit.shift = self.get_sweep_shift();
+        self.sweep_unit.negate = self.is_sweep_negate_enabled();
     }
 
     fn reset_phase_and_units(&mut self) {
@@ -297,20 +309,15 @@ impl PulseWave {
             self.length_counter -= 1;
         }
 
-        let target_period = self.sweep_unit.get_target_period(
-            self.current_period,
-            self.get_sweep_shift(),
-            self.is_sweep_negate_enabled(),
-        );
+        let target_period = self.sweep_unit.get_target_period(self.current_period);
         self.sweep_unit
             .update_muting_status(target_period, self.current_period);
-        if self.sweep_unit.clock(
-            self.is_sweep_unit_enabled(),
-            self.get_sweep_period(),
-            self.get_sweep_shift(),
-        ) {
+
+        if self.sweep_unit.can_period_be_adjusted() {
             self.current_period = target_period;
         }
+
+        self.sweep_unit.clock();
     }
 }
 
@@ -883,7 +890,7 @@ impl WriteAcessRegisters for APU {
             WriteAccessRegister::Pulse1_0 => self.pulse_1.data[0] = value,
             WriteAccessRegister::Pulse1_1 => {
                 self.pulse_1.data[1] = value;
-                self.pulse_1.sweep_unit.reload_flag = true;
+                self.pulse_1.update_sweep_unit();
             }
             WriteAccessRegister::Pulse1_2 => {
                 self.pulse_1.data[2] = value;
@@ -899,7 +906,7 @@ impl WriteAcessRegisters for APU {
             WriteAccessRegister::Pulse2_0 => self.pulse_2.data[0] = value,
             WriteAccessRegister::Pulse2_1 => {
                 self.pulse_2.data[1] = value;
-                self.pulse_2.sweep_unit.reload_flag = true;
+                self.pulse_2.update_sweep_unit();
             }
             WriteAccessRegister::Pulse2_2 => {
                 self.pulse_2.data[2] = value;
