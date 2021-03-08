@@ -1,6 +1,6 @@
 mod gui_builder;
-
-use gui_builder::MenuBarItem;
+mod keyboard_shortcuts;
+mod keycode_to_sdl2_scancode;
 
 use std::collections::HashMap;
 use std::default::Default;
@@ -57,14 +57,18 @@ impl SampleBuffer {
     }
 }
 
-#[derive(Clone, Copy, Default)]
-struct KeyboardShortCuts {
-    load_nes_file: bool,
-    power_cycle: bool,
-    quit: bool,
-    pause: bool,
-    speed_increase: bool,
-    speed_decrease: bool,
+#[derive(Copy, Clone, PartialEq)]
+pub enum MenuBarItem {
+    LoadNesFile,
+    Quit,
+    PowerCycle,
+    Pause,
+    SpeedNormal,
+    SpeedDouble,
+    SpeedHalf,
+    SpeedIncrease,
+    SpeedDecrease,
+    None,
 }
 
 pub struct IOSdl2ImGuiOpenGl {
@@ -79,30 +83,7 @@ pub struct IOSdl2ImGuiOpenGl {
     renderer: imgui_opengl_renderer::Renderer,
     _gl_context: sdl2::video::GLContext,
     gui_builder: gui_builder::GuiBuilder,
-    keyboard_shortcuts: KeyboardShortCuts,
-}
-
-fn keycode_to_sdl2_scancode(key: io::KeyCode) -> sdl2::keyboard::Scancode {
-    use io::KeyCode;
-    use sdl2::keyboard::Scancode;
-    match key {
-        KeyCode::Q => Scancode::Q,
-        KeyCode::E => Scancode::E,
-        KeyCode::C => Scancode::C,
-        KeyCode::Space => Scancode::Space,
-        KeyCode::W => Scancode::W,
-        KeyCode::S => Scancode::S,
-        KeyCode::A => Scancode::A,
-        KeyCode::D => Scancode::D,
-        KeyCode::Kp4 => Scancode::Kp4,
-        KeyCode::Kp5 => Scancode::Kp5,
-        KeyCode::Kp6 => Scancode::Kp6,
-        KeyCode::KpPlus => Scancode::KpPlus,
-        KeyCode::Up => Scancode::Up,
-        KeyCode::Down => Scancode::Down,
-        KeyCode::Left => Scancode::Left,
-        KeyCode::Right => Scancode::Right,
-    }
+    keyboard_shortcuts: keyboard_shortcuts::KeyboardShortcuts,
 }
 
 impl IOSdl2ImGuiOpenGl {
@@ -174,6 +155,7 @@ impl IOSdl2ImGuiOpenGl {
 
         let gui_builder =
             gui_builder::GuiBuilder::new(imgui::TextureId::from(emulation_texture as usize), fonts);
+
         IOSdl2ImGuiOpenGl {
             io_internal: io_internal::IOInternal::new(),
             sample_buffer: SampleBuffer {
@@ -197,44 +179,20 @@ impl IOSdl2ImGuiOpenGl {
     }
 
     fn update_io_state(&mut self, io_state: &mut io::IOState) {
-        io_state.quit |= self.keyboard_shortcuts.quit
-            || self
-                .gui_builder
-                .is_menu_bar_item_selected(MenuBarItem::Quit);
-        io_state.power_cycle = self.keyboard_shortcuts.power_cycle
-            || self
-                .gui_builder
-                .is_menu_bar_item_selected(MenuBarItem::PowerCycle);
-        self.gui_builder.choose_nes_file = self.keyboard_shortcuts.load_nes_file
-            || self
-                .gui_builder
-                .is_menu_bar_item_selected(MenuBarItem::LoadNesFile);
-
+        io_state.quit = self.is_menu_bar_item_selected(MenuBarItem::Quit);
+        io_state.power_cycle = self.is_menu_bar_item_selected(MenuBarItem::PowerCycle);
+        self.gui_builder.choose_nes_file = self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile);
         io_state.speed = None;
-        if self.keyboard_shortcuts.speed_increase
-            || self
-                .gui_builder
-                .is_menu_bar_item_selected(MenuBarItem::SpeedIncrease)
-        {
+        if self.is_menu_bar_item_selected(MenuBarItem::SpeedIncrease) {
             io_state.speed = Some(io::Speed::Increase);
         }
-        if self.keyboard_shortcuts.speed_decrease
-            || self
-                .gui_builder
-                .is_menu_bar_item_selected(MenuBarItem::SpeedDecrease)
-        {
+        if self.is_menu_bar_item_selected(MenuBarItem::SpeedDecrease) {
             io_state.speed = Some(io::Speed::Decrease);
         }
-        if self
-            .gui_builder
-            .is_menu_bar_item_selected(MenuBarItem::SpeedNormal)
-        {
+        if self.is_menu_bar_item_selected(MenuBarItem::SpeedNormal) {
             io_state.speed = Some(io::Speed::Normal)
         }
-        if self
-            .gui_builder
-            .is_menu_bar_item_selected(MenuBarItem::SpeedDouble)
-        {
+        if self.is_menu_bar_item_selected(MenuBarItem::SpeedDouble) {
             io_state.speed = Some(io::Speed::Double)
         }
         if self
@@ -244,22 +202,17 @@ impl IOSdl2ImGuiOpenGl {
             io_state.speed = Some(io::Speed::Half)
         }
 
-        if self.keyboard_shortcuts.pause
-            || self
-                .gui_builder
-                .is_menu_bar_item_selected(MenuBarItem::Pause)
-        {
+        if self.is_menu_bar_item_selected(MenuBarItem::Pause) {
             io_state.pause = !self.gui_builder.paused;
         } else {
             io_state.pause = self.gui_builder.paused;
         }
-
         io_state.pause |= self.gui_builder.choose_nes_file;
     }
 
     fn check_for_keyboard_shortcuts(
         event: &sdl2::event::Event,
-        keyboard_shortcuts: &mut KeyboardShortCuts,
+        keyboard_shortcuts: &mut keyboard_shortcuts::KeyboardShortcuts,
     ) {
         use sdl2::keyboard::Scancode;
         match *event {
@@ -268,19 +221,17 @@ impl IOSdl2ImGuiOpenGl {
             } => {
                 if let Some(scancode) = scancode {
                     if scancode == Scancode::Escape {
-                        keyboard_shortcuts.quit = true;
-                    }
-                    if sdl2::keyboard::Mod::LCTRLMOD & keymod == sdl2::keyboard::Mod::LCTRLMOD {
-                        keyboard_shortcuts.power_cycle = scancode == Scancode::R;
-                        keyboard_shortcuts.load_nes_file = scancode == Scancode::O;
-                        keyboard_shortcuts.pause = scancode == Scancode::P;
-                        keyboard_shortcuts.speed_increase = scancode == Scancode::Equals;
-                        keyboard_shortcuts.speed_decrease = scancode == Scancode::Minus;
+                        keyboard_shortcuts.update(scancode, keymod)
                     }
                 }
             }
             _ => {}
         }
+    }
+
+    fn is_menu_bar_item_selected(&self, item: MenuBarItem) -> bool {
+        self.keyboard_shortcuts.is_menu_bar_item_selected(item)
+            || self.gui_builder.is_menu_bar_item_selected(item)
     }
 }
 
@@ -370,7 +321,7 @@ impl io::AudioAccess for IOSdl2ImGuiOpenGl {
 
 impl io::KeyboardAccess for IOSdl2ImGuiOpenGl {
     fn is_key_pressed(&self, key: io::KeyCode) -> bool {
-        let sdl2_scancode = keycode_to_sdl2_scancode(key);
+        let sdl2_scancode = keycode_to_sdl2_scancode::keycode_to_sdl2_scancode(key);
         let key_state = self.keyboard_state.get(&sdl2_scancode);
         *key_state.unwrap_or(&false)
     }

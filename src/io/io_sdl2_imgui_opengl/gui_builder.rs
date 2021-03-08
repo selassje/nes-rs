@@ -1,6 +1,6 @@
 use imgui::im_str;
 
-use super::{DISPLAY_HEIGHT, DISPLAY_WIDTH, MENU_BAR_HEIGHT};
+use super::{MenuBarItem, DISPLAY_HEIGHT, DISPLAY_WIDTH, MENU_BAR_HEIGHT};
 use crate::common;
 
 macro_rules! add_font_from_ttf {
@@ -65,19 +65,6 @@ macro_rules! create_menu_item {
             .enabled(true)
             .shortcut(im_str!($shortcut))
     }};
-}
-#[derive(PartialEq)]
-pub(super) enum MenuBarItem {
-    LoadNesFile,
-    Quit,
-    PowerCycle,
-    Pause,
-    SpeedNormal,
-    SpeedDouble,
-    SpeedHalf,
-    SpeedIncrease,
-    SpeedDecrease,
-    None,
 }
 enum GuiFont {
     _Default = 0,
