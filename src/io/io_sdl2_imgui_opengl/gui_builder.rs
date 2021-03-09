@@ -3,7 +3,7 @@ use std::ops::RangeInclusive;
 use imgui::im_str;
 
 use super::{MenuBarItem, DISPLAY_HEIGHT, DISPLAY_WIDTH, MENU_BAR_HEIGHT};
-use crate::{common, io::IOControl};
+use crate::{common, io::IOCommon};
 
 macro_rules! add_font_from_ttf {
     ($font_path:literal,$size:expr, $imgui:ident) => {{
@@ -94,7 +94,7 @@ pub(super) struct GuiBuilder {
     emulation_texture: imgui::TextureId,
     fonts: GuiFonts,
     menu_bar_item_selected: [bool; MenuBarItem::None as usize],
-    io_control: IOControl,
+    io_common: IOCommon,
     rom_path: Option<String>,
 }
 
@@ -105,22 +105,22 @@ impl GuiBuilder {
             menu_bar_item_selected: Default::default(),
             fonts,
             rom_path: None,
-            io_control: Default::default(),
+            io_common: Default::default(),
         }
     }
 
-    pub fn get_io_control(&self) -> IOControl {
-        self.io_control
+    pub fn get_io_common(&self) -> IOCommon {
+        self.io_common
     }
 
     pub fn get_rom_path(&mut self) -> Option<String> {
         self.rom_path.take()
     }
 
-    pub fn prepare_for_new_frame(&mut self, io_control: IOControl) {
+    pub fn prepare_for_new_frame(&mut self, io_control: IOCommon) {
         self.menu_bar_item_selected = Default::default();
         self.rom_path = None;
-        self.io_control = io_control;
+        self.io_common = io_control;
     }
 
     pub fn is_menu_bar_item_selected(&self, item: MenuBarItem) -> bool {
@@ -139,7 +139,7 @@ impl GuiBuilder {
                 with_token!(
                     ui,
                     begin_menu,
-                    (im_str!("File"), !self.io_control.choose_nes_file),
+                    (im_str!("File"), !self.io_common.choose_nes_file),
                     {
                         create_menu_item!("Load Nes File", "Ctrl + O").build(ui);
                         self.update_menu_item_status(ui, LoadNesFile);
@@ -155,7 +155,7 @@ impl GuiBuilder {
                     self.update_menu_item_status(ui, PowerCycle);
 
                     create_menu_item!("Pause", "Ctrl + P")
-                        .selected(self.io_control.pause)
+                        .selected(self.io_common.pause)
                         .build(ui);
                     self.update_menu_item_status(ui, Pause);
 
@@ -185,7 +185,7 @@ impl GuiBuilder {
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("Audio"), true), {
                     create_menu_item!("Enabled", "Ctrl + A")
-                        .selected(self.io_control.audio_enabled)
+                        .selected(self.io_common.audio_enabled)
                         .build(ui);
                     self.update_menu_item_status(ui, AudioEnabled);
 
@@ -198,7 +198,7 @@ impl GuiBuilder {
                             imgui::Slider::new(im_str!("Volume"))
                                 .range(range)
                                 .display_format(im_str!("%d%%"))
-                                .build(ui, &mut self.io_control.volume);
+                                .build(ui, &mut self.io_common.volume);
                         })
                 });
             });
@@ -266,9 +266,9 @@ impl GuiBuilder {
                 self.build_menu_bar_and_check_for_mouse_events(target_fps, &mut ui);
                 self.build_emulation_window(&mut ui);
                 self.build_fps_counter(current_fps, target_fps, &mut ui);
-                if self.io_control.choose_nes_file {
+                if self.io_common.choose_nes_file {
                     self.build_load_nes_file_explorer();
-                    self.io_control.pause = false;
+                    self.io_common.pause = false;
                 }
             }
         );

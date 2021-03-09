@@ -16,26 +16,28 @@ pub enum Speed {
     Decrease,
 }
 
+#[derive(Copy, Clone, Default)]
+pub struct IOCommon {
+    pub pause: bool,
+    pub audio_enabled: bool,
+    pub choose_nes_file: bool,
+    pub volume: u8,
+}
+
 #[derive(Default)]
 pub struct IOState {
+    pub common: IOCommon,
     pub quit: bool,
     pub power_cycle: bool,
     pub load_nes_file: Option<String>,
-    pub choose_nes_file: bool,
-    pub pause: bool,
     pub speed: Option<Speed>,
-    pub audio_enabled: bool,
-    pub volume: u8,
 }
 
 #[derive(Copy, Clone, Default)]
 pub struct IOControl {
+    pub common: IOCommon,
     pub target_fps: u16,
     pub current_fps: u16,
-    pub pause: bool,
-    pub audio_enabled: bool,
-    pub choose_nes_file: bool,
-    pub volume: u8,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]

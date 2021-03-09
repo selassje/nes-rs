@@ -134,47 +134,38 @@ impl IOSdl2ImGuiOpenGl {
     }
 
     fn update_io_state(&mut self, io_state: &mut io::IOState) {
+        let io_common = self.gui_builder.get_io_common();
+
         io_state.quit |= self.is_menu_bar_item_selected(MenuBarItem::Quit);
         io_state.power_cycle = self.is_menu_bar_item_selected(MenuBarItem::PowerCycle);
-        io_state.choose_nes_file = self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile);
+        io_state.common.choose_nes_file = self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile);
         io_state.load_nes_file = self.gui_builder.get_rom_path();
+        io_state.common.volume = io_common.volume;
 
         io_state.speed = None;
-        if self.is_menu_bar_item_selected(MenuBarItem::SpeedIncrease) {
-            io_state.speed = Some(io::Speed::Increase);
-        }
-        if self.is_menu_bar_item_selected(MenuBarItem::SpeedDecrease) {
-            io_state.speed = Some(io::Speed::Decrease);
-        }
-        if self.is_menu_bar_item_selected(MenuBarItem::SpeedNormal) {
-            io_state.speed = Some(io::Speed::Normal)
-        }
-        if self.is_menu_bar_item_selected(MenuBarItem::SpeedDouble) {
-            io_state.speed = Some(io::Speed::Double)
-        }
-        if self
-            .gui_builder
-            .is_menu_bar_item_selected(MenuBarItem::SpeedHalf)
-        {
-            io_state.speed = Some(io::Speed::Half)
-        }
+        let mut set_speed_selection = |item: MenuBarItem, speed: io::Speed| {
+            if self.is_menu_bar_item_selected(item) {
+                io_state.speed = Some(speed)
+            }
+        };
+        set_speed_selection(MenuBarItem::SpeedIncrease, io::Speed::Increase);
+        set_speed_selection(MenuBarItem::SpeedDecrease, io::Speed::Decrease);
+        set_speed_selection(MenuBarItem::SpeedNormal, io::Speed::Normal);
+        set_speed_selection(MenuBarItem::SpeedHalf, io::Speed::Half);
+        set_speed_selection(MenuBarItem::SpeedDouble, io::Speed::Double);
 
-        let io_control = self.gui_builder.get_io_control();
+        let toggle = |item: MenuBarItem, value: bool| {
+            if self.is_menu_bar_item_selected(item) {
+                !value
+            } else {
+                value
+            }
+        };
 
-        if self.is_menu_bar_item_selected(MenuBarItem::Pause) {
-            io_state.pause = !io_control.pause;
-        } else {
-            io_state.pause = io_control.pause;
-        }
+        io_state.common.pause = toggle(MenuBarItem::Pause, io_common.pause);
+        io_state.common.audio_enabled = toggle(MenuBarItem::AudioEnabled, io_common.audio_enabled);
 
-        io_state.pause |= io_state.choose_nes_file;
-
-        if self.is_menu_bar_item_selected(MenuBarItem::AudioEnabled) {
-            io_state.audio_enabled = !io_control.audio_enabled;
-        } else {
-            io_state.audio_enabled = io_control.audio_enabled;
-        }
-        io_state.volume = io_control.volume;
+        io_state.common.pause |= io_state.common.choose_nes_file;
     }
 
     fn check_for_keyboard_shortcuts(
@@ -202,7 +193,7 @@ impl IOSdl2ImGuiOpenGl {
 impl io::IO for IOSdl2ImGuiOpenGl {
     fn present_frame(&mut self, control: io::IOControl) -> io::IOState {
         let mut io_state: io::IOState = Default::default();
-        self.gui_builder.prepare_for_new_frame(control);
+        self.gui_builder.prepare_for_new_frame(control.common);
         self.keyboard_shortcuts = Default::default();
 
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
@@ -218,14 +209,14 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         }
 
         if let Some(ref audio_queue) = self.maybe_audio_queue {
-            if control.pause {
+            if control.common.pause {
                 audio_queue.pause();
             } else {
                 audio_queue.resume();
                 while audio_queue.size() as usize > self.sample_buffer.get_byte_size() * 10 {}
                 audio_queue.queue(&self.sample_buffer.get_samples());
-                let volume = if control.audio_enabled {
-                    control.volume as f32 / 100.0
+                let volume = if control.common.audio_enabled {
+                    control.common.volume as f32 / 100.0
                 } else {
                     0.0
                 };

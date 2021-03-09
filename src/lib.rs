@@ -1,6 +1,6 @@
 use std::{cell::RefCell, env, fs::File, io::Read, rc::Rc};
 
-use io::{IOControl, IO};
+use io::IO;
 
 mod apu;
 mod colors;
@@ -72,16 +72,18 @@ pub fn run() {
     let mut io_control = io::IOControl {
         target_fps: common::DEFAULT_FPS as u16,
         current_fps: 0,
-        pause: false,
-        audio_enabled: true,
-        choose_nes_file: false,
-        volume: 100,
+        common: io::IOCommon {
+            pause: false,
+            audio_enabled: true,
+            choose_nes_file: false,
+            volume: 100,
+        },
     };
 
     let is_audio_available = io.borrow().is_audio_available();
 
     while !io_state.quit {
-        if !io_state.pause {
+        if !io_state.common.pause {
             nes.run_single_frame();
             if one_second_timer.elapsed() < std::time::Duration::from_secs(1) {
                 fps += 1;
@@ -95,7 +97,7 @@ pub fn run() {
 
         handle_io_state(&mut nes, &io_state, &mut io_control);
 
-        if !io_state.pause {
+        if !io_state.common.pause {
             let elapsed_time_since_frame_start = frame_start.elapsed();
             if !is_audio_available {
                 if elapsed_time_since_frame_start < frame_duration {
@@ -107,11 +109,8 @@ pub fn run() {
     }
 }
 
-fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut IOControl) {
-    io_control.pause = io_state.pause;
-    io_control.audio_enabled = io_state.audio_enabled;
-    io_control.choose_nes_file = io_state.choose_nes_file;
-    io_control.volume = io_state.volume;
+fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut io::IOControl) {
+    io_control.common = io_state.common;
 
     if io_state.power_cycle {
         nes.power_cycle();
