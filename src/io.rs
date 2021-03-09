@@ -25,6 +25,7 @@ pub struct IOState {
     pub pause: bool,
     pub speed: Option<Speed>,
     pub audio_enabled: bool,
+    pub volume: u8,
 }
 
 #[derive(Copy, Clone, Default)]
@@ -34,6 +35,7 @@ pub struct IOControl {
     pub pause: bool,
     pub audio_enabled: bool,
     pub choose_nes_file: bool,
+    pub volume: u8,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]

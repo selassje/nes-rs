@@ -1,3 +1,5 @@
+use std::ops::RangeInclusive;
+
 use imgui::im_str;
 
 use super::{MenuBarItem, DISPLAY_HEIGHT, DISPLAY_WIDTH, MENU_BAR_HEIGHT};
@@ -179,13 +181,25 @@ impl GuiBuilder {
                     });
                 });
             });
+            ui.set_next_item_width(100.0);
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("Audio"), true), {
                     create_menu_item!("Enabled", "Ctrl + A")
                         .selected(self.io_control.audio_enabled)
                         .build(ui);
                     self.update_menu_item_status(ui, AudioEnabled);
-                    create_menu_item!("Volume", "Esc").build(ui);
+
+                    imgui::ChildWindow::new("child")
+                        .size([190.0, ui.current_font_size() + 3.0])
+                        .border(false)
+                        .scroll_bar(false)
+                        .build(ui, || {
+                            let range = RangeInclusive::new(0, 100);
+                            imgui::Slider::new(im_str!("Volume"))
+                                .range(range)
+                                .display_format(im_str!("%d%%"))
+                                .build(ui, &mut self.io_control.volume);
+                        })
                 });
             });
         });

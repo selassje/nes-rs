@@ -134,7 +134,7 @@ impl IOSdl2ImGuiOpenGl {
     }
 
     fn update_io_state(&mut self, io_state: &mut io::IOState) {
-        io_state.quit = self.is_menu_bar_item_selected(MenuBarItem::Quit);
+        io_state.quit |= self.is_menu_bar_item_selected(MenuBarItem::Quit);
         io_state.power_cycle = self.is_menu_bar_item_selected(MenuBarItem::PowerCycle);
         io_state.choose_nes_file = self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile);
         io_state.load_nes_file = self.gui_builder.get_rom_path();
@@ -174,6 +174,7 @@ impl IOSdl2ImGuiOpenGl {
         } else {
             io_state.audio_enabled = io_control.audio_enabled;
         }
+        io_state.volume = io_control.volume;
     }
 
     fn check_for_keyboard_shortcuts(
@@ -223,7 +224,11 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 audio_queue.resume();
                 while audio_queue.size() as usize > self.sample_buffer.get_byte_size() * 10 {}
                 audio_queue.queue(&self.sample_buffer.get_samples());
-                let volume = if control.audio_enabled { 1.0 } else { 0.0 };
+                let volume = if control.audio_enabled {
+                    control.volume as f32 / 100.0
+                } else {
+                    0.0
+                };
                 self.sample_buffer.reset(control.target_fps, volume);
             }
         }
@@ -248,7 +253,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         );
 
         let mut ui = self.imgui.frame();
-        //ui.show_demo_window(&mut true);
+
         self.imgui_sdl2.prepare_render(&ui, &self.window);
 
         self.gui_builder

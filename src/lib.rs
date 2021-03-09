@@ -75,6 +75,7 @@ pub fn run() {
         pause: false,
         audio_enabled: true,
         choose_nes_file: false,
+        volume: 100,
     };
 
     let is_audio_available = io.borrow().is_audio_available();
@@ -110,6 +111,7 @@ fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut 
     io_control.pause = io_state.pause;
     io_control.audio_enabled = io_state.audio_enabled;
     io_control.choose_nes_file = io_state.choose_nes_file;
+    io_control.volume = io_state.volume;
 
     if io_state.power_cycle {
         nes.power_cycle();
