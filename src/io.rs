@@ -2,7 +2,7 @@ mod io_internal;
 pub mod io_sdl2_imgui_opengl;
 pub mod io_test;
 
-pub type SampleFormat = f32;
+pub type AudioSampleFormat = f32;
 pub const FRAME_WIDTH: usize = 256;
 pub const FRAME_HEIGHT: usize = 240;
 pub type RgbColor = (u8, u8, u8);
@@ -53,7 +53,7 @@ pub enum KeyCode {
 }
 
 pub trait AudioAccess {
-    fn add_sample(&mut self, sample: SampleFormat);
+    fn add_sample(&mut self, sample: AudioSampleFormat);
 }
 
 pub trait VideoAccess {

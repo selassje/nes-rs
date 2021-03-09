@@ -61,7 +61,7 @@ impl IO for IOTest {
 }
 
 impl AudioAccess for IOTest {
-    fn add_sample(&mut self, _: crate::io::SampleFormat) {}
+    fn add_sample(&mut self, _: crate::io::AudioSampleFormat) {}
 }
 
 impl VideoAccess for IOTest {

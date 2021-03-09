@@ -1,3 +1,4 @@
+mod audio_sample_buffer;
 mod gui_builder;
 mod keyboard_shortcuts;
 mod keycode_to_sdl2_scancode;
@@ -7,55 +8,14 @@ use std::default::Default;
 use std::iter::FromIterator;
 
 use super::io_internal;
-use crate::common;
 use crate::io;
 
 use gl::types::*;
-use io::SampleFormat;
-
-const SAMPLING_RATE: usize = 44100;
-const INITIAL_SAMPLE_BUCKET_SIZE: f32 =
-    (common::DEFAULT_FPS as f32 * common::CPU_CYCLES_PER_FRAME as f32) / SAMPLING_RATE as f32;
-const BUFFER_SIZE: usize = 2000;
 
 const DISPLAY_SCALING: usize = 2;
 const DISPLAY_WIDTH: usize = DISPLAY_SCALING * io::FRAME_WIDTH;
 const DISPLAY_HEIGHT: usize = DISPLAY_SCALING * io::FRAME_HEIGHT;
 const MENU_BAR_HEIGHT: usize = 18;
-
-struct SampleBuffer {
-    size: usize,
-    sum: f32,
-    bucket_size: f32,
-    target_bucket_size: f32,
-    buffer: [io::SampleFormat; BUFFER_SIZE],
-}
-
-impl SampleBuffer {
-    fn add(&mut self, sample: io::SampleFormat) {
-        if 1.0 + self.bucket_size >= self.target_bucket_size && self.size < BUFFER_SIZE {
-            let bucket_diff = self.target_bucket_size - self.bucket_size;
-            let bucket_diff_comp = 1.0 - bucket_diff;
-            self.sum += bucket_diff * sample;
-            let target_sample = self.sum / self.target_bucket_size.floor();
-            self.buffer[self.size] = target_sample;
-            self.size += 1;
-            self.sum = bucket_diff_comp * sample;
-            self.bucket_size = bucket_diff_comp;
-        } else {
-            self.sum += sample;
-            self.bucket_size += 1.0;
-        }
-    }
-
-    fn reset(&mut self, fps: u16) {
-        self.size = 0;
-        self.sum = 0.0;
-        self.bucket_size = 0.0;
-        self.target_bucket_size =
-            (fps as f32 * common::CPU_CYCLES_PER_FRAME as f32) / SAMPLING_RATE as f32;
-    }
-}
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum MenuBarItem {
@@ -73,8 +33,8 @@ pub enum MenuBarItem {
 
 pub struct IOSdl2ImGuiOpenGl {
     io_internal: io_internal::IOInternal,
-    sample_buffer: SampleBuffer,
-    maybe_audio_queue: Option<sdl2::audio::AudioQueue<io::SampleFormat>>,
+    sample_buffer: audio_sample_buffer::AudioSampleBuffer,
+    maybe_audio_queue: Option<sdl2::audio::AudioQueue<io::AudioSampleFormat>>,
     events: sdl2::EventPump,
     keyboard_state: HashMap<sdl2::keyboard::Scancode, bool>,
     imgui: imgui::Context,
@@ -92,9 +52,9 @@ impl IOSdl2ImGuiOpenGl {
         let mut maybe_audio_queue = None;
         if let Ok(sdl_audio) = sdl_context.audio() {
             let desired_spec = sdl2::audio::AudioSpecDesired {
-                freq: Some(SAMPLING_RATE as i32),
+                freq: Some(audio_sample_buffer::SAMPLING_RATE as i32),
                 channels: Some(1),
-                samples: Some(BUFFER_SIZE as u16),
+                samples: Some(audio_sample_buffer::BUFFER_SIZE as u16),
             };
             let audio_queue = sdl_audio.open_queue(None, &desired_spec).unwrap();
             audio_queue.resume();
@@ -158,13 +118,7 @@ impl IOSdl2ImGuiOpenGl {
 
         IOSdl2ImGuiOpenGl {
             io_internal: io_internal::IOInternal::new(),
-            sample_buffer: SampleBuffer {
-                size: 0,
-                sum: 0.0,
-                bucket_size: 0.0,
-                buffer: [0.0; BUFFER_SIZE],
-                target_bucket_size: INITIAL_SAMPLE_BUCKET_SIZE,
-            },
+            sample_buffer: audio_sample_buffer::AudioSampleBuffer::new(),
             maybe_audio_queue: maybe_audio_queue,
             events,
             keyboard_state: HashMap::new(),
@@ -214,15 +168,12 @@ impl IOSdl2ImGuiOpenGl {
         event: &sdl2::event::Event,
         keyboard_shortcuts: &mut keyboard_shortcuts::KeyboardShortcuts,
     ) {
-        use sdl2::keyboard::Scancode;
         match *event {
             sdl2::event::Event::KeyDown {
                 scancode, keymod, ..
             } => {
                 if let Some(scancode) = scancode {
-                    if scancode == Scancode::Escape {
-                        keyboard_shortcuts.update(scancode, keymod)
-                    }
+                    keyboard_shortcuts.update(scancode, keymod)
                 }
             }
             _ => {}
@@ -258,11 +209,8 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 audio_queue.pause();
             } else {
                 audio_queue.resume();
-                while audio_queue.size() as usize
-                    > std::mem::size_of::<SampleFormat>() * self.sample_buffer.size * 10
-                {
-                }
-                audio_queue.queue(&self.sample_buffer.buffer[..self.sample_buffer.size]);
+                while audio_queue.size() as usize > self.sample_buffer.get_byte_size() * 10 {}
+                audio_queue.queue(&self.sample_buffer.get_samples());
                 self.sample_buffer.reset(control.target_fps);
             }
         }
@@ -314,7 +262,7 @@ impl io::VideoAccess for IOSdl2ImGuiOpenGl {
 }
 
 impl io::AudioAccess for IOSdl2ImGuiOpenGl {
-    fn add_sample(&mut self, sample: io::SampleFormat) {
+    fn add_sample(&mut self, sample: io::AudioSampleFormat) {
         self.sample_buffer.add(sample);
     }
 }

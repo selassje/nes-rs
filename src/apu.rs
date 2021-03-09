@@ -2,7 +2,7 @@ use self::StatusRegisterFlag::*;
 use crate::{cpu_apu::ApuState, io::AudioAccess, memory::DmcMemory, ram_apu::*};
 use std::{cell::RefCell, default::Default, rc::Rc};
 
-use crate::io::SampleFormat;
+use crate::io::AudioSampleFormat;
 
 const LENGTH_COUNTER_LOOKUP_TABLE: [u8; 32] = [
     10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22,
@@ -837,7 +837,7 @@ impl APU {
         triangle: u8,
         noise: u8,
         dmc: u8,
-    ) -> SampleFormat {
+    ) -> AudioSampleFormat {
         let mut n = pulse_1 + pulse_2;
         let puls_out = if n != 0 {
             95.52 / ((8128.0 / (n as f32)) + 100.0)
@@ -850,7 +850,7 @@ impl APU {
         } else {
             0.0
         };
-        (puls_out + tnd_out) as SampleFormat
+        (puls_out + tnd_out) as AudioSampleFormat
     }
 
     fn is_half_frame_reached(&self) -> bool {
