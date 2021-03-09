@@ -16,6 +16,7 @@ fn shortcut_to_menu_bar_item(key: KeyboardShortcut) -> Option<MenuBarItem> {
         LeftCtrl(Scancode::P) => Some(MenuBarItem::Pause),
         LeftCtrl(Scancode::Equals) => Some(MenuBarItem::SpeedIncrease),
         LeftCtrl(Scancode::Minus) => Some(MenuBarItem::SpeedDecrease),
+        LeftCtrl(Scancode::A) => Some(MenuBarItem::AudioEnabled),
         _ => None,
     }
 }

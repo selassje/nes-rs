@@ -28,6 +28,7 @@ pub enum MenuBarItem {
     SpeedHalf,
     SpeedIncrease,
     SpeedDecrease,
+    AudioEnabled,
     None,
 }
 
@@ -135,7 +136,9 @@ impl IOSdl2ImGuiOpenGl {
     fn update_io_state(&mut self, io_state: &mut io::IOState) {
         io_state.quit = self.is_menu_bar_item_selected(MenuBarItem::Quit);
         io_state.power_cycle = self.is_menu_bar_item_selected(MenuBarItem::PowerCycle);
-        self.gui_builder.choose_nes_file = self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile);
+        io_state.choose_nes_file = self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile);
+        io_state.load_nes_file = self.gui_builder.get_rom_path();
+
         io_state.speed = None;
         if self.is_menu_bar_item_selected(MenuBarItem::SpeedIncrease) {
             io_state.speed = Some(io::Speed::Increase);
@@ -156,12 +159,21 @@ impl IOSdl2ImGuiOpenGl {
             io_state.speed = Some(io::Speed::Half)
         }
 
+        let io_control = self.gui_builder.get_io_control();
+
         if self.is_menu_bar_item_selected(MenuBarItem::Pause) {
-            io_state.pause = !self.gui_builder.paused;
+            io_state.pause = !io_control.pause;
         } else {
-            io_state.pause = self.gui_builder.paused;
+            io_state.pause = io_control.pause;
         }
-        io_state.pause |= self.gui_builder.choose_nes_file;
+
+        io_state.pause |= io_state.choose_nes_file;
+
+        if self.is_menu_bar_item_selected(MenuBarItem::AudioEnabled) {
+            io_state.audio_enabled = !io_control.audio_enabled;
+        } else {
+            io_state.audio_enabled = io_control.audio_enabled;
+        }
     }
 
     fn check_for_keyboard_shortcuts(
@@ -189,7 +201,7 @@ impl IOSdl2ImGuiOpenGl {
 impl io::IO for IOSdl2ImGuiOpenGl {
     fn present_frame(&mut self, control: io::IOControl) -> io::IOState {
         let mut io_state: io::IOState = Default::default();
-        self.gui_builder.prepare_for_new_frame(control.pause);
+        self.gui_builder.prepare_for_new_frame(control);
         self.keyboard_shortcuts = Default::default();
 
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
@@ -211,7 +223,8 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 audio_queue.resume();
                 while audio_queue.size() as usize > self.sample_buffer.get_byte_size() * 10 {}
                 audio_queue.queue(&self.sample_buffer.get_samples());
-                self.sample_buffer.reset(control.target_fps);
+                let volume = if control.audio_enabled { 1.0 } else { 0.0 };
+                self.sample_buffer.reset(control.target_fps, volume);
             }
         }
         unsafe {
@@ -240,8 +253,6 @@ impl io::IO for IOSdl2ImGuiOpenGl {
 
         self.gui_builder
             .build(control.current_fps, control.target_fps, &mut ui);
-
-        io_state.load_nes_file = self.gui_builder.rom_path.take();
 
         self.renderer.render(ui);
         self.update_io_state(&mut io_state);

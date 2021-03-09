@@ -73,6 +73,8 @@ pub fn run() {
         target_fps: common::DEFAULT_FPS as u16,
         current_fps: 0,
         pause: false,
+        audio_enabled: true,
+        choose_nes_file: false,
     };
 
     let is_audio_available = io.borrow().is_audio_available();
@@ -89,7 +91,6 @@ pub fn run() {
             }
         }
         io_state = io.borrow_mut().present_frame(io_control);
-        io_control.pause = io_state.pause;
 
         handle_io_state(&mut nes, &io_state, &mut io_control);
 
@@ -106,6 +107,10 @@ pub fn run() {
 }
 
 fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut IOControl) {
+    io_control.pause = io_state.pause;
+    io_control.audio_enabled = io_state.audio_enabled;
+    io_control.choose_nes_file = io_state.choose_nes_file;
+
     if io_state.power_cycle {
         nes.power_cycle();
     }

@@ -1,7 +1,7 @@
 use imgui::im_str;
 
 use super::{MenuBarItem, DISPLAY_HEIGHT, DISPLAY_WIDTH, MENU_BAR_HEIGHT};
-use crate::common;
+use crate::{common, io::IOControl};
 
 macro_rules! add_font_from_ttf {
     ($font_path:literal,$size:expr, $imgui:ident) => {{
@@ -92,30 +92,36 @@ pub(super) struct GuiBuilder {
     emulation_texture: imgui::TextureId,
     fonts: GuiFonts,
     menu_bar_item_selected: [bool; MenuBarItem::None as usize],
-    pub choose_nes_file: bool,
-    pub rom_path: Option<String>,
-    pub paused: bool,
+    io_control: IOControl,
+    rom_path: Option<String>,
 }
 
 impl GuiBuilder {
-    pub(super) fn new(emulation_texture: imgui::TextureId, fonts: GuiFonts) -> Self {
+    pub fn new(emulation_texture: imgui::TextureId, fonts: GuiFonts) -> Self {
         Self {
             emulation_texture,
             menu_bar_item_selected: Default::default(),
             fonts,
-            choose_nes_file: false,
             rom_path: None,
-            paused: false,
+            io_control: Default::default(),
         }
     }
 
-    pub(super) fn prepare_for_new_frame(&mut self, paused: bool) {
-        self.menu_bar_item_selected = Default::default();
-        self.rom_path = None;
-        self.paused = paused;
+    pub fn get_io_control(&self) -> IOControl {
+        self.io_control
     }
 
-    pub(super) fn is_menu_bar_item_selected(&self, item: MenuBarItem) -> bool {
+    pub fn get_rom_path(&mut self) -> Option<String> {
+        self.rom_path.take()
+    }
+
+    pub fn prepare_for_new_frame(&mut self, io_control: IOControl) {
+        self.menu_bar_item_selected = Default::default();
+        self.rom_path = None;
+        self.io_control = io_control;
+    }
+
+    pub fn is_menu_bar_item_selected(&self, item: MenuBarItem) -> bool {
         self.menu_bar_item_selected[item as usize]
     }
 
@@ -128,13 +134,18 @@ impl GuiBuilder {
         use MenuBarItem::*;
         with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
             with_token!(ui, begin_main_menu_bar, (), {
-                with_token!(ui, begin_menu, (im_str!("File"), !self.choose_nes_file), {
-                    create_menu_item!("Load Nes File", "Ctrl + O").build(ui);
-                    self.update_menu_item_status(ui, LoadNesFile);
+                with_token!(
+                    ui,
+                    begin_menu,
+                    (im_str!("File"), !self.io_control.choose_nes_file),
+                    {
+                        create_menu_item!("Load Nes File", "Ctrl + O").build(ui);
+                        self.update_menu_item_status(ui, LoadNesFile);
 
-                    create_menu_item!("Quit", "Esc").build(ui);
-                    self.update_menu_item_status(ui, Quit);
-                });
+                        create_menu_item!("Quit", "Esc").build(ui);
+                        self.update_menu_item_status(ui, Quit);
+                    }
+                );
             });
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("Emulation"), true), {
@@ -142,7 +153,7 @@ impl GuiBuilder {
                     self.update_menu_item_status(ui, PowerCycle);
 
                     create_menu_item!("Pause", "Ctrl + P")
-                        .selected(self.paused)
+                        .selected(self.io_control.pause)
                         .build(ui);
                     self.update_menu_item_status(ui, Pause);
 
@@ -166,6 +177,15 @@ impl GuiBuilder {
                         create_menu_item!("Decrease", "Ctrl + -").build(ui);
                         self.update_menu_item_status(ui, SpeedDecrease);
                     });
+                });
+            });
+            with_token!(ui, begin_main_menu_bar, (), {
+                with_token!(ui, begin_menu, (im_str!("Audio"), true), {
+                    create_menu_item!("Enabled", "Ctrl + A")
+                        .selected(self.io_control.audio_enabled)
+                        .build(ui);
+                    self.update_menu_item_status(ui, AudioEnabled);
+                    create_menu_item!("Volume", "Esc").build(ui);
                 });
             });
         });
@@ -232,9 +252,9 @@ impl GuiBuilder {
                 self.build_menu_bar_and_check_for_mouse_events(target_fps, &mut ui);
                 self.build_emulation_window(&mut ui);
                 self.build_fps_counter(current_fps, target_fps, &mut ui);
-                if self.choose_nes_file {
+                if self.io_control.choose_nes_file {
                     self.build_load_nes_file_explorer();
-                    self.paused = false;
+                    self.io_control.pause = false;
                 }
             }
         );

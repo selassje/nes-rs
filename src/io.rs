@@ -21,15 +21,19 @@ pub struct IOState {
     pub quit: bool,
     pub power_cycle: bool,
     pub load_nes_file: Option<String>,
+    pub choose_nes_file: bool,
     pub pause: bool,
     pub speed: Option<Speed>,
+    pub audio_enabled: bool,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 pub struct IOControl {
     pub target_fps: u16,
     pub current_fps: u16,
     pub pause: bool,
+    pub audio_enabled: bool,
+    pub choose_nes_file: bool,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
