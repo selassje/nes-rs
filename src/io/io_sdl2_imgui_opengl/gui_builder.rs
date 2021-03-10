@@ -129,7 +129,8 @@ impl GuiBuilder {
 
     fn update_menu_item_status(&mut self, ui: &mut imgui::Ui, item: MenuBarItem) {
         self.menu_bar_item_selected[item as usize] = ui.is_item_clicked(imgui::MouseButton::Left)
-            || (ui.is_item_hovered() && ui.is_key_pressed(sdl2::keyboard::Scancode::Return as _));
+            || (ui.is_item_hovered()
+                && ui.key_pressed_amount(sdl2::keyboard::Scancode::Return as _, 0.0, 0.0) == 1);
     }
 
     fn build_menu_bar_and_check_for_mouse_events(&mut self, fps: u16, ui: &mut imgui::Ui) {
