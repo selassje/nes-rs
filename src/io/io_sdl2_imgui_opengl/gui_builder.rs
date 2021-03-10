@@ -117,10 +117,10 @@ impl GuiBuilder {
         self.rom_path.take()
     }
 
-    pub fn prepare_for_new_frame(&mut self, io_control: IOCommon) {
+    pub fn prepare_for_new_frame(&mut self, io_common: IOCommon) {
         self.menu_bar_item_selected = Default::default();
         self.rom_path = None;
-        self.io_common = io_control;
+        self.io_common = io_common
     }
 
     pub fn is_menu_bar_item_selected(&self, item: MenuBarItem) -> bool {
@@ -129,7 +129,7 @@ impl GuiBuilder {
 
     fn update_menu_item_status(&mut self, ui: &mut imgui::Ui, item: MenuBarItem) {
         self.menu_bar_item_selected[item as usize] = ui.is_item_clicked(imgui::MouseButton::Left)
-            || (ui.is_item_focused() && ui.is_key_pressed(sdl2::keyboard::Scancode::Return as _));
+            || (ui.is_item_hovered() && ui.is_key_pressed(sdl2::keyboard::Scancode::Return as _));
     }
 
     fn build_menu_bar_and_check_for_mouse_events(&mut self, fps: u16, ui: &mut imgui::Ui) {
@@ -174,6 +174,7 @@ impl GuiBuilder {
                             .selected(is_speed_selected(common::HALF_FPS))
                             .build(ui);
                         self.update_menu_item_status(ui, SpeedHalf);
+                        ui.separator();
                         create_menu_item!("Increase", "Ctrl + =").build(ui);
                         self.update_menu_item_status(ui, SpeedIncrease);
                         create_menu_item!("Decrease", "Ctrl + -").build(ui);
@@ -199,7 +200,12 @@ impl GuiBuilder {
                                 .range(range)
                                 .display_format(im_str!("%d%%"))
                                 .build(ui, &mut self.io_common.volume);
-                        })
+                        });
+                    ui.separator();
+                    create_menu_item!("Increase", "=").build(ui);
+                    self.update_menu_item_status(ui, VolumeIncrease);
+                    create_menu_item!("Decrease", "-").build(ui);
+                    self.update_menu_item_status(ui, VolumeDecrease);
                 });
             });
         });

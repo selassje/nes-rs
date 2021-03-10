@@ -16,6 +16,11 @@ pub enum Speed {
     Decrease,
 }
 
+pub enum AudioVolumeControl {
+    Increase,
+    Decrease,
+}
+
 #[derive(Copy, Clone, Default)]
 pub struct IOCommon {
     pub pause: bool,
@@ -31,6 +36,7 @@ pub struct IOState {
     pub power_cycle: bool,
     pub load_nes_file: Option<String>,
     pub speed: Option<Speed>,
+    pub audio_volume_control: Option<AudioVolumeControl>,
 }
 
 #[derive(Copy, Clone, Default)]

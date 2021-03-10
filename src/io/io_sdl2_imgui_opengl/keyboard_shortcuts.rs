@@ -17,19 +17,18 @@ fn shortcut_to_menu_bar_item(key: KeyboardShortcut) -> Option<MenuBarItem> {
         LeftCtrl(Scancode::Equals) => Some(MenuBarItem::SpeedIncrease),
         LeftCtrl(Scancode::Minus) => Some(MenuBarItem::SpeedDecrease),
         LeftCtrl(Scancode::A) => Some(MenuBarItem::AudioEnabled),
+        Single(Scancode::Minus) => Some(MenuBarItem::VolumeDecrease),
+        Single(Scancode::Equals) => Some(MenuBarItem::VolumeIncrease),
         _ => None,
     }
 }
 
 fn is_shortcut(scancode: Scancode, key_mod: Mod) -> Option<MenuBarItem> {
-    let single = shortcut_to_menu_bar_item(Single(scancode));
-    if single.is_some() {
-        return single;
-    } else if Mod::LCTRLMOD & key_mod == Mod::LCTRLMOD {
+    let is_left_ctrl = Mod::LCTRLMOD & key_mod == Mod::LCTRLMOD;
+    if is_left_ctrl {
         return shortcut_to_menu_bar_item(LeftCtrl(scancode));
-    } else {
-        return None;
     }
+    return shortcut_to_menu_bar_item(Single(scancode));
 }
 #[derive(Default)]
 pub(super) struct KeyboardShortcuts {

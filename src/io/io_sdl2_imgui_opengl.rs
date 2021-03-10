@@ -12,7 +12,7 @@ use crate::io;
 
 use gl::types::*;
 
-const DISPLAY_SCALING: usize = 2;
+const DISPLAY_SCALING: usize = 3;
 const DISPLAY_WIDTH: usize = DISPLAY_SCALING * io::FRAME_WIDTH;
 const DISPLAY_HEIGHT: usize = DISPLAY_SCALING * io::FRAME_HEIGHT;
 const MENU_BAR_HEIGHT: usize = 18;
@@ -29,6 +29,8 @@ pub enum MenuBarItem {
     SpeedIncrease,
     SpeedDecrease,
     AudioEnabled,
+    VolumeIncrease,
+    VolumeDecrease,
     None,
 }
 
@@ -143,17 +145,35 @@ impl IOSdl2ImGuiOpenGl {
         io_state.common.volume = io_common.volume;
 
         io_state.speed = None;
-        let mut set_speed_selection = |item: MenuBarItem, speed: io::Speed| {
-            if self.is_menu_bar_item_selected(item) {
-                io_state.speed = Some(speed)
-            }
-        };
-        set_speed_selection(MenuBarItem::SpeedIncrease, io::Speed::Increase);
-        set_speed_selection(MenuBarItem::SpeedDecrease, io::Speed::Decrease);
-        set_speed_selection(MenuBarItem::SpeedNormal, io::Speed::Normal);
-        set_speed_selection(MenuBarItem::SpeedHalf, io::Speed::Half);
-        set_speed_selection(MenuBarItem::SpeedDouble, io::Speed::Double);
-
+        {
+            let mut set_speed_selection = |item: MenuBarItem, speed: io::Speed| {
+                if self.is_menu_bar_item_selected(item) {
+                    io_state.speed = Some(speed)
+                }
+            };
+            set_speed_selection(MenuBarItem::SpeedIncrease, io::Speed::Increase);
+            set_speed_selection(MenuBarItem::SpeedDecrease, io::Speed::Decrease);
+            set_speed_selection(MenuBarItem::SpeedNormal, io::Speed::Normal);
+            set_speed_selection(MenuBarItem::SpeedHalf, io::Speed::Half);
+            set_speed_selection(MenuBarItem::SpeedDouble, io::Speed::Double);
+        }
+        io_state.audio_volume_control = None;
+        {
+            let mut set_volume_control =
+                |item: MenuBarItem, volume_control: io::AudioVolumeControl| {
+                    if self.is_menu_bar_item_selected(item) {
+                        io_state.audio_volume_control = Some(volume_control)
+                    }
+                };
+            set_volume_control(
+                MenuBarItem::VolumeIncrease,
+                io::AudioVolumeControl::Increase,
+            );
+            set_volume_control(
+                MenuBarItem::VolumeDecrease,
+                io::AudioVolumeControl::Decrease,
+            );
+        }
         let toggle = |item: MenuBarItem, value: bool| {
             if self.is_menu_bar_item_selected(item) {
                 !value
