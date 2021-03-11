@@ -12,7 +12,7 @@ use crate::io;
 
 use gl::types::*;
 
-const DISPLAY_SCALING: usize = 3;
+const DISPLAY_SCALING: usize = 4;
 const DISPLAY_WIDTH: usize = DISPLAY_SCALING * io::FRAME_WIDTH;
 const DISPLAY_HEIGHT: usize = DISPLAY_SCALING * io::FRAME_HEIGHT;
 const MENU_BAR_HEIGHT: usize = 18;
@@ -31,6 +31,11 @@ pub enum MenuBarItem {
     AudioEnabled,
     VolumeIncrease,
     VolumeDecrease,
+    VideoSizeNormal,
+    VideoSizeDouble,
+    VideoSizeTriple,
+    VideoSizeQuadrupal,
+    VideoSizeFullScreen,
     None,
 }
 
@@ -172,6 +177,26 @@ impl IOSdl2ImGuiOpenGl {
             set_volume_control(
                 MenuBarItem::VolumeDecrease,
                 io::AudioVolumeControl::Decrease,
+            );
+        }
+        io_state.common.video_size = io_common.video_size;
+        {
+            let mut set_video_size_selection =
+                |item: MenuBarItem, video_size: io::VideoSizeControl| {
+                    if self.is_menu_bar_item_selected(item) {
+                        io_state.common.video_size = video_size;
+                    }
+                };
+            set_video_size_selection(MenuBarItem::VideoSizeNormal, io::VideoSizeControl::Normal);
+            set_video_size_selection(MenuBarItem::VideoSizeDouble, io::VideoSizeControl::Double);
+            set_video_size_selection(MenuBarItem::VideoSizeTriple, io::VideoSizeControl::Triple);
+            set_video_size_selection(
+                MenuBarItem::VideoSizeQuadrupal,
+                io::VideoSizeControl::Quadrupal,
+            );
+            set_video_size_selection(
+                MenuBarItem::VideoSizeFullScreen,
+                io::VideoSizeControl::FullScreen,
             );
         }
         let toggle = |item: MenuBarItem, value: bool| {

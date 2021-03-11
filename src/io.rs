@@ -20,6 +20,20 @@ pub enum AudioVolumeControl {
     Increase,
     Decrease,
 }
+#[derive(Clone, Copy, PartialEq)]
+pub enum VideoSizeControl {
+    Normal,
+    Double,
+    Triple,
+    Quadrupal,
+    FullScreen,
+}
+
+impl Default for VideoSizeControl {
+    fn default() -> Self {
+        Self::Double
+    }
+}
 
 #[derive(Copy, Clone, Default)]
 pub struct IOCommon {
@@ -27,8 +41,8 @@ pub struct IOCommon {
     pub audio_enabled: bool,
     pub choose_nes_file: bool,
     pub volume: u8,
+    pub video_size: VideoSizeControl,
 }
-
 #[derive(Default)]
 pub struct IOState {
     pub common: IOCommon,

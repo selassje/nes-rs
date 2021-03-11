@@ -3,7 +3,7 @@ use std::ops::RangeInclusive;
 use imgui::im_str;
 
 use super::{MenuBarItem, DISPLAY_HEIGHT, DISPLAY_WIDTH, MENU_BAR_HEIGHT};
-use crate::{common, io::IOCommon};
+use crate::{common, io::IOCommon, io::VideoSizeControl};
 
 macro_rules! add_font_from_ttf {
     ($font_path:literal,$size:expr, $imgui:ident) => {{
@@ -183,7 +183,32 @@ impl GuiBuilder {
                     });
                 });
             });
-            ui.set_next_item_width(100.0);
+            with_token!(ui, begin_main_menu_bar, (), {
+                with_token!(ui, begin_menu, (im_str!("Video"), true), {
+                    with_token!(ui, begin_menu, (im_str!("Size"), true), {
+                        create_menu_item!("100%", "")
+                            .selected(self.io_common.video_size == VideoSizeControl::Normal)
+                            .build(ui);
+                        self.update_menu_item_status(ui, VideoSizeNormal);
+                        create_menu_item!("200%", "")
+                            .selected(self.io_common.video_size == VideoSizeControl::Double)
+                            .build(ui);
+                        self.update_menu_item_status(ui, VideoSizeDouble);
+                        create_menu_item!("300%", "")
+                            .selected(self.io_common.video_size == VideoSizeControl::Triple)
+                            .build(ui);
+                        self.update_menu_item_status(ui, VideoSizeTriple);
+                        create_menu_item!("400%", "")
+                            .selected(self.io_common.video_size == VideoSizeControl::Quadrupal)
+                            .build(ui);
+                        self.update_menu_item_status(ui, VideoSizeQuadrupal);
+                        create_menu_item!("Full screen", "")
+                            .selected(self.io_common.video_size == VideoSizeControl::FullScreen)
+                            .build(ui);
+                        self.update_menu_item_status(ui, VideoSizeFullScreen);
+                    });
+                });
+            });
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("Audio"), true), {
                     create_menu_item!("Enabled", "Ctrl + A")

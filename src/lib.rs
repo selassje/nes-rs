@@ -1,6 +1,6 @@
 use std::{cell::RefCell, env, fs::File, io::Read, rc::Rc};
 
-use io::IO;
+use io::{VideoSizeControl, IO};
 
 mod apu;
 mod colors;
@@ -77,6 +77,7 @@ pub fn run() {
             audio_enabled: true,
             choose_nes_file: false,
             volume: 100,
+            video_size: VideoSizeControl::Double,
         },
     };
 
