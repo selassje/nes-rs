@@ -249,11 +249,15 @@ impl GuiBuilder {
                 });
             });
         });
-        //  ui.new_line()
     }
 
     fn build_emulation_window(&self, ui: &mut imgui::Ui) {
-        create_unmovable_simple_window!("emulation", [0.0, 0.0], self.video_size)
+        let vertical_offset = if self.build_menu_bar {
+            MENU_BAR_HEIGHT as f32
+        } else {
+            0.0
+        };
+        create_unmovable_simple_window!("emulation", [0.0, vertical_offset], self.video_size)
             .bring_to_front_on_focus(false)
             .build(ui, || {
                 imgui::Image::new(self.emulation_texture, self.video_size).build(ui);
@@ -299,7 +303,8 @@ impl GuiBuilder {
 
     pub(super) fn build(&mut self, mut ui: &mut imgui::Ui) {
         self.build_menu_bar = self.get_io_common().video_size != VideoSizeControl::FullScreen
-            || ui.mouse_pos_on_opening_current_popup()[1] < MENU_BAR_HEIGHT as f32;
+            || ui.mouse_pos_on_opening_current_popup()[1] < MENU_BAR_HEIGHT as f32
+            || ui.is_any_item_hovered();
 
         with_styles!(
             &mut ui,
