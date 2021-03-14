@@ -101,6 +101,7 @@ pub(super) struct GuiBuilder {
     io_control: IOControl,
     rom_path: Option<String>,
     video_size: super::Size,
+    build_menu_bar: bool,
 }
 
 impl GuiBuilder {
@@ -112,6 +113,7 @@ impl GuiBuilder {
             rom_path: None,
             io_control: Default::default(),
             video_size: Default::default(),
+            build_menu_bar: Default::default(),
         }
     }
 
@@ -247,10 +249,11 @@ impl GuiBuilder {
                 });
             });
         });
+        //  ui.new_line()
     }
 
     fn build_emulation_window(&self, ui: &mut imgui::Ui) {
-        create_unmovable_simple_window!("emulation", [0.0, MENU_BAR_HEIGHT as _], self.video_size)
+        create_unmovable_simple_window!("emulation", [0.0, 0.0], self.video_size)
             .bring_to_front_on_focus(false)
             .build(ui, || {
                 imgui::Image::new(self.emulation_texture, self.video_size).build(ui);
@@ -295,6 +298,9 @@ impl GuiBuilder {
     }
 
     pub(super) fn build(&mut self, mut ui: &mut imgui::Ui) {
+        self.build_menu_bar = self.get_io_common().video_size != VideoSizeControl::FullScreen
+            || ui.mouse_pos_on_opening_current_popup()[1] < MENU_BAR_HEIGHT as f32;
+
         with_styles!(
             &mut ui,
             (
@@ -303,7 +309,9 @@ impl GuiBuilder {
                 imgui::StyleVar::WindowPadding([0.0, 0.0])
             ),
             {
-                self.build_menu_bar_and_check_for_mouse_events(&mut ui);
+                if self.build_menu_bar {
+                    self.build_menu_bar_and_check_for_mouse_events(&mut ui);
+                }
                 self.build_emulation_window(&mut ui);
                 self.build_fps_counter(&mut ui);
                 if self.io_control.common.choose_nes_file {
