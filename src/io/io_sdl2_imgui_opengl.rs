@@ -14,6 +14,8 @@ use gl::types::*;
 
 const MENU_BAR_HEIGHT: usize = 18;
 
+type Size = [f32; 2];
+
 #[derive(Copy, Clone, PartialEq)]
 pub enum MenuBarItem {
     LoadNesFile,
@@ -227,12 +229,35 @@ impl IOSdl2ImGuiOpenGl {
         self.keyboard_shortcuts.is_menu_bar_item_selected(item)
             || self.gui_builder.is_menu_bar_item_selected(item)
     }
+
+    fn set_window_size_and_get_video_size(&mut self, control: io::IOControl) -> Size {
+        if control.common.video_size != VideoSizeControl::FullScreen {
+            let [video_width, video_height]: [u32; 2] = control.common.video_size.into();
+            self.window
+                .borrow_mut()
+                .set_fullscreen(sdl2::video::FullscreenType::Off)
+                .unwrap();
+            self.window
+                .borrow_mut()
+                .set_size(video_width, video_height + MENU_BAR_HEIGHT as u32)
+                .unwrap();
+            [video_width as f32, video_height as f32]
+        } else {
+            self.window
+                .borrow_mut()
+                .set_fullscreen(sdl2::video::FullscreenType::Desktop)
+                .unwrap();
+            let display_mode = self.window.display_mode().unwrap();
+            [display_mode.w as f32, display_mode.h as f32]
+        }
+    }
 }
 
 impl io::IO for IOSdl2ImGuiOpenGl {
     fn present_frame(&mut self, control: io::IOControl) -> io::IOState {
         let mut io_state: io::IOState = Default::default();
-        self.gui_builder.prepare_for_new_frame(control);
+        let video_size = self.set_window_size_and_get_video_size(control);
+        self.gui_builder.prepare_for_new_frame(control, video_size);
         self.keyboard_shortcuts = Default::default();
 
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
@@ -275,23 +300,6 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 self.io_internal.get_pixels_slice().as_ptr() as _,
             );
         };
-
-        if control.common.video_size != VideoSizeControl::FullScreen {
-            let [video_width, video_height]: [u32; 2] = control.common.video_size.into();
-            self.window
-                .borrow_mut()
-                .set_fullscreen(sdl2::video::FullscreenType::Off)
-                .unwrap();
-            self.window
-                .borrow_mut()
-                .set_size(video_width, video_height + MENU_BAR_HEIGHT as u32)
-                .unwrap();
-        } else {
-            self.window
-                .borrow_mut()
-                .set_fullscreen(sdl2::video::FullscreenType::Desktop)
-                .unwrap();
-        }
 
         self.imgui_sdl2.prepare_frame(
             self.imgui.io_mut(),

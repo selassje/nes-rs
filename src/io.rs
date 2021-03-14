@@ -31,6 +31,10 @@ pub enum VideoSizeControl {
 
 impl Into<[u32; 2]> for VideoSizeControl {
     fn into(self) -> [u32; 2] {
+        if self == VideoSizeControl::FullScreen {
+            panic!("VideoSizeControl::FullScreen size can't be converted to [u32;2]")
+        }
+
         let scaling = self as u32;
         [scaling * FRAME_WIDTH as u32, scaling * FRAME_HEIGHT as u32]
     }

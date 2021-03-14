@@ -100,6 +100,7 @@ pub(super) struct GuiBuilder {
     menu_bar_item_selected: [bool; MenuBarItem::None as usize],
     io_control: IOControl,
     rom_path: Option<String>,
+    video_size: super::Size,
 }
 
 impl GuiBuilder {
@@ -110,6 +111,7 @@ impl GuiBuilder {
             fonts,
             rom_path: None,
             io_control: Default::default(),
+            video_size: Default::default(),
         }
     }
 
@@ -121,10 +123,11 @@ impl GuiBuilder {
         self.rom_path.take()
     }
 
-    pub fn prepare_for_new_frame(&mut self, io_control: IOControl) {
+    pub fn prepare_for_new_frame(&mut self, io_control: IOControl, video_size: super::Size) {
         self.menu_bar_item_selected = Default::default();
         self.rom_path = None;
-        self.io_control = io_control
+        self.io_control = io_control;
+        self.video_size = video_size;
     }
 
     pub fn is_menu_bar_item_selected(&self, item: MenuBarItem) -> bool {
@@ -246,25 +249,17 @@ impl GuiBuilder {
     }
 
     fn build_emulation_window(&self, ui: &mut imgui::Ui) {
-        create_unmovable_simple_window!(
-            "emulation",
-            [0.0, MENU_BAR_HEIGHT as _],
-            self.get_io_common().video_size.into()
-        )
-        .bring_to_front_on_focus(false)
-        .build(ui, || {
-            imgui::Image::new(
-                self.emulation_texture,
-                self.get_io_common().video_size.into(),
-            )
-            .build(ui);
-        });
+        create_unmovable_simple_window!("emulation", [0.0, MENU_BAR_HEIGHT as _], self.video_size)
+            .bring_to_front_on_focus(false)
+            .build(ui, || {
+                imgui::Image::new(self.emulation_texture, self.video_size).build(ui);
+            });
     }
 
     fn build_fps_counter(&self, current_fps: u16, target_fps: u16, ui: &mut imgui::Ui) {
         with_font!(self.fonts[GuiFont::FpsCounter as usize], ui, {
             let text = format!("FPS {}/{}", current_fps, target_fps);
-            let [video_width, _]: [f32; 2] = self.get_io_common().video_size.into();
+            let [video_width, _]: [f32; 2] = self.video_size;
             let text_size = ui.calc_text_size(
                 imgui::ImString::new(text.clone()).as_ref(),
                 false,
