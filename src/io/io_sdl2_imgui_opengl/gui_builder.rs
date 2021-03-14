@@ -2,7 +2,7 @@ use std::ops::RangeInclusive;
 
 use imgui::im_str;
 
-use super::{MenuBarItem, DISPLAY_HEIGHT, DISPLAY_WIDTH, MENU_BAR_HEIGHT};
+use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
     common,
     io::IOControl,
@@ -249,13 +249,13 @@ impl GuiBuilder {
         create_unmovable_simple_window!(
             "emulation",
             [0.0, MENU_BAR_HEIGHT as _],
-            [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _]
+            self.get_io_common().video_size.into()
         )
         .bring_to_front_on_focus(false)
         .build(ui, || {
             imgui::Image::new(
                 self.emulation_texture,
-                [DISPLAY_WIDTH as _, DISPLAY_HEIGHT as _],
+                self.get_io_common().video_size.into(),
             )
             .build(ui);
         });
@@ -264,14 +264,15 @@ impl GuiBuilder {
     fn build_fps_counter(&self, current_fps: u16, target_fps: u16, ui: &mut imgui::Ui) {
         with_font!(self.fonts[GuiFont::FpsCounter as usize], ui, {
             let text = format!("FPS {}/{}", current_fps, target_fps);
+            let [video_width, _]: [f32; 2] = self.get_io_common().video_size.into();
             let text_size = ui.calc_text_size(
                 imgui::ImString::new(text.clone()).as_ref(),
                 false,
-                DISPLAY_WIDTH as _,
+                video_width,
             );
             create_unmovable_simple_window!(
                 "fps",
-                [DISPLAY_WIDTH as f32 - text_size[0], MENU_BAR_HEIGHT as _],
+                [video_width - text_size[0], MENU_BAR_HEIGHT as _],
                 text_size
             )
             .bg_alpha(0.0)

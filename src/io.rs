@@ -22,11 +22,25 @@ pub enum AudioVolumeControl {
 }
 #[derive(Clone, Copy, PartialEq)]
 pub enum VideoSizeControl {
-    Normal,
-    Double,
-    Triple,
-    Quadrupal,
-    FullScreen,
+    Normal = 1,
+    Double = 2,
+    Triple = 3,
+    Quadrupal = 4,
+    FullScreen = 5,
+}
+
+impl Into<[u32; 2]> for VideoSizeControl {
+    fn into(self) -> [u32; 2] {
+        let scaling = self as u32;
+        [scaling * FRAME_WIDTH as u32, scaling * FRAME_HEIGHT as u32]
+    }
+}
+
+impl Into<[f32; 2]> for VideoSizeControl {
+    fn into(self) -> [f32; 2] {
+        let [width, height]: [u32; 2] = self.into();
+        [width as _, height as _]
+    }
 }
 
 impl Default for VideoSizeControl {

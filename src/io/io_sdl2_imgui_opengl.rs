@@ -3,18 +3,18 @@ mod gui_builder;
 mod keyboard_shortcuts;
 mod keycode_to_sdl2_scancode;
 
-use std::collections::HashMap;
 use std::default::Default;
 use std::iter::FromIterator;
+use std::{borrow::BorrowMut, collections::HashMap};
 
 use super::io_internal;
 use crate::io;
 
 use gl::types::*;
 
-const DISPLAY_SCALING: usize = 4;
-const DISPLAY_WIDTH: usize = DISPLAY_SCALING * io::FRAME_WIDTH;
-const DISPLAY_HEIGHT: usize = DISPLAY_SCALING * io::FRAME_HEIGHT;
+// const DISPLAY_SCALING: usize = 4;
+// const DISPLAY_WIDTH: usize = DISPLAY_SCALING * io::FRAME_WIDTH;
+// const DISPLAY_HEIGHT: usize = DISPLAY_SCALING * io::FRAME_HEIGHT;
 const MENU_BAR_HEIGHT: usize = 18;
 
 #[derive(Copy, Clone, PartialEq)]
@@ -79,8 +79,8 @@ impl IOSdl2ImGuiOpenGl {
         let window = video_subsys
             .window(
                 title,
-                DISPLAY_WIDTH as _,
-                MENU_BAR_HEIGHT as u32 + DISPLAY_HEIGHT as u32,
+                (io::FRAME_WIDTH * 2) as _,
+                MENU_BAR_HEIGHT as u32 + (io::FRAME_HEIGHT * 2) as u32,
             )
             .position_centered()
             .opengl()
@@ -281,6 +281,14 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 self.io_internal.get_pixels_slice().as_ptr() as _,
             );
         };
+
+        self.window
+            .borrow_mut()
+            .set_size(
+                (io::FRAME_WIDTH * control.common.video_size as usize) as _,
+                (io::FRAME_HEIGHT * control.common.video_size as usize) as _,
+            )
+            .unwrap();
 
         self.imgui_sdl2.prepare_frame(
             self.imgui.io_mut(),
