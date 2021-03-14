@@ -3,7 +3,11 @@ use std::ops::RangeInclusive;
 use imgui::im_str;
 
 use super::{MenuBarItem, DISPLAY_HEIGHT, DISPLAY_WIDTH, MENU_BAR_HEIGHT};
-use crate::{common, io::IOCommon, io::VideoSizeControl};
+use crate::{
+    common,
+    io::IOControl,
+    io::{IOCommon, VideoSizeControl},
+};
 
 macro_rules! add_font_from_ttf {
     ($font_path:literal,$size:expr, $imgui:ident) => {{
@@ -94,7 +98,7 @@ pub(super) struct GuiBuilder {
     emulation_texture: imgui::TextureId,
     fonts: GuiFonts,
     menu_bar_item_selected: [bool; MenuBarItem::None as usize],
-    io_common: IOCommon,
+    io_control: IOControl,
     rom_path: Option<String>,
 }
 
@@ -105,22 +109,22 @@ impl GuiBuilder {
             menu_bar_item_selected: Default::default(),
             fonts,
             rom_path: None,
-            io_common: Default::default(),
+            io_control: Default::default(),
         }
     }
 
     pub fn get_io_common(&self) -> IOCommon {
-        self.io_common
+        self.io_control.common
     }
 
     pub fn get_rom_path(&mut self) -> Option<String> {
         self.rom_path.take()
     }
 
-    pub fn prepare_for_new_frame(&mut self, io_common: IOCommon) {
+    pub fn prepare_for_new_frame(&mut self, io_control: IOControl) {
         self.menu_bar_item_selected = Default::default();
         self.rom_path = None;
-        self.io_common = io_common
+        self.io_control = io_control
     }
 
     pub fn is_menu_bar_item_selected(&self, item: MenuBarItem) -> bool {
@@ -140,7 +144,7 @@ impl GuiBuilder {
                 with_token!(
                     ui,
                     begin_menu,
-                    (im_str!("File"), !self.io_common.choose_nes_file),
+                    (im_str!("File"), !self.io_control.common.choose_nes_file),
                     {
                         create_menu_item!("Load Nes File", "Ctrl + O").build(ui);
                         self.update_menu_item_status(ui, LoadNesFile);
@@ -156,7 +160,7 @@ impl GuiBuilder {
                     self.update_menu_item_status(ui, PowerCycle);
 
                     create_menu_item!("Pause", "Ctrl + P")
-                        .selected(self.io_common.pause)
+                        .selected(self.io_control.common.pause)
                         .build(ui);
                     self.update_menu_item_status(ui, Pause);
 
@@ -187,23 +191,27 @@ impl GuiBuilder {
                 with_token!(ui, begin_menu, (im_str!("Video"), true), {
                     with_token!(ui, begin_menu, (im_str!("Size"), true), {
                         create_menu_item!("100%", "")
-                            .selected(self.io_common.video_size == VideoSizeControl::Normal)
+                            .selected(self.io_control.common.video_size == VideoSizeControl::Normal)
                             .build(ui);
                         self.update_menu_item_status(ui, VideoSizeNormal);
                         create_menu_item!("200%", "")
-                            .selected(self.io_common.video_size == VideoSizeControl::Double)
+                            .selected(self.io_control.common.video_size == VideoSizeControl::Double)
                             .build(ui);
                         self.update_menu_item_status(ui, VideoSizeDouble);
                         create_menu_item!("300%", "")
-                            .selected(self.io_common.video_size == VideoSizeControl::Triple)
+                            .selected(self.io_control.common.video_size == VideoSizeControl::Triple)
                             .build(ui);
                         self.update_menu_item_status(ui, VideoSizeTriple);
                         create_menu_item!("400%", "")
-                            .selected(self.io_common.video_size == VideoSizeControl::Quadrupal)
+                            .selected(
+                                self.io_control.common.video_size == VideoSizeControl::Quadrupal,
+                            )
                             .build(ui);
                         self.update_menu_item_status(ui, VideoSizeQuadrupal);
                         create_menu_item!("Full screen", "")
-                            .selected(self.io_common.video_size == VideoSizeControl::FullScreen)
+                            .selected(
+                                self.io_control.common.video_size == VideoSizeControl::FullScreen,
+                            )
                             .build(ui);
                         self.update_menu_item_status(ui, VideoSizeFullScreen);
                     });
@@ -212,7 +220,7 @@ impl GuiBuilder {
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("Audio"), true), {
                     create_menu_item!("Enabled", "Ctrl + A")
-                        .selected(self.io_common.audio_enabled)
+                        .selected(self.io_control.common.audio_enabled)
                         .build(ui);
                     self.update_menu_item_status(ui, AudioEnabled);
 
@@ -225,7 +233,7 @@ impl GuiBuilder {
                             imgui::Slider::new(im_str!("Volume"))
                                 .range(range)
                                 .display_format(im_str!("%d%%"))
-                                .build(ui, &mut self.io_common.volume);
+                                .build(ui, &mut self.io_control.common.volume);
                         });
                     ui.separator();
                     create_menu_item!("Increase", "=").build(ui);
@@ -298,9 +306,9 @@ impl GuiBuilder {
                 self.build_menu_bar_and_check_for_mouse_events(target_fps, &mut ui);
                 self.build_emulation_window(&mut ui);
                 self.build_fps_counter(current_fps, target_fps, &mut ui);
-                if self.io_common.choose_nes_file {
+                if self.io_control.common.choose_nes_file {
                     self.build_load_nes_file_explorer();
-                    self.io_common.pause = false;
+                    self.io_control.common.pause = false;
                 }
             }
         );

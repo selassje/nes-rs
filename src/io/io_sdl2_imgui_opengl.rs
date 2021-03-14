@@ -238,7 +238,7 @@ impl IOSdl2ImGuiOpenGl {
 impl io::IO for IOSdl2ImGuiOpenGl {
     fn present_frame(&mut self, control: io::IOControl) -> io::IOState {
         let mut io_state: io::IOState = Default::default();
-        self.gui_builder.prepare_for_new_frame(control.common);
+        self.gui_builder.prepare_for_new_frame(control);
         self.keyboard_shortcuts = Default::default();
 
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
