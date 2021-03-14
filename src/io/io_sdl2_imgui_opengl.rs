@@ -76,12 +76,11 @@ impl IOSdl2ImGuiOpenGl {
             gl_attr.set_context_version(3, 0);
         }
 
+        // video_subsys.borrow_mut().current_display_mode(display_index)
+
+        let [video_width, video_height]: [u32; 2] = io::VideoSizeControl::Double.into();
         let window = video_subsys
-            .window(
-                title,
-                (io::FRAME_WIDTH * 2) as _,
-                MENU_BAR_HEIGHT as u32 + (io::FRAME_HEIGHT * 2) as u32,
-            )
+            .window(title, video_width, MENU_BAR_HEIGHT as u32 + video_height)
             .position_centered()
             .opengl()
             .build()
@@ -282,12 +281,10 @@ impl io::IO for IOSdl2ImGuiOpenGl {
             );
         };
 
+        let [video_width, video_height]: [u32; 2] = control.common.video_size.into();
         self.window
             .borrow_mut()
-            .set_size(
-                (io::FRAME_WIDTH * control.common.video_size as usize) as _,
-                (io::FRAME_HEIGHT * control.common.video_size as usize) as _,
-            )
+            .set_size(video_width, video_height + MENU_BAR_HEIGHT as u32)
             .unwrap();
 
         self.imgui_sdl2.prepare_frame(
