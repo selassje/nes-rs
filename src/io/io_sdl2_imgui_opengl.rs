@@ -311,8 +311,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
 
         self.imgui_sdl2.prepare_render(&ui, &self.window);
 
-        self.gui_builder
-            .build(control.current_fps, control.target_fps, &mut ui);
+        self.gui_builder.build(&mut ui);
 
         self.renderer.render(ui);
         self.update_io_state(&mut io_state);

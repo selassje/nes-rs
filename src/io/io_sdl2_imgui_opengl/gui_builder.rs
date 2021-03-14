@@ -140,7 +140,7 @@ impl GuiBuilder {
                 && ui.key_pressed_amount(sdl2::keyboard::Scancode::Return as _, 0.0, 0.0) == 1);
     }
 
-    fn build_menu_bar_and_check_for_mouse_events(&mut self, fps: u16, ui: &mut imgui::Ui) {
+    fn build_menu_bar_and_check_for_mouse_events(&mut self, ui: &mut imgui::Ui) {
         use MenuBarItem::*;
         with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
             with_token!(ui, begin_main_menu_bar, (), {
@@ -167,7 +167,8 @@ impl GuiBuilder {
                         .build(ui);
                     self.update_menu_item_status(ui, Pause);
 
-                    let is_speed_selected = |target_fps: u16| fps == target_fps;
+                    let target_fps = self.io_control.target_fps;
+                    let is_speed_selected = |fps: u16| fps == target_fps;
 
                     with_token!(ui, begin_menu, (im_str!("Speed"), true), {
                         create_menu_item!("Normal", "")
@@ -256,9 +257,12 @@ impl GuiBuilder {
             });
     }
 
-    fn build_fps_counter(&self, current_fps: u16, target_fps: u16, ui: &mut imgui::Ui) {
+    fn build_fps_counter(&self, ui: &mut imgui::Ui) {
         with_font!(self.fonts[GuiFont::FpsCounter as usize], ui, {
-            let text = format!("FPS {}/{}", current_fps, target_fps);
+            let text = format!(
+                "FPS {}/{}",
+                self.io_control.current_fps, self.io_control.target_fps
+            );
             let [video_width, _]: [f32; 2] = self.video_size;
             let text_size = ui.calc_text_size(
                 imgui::ImString::new(text.clone()).as_ref(),
@@ -290,7 +294,7 @@ impl GuiBuilder {
         }
     }
 
-    pub(super) fn build(&mut self, current_fps: u16, target_fps: u16, mut ui: &mut imgui::Ui) {
+    pub(super) fn build(&mut self, mut ui: &mut imgui::Ui) {
         with_styles!(
             &mut ui,
             (
@@ -299,9 +303,9 @@ impl GuiBuilder {
                 imgui::StyleVar::WindowPadding([0.0, 0.0])
             ),
             {
-                self.build_menu_bar_and_check_for_mouse_events(target_fps, &mut ui);
+                self.build_menu_bar_and_check_for_mouse_events(&mut ui);
                 self.build_emulation_window(&mut ui);
-                self.build_fps_counter(current_fps, target_fps, &mut ui);
+                self.build_fps_counter(&mut ui);
                 if self.io_control.common.choose_nes_file {
                     self.build_load_nes_file_explorer();
                     self.io_control.common.pause = false;
