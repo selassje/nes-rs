@@ -190,25 +190,25 @@ impl GuiBuilder {
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("Video"), true), {
                     with_token!(ui, begin_menu, (im_str!("Size"), true), {
-                        create_menu_item!("100%", "")
+                        create_menu_item!("100%", "F8")
                             .selected(self.io_control.common.video_size == VideoSizeControl::Normal)
                             .build(ui);
                         self.update_menu_item_status(ui, VideoSizeNormal);
-                        create_menu_item!("200%", "")
+                        create_menu_item!("200%", "F9")
                             .selected(self.io_control.common.video_size == VideoSizeControl::Double)
                             .build(ui);
                         self.update_menu_item_status(ui, VideoSizeDouble);
-                        create_menu_item!("300%", "")
+                        create_menu_item!("300%", "F10")
                             .selected(self.io_control.common.video_size == VideoSizeControl::Triple)
                             .build(ui);
                         self.update_menu_item_status(ui, VideoSizeTriple);
-                        create_menu_item!("400%", "")
+                        create_menu_item!("400%", "F11")
                             .selected(
                                 self.io_control.common.video_size == VideoSizeControl::Quadrupal,
                             )
                             .build(ui);
                         self.update_menu_item_status(ui, VideoSizeQuadrupal);
-                        create_menu_item!("Full screen", "")
+                        create_menu_item!("Full screen", "F12")
                             .selected(
                                 self.io_control.common.video_size == VideoSizeControl::FullScreen,
                             )

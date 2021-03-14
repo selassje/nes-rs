@@ -7,14 +7,11 @@ use std::default::Default;
 use std::iter::FromIterator;
 use std::{borrow::BorrowMut, collections::HashMap};
 
-use super::io_internal;
+use super::{io_internal, VideoSizeControl};
 use crate::io;
 
 use gl::types::*;
 
-// const DISPLAY_SCALING: usize = 4;
-// const DISPLAY_WIDTH: usize = DISPLAY_SCALING * io::FRAME_WIDTH;
-// const DISPLAY_HEIGHT: usize = DISPLAY_SCALING * io::FRAME_HEIGHT;
 const MENU_BAR_HEIGHT: usize = 18;
 
 #[derive(Copy, Clone, PartialEq)]
@@ -75,8 +72,6 @@ impl IOSdl2ImGuiOpenGl {
             gl_attr.set_context_profile(sdl2::video::GLProfile::Core);
             gl_attr.set_context_version(3, 0);
         }
-
-        // video_subsys.borrow_mut().current_display_mode(display_index)
 
         let [video_width, video_height]: [u32; 2] = io::VideoSizeControl::Double.into();
         let window = video_subsys
@@ -281,11 +276,22 @@ impl io::IO for IOSdl2ImGuiOpenGl {
             );
         };
 
-        let [video_width, video_height]: [u32; 2] = control.common.video_size.into();
-        self.window
-            .borrow_mut()
-            .set_size(video_width, video_height + MENU_BAR_HEIGHT as u32)
-            .unwrap();
+        if control.common.video_size != VideoSizeControl::FullScreen {
+            let [video_width, video_height]: [u32; 2] = control.common.video_size.into();
+            self.window
+                .borrow_mut()
+                .set_fullscreen(sdl2::video::FullscreenType::Off)
+                .unwrap();
+            self.window
+                .borrow_mut()
+                .set_size(video_width, video_height + MENU_BAR_HEIGHT as u32)
+                .unwrap();
+        } else {
+            self.window
+                .borrow_mut()
+                .set_fullscreen(sdl2::video::FullscreenType::Desktop)
+                .unwrap();
+        }
 
         self.imgui_sdl2.prepare_frame(
             self.imgui.io_mut(),

@@ -19,6 +19,11 @@ fn shortcut_to_menu_bar_item(key: KeyboardShortcut) -> Option<MenuBarItem> {
         LeftCtrl(Scancode::A) => Some(MenuBarItem::AudioEnabled),
         Single(Scancode::Minus) => Some(MenuBarItem::VolumeDecrease),
         Single(Scancode::Equals) => Some(MenuBarItem::VolumeIncrease),
+        Single(Scancode::F8) => Some(MenuBarItem::VideoSizeNormal),
+        Single(Scancode::F9) => Some(MenuBarItem::VideoSizeDouble),
+        Single(Scancode::F10) => Some(MenuBarItem::VideoSizeTriple),
+        Single(Scancode::F11) => Some(MenuBarItem::VideoSizeQuadrupal),
+        Single(Scancode::F12) => Some(MenuBarItem::VideoSizeFullScreen),
         _ => None,
     }
 }
