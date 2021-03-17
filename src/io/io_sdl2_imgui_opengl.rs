@@ -55,7 +55,7 @@ pub struct IOSdl2ImGuiOpenGl {
 }
 
 impl IOSdl2ImGuiOpenGl {
-    pub fn new(title: &str) -> Self {
+    pub fn new() -> Self {
         let sdl_context = sdl2::init().unwrap();
         let mut maybe_audio_queue = None;
         if let Ok(sdl_audio) = sdl_context.audio() {
@@ -78,7 +78,7 @@ impl IOSdl2ImGuiOpenGl {
 
         let [video_width, video_height]: [u32; 2] = io::VideoSizeControl::Double.into();
         let mut window = video_subsys
-            .window(title, video_width, MENU_BAR_HEIGHT as u32 + video_height)
+            .window("NES-RS", video_width, MENU_BAR_HEIGHT as u32 + video_height)
             .position_centered()
             .resizable()
             .opengl()
@@ -239,7 +239,13 @@ impl IOSdl2ImGuiOpenGl {
             || self.gui_builder.is_menu_bar_item_selected(item)
     }
 
-    fn set_window_size_and_get_video_size(&mut self, control: io::IOControl) -> Size {
+    fn set_window_tile(&mut self, control: &io::IOControl) {
+        if let Some(ref title) = control.title {
+            self.window.borrow_mut().set_title(title).unwrap();
+        }
+    }
+
+    fn set_window_size_and_get_video_size(&mut self, control: &io::IOControl) -> Size {
         if control.common.video_size != VideoSizeControl::FullScreen {
             let [video_width, video_height]: [u32; 2] = control.common.video_size.into();
             self.window
@@ -265,11 +271,11 @@ impl IOSdl2ImGuiOpenGl {
 impl io::IO for IOSdl2ImGuiOpenGl {
     fn present_frame(&mut self, control: io::IOControl) -> io::IOState {
         let mut io_state: io::IOState = Default::default();
-        let video_size = self.set_window_size_and_get_video_size(control);
-        self.gui_builder.prepare_for_new_frame(control, video_size);
+        self.set_window_tile(&control);
+        let video_size = self.set_window_size_and_get_video_size(&control);
+        self.gui_builder
+            .prepare_for_new_frame(control.clone(), video_size);
         self.keyboard_shortcuts = Default::default();
-
-        //self.window.set_icon(icon)
 
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
         for event in self.events.poll_iter() {

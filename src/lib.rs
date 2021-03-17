@@ -43,7 +43,7 @@ fn read_nes_file(file_name: &str) -> nes_file::NesFile {
 
 pub fn run() {
     let io = Rc::new(RefCell::new(
-        io::io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl::new("nes-rs"),
+        io::io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl::new(),
     ));
     let controller_1 =
         Rc::new(keyboard::KeyboardController::get_default_keyboard_controller_player1(io.clone()));
@@ -51,11 +51,12 @@ pub fn run() {
         Rc::new(keyboard::KeyboardController::get_default_keyboard_controller_player2(io.clone()));
 
     let mut nes = nes::Nes::new(io.clone(), controller_1.clone(), controller_2.clone());
-
+    let mut initial_title: Option<String> = None;
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {
         let path = &args[1];
         load(&mut nes, &path);
+        initial_title = Some(path.clone());
     };
 
     let frame_duration: std::time::Duration = std::time::Duration::from_nanos(
@@ -72,6 +73,7 @@ pub fn run() {
     let mut io_control = io::IOControl {
         target_fps: common::DEFAULT_FPS as u16,
         current_fps: 0,
+        title: initial_title,
         common: io::IOCommon {
             pause: false,
             audio_enabled: true,
@@ -94,7 +96,7 @@ pub fn run() {
                 fps = 1;
             }
         }
-        io_state = io.borrow_mut().present_frame(io_control);
+        io_state = io.borrow_mut().present_frame(io_control.clone());
 
         handle_io_state(&mut nes, &io_state, &mut io_control);
 
@@ -119,6 +121,7 @@ fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut 
 
     if let Some(ref nes_file_path) = io_state.load_nes_file {
         load(nes, nes_file_path.as_str());
+        io_control.title = Some(nes_file_path.clone());
     }
 
     if let Some(ref speed) = io_state.speed {

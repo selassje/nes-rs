@@ -71,11 +71,12 @@ pub struct IOState {
     pub audio_volume_control: Option<AudioVolumeControl>,
 }
 
-#[derive(Copy, Clone, Default)]
+#[derive(Clone, Default)]
 pub struct IOControl {
     pub common: IOCommon,
     pub target_fps: u16,
     pub current_fps: u16,
+    pub title: Option<String>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
