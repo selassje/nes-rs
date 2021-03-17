@@ -80,7 +80,6 @@ impl IOSdl2ImGuiOpenGl {
         let mut window = video_subsys
             .window("NES-RS", video_width, MENU_BAR_HEIGHT as u32 + video_height)
             .position_centered()
-            .resizable()
             .opengl()
             .build()
             .unwrap();
