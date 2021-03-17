@@ -11,6 +11,7 @@ use super::{io_internal, VideoSizeControl};
 use crate::io;
 
 use gl::types::*;
+use sdl2::image::ImageRWops;
 
 const MENU_BAR_HEIGHT: usize = 18;
 
@@ -76,12 +77,20 @@ impl IOSdl2ImGuiOpenGl {
         }
 
         let [video_width, video_height]: [u32; 2] = io::VideoSizeControl::Double.into();
-        let window = video_subsys
+        let mut window = video_subsys
             .window(title, video_width, MENU_BAR_HEIGHT as u32 + video_height)
             .position_centered()
+            .resizable()
             .opengl()
             .build()
             .unwrap();
+
+        window.set_icon(
+            sdl2::rwops::RWops::from_bytes(include_bytes!("../../res/icon/Nintendo-gray-icon.png"))
+                .unwrap()
+                .load_png()
+                .unwrap(),
+        );
 
         let _gl_context = window
             .gl_create_context()
@@ -259,6 +268,8 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         let video_size = self.set_window_size_and_get_video_size(control);
         self.gui_builder.prepare_for_new_frame(control, video_size);
         self.keyboard_shortcuts = Default::default();
+
+        //self.window.set_icon(icon)
 
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
         for event in self.events.poll_iter() {

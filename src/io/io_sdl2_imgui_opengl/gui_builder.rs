@@ -88,10 +88,10 @@ pub(super) fn prepare_fonts(imgui: &mut imgui::Context) -> GuiFonts {
 
     let mut fonts = [default_font; 3];
     fonts[GuiFont::FpsCounter as usize] =
-        add_font_from_ttf!("../../../res/OpenSans-Regular.ttf", 30.0, imgui);
+        add_font_from_ttf!("../../../res/fonts/OpenSans-Regular.ttf", 30.0, imgui);
 
     fonts[GuiFont::MenuBar as usize] =
-        add_font_from_ttf!("../../../res/Roboto-Regular.ttf", 20.0, imgui);
+        add_font_from_ttf!("../../../res/fonts/Roboto-Regular.ttf", 20.0, imgui);
     fonts
 }
 pub(super) struct GuiBuilder {
@@ -138,8 +138,7 @@ impl GuiBuilder {
 
     fn update_menu_item_status(&mut self, ui: &mut imgui::Ui, item: MenuBarItem) {
         self.menu_bar_item_selected[item as usize] = ui.is_item_clicked(imgui::MouseButton::Left)
-            || (ui.is_item_hovered()
-                && ui.key_pressed_amount(sdl2::keyboard::Scancode::Return as _, 0.0, 0.0) == 1);
+            || (ui.is_item_hovered() && ui.key_pressed_amount(imgui::Key::Enter, 0.0, 0.0) == 1);
     }
 
     fn build_menu_bar_and_check_for_mouse_events(&mut self, ui: &mut imgui::Ui) {

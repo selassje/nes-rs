@@ -36,19 +36,19 @@ debug = true
 cfg-if = "0.1"
 enum-tryfrom = "0.2.1"
 enum-tryfrom-derive = "0.2.1"
-imgui = "0.5.0"
-imgui-opengl-renderer = "0.9"
-imgui-sdl2 = "0.12"
+imgui = "0.7.0"
+imgui-opengl-renderer = "0.11"
+imgui-sdl2 = "0.14"
 gl = "0.10.0"
 nfd = "0.0.4"
 
 [dependencies.sdl2]
 version = "0.34"
 default-features = false
-features = ["static-link","use-vcpkg"]
+features = ["static-link","use-vcpkg", "image"]
 
 [package.metadata.vcpkg]
-dependencies = ["sdl2"]
+dependencies = ["sdl2","sdl2-image[libjpeg-turbo,tiff,libwebp]"]
 git = "https://github.com/microsoft/vcpkg"
 rev = "a0518036077baa4"
 
