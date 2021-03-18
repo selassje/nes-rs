@@ -17,6 +17,7 @@ fn shortcut_to_menu_bar_item(key: KeyboardShortcut) -> Option<MenuBarItem> {
         LeftCtrl(Scancode::Equals) => Some(MenuBarItem::SpeedIncrease),
         LeftCtrl(Scancode::Minus) => Some(MenuBarItem::SpeedDecrease),
         LeftCtrl(Scancode::A) => Some(MenuBarItem::AudioEnabled),
+        LeftCtrl(Scancode::C) => Some(MenuBarItem::ControllersSetup),
         Single(Scancode::Minus) => Some(MenuBarItem::VolumeDecrease),
         Single(Scancode::Equals) => Some(MenuBarItem::VolumeIncrease),
         Single(Scancode::F8) => Some(MenuBarItem::VideoSizeNormal),

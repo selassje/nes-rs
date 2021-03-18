@@ -247,6 +247,14 @@ impl GuiBuilder {
                     self.update_menu_item_status(ui, VolumeDecrease);
                 });
             });
+            with_token!(ui, begin_main_menu_bar, (), {
+                with_token!(ui, begin_menu, (im_str!("Controllers"), true), {
+                    create_menu_item!("Setup", "Ctrl + C")
+                        .selected(self.io_control.common.controllers_setup)
+                        .build(ui);
+                    self.update_menu_item_status(ui, ControllersSetup);
+                });
+            });
         });
     }
 

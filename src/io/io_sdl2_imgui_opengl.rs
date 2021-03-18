@@ -13,7 +13,8 @@ use crate::io;
 use gl::types::*;
 use sdl2::image::ImageRWops;
 
-const MENU_BAR_HEIGHT: usize = 18;
+const MENU_BAR_HEIGHT: u32 = 18;
+const MIN_WINDOW_WIDTH: u32 = 360;
 
 type Size = [f32; 2];
 
@@ -36,6 +37,7 @@ pub enum MenuBarItem {
     VideoSizeTriple,
     VideoSizeQuadrupal,
     VideoSizeFullScreen,
+    ControllersSetup,
     None,
 }
 
@@ -147,11 +149,12 @@ impl IOSdl2ImGuiOpenGl {
     fn update_io_state(&mut self, io_state: &mut io::IOState) {
         let io_common = self.gui_builder.get_io_common();
 
+        io_state.common.choose_nes_file = self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile);
+        io_state.common.volume = io_common.volume;
+
         io_state.quit |= self.is_menu_bar_item_selected(MenuBarItem::Quit);
         io_state.power_cycle = self.is_menu_bar_item_selected(MenuBarItem::PowerCycle);
-        io_state.common.choose_nes_file = self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile);
         io_state.load_nes_file = self.gui_builder.get_rom_path();
-        io_state.common.volume = io_common.volume;
 
         io_state.speed = None;
         {
@@ -213,7 +216,8 @@ impl IOSdl2ImGuiOpenGl {
 
         io_state.common.pause = toggle(MenuBarItem::Pause, io_common.pause);
         io_state.common.audio_enabled = toggle(MenuBarItem::AudioEnabled, io_common.audio_enabled);
-
+        io_state.common.controllers_setup =
+            toggle(MenuBarItem::ControllersSetup, io_common.controllers_setup);
         io_state.common.pause |= io_state.common.choose_nes_file;
     }
 
@@ -253,7 +257,10 @@ impl IOSdl2ImGuiOpenGl {
                 .unwrap();
             self.window
                 .borrow_mut()
-                .set_size(video_width, video_height + MENU_BAR_HEIGHT as u32)
+                .set_size(
+                    std::cmp::max(video_width, MIN_WINDOW_WIDTH),
+                    video_height + MENU_BAR_HEIGHT as u32,
+                )
                 .unwrap();
             [video_width as f32, video_height as f32]
         } else {

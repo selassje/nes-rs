@@ -78,6 +78,7 @@ pub fn run() {
             pause: false,
             audio_enabled: true,
             choose_nes_file: false,
+            controllers_setup: false,
             volume: 100,
             video_size: VideoSizeControl::Double,
         },

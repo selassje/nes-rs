@@ -60,6 +60,7 @@ pub struct IOCommon {
     pub choose_nes_file: bool,
     pub volume: u8,
     pub video_size: VideoSizeControl,
+    pub controllers_setup: bool,
 }
 #[derive(Default)]
 pub struct IOState {
