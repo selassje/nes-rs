@@ -1,10 +1,11 @@
 use std::ops::RangeInclusive;
 
-use imgui::im_str;
+use imgui::{im_str, ImStr};
 
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
     common,
+    io::ControllerConfig,
     io::IOControl,
     io::{IOCommon, VideoSizeControl},
 };
@@ -259,16 +260,18 @@ impl GuiBuilder {
     }
 
     fn build_emulation_window(&self, ui: &mut imgui::Ui) {
-        let vertical_offset = if self.build_menu_bar {
-            MENU_BAR_HEIGHT as f32
-        } else {
-            0.0
-        };
-        create_unmovable_simple_window!("emulation", [0.0, vertical_offset], self.video_size)
-            .bring_to_front_on_focus(false)
-            .build(ui, || {
-                imgui::Image::new(self.emulation_texture, self.video_size).build(ui);
-            });
+        with_styles!(&ui, (imgui::StyleVar::WindowBorderSize(0.0)), {
+            let vertical_offset = if self.build_menu_bar {
+                MENU_BAR_HEIGHT as f32
+            } else {
+                0.0
+            };
+            create_unmovable_simple_window!("emulation", [0.0, vertical_offset], self.video_size)
+                .bring_to_front_on_focus(false)
+                .build(ui, || {
+                    imgui::Image::new(self.emulation_texture, self.video_size).build(ui);
+                });
+        });
     }
 
     fn build_fps_counter(&self, ui: &mut imgui::Ui) {
@@ -308,6 +311,66 @@ impl GuiBuilder {
         }
     }
 
+    fn build_controller_setup_for_player(&mut self, player_index: usize, ui: &mut imgui::Ui) {
+        let mut controller_config = &mut self.io_control.common.controller_configs[player_index];
+
+        for i in 0..8u8 {
+            let button = crate::controllers::Button::from(i);
+            let caption = imgui::ImString::from(button.to_string());
+            let key = controller_config.mapping[i as usize].key;
+            let mut text = key.to_string();
+
+            if let Some(j) = controller_config.pending_key_select {
+                ui.small_button(&caption);
+            } else if ui.small_button(&caption) {
+                controller_config.pending_key_select = Some(i);
+            }
+
+            if Some(i) == controller_config.pending_key_select {
+                text = String::from("Press key");
+            }
+
+            ui.same_line(150.0);
+            ui.text(text);
+        }
+    }
+
+    fn build_controllers_setup_window(&mut self, ui: &mut imgui::Ui) {
+        with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
+            with_styles!(&ui, (imgui::StyleVar::WindowBorderSize(2.0)), {
+                if let Some(token) = imgui::Window::new(im_str!("Controllers Setup"))
+                    .position(
+                        [self.video_size[0] / 2.0, self.video_size[1] * 0.2],
+                        imgui::Condition::Appearing,
+                    )
+                    .size([200.0, 250.0], imgui::Condition::Appearing)
+                    .collapsible(false)
+                    .no_decoration()
+                    .title_bar(true)
+                    .position_pivot([0.5, 0.1])
+                    .begin(ui)
+                {
+                    if let Some(tab_bar) = imgui::TabBar::new(im_str!("Players")).begin(ui) {
+                        if let Some(player_1_tab) =
+                            imgui::TabItem::new(im_str!("Player 1")).begin(ui)
+                        {
+                            self.build_controller_setup_for_player(0, ui);
+                            player_1_tab.end(ui);
+                        }
+                        if let Some(player_2_tab) =
+                            imgui::TabItem::new(im_str!("Player 2")).begin(ui)
+                        {
+                            self.build_controller_setup_for_player(1, ui);
+                            player_2_tab.end(ui);
+                        }
+                        tab_bar.end(ui);
+                    }
+                    token.end(ui);
+                }
+            });
+        });
+    }
+
     pub(super) fn build(&mut self, mut ui: &mut imgui::Ui) {
         self.build_menu_bar = self.get_io_common().video_size != VideoSizeControl::FullScreen
             || ui.mouse_pos_on_opening_current_popup()[1] < MENU_BAR_HEIGHT as f32
@@ -326,6 +389,11 @@ impl GuiBuilder {
                 }
                 self.build_emulation_window(&mut ui);
                 self.build_fps_counter(&mut ui);
+
+                if self.io_control.common.controllers_setup {
+                    self.build_controllers_setup_window(&mut ui);
+                }
+
                 if self.io_control.common.choose_nes_file {
                     self.build_load_nes_file_explorer();
                     self.io_control.common.pause = false;

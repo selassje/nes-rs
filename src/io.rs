@@ -1,3 +1,5 @@
+use crate::controllers;
+
 mod io_internal;
 pub mod io_sdl2_imgui_opengl;
 pub mod io_test;
@@ -53,6 +55,28 @@ impl Default for VideoSizeControl {
     }
 }
 
+#[derive(Clone, Copy)]
+pub struct ButtonMapping {
+    pub waiting_for_input: bool,
+    pub key: sdl2::keyboard::Scancode,
+}
+
+impl Default for ButtonMapping {
+    fn default() -> Self {
+        Self {
+            waiting_for_input: false,
+            key: sdl2::keyboard::Scancode::A,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Default)]
+pub struct ControllerConfig {
+    pub use_zapper: bool,
+    pub mapping: [ButtonMapping; controllers::Button::Right as usize + 1],
+    pub pending_key_select: Option<u8>,
+}
+
 #[derive(Copy, Clone, Default)]
 pub struct IOCommon {
     pub pause: bool,
@@ -61,6 +85,7 @@ pub struct IOCommon {
     pub volume: u8,
     pub video_size: VideoSizeControl,
     pub controllers_setup: bool,
+    pub controller_configs: [ControllerConfig; 2],
 }
 #[derive(Default)]
 pub struct IOState {

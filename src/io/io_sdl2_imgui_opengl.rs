@@ -219,6 +219,7 @@ impl IOSdl2ImGuiOpenGl {
         io_state.common.controllers_setup =
             toggle(MenuBarItem::ControllersSetup, io_common.controllers_setup);
         io_state.common.pause |= io_state.common.choose_nes_file;
+        io_state.common.controller_configs = io_common.controller_configs;
     }
 
     fn check_for_keyboard_shortcuts(
@@ -331,7 +332,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         );
 
         let mut ui = self.imgui.frame();
-
+        ui.show_demo_window(&mut true);
         self.imgui_sdl2.prepare_render(&ui, &self.window);
 
         self.gui_builder.build(&mut ui);

@@ -1,6 +1,6 @@
 use self::Button::*;
 use crate::ram_controllers::*;
-use std::rc::Rc;
+use std::{fmt::Display, rc::Rc};
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
 pub enum Button {
@@ -27,6 +27,21 @@ impl From<u8> for Button {
             7 => Right,
             _ => panic!("Can't cast {} to Button", value),
         }
+    }
+}
+
+impl Display for Button {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            A => "A",
+            B => "B",
+            Select => "Select",
+            Start => "Start",
+            Up => "Up",
+            Down => "Down",
+            Left => "Left",
+            Right => "Right",
+        })
     }
 }
 
