@@ -254,6 +254,9 @@ impl GuiBuilder {
                         .selected(self.io_control.common.controllers_setup)
                         .build(ui);
                     self.update_menu_item_status(ui, ControllersSetup);
+                    with_token!(ui, begin_menu, (im_str!("Setup2"), true), {
+                        self.build_controllers_setup_window(ui);
+                    });
                 });
             });
         });
@@ -375,16 +378,9 @@ impl GuiBuilder {
     fn build_controllers_setup_window(&mut self, ui: &mut imgui::Ui) {
         with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
             with_styles!(&ui, (imgui::StyleVar::WindowBorderSize(2.0)), {
-                if let Some(token) = imgui::Window::new(im_str!("Controllers Setup"))
-                    .position(
-                        [self.video_size[0] / 2.0, self.video_size[1] * 0.2],
-                        imgui::Condition::Appearing,
-                    )
-                    .size([230.0, 250.0], imgui::Condition::Appearing)
-                    .collapsible(false)
-                    .no_decoration()
-                    .title_bar(true)
-                    .position_pivot([0.5, 0.1])
+                if let Some(token) = imgui::ChildWindow::new(im_str!("Controllers Setup"))
+                    .size([230.0, 250.0])
+                    .border(true)
                     .begin(ui)
                 {
                     if let Some(tab_bar) = imgui::TabBar::new(im_str!("Players")).begin(ui) {
