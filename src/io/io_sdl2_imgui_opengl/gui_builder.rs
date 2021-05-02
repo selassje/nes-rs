@@ -310,6 +310,43 @@ impl GuiBuilder {
             _ => panic!("Unsupported file selection"),
         }
     }
+    pub fn try_get_key_selection(&mut self, event: &sdl2::event::Event) {
+        match *event {
+            sdl2::event::Event::KeyDown {
+                scancode, keymod, ..
+            } => {
+                if keymod & sdl2::keyboard::Mod::NOMOD == sdl2::keyboard::Mod::NOMOD {
+                    if let Some(scancode) = scancode {
+                        if let Some(button) = self.io_control.common.controller_configs[0]
+                            .pending_key_select
+                            .take()
+                        {
+                            self.io_control.common.controller_configs[0].mapping[button as usize]
+                                .key = scancode;
+
+                            self.io_control.common.controller_configs[0].pending_key_select = None;
+                        } else if let Some(button) = self.io_control.common.controller_configs[1]
+                            .pending_key_select
+                            .take()
+                        {
+                            self.io_control.common.controller_configs[1].mapping[button as usize]
+                                .key = scancode;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        };
+    }
+    pub fn is_key_selection_pending(&self) -> bool {
+        self.io_control.common.controllers_setup
+            && (self.io_control.common.controller_configs[0]
+                .pending_key_select
+                .is_some()
+                || self.io_control.common.controller_configs[1]
+                    .pending_key_select
+                    .is_some())
+    }
 
     fn build_controller_setup_for_player(&mut self, player_index: usize, ui: &mut imgui::Ui) {
         let mut controller_config = &mut self.io_control.common.controller_configs[player_index];
@@ -343,7 +380,7 @@ impl GuiBuilder {
                         [self.video_size[0] / 2.0, self.video_size[1] * 0.2],
                         imgui::Condition::Appearing,
                     )
-                    .size([200.0, 250.0], imgui::Condition::Appearing)
+                    .size([230.0, 250.0], imgui::Condition::Appearing)
                     .collapsible(false)
                     .no_decoration()
                     .title_bar(true)
@@ -351,17 +388,27 @@ impl GuiBuilder {
                     .begin(ui)
                 {
                     if let Some(tab_bar) = imgui::TabBar::new(im_str!("Players")).begin(ui) {
-                        if let Some(player_1_tab) =
-                            imgui::TabItem::new(im_str!("Player 1")).begin(ui)
+                        if self.io_control.common.controller_configs[1]
+                            .pending_key_select
+                            .is_none()
                         {
-                            self.build_controller_setup_for_player(0, ui);
-                            player_1_tab.end(ui);
+                            if let Some(player_1_tab) =
+                                imgui::TabItem::new(im_str!("Player 1")).begin(ui)
+                            {
+                                self.build_controller_setup_for_player(0, ui);
+                                player_1_tab.end(ui);
+                            }
                         }
-                        if let Some(player_2_tab) =
-                            imgui::TabItem::new(im_str!("Player 2")).begin(ui)
+                        if self.io_control.common.controller_configs[0]
+                            .pending_key_select
+                            .is_none()
                         {
-                            self.build_controller_setup_for_player(1, ui);
-                            player_2_tab.end(ui);
+                            if let Some(player_2_tab) =
+                                imgui::TabItem::new(im_str!("Player 2")).begin(ui)
+                            {
+                                self.build_controller_setup_for_player(1, ui);
+                                player_2_tab.end(ui);
+                            }
                         }
                         tab_bar.end(ui);
                     }

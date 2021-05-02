@@ -286,7 +286,11 @@ impl io::IO for IOSdl2ImGuiOpenGl {
 
         self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
         for event in self.events.poll_iter() {
-            Self::check_for_keyboard_shortcuts(&event, &mut self.keyboard_shortcuts);
+            if self.gui_builder.is_key_selection_pending() {
+                self.gui_builder.try_get_key_selection(&event);
+            } else {
+                Self::check_for_keyboard_shortcuts(&event, &mut self.keyboard_shortcuts);
+            }
             match event {
                 sdl2::event::Event::Window { win_event, .. } => {
                     io_state.quit = win_event == sdl2::event::WindowEvent::Close
