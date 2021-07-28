@@ -1,11 +1,10 @@
 use std::ops::RangeInclusive;
 
-use imgui::{im_str, ImStr};
+use imgui::im_str;
 
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
     common,
-    io::ControllerConfig,
     io::IOControl,
     io::{IOCommon, VideoSizeControl},
 };
@@ -33,6 +32,9 @@ macro_rules! with_token {
         if let Some(token) = $ui.$token_function($($arg),*) {
             $code
             token.end($ui);
+            true
+        } else {
+            false
         }
     }};
 }
@@ -250,13 +252,17 @@ impl GuiBuilder {
             });
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("Controllers"), true), {
-                    create_menu_item!("Setup", "Ctrl + C")
-                        .selected(self.io_control.common.controllers_setup)
-                        .build(ui);
-                    self.update_menu_item_status(ui, ControllersSetup);
-                    with_token!(ui, begin_menu, (im_str!("Setup2"), true), {
-                        self.build_controllers_setup_window(ui);
-                    });
+                    self.io_control.common.controllers_setup =
+                        with_token!(ui, begin_menu, (im_str!("Setup"), true), {
+                            self.build_controllers_setup_window(ui);
+                        });
+
+                    if !self.io_control.common.controllers_setup {
+                        self.io_control.common.controller_configs[0].pending_key_select =
+                            Option::None;
+                        self.io_control.common.controller_configs[1].pending_key_select =
+                            Option::None;
+                    }
                 });
             });
         });
@@ -359,17 +365,12 @@ impl GuiBuilder {
             let caption = imgui::ImString::from(button.to_string());
             let key = controller_config.mapping[i as usize].key;
             let mut text = key.to_string();
-
-            if let Some(j) = controller_config.pending_key_select {
-                ui.small_button(&caption);
-            } else if ui.small_button(&caption) {
+            if ui.small_button(&caption) && controller_config.pending_key_select.is_none() {
                 controller_config.pending_key_select = Some(i);
             }
-
             if Some(i) == controller_config.pending_key_select {
-                text = String::from("Press key");
+                text = String::from("Press Key");
             }
-
             ui.same_line(150.0);
             ui.text(text);
         }
@@ -379,7 +380,7 @@ impl GuiBuilder {
         with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
             with_styles!(&ui, (imgui::StyleVar::WindowBorderSize(2.0)), {
                 if let Some(token) = imgui::ChildWindow::new(im_str!("Controllers Setup"))
-                    .size([230.0, 250.0])
+                    .size([230.0, 230.0])
                     .border(true)
                     .begin(ui)
                 {
@@ -434,7 +435,7 @@ impl GuiBuilder {
                 self.build_fps_counter(&mut ui);
 
                 if self.io_control.common.controllers_setup {
-                    self.build_controllers_setup_window(&mut ui);
+                    //   self.build_controllers_setup_window(&mut ui);
                 }
 
                 if self.io_control.common.choose_nes_file {

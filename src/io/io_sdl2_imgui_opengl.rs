@@ -103,10 +103,10 @@ impl IOSdl2ImGuiOpenGl {
 
         let mut imgui = imgui::Context::create();
         imgui.set_ini_filename(None);
-        imgui
-            .io_mut()
-            .config_flags
-            .set(imgui::ConfigFlags::NAV_ENABLE_KEYBOARD, true);
+        // imgui
+        //     .io_mut()
+        //     .config_flags
+        //     .set(imgui::ConfigFlags::NAV_ENABLE_KEYBOARD, true);
 
         let imgui_sdl2 = imgui_sdl2::ImguiSdl2::new(&mut imgui, &window);
 
@@ -336,7 +336,6 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         );
 
         let mut ui = self.imgui.frame();
-        ui.show_demo_window(&mut true);
         self.imgui_sdl2.prepare_render(&ui, &self.window);
 
         self.gui_builder.build(&mut ui);

@@ -1,6 +1,5 @@
 use std::{cell::RefCell, env, fs::File, io::Read, rc::Rc};
 
-use gl::COMPRESSED_TEXTURE_FORMATS;
 use io::{VideoSizeControl, IO};
 
 mod apu;
