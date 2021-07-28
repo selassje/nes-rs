@@ -5,7 +5,7 @@ use imgui::im_str;
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
     common,
-    io::IOControl,
+    io::{ControllerConfig, IOControl},
     io::{IOCommon, VideoSizeControl},
 };
 
@@ -109,12 +109,20 @@ pub(super) struct GuiBuilder {
 
 impl GuiBuilder {
     pub fn new(emulation_texture: imgui::TextureId, fonts: GuiFonts) -> Self {
+        let common = IOCommon {
+            controller_configs: [ControllerConfig::new(0), ControllerConfig::new(1)],
+            ..Default::default()
+        };
+
         Self {
             emulation_texture,
             menu_bar_item_selected: Default::default(),
             fonts,
             rom_path: None,
-            io_control: Default::default(),
+            io_control: IOControl {
+                common,
+                ..Default::default()
+            },
             video_size: Default::default(),
             build_menu_bar: Default::default(),
         }
@@ -433,10 +441,6 @@ impl GuiBuilder {
                 }
                 self.build_emulation_window(&mut ui);
                 self.build_fps_counter(&mut ui);
-
-                if self.io_control.common.controllers_setup {
-                    //   self.build_controllers_setup_window(&mut ui);
-                }
 
                 if self.io_control.common.choose_nes_file {
                     self.build_load_nes_file_explorer();

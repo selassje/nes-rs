@@ -1,6 +1,6 @@
 use std::{cell::RefCell, env, fs::File, io::Read, rc::Rc};
 
-use io::{VideoSizeControl, IO};
+use io::{ControllerConfig, VideoSizeControl, IO};
 
 mod apu;
 mod colors;
@@ -81,7 +81,7 @@ pub fn run() {
             controllers_setup: false,
             volume: 100,
             video_size: VideoSizeControl::Double,
-            controller_configs: Default::default(),
+            controller_configs: [ControllerConfig::new(0), ControllerConfig::new(1)],
         },
     };
 

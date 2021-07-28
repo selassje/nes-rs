@@ -70,11 +70,53 @@ impl Default for ButtonMapping {
     }
 }
 
+impl ButtonMapping {
+    pub fn new(key: sdl2::keyboard::Scancode) -> Self {
+        Self {
+            waiting_for_input: false,
+            key,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Default)]
 pub struct ControllerConfig {
     pub use_zapper: bool,
     pub mapping: [ButtonMapping; controllers::Button::Right as usize + 1],
     pub pending_key_select: Option<u8>,
+}
+
+impl ControllerConfig {
+    pub fn new(player: u8) -> Self {
+        use sdl2::keyboard::Scancode::*;
+        Self {
+            use_zapper: false,
+            pending_key_select: None,
+            mapping: match player {
+                0 => [
+                    ButtonMapping::new(Q),
+                    ButtonMapping::new(E),
+                    ButtonMapping::new(C),
+                    ButtonMapping::new(Space),
+                    ButtonMapping::new(W),
+                    ButtonMapping::new(S),
+                    ButtonMapping::new(A),
+                    ButtonMapping::new(D),
+                ],
+                1 => [
+                    ButtonMapping::new(Kp4),
+                    ButtonMapping::new(Kp5),
+                    ButtonMapping::new(Kp6),
+                    ButtonMapping::new(KpPlus),
+                    ButtonMapping::new(Up),
+                    ButtonMapping::new(Left),
+                    ButtonMapping::new(Right),
+                    ButtonMapping::new(Down),
+                ],
+                _ => panic!("Wrong player"),
+            },
+        }
+    }
 }
 
 #[derive(Copy, Clone, Default)]
