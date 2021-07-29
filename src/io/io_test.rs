@@ -1,52 +1,28 @@
 use std::collections::HashMap;
 
-use crate::io::{AudioAccess, KeyboardAccess, RgbColor, VideoAccess, IO};
-use crate::{controllers::Button, io::io_internal::IOInternal, keyboard::ButtonKeyMap};
+use crate::io::{AudioAccess, ControllerAccess, RgbColor, VideoAccess, IO};
+use crate::{controllers::Button, controllers::ControllerId, io::io_internal::IOInternal};
 
-use super::{IOControl, IOState, KeyCode};
-#[derive(PartialEq)]
-pub enum Player {
-    Player1,
-    _Player2,
-}
+use super::{IOControl, IOState};
 
 pub struct IOTest {
     io_internal: IOInternal,
-    player_1_button_key_map: ButtonKeyMap,
-    player_2_button_key_map: ButtonKeyMap,
-    keys_state: HashMap<KeyCode, bool>,
+    controller_buttons_state: [HashMap<Button, bool>; 2],
 }
 
 impl IOTest {
     pub fn new(_: &str) -> Self {
         IOTest {
             io_internal: IOInternal::new(),
-            player_1_button_key_map: HashMap::new(),
-            player_2_button_key_map: HashMap::new(),
-            keys_state: HashMap::new(),
+            controller_buttons_state: [HashMap::new(), HashMap::new()],
         }
     }
     pub fn dump_frame(&self, path: &str) {
         self.io_internal.dump_frame(path);
     }
 
-    pub fn set_button_state(&mut self, button: Button, player1: Player, state: bool) {
-        let mapping = if player1 == Player::Player1 {
-            self.player_1_button_key_map.clone()
-        } else {
-            self.player_2_button_key_map.clone()
-        };
-        let key = mapping.get(&button).unwrap();
-        self.keys_state.insert(*key, state);
-    }
-
-    pub fn set_key_mappings(
-        &mut self,
-        player_1_button_key_map: ButtonKeyMap,
-        player_2_button_key_map: ButtonKeyMap,
-    ) {
-        self.player_1_button_key_map = player_1_button_key_map;
-        self.player_2_button_key_map = player_2_button_key_map;
+    pub fn set_button_state(&mut self, button: Button, controller_id: ControllerId, state: bool) {
+        self.controller_buttons_state[controller_id as usize].insert(button, state);
     }
 }
 
@@ -70,9 +46,12 @@ impl VideoAccess for IOTest {
     }
 }
 
-impl KeyboardAccess for IOTest {
-    fn is_key_pressed(&self, key: crate::io::KeyCode) -> bool {
-        let key_state = self.keys_state.get(&key);
-        *key_state.unwrap_or(&false)
+impl ControllerAccess for IOTest {
+    fn is_button_pressed(&self, controller_id: ControllerId, button: Button) -> bool {
+        if let Some(pressed) = self.controller_buttons_state[controller_id as usize].get(&button) {
+            *pressed
+        } else {
+            false
+        }
     }
 }

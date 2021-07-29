@@ -1,6 +1,6 @@
 use self::Button::*;
-use crate::ram_controllers::*;
-use std::{fmt::Display, rc::Rc};
+use crate::{io::ControllerAccess, ram_controllers::*};
+use std::{cell::RefCell, fmt::Display, rc::Rc};
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
 pub enum Button {
@@ -12,6 +12,12 @@ pub enum Button {
     Down,
     Left,
     Right,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum ControllerId {
+    Controller1,
+    Controller2,
 }
 
 impl From<u8> for Button {
@@ -56,7 +62,8 @@ pub struct Controllers {
 }
 
 struct ControllerState {
-    controller: Rc<dyn Controller>,
+    id: ControllerId,
+    controller_access: Rc<RefCell<dyn ControllerAccess>>,
     button: u8,
 }
 
@@ -64,19 +71,32 @@ impl ControllerState {
     fn read(&mut self, strobe: bool) -> u8 {
         if self.button < 8 {
             let button: Button = self.button.into();
-            let mut val = self.controller.is_button_pressed(button);
-            if val != 0
+            let mut val = self
+                .controller_access
+                .borrow()
+                .is_button_pressed(self.id, button);
+            if val
                 && ((button == Button::Left
-                    && self.controller.is_button_pressed(Button::Right) != 0)
-                    || button == Button::Down && self.controller.is_button_pressed(Button::Up) != 0)
+                    && self
+                        .controller_access
+                        .borrow()
+                        .is_button_pressed(self.id, Button::Right))
+                    || button == Button::Down
+                        && self
+                            .controller_access
+                            .borrow()
+                            .is_button_pressed(self.id, Button::Up))
             {
-                val = 0;
+                val = false;
             }
-
             if !strobe {
                 self.button += 1;
             }
-            val
+            if val {
+                1
+            } else {
+                0
+            }
         } else {
             1
         }
@@ -84,14 +104,16 @@ impl ControllerState {
 }
 
 impl Controllers {
-    pub fn new(controller_1: Rc<dyn Controller>, controller_2: Rc<dyn Controller>) -> Self {
+    pub fn new(controller_access: Rc<RefCell<dyn ControllerAccess>>) -> Self {
         Controllers {
             controller_1: ControllerState {
-                controller: controller_1,
+                id: ControllerId::Controller1,
+                controller_access: controller_access.clone(),
                 button: 0,
             },
             controller_2: ControllerState {
-                controller: controller_2,
+                id: ControllerId::Controller2,
+                controller_access,
                 button: 0,
             },
             strobe: true,

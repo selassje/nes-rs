@@ -10,7 +10,6 @@ mod cpu;
 mod cpu_apu;
 mod cpu_ppu;
 mod io;
-mod keyboard;
 mod mappers;
 mod memory;
 mod nes;
@@ -45,12 +44,8 @@ pub fn run() {
     let io = Rc::new(RefCell::new(
         io::io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl::new(),
     ));
-    let controller_1 =
-        Rc::new(keyboard::KeyboardController::get_default_keyboard_controller_player1(io.clone()));
-    let controller_2 =
-        Rc::new(keyboard::KeyboardController::get_default_keyboard_controller_player2(io.clone()));
 
-    let mut nes = nes::Nes::new(io.clone(), controller_1.clone(), controller_2.clone());
+    let mut nes = nes::Nes::new(io.clone());
     let mut initial_title: Option<String> = None;
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 {

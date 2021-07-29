@@ -147,26 +147,6 @@ pub struct IOControl {
     pub title: Option<String>,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub enum KeyCode {
-    Q,
-    E,
-    C,
-    Space,
-    W,
-    S,
-    A,
-    D,
-    Kp4,
-    Kp5,
-    Kp6,
-    KpPlus,
-    Up,
-    Down,
-    Left,
-    Right,
-}
-
 pub trait AudioAccess {
     fn add_sample(&mut self, sample: AudioSampleFormat);
 }
@@ -180,6 +160,10 @@ pub trait IO {
     fn is_audio_available(&self) -> bool;
 }
 
-pub trait KeyboardAccess {
-    fn is_key_pressed(&self, key: KeyCode) -> bool;
+pub trait ControllerAccess {
+    fn is_button_pressed(
+        &self,
+        controller_id: controllers::ControllerId,
+        button: controllers::Button,
+    ) -> bool;
 }

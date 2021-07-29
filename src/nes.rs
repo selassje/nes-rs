@@ -1,14 +1,14 @@
+use crate::apu::APU;
 use crate::common;
 use crate::controllers;
 use crate::io::AudioAccess;
-use crate::io::KeyboardAccess;
+use crate::io::ControllerAccess;
 use crate::io::VideoAccess;
 use crate::io::IO;
 use crate::nes_file::NesFile;
 use crate::ppu::PPU;
 use crate::ram::RAM;
 use crate::vram::VRAM;
-use crate::{apu::APU, controllers::Controller};
 use crate::{cpu::CPU, mappers::Mapper};
 
 use std::cell::RefCell;
@@ -25,18 +25,11 @@ pub struct Nes {
 }
 
 impl Nes {
-    pub fn new<T>(
-        io: Rc<RefCell<T>>,
-        controller_1: Rc<dyn Controller>,
-        controller_2: Rc<dyn Controller>,
-    ) -> Self
+    pub fn new<T>(io: Rc<RefCell<T>>) -> Self
     where
-        T: IO + VideoAccess + AudioAccess + KeyboardAccess + 'static,
+        T: IO + VideoAccess + AudioAccess + ControllerAccess + 'static,
     {
-        let controllers = Rc::new(RefCell::new(controllers::Controllers::new(
-            controller_1,
-            controller_2,
-        )));
+        let controllers = Rc::new(RefCell::new(controllers::Controllers::new(io.clone())));
         let mapper = Rc::new(RefCell::new(crate::mappers::MapperNull::new()));
         let vram = Rc::new(RefCell::new(VRAM::new(mapper.clone())));
         let ppu = Rc::new(RefCell::new(PPU::new(

@@ -1,14 +1,13 @@
 mod audio_sample_buffer;
 mod gui_builder;
 mod keyboard_shortcuts;
-mod keycode_to_sdl2_scancode;
 
 use std::default::Default;
 use std::iter::FromIterator;
 use std::{borrow::BorrowMut, collections::HashMap};
 
 use super::{io_internal, VideoSizeControl};
-use crate::io;
+use crate::{controllers, io};
 
 use gl::types::*;
 use sdl2::image::ImageRWops;
@@ -360,9 +359,16 @@ impl io::AudioAccess for IOSdl2ImGuiOpenGl {
     }
 }
 
-impl io::KeyboardAccess for IOSdl2ImGuiOpenGl {
-    fn is_key_pressed(&self, key: io::KeyCode) -> bool {
-        let sdl2_scancode = keycode_to_sdl2_scancode::keycode_to_sdl2_scancode(key);
+impl io::ControllerAccess for IOSdl2ImGuiOpenGl {
+    fn is_button_pressed(
+        &self,
+        controller_id: controllers::ControllerId,
+        button: controllers::Button,
+    ) -> bool {
+        let sdl2_scancode = self.gui_builder.get_io_common().controller_configs
+            [controller_id as usize]
+            .mapping[button as usize]
+            .key;
         let key_state = self.keyboard_state.get(&sdl2_scancode);
         *key_state.unwrap_or(&false)
     }

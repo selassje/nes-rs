@@ -1,4 +1,9 @@
-use crate::{controllers::Button, io::io_test, keyboard, nes::Nes, read_nes_file};
+use crate::{
+    controllers::{Button, ControllerId},
+    io::io_test,
+    nes::Nes,
+    read_nes_file,
+};
 use fs::File;
 use std::{cell::RefCell, fs, io::Read, path::Path, path::PathBuf, rc::Rc, time::Duration};
 
@@ -26,17 +31,7 @@ impl NesTest {
     ) -> Self {
         let io_test = Rc::new(RefCell::new(io_test::IOTest::new(rom_path)));
         let nes_file = read_nes_file(rom_path);
-        let controller_1 = Rc::new(
-            keyboard::KeyboardController::get_default_keyboard_controller_player1(io_test.clone()),
-        );
-        let controller_2 = Rc::new(
-            keyboard::KeyboardController::get_default_keyboard_controller_player1(io_test.clone()),
-        );
-        io_test.borrow_mut().set_key_mappings(
-            controller_1.get_key_mappings(),
-            controller_2.get_key_mappings(),
-        );
-        let mut nes = Nes::new(io_test.clone(), controller_1, controller_2);
+        let mut nes = Nes::new(io_test.clone());
         let mut dir = PathBuf::from(rom_path);
         let mut test_name = dir.file_name().unwrap().to_str().unwrap().to_owned();
         if let Some(suffix) = suffix {
@@ -88,19 +83,21 @@ impl NesTest {
     pub fn press_player_1_start(&mut self) {
         self.io_test
             .borrow_mut()
-            .set_button_state(Button::Start, io_test::Player::Player1, true);
+            .set_button_state(Button::Start, ControllerId::Controller1, true);
     }
 
     pub fn press_player_1_select(&mut self) {
         self.io_test
             .borrow_mut()
-            .set_button_state(Button::Select, io_test::Player::Player1, true);
+            .set_button_state(Button::Select, ControllerId::Controller1, true);
     }
 
     pub fn release_player_1_select(&mut self) {
-        self.io_test
-            .borrow_mut()
-            .set_button_state(Button::Select, io_test::Player::Player1, false);
+        self.io_test.borrow_mut().set_button_state(
+            Button::Select,
+            ControllerId::Controller1,
+            false,
+        );
     }
 
     fn dump_frame(&self) {
