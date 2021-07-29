@@ -7,8 +7,6 @@ mod colors;
 mod common;
 mod controllers;
 mod cpu;
-mod cpu_apu;
-mod cpu_ppu;
 mod io;
 mod mappers;
 mod memory;

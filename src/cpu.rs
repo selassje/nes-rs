@@ -1,8 +1,9 @@
 mod opcodes;
 
 use self::{opcodes::IRQ_OPCODE, AddressingMode::*};
+use crate::apu::ApuState;
+use crate::ppu::PpuState;
 use crate::{common::*, memory::Memory};
-use crate::{cpu_apu::ApuState, cpu_ppu::PpuState};
 use crate::{mappers::Mapper, ram_ppu::DmaWriteAccessRegister::OamDma};
 use opcodes::{get_opcodes, OpCodes, NMI_OPCODE};
 use std::cell::RefCell;

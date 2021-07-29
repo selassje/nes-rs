@@ -1,4 +1,14 @@
-use crate::cpu_ppu::PpuState;
+pub struct PpuTime {
+    pub scanline: i16,
+    pub cycle: u16,
+    pub frame: u128,
+}
+
+pub trait PpuState {
+    fn is_nmi_pending(&mut self) -> bool;
+    fn clear_nmi_pending(&mut self);
+    fn get_time(&self) -> PpuTime;
+}
 use crate::{
     colors::{ColorMapper, DefaultColorMapper, RgbColor},
     io::FRAME_WIDTH,
@@ -866,8 +876,8 @@ impl PpuState for PPU {
         self.nmi_pending
     }
 
-    fn get_time(&self) -> crate::cpu_ppu::PpuTime {
-        crate::cpu_ppu::PpuTime {
+    fn get_time(&self) -> crate::ppu::PpuTime {
+        crate::ppu::PpuTime {
             scanline: self.scanline,
             cycle: self.ppu_cycle,
             frame: self.frame,

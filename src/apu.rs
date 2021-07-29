@@ -1,5 +1,8 @@
+pub trait ApuState {
+    fn is_irq_pending(&self) -> bool;
+}
 use self::StatusRegisterFlag::*;
-use crate::{cpu_apu::ApuState, io::AudioAccess, memory::DmcMemory, ram_apu::*};
+use crate::{io::AudioAccess, memory::DmcMemory, ram_apu::*};
 use std::{cell::RefCell, default::Default, rc::Rc};
 
 use crate::io::AudioSampleFormat;
