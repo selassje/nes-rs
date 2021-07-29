@@ -3,6 +3,7 @@ name = "nes-rs"
 version = "0.1.0"
 authors = ["Przemyslaw Koziol <przemkoz85@gmail.com>"]
 edition = "2018"
+resolver = "2"
 
 [[test]]
 name = "branch_timing_tests"
@@ -32,6 +33,12 @@ path = "tests/cpu_interrupts_v2.rs"
 [profile.release] 
 debug = true
 
+[target.x86_64-pc-windows-msvc.dependencies]
+sdl2 = {version = "0.34", default-features = false, features = ["static-link","use-vcpkg", "image"]}
+
+[target.wasm32-unknown-emscripten.dependencies]
+sdl2 = {version = "0.34", default-features = false, features = []}
+
 [dependencies]
 cfg-if = "0.1"
 enum-tryfrom = "0.2.1"
@@ -41,11 +48,6 @@ imgui-opengl-renderer = "0.11"
 imgui-sdl2 = "0.14"
 gl = "0.10.0"
 nfd = "0.0.4"
-
-[dependencies.sdl2]
-version = "0.34"
-default-features = false
-features = ["static-link","use-vcpkg", "image"]
 
 [package.metadata.vcpkg]
 dependencies = ["sdl2","sdl2-image[libjpeg-turbo,tiff,libwebp]"]
