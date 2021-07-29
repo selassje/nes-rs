@@ -206,10 +206,6 @@ impl GuiBuilder {
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("Video"), true), {
                     with_token!(ui, begin_menu, (im_str!("Size"), true), {
-                        create_menu_item!("100%", "F8")
-                            .selected(self.io_control.common.video_size == VideoSizeControl::Normal)
-                            .build(ui);
-                        self.update_menu_item_status(ui, VideoSizeNormal);
                         create_menu_item!("200%", "F9")
                             .selected(self.io_control.common.video_size == VideoSizeControl::Double)
                             .build(ui);
@@ -317,7 +313,7 @@ impl GuiBuilder {
 
     fn build_load_nes_file_explorer(&mut self) {
         let result = nfd::open_file_dialog(None, None).unwrap_or_else(|e| {
-            panic!(e);
+            panic!("{:?}", e);
         });
         match result {
             nfd::Response::Okay(file_path) => {
@@ -424,10 +420,7 @@ impl GuiBuilder {
     }
 
     pub(super) fn build(&mut self, mut ui: &mut imgui::Ui) {
-        self.build_menu_bar = self.get_io_common().video_size != VideoSizeControl::FullScreen
-            || ui.mouse_pos_on_opening_current_popup()[1] < MENU_BAR_HEIGHT as f32
-            || ui.is_any_item_hovered();
-
+        self.build_menu_bar = self.get_io_common().video_size != VideoSizeControl::FullScreen;
         with_styles!(
             &mut ui,
             (

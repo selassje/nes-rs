@@ -24,7 +24,7 @@ pub enum AudioVolumeControl {
 }
 #[derive(Clone, Copy, PartialEq)]
 pub enum VideoSizeControl {
-    Normal = 1,
+    _Normal = 1,
     Double = 2,
     Triple = 3,
     Quadrupal = 4,

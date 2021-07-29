@@ -189,7 +189,6 @@ impl IOSdl2ImGuiOpenGl {
                         io_state.common.video_size = video_size;
                     }
                 };
-            set_video_size_selection(MenuBarItem::VideoSizeNormal, io::VideoSizeControl::Normal);
             set_video_size_selection(MenuBarItem::VideoSizeDouble, io::VideoSizeControl::Double);
             set_video_size_selection(MenuBarItem::VideoSizeTriple, io::VideoSizeControl::Triple);
             set_video_size_selection(
