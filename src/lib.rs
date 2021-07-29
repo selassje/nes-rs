@@ -69,7 +69,6 @@ pub fn run() {
         title: initial_title,
         common: io::IOCommon {
             pause: false,
-            audio_enabled: true,
             choose_nes_file: false,
             controllers_setup: false,
             volume: 100,

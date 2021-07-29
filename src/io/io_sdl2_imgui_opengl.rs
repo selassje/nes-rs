@@ -200,6 +200,15 @@ impl IOSdl2ImGuiOpenGl {
                 io::VideoSizeControl::FullScreen,
             );
         }
+        {
+            let mut toggle = |item: MenuBarItem| {
+                if self.keyboard_shortcuts.is_menu_bar_item_selected(item) {
+                    self.gui_builder.toggle_menu_bar_item(item)
+                }
+            };
+            toggle(MenuBarItem::AudioEnabled);
+        }
+
         let toggle = |item: MenuBarItem, value: bool| {
             if self.is_menu_bar_item_selected(item) {
                 !value
@@ -209,7 +218,6 @@ impl IOSdl2ImGuiOpenGl {
         };
 
         io_state.common.pause = toggle(MenuBarItem::Pause, io_common.pause);
-        io_state.common.audio_enabled = toggle(MenuBarItem::AudioEnabled, io_common.audio_enabled);
         io_state.common.controllers_setup =
             toggle(MenuBarItem::ControllersSetup, io_common.controllers_setup);
         io_state.common.pause |= io_state.common.choose_nes_file;
@@ -301,7 +309,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 audio_queue.resume();
                 while audio_queue.size() as usize > self.sample_buffer.get_byte_size() * 10 {}
                 audio_queue.queue(&self.sample_buffer.get_samples());
-                let volume = if control.common.audio_enabled {
+                let volume = if self.gui_builder.is_audio_enabled() {
                     control.common.volume as f32 / 100.0
                 } else {
                     0.0

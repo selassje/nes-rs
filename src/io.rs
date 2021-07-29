@@ -122,7 +122,6 @@ impl ControllerConfig {
 #[derive(Copy, Clone, Default)]
 pub struct IOCommon {
     pub pause: bool,
-    pub audio_enabled: bool,
     pub choose_nes_file: bool,
     pub volume: u8,
     pub video_size: VideoSizeControl,

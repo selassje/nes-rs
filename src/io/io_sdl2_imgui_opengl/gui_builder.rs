@@ -132,12 +132,15 @@ impl GuiBuilder {
         self.io_control.common
     }
 
+    pub fn is_audio_enabled(&self) -> bool {
+        self.is_menu_bar_item_selected(MenuBarItem::AudioEnabled)
+    }
+
     pub fn get_rom_path(&mut self) -> Option<String> {
         self.rom_path.take()
     }
 
     pub fn prepare_for_new_frame(&mut self, io_control: IOControl, video_size: super::Size) {
-        self.menu_bar_item_selected = Default::default();
         self.rom_path = None;
         self.io_control = io_control;
         self.video_size = video_size;
@@ -152,6 +155,17 @@ impl GuiBuilder {
             || (ui.is_item_hovered() && ui.key_pressed_amount(imgui::Key::Enter, 0.0, 0.0) == 1);
     }
 
+    pub fn toggle_menu_bar_item(&mut self, item: MenuBarItem) {
+        self.menu_bar_item_selected[item as usize] = !self.menu_bar_item_selected[item as usize];
+    }
+    fn toggle_menu_bar_item_if_clicked(&mut self, ui: &imgui::Ui, item: MenuBarItem) {
+        if ui.is_item_clicked(imgui::MouseButton::Left)
+            || (ui.is_item_hovered() && ui.key_pressed_amount(imgui::Key::Enter, 0.0, 0.0) == 1)
+        {
+            self.menu_bar_item_selected[item as usize] =
+                !self.menu_bar_item_selected[item as usize];
+        }
+    }
     fn build_menu_bar_and_check_for_mouse_events(&mut self, ui: &mut imgui::Ui) {
         use MenuBarItem::*;
         with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
@@ -232,9 +246,10 @@ impl GuiBuilder {
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("Audio"), true), {
                     create_menu_item!("Enabled", "Ctrl + A")
-                        .selected(self.io_control.common.audio_enabled)
+                        .selected(self.is_menu_bar_item_selected(AudioEnabled))
                         .build(ui);
-                    self.update_menu_item_status(ui, AudioEnabled);
+
+                    self.toggle_menu_bar_item_if_clicked(ui, AudioEnabled);
 
                     imgui::ChildWindow::new("child")
                         .size([190.0, ui.current_font_size() + 3.0])
