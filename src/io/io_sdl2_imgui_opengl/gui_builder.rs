@@ -456,6 +456,8 @@ impl GuiBuilder {
                 if self.io_control.common.choose_nes_file {
                     self.build_load_nes_file_explorer();
                     self.io_control.common.pause = false;
+                    self.io_control.common.choose_nes_file = false;
+                    self.toggle_menu_bar_item(MenuBarItem::LoadNesFile)
                 }
             }
         );
