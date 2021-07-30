@@ -113,7 +113,7 @@ impl ControllerConfig {
                     ButtonMapping::new(Left),
                     ButtonMapping::new(Right),
                 ],
-                _ => panic!("Wrong player"),
+                _ => panic!("Wrong player!"),
             },
         }
     }
