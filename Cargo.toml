@@ -33,7 +33,7 @@ path = "tests/cpu_interrupts_v2.rs"
 [profile.release] 
 debug = true
 
-[target.x86_64-pc-windows-msvc.dependencies]
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 sdl2 = {version = "0.34", default-features = false, features = ["static-link","use-vcpkg", "image"]}
 nfd = "0.0.4"
 
