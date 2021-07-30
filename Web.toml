@@ -4,4 +4,4 @@ default-target = "wasm32-unknown-emscripten"
 minimum-version = "0.6.0"
 
 [target.emscripten]
-link-args = ["-s", "USE_SDL=2","-s", "USE_SDL_IMAGE=2", "-s","MIN_WEBGL_VERSION=2","-s","MAX_WEBGL_VERSION=2","-s", "LLD_REPORT_UNDEFINED"]
+link-args = ["-s", "USE_SDL=2","-s", "USE_SDL_IMAGE=2", "-s","MIN_WEBGL_VERSION=2","-s","MAX_WEBGL_VERSION=2","-s", "DISABLE_DEPRECATED_FIND_EVENT_TARGET_BEHAVIOR=0"]

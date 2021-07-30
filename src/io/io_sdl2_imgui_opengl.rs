@@ -73,10 +73,14 @@ impl IOSdl2ImGuiOpenGl {
         let video_subsys = sdl_context.video().unwrap();
         {
             let gl_attr = video_subsys.gl_attr();
-            gl_attr.set_context_profile(sdl2::video::GLProfile::Core);
-            gl_attr.set_context_version(4, 3);
+            let profile = if cfg!(target_arch = "wasm32") {
+                sdl2::video::GLProfile::GLES
+            } else {
+                sdl2::video::GLProfile::Core
+            };
+            gl_attr.set_context_profile(profile);
+            gl_attr.set_context_version(3, 0);
         }
-
         let [video_width, video_height]: [u32; 2] = io::VideoSizeControl::Double.into();
         let mut window = video_subsys
             .window("NES-RS", video_width, MENU_BAR_HEIGHT as u32 + video_height)
@@ -85,12 +89,16 @@ impl IOSdl2ImGuiOpenGl {
             .build()
             .unwrap();
 
-        window.set_icon(
-            sdl2::rwops::RWops::from_bytes(include_bytes!("../../res/icon/Nintendo-gray-icon.png"))
+        if !cfg!(target_arch = "wasm32") {
+            window.set_icon(
+                sdl2::rwops::RWops::from_bytes(include_bytes!(
+                    "../../res/icon/Nintendo-gray-icon.png"
+                ))
                 .unwrap()
                 .load_png()
                 .unwrap(),
-        );
+            );
+        }
 
         let _gl_context = window
             .gl_create_context()
