@@ -74,7 +74,7 @@ impl IOSdl2ImGuiOpenGl {
         {
             let gl_attr = video_subsys.gl_attr();
             gl_attr.set_context_profile(sdl2::video::GLProfile::Core);
-            gl_attr.set_context_version(3, 0);
+            gl_attr.set_context_version(4, 3);
         }
 
         let [video_width, video_height]: [u32; 2] = io::VideoSizeControl::Double.into();

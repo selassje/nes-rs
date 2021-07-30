@@ -4,4 +4,4 @@ default-target = "wasm32-unknown-emscripten"
 minimum-version = "0.6.0"
 
 [target.emscripten]
-link-args = ["-s", "USE_SDL=2"]
+link-args = ["-s", "USE_SDL=2","-s", "USE_SDL_IMAGE=2", "-s","MIN_WEBGL_VERSION=2","-s","MAX_WEBGL_VERSION=2","-s", "LLD_REPORT_UNDEFINED"]

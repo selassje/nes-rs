@@ -37,7 +37,8 @@ debug = true
 sdl2 = {version = "0.34", default-features = false, features = ["static-link","use-vcpkg", "image"]}
 
 [target.wasm32-unknown-emscripten.dependencies]
-sdl2 = {version = "0.34", default-features = false, features = []}
+sdl2 = {version = "0.34", default-features = false, features = ["image"]}
+instant = {version = "0.1", features = ["wasm-bindgen"]}
 
 [dependencies]
 cfg-if = "0.1"
@@ -47,12 +48,12 @@ imgui = "0.7.0"
 imgui-opengl-renderer = "0.11"
 imgui-sdl2 = "0.14"
 gl = "0.10.0"
-nfd = "0.0.4"
+#nfd = "0.0.4"
 
 [package.metadata.vcpkg]
 dependencies = ["sdl2","sdl2-image[libjpeg-turbo,tiff,libwebp]"]
 git = "https://github.com/microsoft/vcpkg"
-rev = "a0518036077baa4"
+rev = "fa1bbe097b26678"
 
 [package.metadata.vcpkg.target]
 x86_64-pc-windows-msvc = { triplet = "x64-windows-static-md" }

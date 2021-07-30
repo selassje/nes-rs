@@ -327,6 +327,7 @@ impl GuiBuilder {
     }
 
     fn build_load_nes_file_explorer(&mut self) {
+        /*
         let result = nfd::open_file_dialog(None, None).unwrap_or_else(|e| {
             panic!("{:?}", e);
         });
@@ -337,6 +338,7 @@ impl GuiBuilder {
             nfd::Response::Cancel => {}
             _ => panic!("Unsupported file selection"),
         }
+        */
     }
     pub fn try_get_key_selection(&mut self, event: &sdl2::event::Event) {
         match *event {
