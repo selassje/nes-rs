@@ -318,7 +318,7 @@ impl CPU {
         let is_branching_executing = self.is_current_instruction_branching();
         if instruction.cycle == instruction.total_cycles {
             (instruction.fun)(self);
-            self.pc += instruction.bytes as u16;
+            self.pc = ((self.pc as u32 +  instruction.bytes as u32) % u16::MAX as u32) as u16;
             let cycles_left = std::u128::MAX - self.cycle;
             if cycles_left < instruction.total_cycles as u128 {
                 self.cycle = instruction.total_cycles as u128 - cycles_left;
@@ -607,11 +607,16 @@ impl CPU {
     fn nop(&mut self) {}
 
     fn update_pc_for_brk_or_irq(&mut self) {
-        self.pc = if self.is_brk_or_irq_hijacked_by_nmi {
+        let new_pc = if self.is_brk_or_irq_hijacked_by_nmi {
             self.ram.borrow().get_word(0xFFFA)
         } else {
             self.ram.borrow().get_word(0xFFFE)
-        } - 1;
+        };
+        if new_pc > 0 {
+            self.pc = new_pc - 1;
+        } else {
+            self.pc = u16::MAX;
+        }
         self.is_brk_or_irq_hijacked_by_nmi = false;
     }
 

@@ -162,7 +162,7 @@ impl SweepUnit {
                 (current_period as i32 - change_amount as i32) as u16
             }
         } else {
-            current_period + change_amount
+            ((current_period as u32 + change_amount as u32) % u16::MAX as u32) as u16
         }
     }
 
@@ -279,7 +279,7 @@ impl PulseWave {
             } else {
                 self.sequencer_position = 7;
             }
-            self.timer_tick = 2 * self.current_period;
+            self.timer_tick = ((2 * (self.current_period as u32)) % u16::MAX as u32) as u16;
         } else {
             self.timer_tick -= 1;
         }
