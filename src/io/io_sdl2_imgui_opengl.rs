@@ -73,13 +73,13 @@ impl IOSdl2ImGuiOpenGl {
         let video_subsys = sdl_context.video().unwrap();
         {
             let gl_attr = video_subsys.gl_attr();
-            let profile = if cfg!(target_arch = "wasm32") {
-                sdl2::video::GLProfile::GLES
+            if cfg!(target_arch = "wasm32") {
+                gl_attr.set_context_profile(sdl2::video::GLProfile::GLES);
+                gl_attr.set_context_version(3, 0);
             } else {
-                sdl2::video::GLProfile::Core
+                gl_attr.set_context_profile(sdl2::video::GLProfile::Core);
+                gl_attr.set_context_version(4, 3);
             };
-            gl_attr.set_context_profile(profile);
-            gl_attr.set_context_version(3, 0);
         }
         let [video_width, video_height]: [u32; 2] = io::VideoSizeControl::Double.into();
         let mut window = video_subsys
