@@ -106,6 +106,7 @@ impl IOSdl2ImGuiOpenGl {
 
         gl::load_with(|s| video_subsys.gl_get_proc_address(s) as _);
 
+        #[cfg(not(target_os = "emscripten"))]
         let _ = video_subsys.gl_set_swap_interval(0);
 
         let mut imgui = imgui::Context::create();
@@ -310,6 +311,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
             self.imgui_sdl2.handle_event(&mut self.imgui, &event);
         }
 
+        #[cfg(not(target_os = "emscripten"))]
         if let Some(ref audio_queue) = self.maybe_audio_queue {
             if control.common.pause {
                 audio_queue.pause();

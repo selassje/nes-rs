@@ -1,6 +1,11 @@
 use std::{cell::RefCell, env, fs::File, io::Read, rc::Rc};
 
-use io::{ControllerConfig, VideoSizeControl, IO};
+use emscripten_main_loop::MainLoop;
+use io::{
+    io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl, ControllerConfig, IOControl, IOState,
+    VideoSizeControl, IO,
+};
+use nes::Nes;
 
 mod apu;
 mod colors;
@@ -27,6 +32,103 @@ extern crate enum_tryfrom;
 extern crate enum_tryfrom_derive;
 extern crate cfg_if;
 
+#[cfg(not(target_os = "emscripten"))]
+const FRAME_DURATION: std::time::Duration = std::time::Duration::from_nanos(
+    (std::time::Duration::from_secs(1).as_nanos() / (common::DEFAULT_FPS) as u128) as u64,
+);
+pub struct Emulation {
+    nes: Nes,
+    io: Rc<RefCell<IOSdl2ImGuiOpenGl>>,
+    io_control: IOControl,
+    io_state: IOState,
+    fps: u16,
+    one_second_timer: std::time::Instant,
+    frame_start: std::time::Instant,
+    #[cfg(not(target_os = "emscripten"))]
+    is_audio_available: bool,
+}
+
+impl Emulation {
+    pub fn new() -> Self {
+        let io = Rc::new(RefCell::new(
+            io::io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl::new(),
+        ));
+
+        let mut nes = nes::Nes::new(io.clone());
+        let mut initial_title: Option<String> = None;
+        let args: Vec<String> = env::args().collect();
+        if args.len() > 1 {
+            let path = &args[1];
+            load(&mut nes, &path);
+            initial_title = Some(path.clone());
+        };
+
+        let io_state: io::IOState = Default::default();
+        let frame_start = std::time::Instant::now();
+        let fps = 0;
+        let one_second_timer = std::time::Instant::now();
+
+        let io_control = io::IOControl {
+            target_fps: common::DEFAULT_FPS as u16,
+            current_fps: 0,
+            title: initial_title,
+            common: io::IOCommon {
+                pause: false,
+                choose_nes_file: false,
+                controllers_setup: false,
+                volume: 100,
+                video_size: VideoSizeControl::Double,
+                controller_configs: [ControllerConfig::new(0), ControllerConfig::new(1)],
+            },
+        };
+        #[cfg(not(target_os = "emscripten"))]
+        let is_audio_available = io.borrow().is_audio_available();
+        Self {
+            nes,
+            io,
+            io_control,
+            io_state,
+            fps,
+            one_second_timer,
+            frame_start,
+            #[cfg(not(target_os = "emscripten"))]
+            is_audio_available,
+        }
+    }
+}
+
+impl emscripten_main_loop::MainLoop for Emulation {
+    fn main_loop(&mut self) -> emscripten_main_loop::MainLoopEvent {
+        if !self.io_state.common.pause {
+            self.nes.run_single_frame();
+            if self.one_second_timer.elapsed() < std::time::Duration::from_secs(1) {
+                self.fps += 1;
+            } else {
+                self.one_second_timer = std::time::Instant::now();
+                self.io_control.current_fps = self.fps;
+                self.fps = 1;
+            }
+        }
+        self.io_state = self.io.borrow_mut().present_frame(self.io_control.clone());
+
+        handle_io_state(&mut self.nes, &self.io_state, &mut self.io_control);
+
+        if !self.io_state.common.pause {
+            #[cfg(not(target_os = "emscripten"))]
+            {
+                let elapsed_time_since_frame_start = self.frame_start.elapsed();
+                if !self.is_audio_available {
+                    if elapsed_time_since_frame_start < FRAME_DURATION {
+                        std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);
+                    }
+                }
+            }
+            self.frame_start = std::time::Instant::now();
+        }
+        emscripten_main_loop::MainLoopEvent::Continue
+    }
+}
+
 fn read_nes_file(file_name: &str) -> nes_file::NesFile {
     let mut rom = Vec::new();
     let mut file = File::open(&file_name).expect(&format!(
@@ -38,71 +140,9 @@ fn read_nes_file(file_name: &str) -> nes_file::NesFile {
     nes_file::NesFile::new(&rom)
 }
 
-pub fn run() {
-    let io = Rc::new(RefCell::new(
-        io::io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl::new(),
-    ));
-
-    let mut nes = nes::Nes::new(io.clone());
-    let mut initial_title: Option<String> = None;
-    let args: Vec<String> = env::args().collect();
-    if args.len() > 1 {
-        let path = &args[1];
-        load(&mut nes, &path);
-        initial_title = Some(path.clone());
-    };
-
-    let frame_duration: std::time::Duration = std::time::Duration::from_nanos(
-        (std::time::Duration::from_secs(1).as_nanos() / (common::DEFAULT_FPS) as u128) as u64,
-    );
-
-    let mut io_state: io::IOState = Default::default();
-
-    let mut frame_start = std::time::Instant::now();
-
-    let mut fps = 0;
-    let mut one_second_timer = std::time::Instant::now();
-
-    let mut io_control = io::IOControl {
-        target_fps: common::DEFAULT_FPS as u16,
-        current_fps: 0,
-        title: initial_title,
-        common: io::IOCommon {
-            pause: false,
-            choose_nes_file: false,
-            controllers_setup: false,
-            volume: 100,
-            video_size: VideoSizeControl::Double,
-            controller_configs: [ControllerConfig::new(0), ControllerConfig::new(1)],
-        },
-    };
-
-    let is_audio_available = io.borrow().is_audio_available();
-
-    while !io_state.quit {
-        if !io_state.common.pause {
-            nes.run_single_frame();
-            if one_second_timer.elapsed() < std::time::Duration::from_secs(1) {
-                fps += 1;
-            } else {
-                one_second_timer = std::time::Instant::now();
-                io_control.current_fps = fps;
-                fps = 1;
-            }
-        }
-        io_state = io.borrow_mut().present_frame(io_control.clone());
-
-        handle_io_state(&mut nes, &io_state, &mut io_control);
-
-        if !io_state.common.pause {
-            let elapsed_time_since_frame_start = frame_start.elapsed();
-            if !is_audio_available {
-                if elapsed_time_since_frame_start < frame_duration {
-                    std::thread::sleep(frame_duration - elapsed_time_since_frame_start);
-                }
-            }
-            frame_start = std::time::Instant::now();
-        }
+pub fn run(mut emulation: Emulation) {
+    while !emulation.io_state.quit {
+        emulation.main_loop();
     }
 }
 

@@ -132,6 +132,7 @@ impl GuiBuilder {
         self.io_control.common
     }
 
+    #[cfg(not(target_os = "emscripten"))]
     pub fn is_audio_enabled(&self) -> bool {
         self.is_menu_bar_item_selected(MenuBarItem::AudioEnabled)
     }

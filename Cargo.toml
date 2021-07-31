@@ -49,6 +49,7 @@ imgui = "0.7.0"
 imgui-opengl-renderer = "0.11"
 imgui-sdl2 = "0.14"
 gl = "0.10.0"
+emscripten_main_loop = "0.1.1"
 
 [package.metadata.vcpkg]
 dependencies = ["sdl2","sdl2-image[libjpeg-turbo,tiff,libwebp]"]

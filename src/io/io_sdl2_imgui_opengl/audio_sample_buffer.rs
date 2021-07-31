@@ -5,7 +5,6 @@ pub(super) const SAMPLING_RATE: usize = 44100;
 const INITIAL_SAMPLE_BUCKET_SIZE: f32 =
     (common::DEFAULT_FPS as f32 * common::CPU_CYCLES_PER_FRAME as f32) / SAMPLING_RATE as f32;
 pub(super) const BUFFER_SIZE: usize = 2048;
-
 pub(super) struct AudioSampleBuffer {
     size: usize,
     sum: f32,
@@ -44,18 +43,22 @@ impl AudioSampleBuffer {
         }
     }
 
+    #[allow(dead_code)]
     pub fn get_size(&self) -> usize {
         self.size
     }
 
+    #[allow(dead_code)]
     pub fn get_byte_size(&self) -> usize {
         std::mem::size_of::<io::AudioSampleFormat>() * self.get_size()
     }
 
+    #[allow(dead_code)]
     pub fn get_samples(&self) -> &[io::AudioSampleFormat] {
         &self.buffer[..self.size]
     }
 
+    #[allow(dead_code)]
     pub fn reset(&mut self, fps: u16, volume: f32) {
         self.size = 0;
         self.sum = 0.0;
