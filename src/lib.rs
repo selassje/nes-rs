@@ -63,13 +63,13 @@ impl Emulation {
             initial_title = Some(path.clone());
         };
 
-        #[cfg(target_os = "emscripten")]
-        {
-            let game = include_bytes!("../games/Balloon Fight (E).nes");
-            let v: Vec<u8> = game.to_vec();
-            let nes_file = nes_file::NesFile::new(&v);
-            nes.load(&nes_file);
-        }
+        // #[cfg(target_os = "emscripten")]
+        // {
+        //     let game = include_bytes!("../games/Balloon Fight (E).nes");
+        //     let v: Vec<u8> = game.to_vec();
+        //     let nes_file = nes_file::NesFile::new(&v);
+        //     nes.load(&nes_file);
+        // }
 
         let io_state: io::IOState = Default::default();
         let frame_start = std::time::Instant::now();
