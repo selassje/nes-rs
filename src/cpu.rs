@@ -285,7 +285,7 @@ impl CPU {
 
             if false {
                 println!(
-                    "{:X} {:X} {:X} {:X} \t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CYC:{:<3} SL:{:<3} FC:{} CPU Cycle:{}",
+                    "{:04X} {:02X} {:02X} {:02X} \t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CYC:{:<3} SL:{:<3} FC:{} CPU Cycle:{}",
                     self.pc,
                     op,
                     operand_1,
@@ -318,7 +318,7 @@ impl CPU {
         let is_branching_executing = self.is_current_instruction_branching();
         if instruction.cycle == instruction.total_cycles {
             (instruction.fun)(self);
-            self.pc = ((self.pc as u32 +  instruction.bytes as u32) % u16::MAX as u32) as u16;
+            self.pc = ((self.pc as u32 + instruction.bytes as u32) % u16::MAX as u32) as u16;
             let cycles_left = std::u128::MAX - self.cycle;
             if cycles_left < instruction.total_cycles as u128 {
                 self.cycle = instruction.total_cycles as u128 - cycles_left;

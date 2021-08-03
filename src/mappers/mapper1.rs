@@ -42,18 +42,21 @@ pub struct Mapper1 {
     chr_bank_0: u8,
     chr_bank_1: u8,
     prg_bank: u8,
+    last_16k_bank: usize,
 }
 
 impl Mapper1 {
     pub fn new(prg_rom: Vec<u8>, chr_rom: Vec<u8>) -> Self {
+        let last_16k_bank = prg_rom.len() / BankSize::_16KB as usize - 1;
         let mapper_internal = MapperInternal::new(prg_rom, chr_rom);
         Self {
             mapper_internal,
             shift_register: Default::default(),
-            control: 0,
+            control: 0x0C,
             chr_bank_0: 0,
             chr_bank_1: 0,
             prg_bank: 0,
+            last_16k_bank,
         }
     }
 
@@ -77,12 +80,26 @@ impl Mapper for Mapper1 {
     }
 
     fn get_prg_byte(&mut self, address: u16) -> u8 {
-        if self.control.get_prg_bank_mode() < 2 {
-            self.mapper_internal
-                .get_prg_rom_byte(address, self.prg_bank as usize & 0xF >> 1, _32KB)
+        let bank_mode = self.control.get_prg_bank_mode();
+        if bank_mode < 2 {
+            self.mapper_internal.get_prg_rom_byte(
+                address,
+                (self.prg_bank as usize & 0xF) >> 1,
+                _32KB,
+            )
         } else {
+            let [bank_1, bank_2] = match bank_mode {
+                2 => [0, self.prg_bank & 0xF],
+                3 => [self.prg_bank & 0xF, self.last_16k_bank as _],
+                _ => panic!("Mapper1: Unsupported PRG Mode"),
+            };
+            let bank = match address {
+                0x8000..=0xBFFF => bank_1,
+                0xC000..=0xFFFF => bank_2,
+                _ => 0,
+            };
             self.mapper_internal
-                .get_prg_rom_byte(address, self.prg_bank as usize & 0xF, _16KB)
+                .get_prg_rom_byte(address, bank.into(), _16KB)
         }
     }
 
@@ -97,19 +114,19 @@ impl Mapper for Mapper1 {
             self.shift_register = Default::default();
             self.control |= 0x0C;
         } else {
-            self.shift_register.value <<= 1;
-            self.shift_register.value |= byte & 1;
+            self.shift_register.value >>= 1;
+            self.shift_register.value |= (byte & 1) << 4;
             self.shift_register.write_count += 1;
 
             if self.shift_register.write_count == 5 {
-                let register = &mut match address {
-                    0x8000..=0x9FFF => self.control,
-                    0xA000..=0xBFFF => self.chr_bank_0,
-                    0xC000..=0xDFFF => self.chr_bank_1,
-                    0xE000..=0xFFFF => self.prg_bank,
+                let register = match address {
+                    0x8000..=0x9FFF => &mut self.control,
+                    0xA000..=0xBFFF => &mut self.chr_bank_0,
+                    0xC000..=0xDFFF => &mut self.chr_bank_1,
+                    0xE000..=0xFFFF => &mut self.prg_bank,
                     _ => panic!("Incorrect address {:X}", address),
                 };
-                *register = byte;
+                *register = self.shift_register.value;
                 self.shift_register = Default::default();
             }
         }
@@ -121,6 +138,7 @@ impl Mapper for Mapper1 {
 
     fn power_cycle(&mut self) {
         self.mapper_internal.reset();
+        self.control = 0x0C;
         self.chr_bank_0 = 0;
         self.chr_bank_1 = 0;
         self.shift_register.value = 0;
