@@ -43,22 +43,18 @@ impl AudioSampleBuffer {
         }
     }
 
-    #[allow(dead_code)]
     pub fn get_size(&self) -> usize {
         self.size
     }
 
-    #[allow(dead_code)]
     pub fn get_byte_size(&self) -> usize {
         std::mem::size_of::<io::AudioSampleFormat>() * self.get_size()
     }
 
-    #[allow(dead_code)]
     pub fn get_samples(&self) -> &[io::AudioSampleFormat] {
         &self.buffer[..self.size]
     }
 
-    #[allow(dead_code)]
     pub fn reset(&mut self, fps: u16, volume: f32) {
         self.size = 0;
         self.sum = 0.0;

@@ -311,20 +311,23 @@ impl io::IO for IOSdl2ImGuiOpenGl {
             self.imgui_sdl2.handle_event(&mut self.imgui, &event);
         }
 
-        #[cfg(not(target_os = "emscripten"))]
         if let Some(ref audio_queue) = self.maybe_audio_queue {
             if control.common.pause {
                 audio_queue.pause();
             } else {
                 audio_queue.resume();
+                #[cfg(not(target_os = "emscripten"))]
                 while audio_queue.size() as usize > self.sample_buffer.get_byte_size() * 10 {}
-                audio_queue.queue(&self.sample_buffer.get_samples());
+                #[cfg(target_os = "emscripten")]
+                if (audio_queue.size() as usize) < self.sample_buffer.get_byte_size() * 10 {
+                    audio_queue.queue(&self.sample_buffer.get_samples());
+                }
                 let volume = if self.gui_builder.is_audio_enabled() {
                     control.common.volume as f32 / 100.0
                 } else {
                     0.0
                 };
-                self.sample_buffer.reset(control.target_fps, volume);
+                self.sample_buffer.reset(60, volume);
             }
         }
         unsafe {
