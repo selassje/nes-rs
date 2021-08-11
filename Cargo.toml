@@ -32,6 +32,9 @@ path = "tests/cpu_interrupts_v2.rs"
 
 [profile.release] 
 debug = false
+lto = true
+opt-level = 3
+panic = "abort"
 
 [target.'cfg(not(target_os = "emscripten"))'.dependencies]
 sdl2 = {version = "0.34", default-features = false, features = ["static-link","use-vcpkg", "image"]}
@@ -49,7 +52,7 @@ imgui = "0.7.0"
 imgui-opengl-renderer = { git = "https://github.com/selassje/rust-imgui-opengl-renderer" }
 imgui-sdl2 = "0.14"
 gl = "0.10.0"
-emscripten_main_loop = "0.1.1"
+emscripten_main_loop = "0.1"
 
 [package.metadata.vcpkg]
 dependencies = ["sdl2","sdl2-image[libjpeg-turbo,tiff,libwebp]"]
