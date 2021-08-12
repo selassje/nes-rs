@@ -89,16 +89,12 @@ impl IOSdl2ImGuiOpenGl {
             .build()
             .unwrap();
 
-        if !cfg!(target_arch = "wasm32") {
-            window.set_icon(
-                sdl2::rwops::RWops::from_bytes(include_bytes!(
-                    "../../res/icon/Nintendo-gray-icon.png"
-                ))
+        window.set_icon(
+            sdl2::rwops::RWops::from_bytes(include_bytes!("../../res/icon/Nintendo-gray-icon.png"))
                 .unwrap()
                 .load_png()
                 .unwrap(),
-            );
-        }
+        );
 
         let _gl_context = window
             .gl_create_context()

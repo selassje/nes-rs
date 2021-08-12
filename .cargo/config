@@ -2,6 +2,7 @@
 rustflags = [
     "-C", "link-arg=-sUSE_SDL=2",
     "-C", "link-arg=-sUSE_SDL_IMAGE=2",
+    "-C", "link-arg=-sSDL2_IMAGE_FORMATS=['png']",
     "-C", "link-arg=-sMIN_WEBGL_VERSION=2",
     "-C", "link-arg=-sMAX_WEBGL_VERSION=2",
     "-C", "link-arg=-sDISABLE_DEPRECATED_FIND_EVENT_TARGET_BEHAVIOR=0",
@@ -12,6 +13,7 @@ rustflags = [
 rustflags = [
     "-C", "link-arg=-sUSE_SDL=2",
     "-C", "link-arg=-sUSE_SDL_IMAGE=2",
+    "-C", "link-arg=-sSDL2_IMAGE_FORMATS=['png']",
     "-C", "link-arg=-sMIN_WEBGL_VERSION=2",
     "-C", "link-arg=-sMAX_WEBGL_VERSION=2",
     "-C", "link-arg=-sDISABLE_DEPRECATED_FIND_EVENT_TARGET_BEHAVIOR=0",
