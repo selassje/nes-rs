@@ -312,12 +312,17 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 audio_queue.pause();
             } else {
                 audio_queue.resume();
+                let audio_saturation_threshold = self.sample_buffer.get_byte_size() as u32 * 10;
                 #[cfg(not(target_os = "emscripten"))]
-                while audio_queue.size() as usize > self.sample_buffer.get_byte_size() * 10 {}
-                #[cfg(target_os = "emscripten")]
-                if (audio_queue.size() as usize) < self.sample_buffer.get_byte_size() * 10 {
+                {
+                    while audio_queue.size() > audio_saturation_threshold {}
                     audio_queue.queue(&self.sample_buffer.get_samples());
                 }
+                #[cfg(target_os = "emscripten")]
+                if audio_queue.size() < audio_saturation_threshold {
+                    audio_queue.queue(&self.sample_buffer.get_samples());
+                }
+
                 let volume = if self.gui_builder.is_audio_enabled() {
                     control.common.volume as f32 / 100.0
                 } else {
