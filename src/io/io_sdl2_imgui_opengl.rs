@@ -108,6 +108,10 @@ impl IOSdl2ImGuiOpenGl {
         let mut imgui = imgui::Context::create();
         imgui.set_ini_filename(None);
 
+        imgui
+            .io_mut()
+            .config_flags
+            .set(imgui::ConfigFlags::NAV_ENABLE_KEYBOARD, true);
         let imgui_sdl2 = imgui_sdl2::ImguiSdl2::new(&mut imgui, &window);
 
         let fonts = gui_builder::prepare_fonts(&mut imgui);
@@ -328,7 +332,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 } else {
                     0.0
                 };
-                self.sample_buffer.reset(60, volume);
+                self.sample_buffer.reset(control.target_fps, volume);
             }
         }
         unsafe {

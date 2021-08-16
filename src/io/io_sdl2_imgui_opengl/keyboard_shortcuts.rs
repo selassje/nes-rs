@@ -10,7 +10,6 @@ enum KeyboardShortcut {
 
 fn shortcut_to_menu_bar_item(key: KeyboardShortcut) -> Option<MenuBarItem> {
     match key {
-        Single(Scancode::Escape) => Some(MenuBarItem::Quit),
         LeftCtrl(Scancode::R) => Some(MenuBarItem::PowerCycle),
         LeftCtrl(Scancode::O) => Some(MenuBarItem::LoadNesFile),
         LeftCtrl(Scancode::P) => Some(MenuBarItem::Pause),

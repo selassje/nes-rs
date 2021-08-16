@@ -126,7 +126,9 @@ impl GuiBuilder {
             },
             video_size: Default::default(),
             build_menu_bar: Default::default(),
-            fd: imgui_filedialog::FileDialog::create("nes_file"),
+            fd: imgui_filedialog::FileDialog::new(im_str!("nes_file"))
+                .title(im_str!("Open NES file"))
+                .filters(im_str!(".nes,.NES")),
         }
     }
 
@@ -177,8 +179,7 @@ impl GuiBuilder {
                     if !self.io_control.common.choose_nes_file {
                         self.update_menu_item_status(ui, LoadNesFile);
                     }
-
-                    create_menu_item!("Quit", "Esc").build(ui);
+                    create_menu_item!("Quit", "Alt + F4").build(ui);
                     self.update_menu_item_status(ui, Quit);
                 });
             });
