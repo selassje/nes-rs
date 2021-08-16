@@ -51,8 +51,9 @@ enum-tryfrom-derive = "0.2.1"
 imgui = "0.7.0"
 imgui-opengl-renderer = { git = "https://github.com/selassje/rust-imgui-opengl-renderer" }
 imgui-sdl2 = "0.14"
+imgui-filedialog = { git = "https://github.com/selassje/imgui-filedialog-rs.git"}
 gl = "0.10.0"
-emscripten_main_loop = "0.1"
+emscripten_main_loop = "0.1" 
 
 [package.metadata.vcpkg]
 dependencies = ["sdl2","sdl2-image[libjpeg-turbo,tiff,libwebp]"]

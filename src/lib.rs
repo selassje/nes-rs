@@ -32,7 +32,6 @@ extern crate enum_tryfrom;
 extern crate enum_tryfrom_derive;
 extern crate cfg_if;
 
-#[cfg(not(target_os = "emscripten"))]
 const FRAME_DURATION: std::time::Duration = std::time::Duration::from_nanos(
     (std::time::Duration::from_secs(1).as_nanos() / (common::DEFAULT_FPS) as u128) as u64,
 );
@@ -44,7 +43,6 @@ pub struct Emulation {
     fps: u16,
     one_second_timer: std::time::Instant,
     frame_start: std::time::Instant,
-    #[cfg(not(target_os = "emscripten"))]
     is_audio_available: bool,
 }
 
@@ -62,14 +60,6 @@ impl Emulation {
             load(&mut nes, &path);
             initial_title = Some(path.clone());
         };
-
-        #[cfg(target_os = "emscripten")]
-        {
-            let game = include_bytes!("../games/assimilate_full_dl.nes");
-            let v: Vec<u8> = game.to_vec();
-            let nes_file = nes_file::NesFile::new(&v);
-            nes.load(&nes_file);
-        }
 
         let io_state: io::IOState = Default::default();
         let frame_start = std::time::Instant::now();
@@ -89,7 +79,6 @@ impl Emulation {
                 controller_configs: [ControllerConfig::new(0), ControllerConfig::new(1)],
             },
         };
-        #[cfg(not(target_os = "emscripten"))]
         let is_audio_available = io.borrow().is_audio_available();
         Self {
             nes,
@@ -99,7 +88,6 @@ impl Emulation {
             fps,
             one_second_timer,
             frame_start,
-            #[cfg(not(target_os = "emscripten"))]
             is_audio_available,
         }
     }
@@ -122,11 +110,11 @@ impl emscripten_main_loop::MainLoop for Emulation {
         handle_io_state(&mut self.nes, &self.io_state, &mut self.io_control);
 
         if !self.io_state.common.pause {
-            #[cfg(not(target_os = "emscripten"))]
             {
                 let elapsed_time_since_frame_start = self.frame_start.elapsed();
                 if !self.is_audio_available {
                     if elapsed_time_since_frame_start < FRAME_DURATION {
+                        #[cfg(not(target_os = "emscripten"))]
                         std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);
                     }
                 }
@@ -144,6 +132,7 @@ fn read_nes_file(file_name: &str) -> nes_file::NesFile {
         file_name,
         std::env::current_dir().unwrap().display()
     ));
+    println!("Opening file {}", file_name);
     file.read_to_end(&mut rom).expect("Unable to read ROM");
     nes_file::NesFile::new(&rom)
 }
