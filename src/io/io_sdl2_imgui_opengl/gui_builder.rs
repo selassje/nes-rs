@@ -326,10 +326,13 @@ impl GuiBuilder {
     }
 
     fn build_load_nes_file_explorer(&mut self, ui: &mut imgui::Ui) {
-        create_unmovable_simple_window!("load_nes_file", [20.0, 50.0], [500.0, 110.0])
+        create_unmovable_simple_window!("load_nes_file", [10.0, 50.0], [500.0, 110.0])
             .bg_alpha(0.0)
             .build(ui, || {
                 if self.io_control.common.choose_nes_file {
+                    self.io_control.common.choose_nes_file = false;
+                    self.io_control.common.pause = false;
+                    self.toggle_menu_bar_item(MenuBarItem::LoadNesFile);
                     self.fd.open_modal();
                 }
                 if self.fd.display() {
@@ -337,9 +340,7 @@ impl GuiBuilder {
                         let file = &self.fd.selection().unwrap().files()[0];
                         self.rom_path = Some(file.to_str().unwrap().to_owned());
                     }
-                    self.io_control.common.choose_nes_file = false;
-                    self.io_control.common.pause = false;
-                    self.toggle_menu_bar_item(MenuBarItem::LoadNesFile);
+
                     self.fd.close();
                 }
             });

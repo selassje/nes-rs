@@ -132,7 +132,6 @@ fn read_nes_file(file_name: &str) -> nes_file::NesFile {
         file_name,
         std::env::current_dir().unwrap().display()
     ));
-    println!("Opening file {}", file_name);
     file.read_to_end(&mut rom).expect("Unable to read ROM");
     nes_file::NesFile::new(&rom)
 }
