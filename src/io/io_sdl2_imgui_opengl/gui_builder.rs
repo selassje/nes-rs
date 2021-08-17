@@ -5,7 +5,7 @@ use imgui::im_str;
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
     common,
-    io::{ControllerConfig, IOControl},
+    io::{ControllerConfig, IOControl, FRAME_HEIGHT, FRAME_WIDTH},
     io::{IOCommon, VideoSizeControl},
 };
 
@@ -128,7 +128,12 @@ impl GuiBuilder {
             build_menu_bar: Default::default(),
             fd: imgui_filedialog::FileDialog::new(im_str!("nes_file"))
                 .title(im_str!("Open NES file"))
-                .filters(im_str!(".nes,.NES")),
+                .filters(im_str!(".nes,.NES"))
+                .min_size([2.0 * FRAME_WIDTH as f32 - 30.0, 200.0])
+                .max_size([
+                    2.0 * FRAME_WIDTH as f32,
+                    (2 * FRAME_HEIGHT - MENU_BAR_HEIGHT as usize) as _,
+                ]),
         }
     }
 
@@ -326,25 +331,21 @@ impl GuiBuilder {
         });
     }
 
-    fn build_load_nes_file_explorer(&mut self, ui: &mut imgui::Ui) {
-        create_unmovable_simple_window!("load_nes_file", [10.0, 50.0], [500.0, 110.0])
-            .bg_alpha(0.0)
-            .build(ui, || {
-                if self.io_control.common.choose_nes_file {
-                    self.io_control.common.choose_nes_file = false;
-                    self.io_control.common.pause = false;
-                    self.toggle_menu_bar_item(MenuBarItem::LoadNesFile);
-                    self.fd.open_modal();
-                }
-                if self.fd.display() {
-                    if self.fd.is_ok() {
-                        let file = &self.fd.selection().unwrap().files()[0];
-                        self.rom_path = Some(file.to_str().unwrap().to_owned());
-                    }
+    fn build_load_nes_file_explorer(&mut self) {
+        if self.io_control.common.choose_nes_file {
+            self.io_control.common.choose_nes_file = false;
+            self.io_control.common.pause = false;
+            self.toggle_menu_bar_item(MenuBarItem::LoadNesFile);
+            self.fd.open_modal();
+        }
+        if self.fd.display() {
+            if self.fd.is_ok() {
+                let file = &self.fd.selection().unwrap().files()[0];
+                self.rom_path = Some(file.to_str().unwrap().to_owned());
+            }
 
-                    self.fd.close();
-                }
-            });
+            self.fd.close();
+        }
     }
     pub fn try_get_key_selection(&mut self, event: &sdl2::event::Event) {
         match *event {
@@ -457,12 +458,7 @@ impl GuiBuilder {
                 }
                 self.build_emulation_window(&mut ui);
                 self.build_fps_counter(&mut ui);
-                self.build_load_nes_file_explorer(&mut ui);
-                if self.io_control.common.choose_nes_file {
-                    self.io_control.common.pause = false;
-                    //self.io_control.common.choose_nes_file = false;
-                    //self.toggle_menu_bar_item(MenuBarItem::LoadNesFile)
-                }
+                self.build_load_nes_file_explorer();
             }
         );
     }

@@ -38,7 +38,6 @@ panic = "abort"
 
 [target.'cfg(not(target_os = "emscripten"))'.dependencies]
 sdl2 = {version = "0.34", default-features = false, features = ["static-link","use-vcpkg", "image"]}
-nfd = "0.0.4"
 
 [target.'cfg(target_os = "emscripten")'.dependencies]
 sdl2 = {version = "0.34", default-features = false, features = ["image"]}
