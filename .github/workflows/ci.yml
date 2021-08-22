@@ -26,8 +26,8 @@ jobs:
               ./emsdk activate 2.0.9
               source "emsdk_env.sh"
          elif [ "$RUNNER_OS" == "Windows" ]; then
-              emsdk.bat install  2.0.9
-              emsdk.bat activate 2.0.9
+              ./emsdk.bat install  2.0.9
+              ./emsdk.bat activate 2.0.9
          else
               echo "$RUNNER_OS not supported"
               exit 1
