@@ -31,7 +31,8 @@ jobs:
               echo "$RUNNER_OS not supported"
               exit 1
          fi
-    - name: Build Emscripten targets 
+    - name: Build Emscripten targets
+      shell: bash 
       run: |
         if [ "$RUNNER_OS" == "Linux" ]; then
               source "emsdk/emsdk_env.sh"
