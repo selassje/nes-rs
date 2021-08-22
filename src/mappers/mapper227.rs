@@ -15,21 +15,21 @@ trait Register {
 
 impl Register for u16 {
     fn is_last_prg_page_mode(&self) -> bool {
-        self & 0b00000010_00000000 != 0
+        self & 0b0000_0010_0000_0000 != 0
     }
 
     fn get_prg_bank(&self) -> usize {
-        let bits_0_4 = (0b00000000_01111100 & self) >> 2;
-        let bit_5 = (0b00000001_00000000 & self) >> 3;
+        let bits_0_4 = (0b0000_0000_0111_1100 & self) >> 2;
+        let bit_5 = (0b0000_0001_0000_0000 & self) >> 3;
         bit_5 as usize | bits_0_4 as usize
     }
 
     fn is_mode_1_enabled(&self) -> bool {
-        self & 0b00000000_10000000 != 0
+        self & 0b0000_0000_1000_0000 != 0
     }
 
     fn get_mirroring(&self) -> Mirroring {
-        if self & 0b00000000_00000010 != 0 {
+        if self & 0b0000_0000_0000_0010 != 0 {
             Mirroring::Horizontal
         } else {
             Mirroring::Vertical
@@ -37,7 +37,7 @@ impl Register for u16 {
     }
 
     fn get_prg_bank_size(&self) -> BankSize {
-        if self & 0b00000000_00000001 != 0 {
+        if self & 0b0000_0000_0000_0001 != 0 {
             _32KB
         } else {
             _16KB
@@ -45,7 +45,7 @@ impl Register for u16 {
     }
 
     fn is_menu_selection_mode(&self) -> bool {
-        self & 0b00000100_00000000 != 0
+        self & 0b0000_0100_0000_0000 != 0
     }
 }
 

@@ -28,7 +28,7 @@ pub enum WriteAccessRegister {
 }
 
 pub trait WriteAcessRegisters {
-    fn write(&mut self, register: WriteAccessRegister, value: u8) -> ();
+    fn write(&mut self, register: WriteAccessRegister, value: u8);
 }
 
 #[derive(Copy, Clone, Debug, TryFromPrimitive)]

@@ -3,7 +3,6 @@ mod gui_builder;
 mod keyboard_shortcuts;
 
 use std::default::Default;
-use std::iter::FromIterator;
 use std::{borrow::BorrowMut, collections::HashMap};
 
 use super::{io_internal, VideoSizeControl};
@@ -137,7 +136,7 @@ impl IOSdl2ImGuiOpenGl {
         IOSdl2ImGuiOpenGl {
             io_internal: io_internal::IOInternal::new(),
             sample_buffer: audio_sample_buffer::AudioSampleBuffer::new(),
-            maybe_audio_queue: maybe_audio_queue,
+            maybe_audio_queue,
             events,
             keyboard_state: HashMap::new(),
             imgui,
@@ -237,15 +236,13 @@ impl IOSdl2ImGuiOpenGl {
         event: &sdl2::event::Event,
         keyboard_shortcuts: &mut keyboard_shortcuts::KeyboardShortcuts,
     ) {
-        match *event {
-            sdl2::event::Event::KeyDown {
-                scancode, keymod, ..
-            } => {
-                if let Some(scancode) = scancode {
-                    keyboard_shortcuts.update(scancode, keymod)
-                }
-            }
-            _ => {}
+        if let sdl2::event::Event::KeyDown {
+            scancode: Some(scancode),
+            keymod,
+            ..
+        } = *event
+        {
+            keyboard_shortcuts.update(scancode, keymod)
         }
     }
 
@@ -295,18 +292,19 @@ impl io::IO for IOSdl2ImGuiOpenGl {
             .prepare_for_new_frame(control.clone(), video_size);
         self.keyboard_shortcuts = Default::default();
 
-        self.keyboard_state = HashMap::from_iter(self.events.keyboard_state().scancodes());
+        self.keyboard_state = self
+            .events
+            .keyboard_state()
+            .scancodes()
+            .collect::<HashMap<_, _>>();
         for event in self.events.poll_iter() {
             if self.gui_builder.is_key_selection_pending() {
                 self.gui_builder.try_get_key_selection(&event);
             } else {
                 Self::check_for_keyboard_shortcuts(&event, &mut self.keyboard_shortcuts);
             }
-            match event {
-                sdl2::event::Event::Window { win_event, .. } => {
-                    io_state.quit = win_event == sdl2::event::WindowEvent::Close
-                }
-                _ => {}
+            if let sdl2::event::Event::Window { win_event, .. } = event {
+                io_state.quit = win_event == sdl2::event::WindowEvent::Close
             };
             self.imgui_sdl2.handle_event(&mut self.imgui, &event);
         }

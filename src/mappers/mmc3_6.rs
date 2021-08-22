@@ -157,11 +157,8 @@ impl MMC3_6 {
 impl Mapper for MMC3_6 {
     fn get_chr_byte(&mut self, address: u16) -> u8 {
         let bank_select = self.chr_rom_banks[address as usize / _1KB as usize];
-        let val = self
-            .mapper_internal
-            .get_chr_byte(address, bank_select.bank, bank_select.size);
-
-        val
+        self.mapper_internal
+            .get_chr_byte(address, bank_select.bank, bank_select.size)
     }
 
     fn get_prg_byte(&mut self, address: u16) -> u8 {

@@ -196,27 +196,27 @@ impl Sprite {
     }
 
     fn if_flip_horizontally(&self) -> bool {
-        self.data[2] & self.data[2] & 0b01000000 != 0
+        self.data[2] & 0b01000000 != 0
     }
 
     fn if_flip_vertically(&self) -> bool {
-        self.data[2] & self.data[2] & 0b10000000 != 0
+        self.data[2] & 0b10000000 != 0
     }
 }
 
-type OAM = [u8; 256];
+type Oam = [u8; 256];
 
 type VRAMAddressFlag = (u16, u16);
-const COARSE_X: VRAMAddressFlag = (0b00000000_00011111, 0);
-const COARSE_Y: VRAMAddressFlag = (0b00000011_11100000, 5);
-const NM_TABLE: VRAMAddressFlag = (0b00001100_00000000, 10);
-const NM_TABLE_X: VRAMAddressFlag = (0b00000100_00000000, 10);
-const NM_TABLE_Y: VRAMAddressFlag = (0b00001000_00000000, 11);
-const FINE_Y: VRAMAddressFlag = (0b01110000_00000000, 12);
-const BIT_12: VRAMAddressFlag = (0b00010000_00000000, 12);
-const BIT_14: VRAMAddressFlag = (0b01000000_00000000, 14);
-const BITS_8_13: VRAMAddressFlag = (0b00111111_00000000, 8);
-const LOW_BYTE: VRAMAddressFlag = (0b00000000_11111111, 0);
+const COARSE_X: VRAMAddressFlag = (0b0000_0000_0001_1111, 0);
+const COARSE_Y: VRAMAddressFlag = (0b0000_0011_1110_0000, 5);
+const NM_TABLE: VRAMAddressFlag = (0b0000_1100_0000_0000, 10);
+const NM_TABLE_X: VRAMAddressFlag = (0b0000_0100_0000_0000, 10);
+const NM_TABLE_Y: VRAMAddressFlag = (0b0000_1000_0000_0000, 11);
+const FINE_Y: VRAMAddressFlag = (0b0111_0000_0000_0000, 12);
+const BIT_12: VRAMAddressFlag = (0b0001_0000_0000_0000, 12);
+const BIT_14: VRAMAddressFlag = (0b0100_0000_0000_0000, 14);
+const BITS_8_13: VRAMAddressFlag = (0b0011_1111_0000_0000, 8);
+const LOW_BYTE: VRAMAddressFlag = (0b0000_0000_1111_1111, 0);
 
 #[derive(Copy, Clone, Default)]
 struct VRAMAddress {
@@ -303,7 +303,7 @@ pub struct PPU {
     mask_reg: MaskRegister,
     status_reg: StatusRegister,
     oam_address: u8,
-    oam: OAM,
+    oam: Oam,
     pattern_tables: [RefCell<PatternTable>; 2],
     ppu_cycle: u16,
     scanline: i16,
@@ -329,7 +329,7 @@ impl PPU {
         mapper: Rc<RefCell<dyn Mapper>>,
     ) -> PPU {
         PPU {
-            vram: vram,
+            vram,
             control_reg: ControlRegister { value: 0 },
             mask_reg: MaskRegister { value: 0 },
             status_reg: StatusRegister { value: 0 },
@@ -462,16 +462,14 @@ impl PPU {
         }
     }
 
-    fn run_single_ppu_cycle(&mut self) -> () {
-        if self.ppu_cycle == ACTIVE_PIXELS_CYCLE_END + 1 {
-            if self.is_rendering_in_progress() {
-                self.vram_address.inc_y();
-                self.mapper.borrow_mut().ppu_a12_rising_edge_triggered();
-                self.vram_address
-                    .set(COARSE_X, self.t_vram_address.get(COARSE_X));
-                self.vram_address
-                    .set(NM_TABLE_X, self.t_vram_address.get(NM_TABLE_X));
-            }
+    fn run_single_ppu_cycle(&mut self) {
+        if self.ppu_cycle == ACTIVE_PIXELS_CYCLE_END + 1 && self.is_rendering_in_progress() {
+            self.vram_address.inc_y();
+            self.mapper.borrow_mut().ppu_a12_rising_edge_triggered();
+            self.vram_address
+                .set(COARSE_X, self.t_vram_address.get(COARSE_X));
+            self.vram_address
+                .set(NM_TABLE_X, self.t_vram_address.get(NM_TABLE_X));
         }
 
         match self.scanline {
@@ -653,15 +651,14 @@ impl PPU {
                         tile_index += 1;
                     }
 
-                    if is_sprite_mode_8x16 {
-                        if sprite.if_flip_vertically() {
-                            if self.scanline as u8 <= sprite.get_y() + 7 {
-                                tile_index += 1;
-                            } else {
-                                tile_index -= 1;
-                            }
+                    if is_sprite_mode_8x16 && sprite.if_flip_vertically() {
+                        if self.scanline as u8 <= sprite.get_y() + 7 {
+                            tile_index += 1;
+                        } else {
+                            tile_index -= 1;
                         }
                     }
+
                     let mut x = x - sprite.get_x();
                     let mut y = (self.scanline as u8 - sprite.get_y()) % 8;
                     if sprite.if_flip_horizontally() {
@@ -826,7 +823,7 @@ impl WritePpuRegisters for PPU {
 }
 
 impl WriteOamDma for PPU {
-    fn write_oam_dma(&mut self, data: [u8; 256]) -> () {
+    fn write_oam_dma(&mut self, data: [u8; 256]) {
         let write_len = 256 - self.oam_address as usize;
         self.oam[self.oam_address as usize..].copy_from_slice(&data[..write_len as usize])
     }
@@ -859,10 +856,7 @@ impl ReadPpuRegisters for PPU {
                 self.check_for_a12_rising_toggle(old_vram_address);
                 val
             }
-            ReadAccessRegister::OamData => {
-                let val = self.oam[self.oam_address as usize];
-                val
-            }
+            ReadAccessRegister::OamData => self.oam[self.oam_address as usize],
         }
     }
 }

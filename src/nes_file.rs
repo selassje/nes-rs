@@ -108,14 +108,10 @@ impl NesFile {
         }
     }
 
-    fn get_format(header: &Vec<u8>) -> NesFormat {
+    fn get_format(header: &[u8]) -> NesFormat {
         let mut is_ines_format = false;
         let mut is_nes2_format = false;
-        if header[0] == 'N' as u8
-            && header[1] == 'E' as u8
-            && header[2] == 'S' as u8
-            && header[3] == 0x1A
-        {
+        if header[0] == b'N' && header[1] == b'E' && header[2] == b'S' && header[3] == 0x1A {
             is_ines_format = true;
         }
 
@@ -132,7 +128,7 @@ impl NesFile {
         }
     }
 
-    pub fn new(in_bytes: &Vec<u8>) -> NesFile {
+    pub fn new(in_bytes: &[u8]) -> NesFile {
         let format = Self::get_format(in_bytes);
         assert!(format == NesFormat::INes);
 
@@ -158,8 +154,7 @@ impl NesFile {
         read_index = 16;
         let mut trainer = Option::None;
         if header.flag_6 & (HeaderFlag6::TrainerPresent as u8) == 1 {
-            let mut trainer_data: Trainer =
-                unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+            let mut trainer_data: Trainer = [0; 512];
             read_index += read_to_array(&mut trainer_data, &in_bytes[read_index..]);
             trainer = Option::Some(trainer_data);
         }
@@ -174,8 +169,7 @@ impl NesFile {
         let mut chr_rom = Vec::<ChrRomUnit>::new();
 
         for _ in 0..header.chr_rom_units {
-            let mut chr_rom_unit: ChrRomUnit =
-                unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+            let mut chr_rom_unit: ChrRomUnit = [0; common::CHR_ROM_UNIT_SIZE];
             read_index += read_to_array(&mut chr_rom_unit, &in_bytes[read_index..]);
             chr_rom.push(chr_rom_unit);
         }
@@ -183,16 +177,13 @@ impl NesFile {
         let mut play_choice_rom = Option::None;
 
         if header.flag_7 & (HeaderFlag7::PlayChoice10 as u8) == 1 {
-            let mut inst_rom: PlayChoiceInstRom =
-                unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+            let mut inst_rom: PlayChoiceInstRom = [0; 8192];
             read_index += read_to_array(&mut inst_rom, &in_bytes[read_index..]);
 
-            let mut data_output: PlayChoiceDecryptData =
-                unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+            let mut data_output: PlayChoiceDecryptData = [0; 16];
             read_index += read_to_array(&mut data_output, &in_bytes[read_index..]);
 
-            let mut counter_output: PlayChoiceDecryptData =
-                unsafe { std::mem::MaybeUninit::uninit().assume_init() };
+            let mut counter_output: PlayChoiceDecryptData = [0; 16];
             read_to_array(&mut counter_output, &in_bytes[read_index..]);
 
             play_choice_rom = Some(PlayChoiceRom {

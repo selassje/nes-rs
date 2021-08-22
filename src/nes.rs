@@ -9,7 +9,7 @@ use crate::nes_file::NesFile;
 use crate::ppu::PPU;
 use crate::ram::RAM;
 use crate::vram::VRAM;
-use crate::{cpu::CPU, mappers::Mapper};
+use crate::{cpu::CPU, mappers::Mapper, mappers::MapperNull};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -30,17 +30,17 @@ impl Nes {
         T: IO + VideoAccess + AudioAccess + ControllerAccess + 'static,
     {
         let controllers = Rc::new(RefCell::new(controllers::Controllers::new(io.clone())));
-        let mapper = Rc::new(RefCell::new(crate::mappers::MapperNull::new()));
+        let mapper = Rc::new(RefCell::new(MapperNull::new()));
         let vram = Rc::new(RefCell::new(VRAM::new(mapper.clone())));
         let ppu = Rc::new(RefCell::new(PPU::new(
             vram.clone(),
             io.clone(),
             mapper.clone(),
         )));
-        let apu = Rc::new(RefCell::new(APU::new(io.clone())));
+        let apu = Rc::new(RefCell::new(APU::new(io)));
         let ram = Rc::new(RefCell::new(RAM::new(
             ppu.clone(),
-            controllers.clone(),
+            controllers,
             apu.clone(),
             mapper.clone(),
         )));

@@ -18,7 +18,7 @@ pub trait ReadInputRegisters {
 }
 
 pub trait WriteOutputRegisters {
-    fn write(&mut self, port: OutputRegister, value: u8) -> ();
+    fn write(&mut self, port: OutputRegister, value: u8);
 }
 
 pub trait ControllerRegisterAccess: ReadInputRegisters + WriteOutputRegisters {}

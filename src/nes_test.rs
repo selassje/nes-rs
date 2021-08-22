@@ -18,7 +18,7 @@ pub struct NesTest {
 }
 
 impl NesTest {
-    fn create_frame_path(dir: &PathBuf, test_name: &str, suffix: &str) -> String {
+    fn create_frame_path(dir: &Path, test_name: &str, suffix: &str) -> String {
         let frame_path = dir.join(Path::new(&(test_name.to_owned() + suffix + ".bmp")));
         let frame_path = frame_path.to_str().unwrap();
         String::from(frame_path)
@@ -36,7 +36,7 @@ impl NesTest {
         let mut test_name = dir.file_name().unwrap().to_str().unwrap().to_owned();
         if let Some(suffix) = suffix {
             let suffix: String = ".".to_owned() + suffix;
-            test_name.extend(suffix.chars())
+            test_name.push_str(&suffix)
         }
 
         dir.pop();
@@ -59,9 +59,9 @@ impl NesTest {
 
     fn frames_are_the_same(&self) -> bool {
         let mut file_1 = File::open(self.output_frame_path.clone())
-            .expect(&format!("Unable to open {}", self.output_frame_path));
+            .unwrap_or_else(|_| panic!("Unable to open {}", self.output_frame_path));
         let mut file_2 = File::open(self.expected_frame_path.clone())
-            .expect(&format!("Unable to open {}", self.expected_frame_path));
+            .unwrap_or_else(|_| panic!("Unable to open {}", self.expected_frame_path));
         let mut buffer_1 = Vec::new();
         let mut buffer_2 = Vec::new();
         let _ = file_1.read_to_end(&mut buffer_1);

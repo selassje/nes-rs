@@ -31,9 +31,10 @@ fn shortcut_to_menu_bar_item(key: KeyboardShortcut) -> Option<MenuBarItem> {
 fn is_shortcut(scancode: Scancode, key_mod: Mod) -> Option<MenuBarItem> {
     let is_left_ctrl = Mod::LCTRLMOD & key_mod == Mod::LCTRLMOD;
     if is_left_ctrl {
-        return shortcut_to_menu_bar_item(LeftCtrl(scancode));
+        shortcut_to_menu_bar_item(LeftCtrl(scancode))
+    } else {
+        shortcut_to_menu_bar_item(Single(scancode))
     }
-    return shortcut_to_menu_bar_item(Single(scancode));
 }
 #[derive(Default)]
 pub(super) struct KeyboardShortcuts {

@@ -171,8 +171,8 @@ impl VideoMemory for VRAM {
     fn get_pattern_table_tile_data(&self, table_index: u8, tile_index: u8) -> [u8; 16] {
         let mut tile_data = [0; 16];
         let pattern_table_addr = table_index as u16 * PATTERN_TABLE_SIZE;
-        for i in 0..16 {
-            tile_data[i] =
+        for (i, tile_data) in tile_data.iter_mut().enumerate() {
+            *tile_data =
                 self.get_byte_internal(pattern_table_addr + 16 * tile_index as u16 + i as u16);
         }
         tile_data
@@ -197,6 +197,6 @@ impl VideoMemory for VRAM {
 
     fn get_high_pattern_data(&self, table_index: u8, tile_index: u8, y: u8) -> u8 {
         let pattern_table_addr = table_index as u16 * PATTERN_TABLE_SIZE;
-        self.get_byte_internal(pattern_table_addr + 16 * tile_index as u16 + 8 as u16 + y as u16)
+        self.get_byte_internal(pattern_table_addr + 16 * tile_index as u16 + 8 + y as u16)
     }
 }

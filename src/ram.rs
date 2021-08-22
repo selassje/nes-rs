@@ -59,10 +59,10 @@ impl RAM {
     ) -> RAM {
         RAM {
             memory: [0; 0x0808],
-            mapper: mapper,
-            ppu_access: ppu_access,
-            controller_access: controller_access,
-            apu_access: apu_access,
+            mapper,
+            ppu_access,
+            controller_access,
+            apu_access,
             dmc_sample_address: 0,
             ppu_register_latch: RegisterLatch::new(0),
             apu_register_latch: RegisterLatch::new(0),
@@ -113,13 +113,13 @@ impl Memory for RAM {
             *self.controller_register_latch.borrow_mut() =
                 self.controller_access.borrow_mut().read(input_port);
             *self.controller_register_latch.borrow()
-        } else if let Ok(_) = WriteAccessRegister::try_from(addr) {
+        } else if WriteAccessRegister::try_from(addr).is_ok() {
             *self.ppu_register_latch.borrow_mut()
-        } else if let Ok(_) = DmaWriteAccessRegister::try_from(addr) {
+        } else if DmaWriteAccessRegister::try_from(addr).is_ok() {
             *self.oam_dma_register_latch.borrow()
-        } else if let Ok(_) = OutputRegister::try_from(addr) {
+        } else if OutputRegister::try_from(addr).is_ok() {
             *self.controller_register_latch.borrow()
-        } else if let Ok(_) = ram_apu::WriteAccessRegister::try_from(addr) {
+        } else if ram_apu::WriteAccessRegister::try_from(addr).is_ok() {
             *self.apu_register_latch.borrow()
         } else if CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)) {
             self.mapper.borrow_mut().get_prg_byte(addr)
@@ -137,7 +137,7 @@ impl Memory for RAM {
         if let Ok(reg) = WriteAccessRegister::try_from(addr) {
             self.ppu_access.borrow_mut().write(reg, byte);
             *self.ppu_register_latch.borrow_mut() = byte;
-        } else if let Ok(_) = DmaWriteAccessRegister::try_from(addr) {
+        } else if DmaWriteAccessRegister::try_from(addr).is_ok() {
             let mut dma_data = [0; 256];
             for (i, e) in dma_data.iter_mut().enumerate() {
                 let page_adress = (byte as u16) << 8;
@@ -151,17 +151,15 @@ impl Memory for RAM {
         } else if let Ok(reg) = ram_apu::WriteAccessRegister::try_from(addr) {
             self.apu_access.borrow_mut().write(reg, byte);
             *self.apu_register_latch.borrow_mut() = byte;
-        } else if let Ok(_) = InputRegister::try_from(addr) {
+        } else if InputRegister::try_from(addr).is_ok() {
             *self.controller_register_latch.borrow_mut() = byte;
-        } else if let Ok(_) = ReadAccessRegister::try_from(addr) {
+        } else if ReadAccessRegister::try_from(addr).is_ok() {
             *self.ppu_register_latch.borrow_mut() = byte;
-        } else if let Ok(_) = ram_apu::ReadAccessRegister::try_from(addr) {
+        } else if ram_apu::ReadAccessRegister::try_from(addr).is_ok() {
             *self.apu_register_latch.borrow_mut() = byte;
         } else if CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)) {
             self.mapper.borrow_mut().store_prg_byte(addr, byte)
-        } else if addr >= CPU_TEST_MODE_SPACE_START {
-            self.memory[(INTERNAL_MIRROR_SIZE + addr - CPU_TEST_MODE_SPACE_START) as usize];
-        } else {
+        } else if addr < CPU_TEST_MODE_SPACE_START {
             assert!(addr < INTERNAL_MIRROR_SIZE);
             self.memory[addr as usize] = byte;
         }
@@ -171,7 +169,7 @@ impl Memory for RAM {
         crate::common::convert_2u8_to_u16(self.get_byte(addr), self.get_byte(addr + 1))
     }
 
-    fn store_bytes(&mut self, addr: u16, bytes: &Vec<u8>) {
+    fn store_bytes(&mut self, addr: u16, bytes: &[u8]) {
         for (i, b) in bytes.iter().enumerate() {
             self.store_byte(addr + i as u16, *b);
         }

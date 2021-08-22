@@ -54,7 +54,7 @@ enum Address {
     Implicit,
     Accumulator,
     Immediate(u8),
-    RAM(u16),
+    Ram(u16),
     Relative(u16),
 }
 
@@ -64,7 +64,7 @@ impl Display for Address {
             Address::Implicit => write!(f, ""),
             Address::Accumulator => write!(f, "A"),
             Address::Immediate(i) => write!(f, "{:#X}", i),
-            Address::RAM(address) => write!(f, "{:#X}", address),
+            Address::Ram(address) => write!(f, "{:#X}", address),
             Address::Relative(pc) => write!(f, "{:#X}", pc),
         }
     }
@@ -241,10 +241,10 @@ impl CPU {
             let mut operand_1 = 0;
             let mut operand_2 = 0;
 
-            if self.pc + 1 <= code_segment_end {
+            if self.pc < code_segment_end {
                 operand_1 = self.ram.borrow().get_byte(self.pc + 1);
             }
-            if self.pc + 2 <= code_segment_end {
+            if self.pc + 1 < code_segment_end {
                 operand_2 = self.ram.borrow().get_byte(self.pc + 2);
             }
 
@@ -326,33 +326,28 @@ impl CPU {
                 self.cycle += instruction.total_cycles as u128;
             }
             self.instruction = None;
-        } else {
-            if is_brk_or_irq_executing {
-                if self.ppu_state.borrow_mut().is_nmi_pending() && instruction.cycle <= 4 {
-                    self.is_brk_or_irq_hijacked_by_nmi = true;
-                    self.ppu_state.borrow_mut().clear_nmi_pending()
-                }
-            } else if is_branching_executing {
-                if instruction.cycle == 1
-                    || (instruction.cycle == 3 && instruction.total_cycles == 4)
-                {
-                    self.check_for_interrupts();
-                }
-            } else if !is_nmi_executing {
-                if (self.oam_dma_in_progress.is_some()
-                    && instruction.cycle == self.oam_dma_in_progress.unwrap() - 1)
-                    || (self.oam_dma_in_progress.is_none()
-                        && instruction.cycle == instruction.total_cycles - 1)
-                {
-                    self.check_for_interrupts()
-                }
+        } else if is_brk_or_irq_executing {
+            if self.ppu_state.borrow_mut().is_nmi_pending() && instruction.cycle <= 4 {
+                self.is_brk_or_irq_hijacked_by_nmi = true;
+                self.ppu_state.borrow_mut().clear_nmi_pending()
             }
+        } else if is_branching_executing {
+            if instruction.cycle == 1 || (instruction.cycle == 3 && instruction.total_cycles == 4) {
+                self.check_for_interrupts();
+            }
+        } else if !is_nmi_executing
+            && ((self.oam_dma_in_progress.is_some()
+                && instruction.cycle == self.oam_dma_in_progress.unwrap() - 1)
+                || (self.oam_dma_in_progress.is_none()
+                    && instruction.cycle == instruction.total_cycles - 1))
+        {
+            self.check_for_interrupts()
         }
     }
 
     fn get_extra_cycles_from_oam_dma(&mut self) -> u16 {
         let mut extra_cycles = 0;
-        if self.address == Address::RAM(OamDma as u16) {
+        if self.address == Address::Ram(OamDma as u16) {
             extra_cycles = 513;
             if self.cycle % 2 == 1 {
                 extra_cycles += 1;
@@ -435,31 +430,31 @@ impl CPU {
             AddressingMode::Implicit => Address::Implicit,
             AddressingMode::Accumulator => Address::Accumulator,
             AddressingMode::Immediate => Address::Immediate(operand_1),
-            AddressingMode::ZeroPage => Address::RAM(b0_u16),
-            AddressingMode::ZeroPageX => Address::RAM(zero_page_x),
-            AddressingMode::ZeroPageY => Address::RAM(zero_page_y),
-            AddressingMode::Absolute => Address::RAM(convert_2u8_to_u16(operand_1, operand_2)),
+            AddressingMode::ZeroPage => Address::Ram(b0_u16),
+            AddressingMode::ZeroPageX => Address::Ram(zero_page_x),
+            AddressingMode::ZeroPageY => Address::Ram(zero_page_y),
+            AddressingMode::Absolute => Address::Ram(convert_2u8_to_u16(operand_1, operand_2)),
 
             AddressingMode::AbsoluteX => {
                 if extra_cycle_on_page_crossing && b0_u16 + x_u16 > 0xFF {
                     extra_cycle = 1
                 }
                 let address = b0_u16 as u32 + x_u16 as u32 + (b1_u16 << 8) as u32;
-                Address::RAM(address as u16)
+                Address::Ram(address as u16)
             }
             AddressingMode::AbsoluteY => {
                 if extra_cycle_on_page_crossing && b0_u16 + y_u16 > 0xFF {
                     extra_cycle = 1
                 }
                 let address = b0_u16 as u32 + y_u16 as u32 + (b1_u16 << 8) as u32;
-                Address::RAM(address as u16)
+                Address::Ram(address as u16)
             }
             AddressingMode::IndexedIndirectX => {
                 let indexed_indirect = convert_2u8_to_u16(
                     self.ram.borrow().get_byte(zero_page_x),
                     self.ram.borrow().get_byte(zero_page_x_hi),
                 );
-                Address::RAM(indexed_indirect)
+                Address::Ram(indexed_indirect)
             }
             AddressingMode::IndirectIndexedY => {
                 let indirect = convert_2u8_to_u16(
@@ -470,7 +465,7 @@ impl CPU {
                 if extra_cycle_on_page_crossing && indirect_indexed & 0xFF00 != indirect & 0xFF00 {
                     extra_cycle = 1;
                 }
-                Address::RAM(indirect_indexed)
+                Address::Ram(indirect_indexed)
             }
             AddressingMode::Relative => {
                 let new_pc = (self.pc as i16 + (operand_1 as i8 as i16)) as u16;
@@ -488,7 +483,7 @@ impl CPU {
                         self.ram.borrow().get_byte(b0_u16 + (b1_u16 << 8) + 1),
                     )
                 };
-                Address::RAM(indirect)
+                Address::Ram(indirect)
             }
         };
         (address, extra_cycle)
@@ -499,14 +494,14 @@ impl CPU {
             Address::Implicit => panic!("load_from_address can't be used for implicit mode"),
             Address::Accumulator => self.a,
             Address::Immediate(i) => *i,
-            Address::RAM(address) => self.ram.borrow().get_byte(*address),
+            Address::Ram(address) => self.ram.borrow().get_byte(*address),
             Address::Relative(_) => panic!("load_from_address can't be used for the Relative mode"),
         }
     }
 
     fn get_ram_address(&self) -> u16 {
         match &self.address {
-            Address::RAM(address) => *address,
+            Address::Ram(address) => *address,
             _ => panic!("Invalid address type {:?}", self.address),
         }
     }
@@ -516,7 +511,7 @@ impl CPU {
             Address::Implicit => panic!("store_to_address can't be used for implicit mode"),
             Address::Accumulator => self.a = byte,
             Address::Immediate(_) => panic!("Not possible to store in Immediate addressing"),
-            Address::RAM(address) => self.ram.borrow_mut().store_byte(*address, byte),
+            Address::Ram(address) => self.ram.borrow_mut().store_byte(*address, byte),
             Address::Relative(_) => panic!("store_to_address can't be used for the Relative mode"),
         }
     }
@@ -546,7 +541,7 @@ impl CPU {
     fn asl(&mut self) {
         let mut m = self.load_from_address();
         let old_bit_7 = m & 0x80;
-        m = m << 1;
+        m <<= 1;
         self.set_or_clear_flag(ProcessorFlag::CarryFlag, old_bit_7 != 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
@@ -864,7 +859,7 @@ impl CPU {
         if self.y == 0 {
             self.y = 0xFF;
         } else {
-            self.y = self.y - 1;
+            self.y -= 1;
         }
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.y == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.y & 0x80 != 0);
@@ -875,7 +870,7 @@ impl CPU {
         if m == 0 {
             m = 0xFF;
         } else {
-            m = m - 1;
+            m -= 1;
         }
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
@@ -886,7 +881,7 @@ impl CPU {
         if self.x == 0 {
             self.x = 0xFF;
         } else {
-            self.x = self.x - 1;
+            self.x -= 1;
         }
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.x == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);

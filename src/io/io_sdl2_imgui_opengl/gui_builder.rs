@@ -348,31 +348,29 @@ impl GuiBuilder {
         }
     }
     pub fn try_get_key_selection(&mut self, event: &sdl2::event::Event) {
-        match *event {
-            sdl2::event::Event::KeyDown {
-                scancode, keymod, ..
-            } => {
-                if keymod & sdl2::keyboard::Mod::NOMOD == sdl2::keyboard::Mod::NOMOD {
-                    if let Some(scancode) = scancode {
-                        if let Some(button) = self.io_control.common.controller_configs[0]
-                            .pending_key_select
-                            .take()
-                        {
-                            self.io_control.common.controller_configs[0].mapping[button as usize]
-                                .key = scancode;
+        if let sdl2::event::Event::KeyDown {
+            scancode, keymod, ..
+        } = *event
+        {
+            if keymod & sdl2::keyboard::Mod::NOMOD == sdl2::keyboard::Mod::NOMOD {
+                if let Some(scancode) = scancode {
+                    if let Some(button) = self.io_control.common.controller_configs[0]
+                        .pending_key_select
+                        .take()
+                    {
+                        self.io_control.common.controller_configs[0].mapping[button as usize].key =
+                            scancode;
 
-                            self.io_control.common.controller_configs[0].pending_key_select = None;
-                        } else if let Some(button) = self.io_control.common.controller_configs[1]
-                            .pending_key_select
-                            .take()
-                        {
-                            self.io_control.common.controller_configs[1].mapping[button as usize]
-                                .key = scancode;
-                        }
+                        self.io_control.common.controller_configs[0].pending_key_select = None;
+                    } else if let Some(button) = self.io_control.common.controller_configs[1]
+                        .pending_key_select
+                        .take()
+                    {
+                        self.io_control.common.controller_configs[1].mapping[button as usize].key =
+                            scancode;
                     }
                 }
             }
-            _ => {}
         };
     }
     pub fn is_key_selection_pending(&self) -> bool {
@@ -446,7 +444,7 @@ impl GuiBuilder {
     pub(super) fn build(&mut self, mut ui: &mut imgui::Ui) {
         self.build_menu_bar = self.get_io_common().video_size != VideoSizeControl::FullScreen;
         with_styles!(
-            &mut ui,
+            &ui,
             (
                 imgui::StyleVar::WindowRounding(0.0),
                 imgui::StyleVar::WindowBorderSize(0.0),

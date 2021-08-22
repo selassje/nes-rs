@@ -45,7 +45,7 @@ pub struct Emulation {
     frame_start: std::time::Instant,
     is_audio_available: bool,
 }
-
+#[allow(clippy::new_without_default)]
 impl Emulation {
     pub fn new() -> Self {
         let io = Rc::new(RefCell::new(
@@ -112,11 +112,9 @@ impl emscripten_main_loop::MainLoop for Emulation {
         if !self.io_state.common.pause {
             {
                 let elapsed_time_since_frame_start = self.frame_start.elapsed();
-                if !self.is_audio_available {
-                    if elapsed_time_since_frame_start < FRAME_DURATION {
-                        #[cfg(not(target_os = "emscripten"))]
-                        std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);
-                    }
+                if !self.is_audio_available && elapsed_time_since_frame_start < FRAME_DURATION {
+                    #[cfg(not(target_os = "emscripten"))]
+                    std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);
                 }
             }
             self.frame_start = std::time::Instant::now();
@@ -127,11 +125,13 @@ impl emscripten_main_loop::MainLoop for Emulation {
 
 fn read_nes_file(file_name: &str) -> nes_file::NesFile {
     let mut rom = Vec::new();
-    let mut file = File::open(&file_name).expect(&format!(
-        "Unable to open ROM {} current dir {}",
-        file_name,
-        std::env::current_dir().unwrap().display()
-    ));
+    let mut file = File::open(&file_name).unwrap_or_else(|_| {
+        panic!(
+            "Unable to open ROM {} current dir {}",
+            file_name,
+            std::env::current_dir().unwrap().display()
+        )
+    });
     file.read_to_end(&mut rom).expect("Unable to read ROM");
     nes_file::NesFile::new(&rom)
 }

@@ -82,8 +82,8 @@ impl DefaultColorMapper {
             _ => panic!("This shouldn't happen"),
         };
         let mut color_map = [(0, 0, 0); 64];
-        for i in 0..64 {
-            color_map[i] = map_color(i);
+        for (i, color) in color_map.iter_mut().enumerate() {
+            *color = map_color(i);
         }
 
         DefaultColorMapper { color_map }

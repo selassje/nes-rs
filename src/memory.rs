@@ -9,7 +9,7 @@ pub trait Memory {
         common::convert_2u8_to_u16(self.get_byte(addr), self.get_byte(addr + 1))
     }
 
-    fn store_bytes(&mut self, addr: u16, bytes: &Vec<u8>) {
+    fn store_bytes(&mut self, addr: u16, bytes: &[u8]) {
         for (i, b) in bytes.iter().enumerate() {
             self.store_byte(addr + i as u16, *b);
         }

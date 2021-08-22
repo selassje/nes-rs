@@ -113,16 +113,14 @@ impl Envelope {
             self.start_flag = false;
             self.decay_level_counter = 15;
             self.divider = divider_reload_value;
+        } else if self.divider > 0 {
+            self.divider -= 1;
         } else {
-            if self.divider > 0 {
-                self.divider -= 1;
-            } else {
-                self.divider = divider_reload_value;
-                if self.decay_level_counter > 0 {
-                    self.decay_level_counter -= 1;
-                } else if loop_flag {
-                    self.decay_level_counter = 15;
-                }
+            self.divider = divider_reload_value;
+            if self.decay_level_counter > 0 {
+                self.decay_level_counter -= 1;
+            } else if loop_flag {
+                self.decay_level_counter = 15;
             }
         }
     }
@@ -142,9 +140,10 @@ struct SweepUnit {
 
 impl SweepUnit {
     fn new(use_ones_complement: bool) -> Self {
-        let mut sweep_unit = Self::default();
-        sweep_unit.use_ones_complement = use_ones_complement;
-        sweep_unit
+        Self {
+            use_ones_complement,
+            ..Default::default()
+        }
     }
 
     fn power_cycle(&mut self) {
@@ -487,9 +486,9 @@ impl Noise {
     fn clock_timer(&mut self) {
         if self.timer_tick == 0 {
             let snd_xor_bit = if self.is_mode_flag_set() {
-                (self.shift_register & 0b000000_01000000) >> 6
+                (self.shift_register & 0b00_0000_0100_0000) >> 6
             } else {
-                (self.shift_register & 0b000000_00000010) >> 1
+                (self.shift_register & 0b00_0000_0000_0010) >> 1
             };
             let feedback_bit = (self.shift_register & 1) ^ snd_xor_bit;
             self.shift_register >>= 1;
@@ -527,7 +526,7 @@ impl LengthCounterChannel for Noise {
     }
 }
 
-struct DMC {
+struct Dmc {
     data: [u8; 4],
     timer_tick: u16,
     sample_buffer: Option<u8>,
@@ -542,9 +541,9 @@ struct DMC {
     dmc_memory: Option<Rc<RefCell<dyn DmcMemory>>>,
 }
 
-impl DMC {
+impl Dmc {
     fn new() -> Self {
-        DMC {
+        Dmc {
             data: [0; 4],
             timer_tick: 0,
             bits_counter: 0,
@@ -672,7 +671,7 @@ pub struct APU {
     pulse_2: PulseWave,
     triangle: TriangleWave,
     noise: Noise,
-    dmc: DMC,
+    dmc: Dmc,
     cpu_cycle: u16,
     is_during_apu_cycle: bool,
     frame_interrupt: bool,
@@ -690,7 +689,7 @@ impl APU {
             pulse_2: PulseWave::new(true),
             triangle: TriangleWave::default(),
             noise: Noise::new(),
-            dmc: DMC::new(),
+            dmc: Dmc::new(),
             cpu_cycle: 8,
             is_during_apu_cycle: false,
             frame_interrupt: false,
@@ -857,38 +856,21 @@ impl APU {
     }
 
     fn is_half_frame_reached(&self) -> bool {
-        let next_cpu_cycle = self.cpu_cycle;
-        if next_cpu_cycle == FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES {
-            return true;
-        } else if self.frame_counter.get_sequencer_mode() == 0
-            && next_cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
-        {
-            return true;
-        } else if self.frame_counter.get_sequencer_mode() == 1
-            && next_cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES
-        {
-            return true;
-        }
-        false
+        let mode = self.frame_counter.get_sequencer_mode();
+        self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES
+            || (mode == 0 && self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES)
+            || (mode == 1 && self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES)
     }
 
     fn is_quarter_frame_reached(&self) -> bool {
-        if self.is_half_frame_reached() {
-            return true;
-        } else {
-            if self.cpu_cycle == FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES {
-                return true;
-            }
-            if self.cpu_cycle == FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES {
-                return true;
-            }
-        }
-        false
+        self.is_half_frame_reached()
+            || self.cpu_cycle == FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES
+            || self.cpu_cycle == FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES
     }
 }
 
 impl WriteAcessRegisters for APU {
-    fn write(&mut self, register: WriteAccessRegister, value: u8) -> () {
+    fn write(&mut self, register: WriteAccessRegister, value: u8) {
         match register {
             WriteAccessRegister::Pulse1_0 => self.pulse_1.data[0] = value,
             WriteAccessRegister::Pulse1_1 => {

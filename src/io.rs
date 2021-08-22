@@ -31,20 +31,20 @@ pub enum VideoSizeControl {
     FullScreen = 5,
 }
 
-impl Into<[u32; 2]> for VideoSizeControl {
-    fn into(self) -> [u32; 2] {
-        if self == VideoSizeControl::FullScreen {
+impl From<VideoSizeControl> for [u32; 2] {
+    fn from(val: VideoSizeControl) -> Self {
+        if val == VideoSizeControl::FullScreen {
             panic!("VideoSizeControl::FullScreen size can't be converted to [u32;2]")
         }
 
-        let scaling = self as u32;
+        let scaling = val as u32;
         [scaling * FRAME_WIDTH as u32, scaling * FRAME_HEIGHT as u32]
     }
 }
 
-impl Into<[f32; 2]> for VideoSizeControl {
-    fn into(self) -> [f32; 2] {
-        let [width, height]: [u32; 2] = self.into();
+impl From<VideoSizeControl> for [f32; 2] {
+    fn from(val: VideoSizeControl) -> Self {
+        let [width, height]: [u32; 2] = val.into();
         [width as _, height as _]
     }
 }

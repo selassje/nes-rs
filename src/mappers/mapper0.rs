@@ -16,8 +16,8 @@ impl Mapper0 {
         let mapper_internal = MapperInternal::new(final_prg_rom, chr_rom);
 
         Self {
-            mirroring,
             mapper_internal,
+            mirroring,
         }
     }
 }

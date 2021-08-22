@@ -27,7 +27,7 @@ pub enum ReadAccessRegister {
 }
 
 pub trait WritePpuRegisters {
-    fn write(&mut self, register: WriteAccessRegister, value: u8) -> ();
+    fn write(&mut self, register: WriteAccessRegister, value: u8);
 }
 
 pub trait ReadPpuRegisters {
@@ -35,7 +35,7 @@ pub trait ReadPpuRegisters {
 }
 
 pub trait WriteOamDma {
-    fn write_oam_dma(&mut self, data: [u8; 256]) -> ();
+    fn write_oam_dma(&mut self, data: [u8; 256]);
 }
 
 pub trait PpuRegisterAccess: WritePpuRegisters + WriteOamDma + ReadPpuRegisters {}

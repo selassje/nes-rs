@@ -46,10 +46,9 @@ impl IOInternal {
 
 impl VideoAccess for IOInternal {
     fn set_pixel(&mut self, x: usize, y: usize, color: RgbColor) {
-        let (r, g, b) = color;
         let index = y * PIXEL_SIZE * FRAME_WIDTH + x * PIXEL_SIZE;
-        self.frame[index] = r;
-        self.frame[index + 1] = g;
-        self.frame[index + 2] = b;
+        self.frame[index] = color.0;
+        self.frame[index + 1] = color.1;
+        self.frame[index + 2] = color.2;
     }
 }
