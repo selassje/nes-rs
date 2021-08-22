@@ -23,11 +23,11 @@ jobs:
          cd emsdk
          if [ "$RUNNER_OS" == "Linux" ]; then
               ./emsdk install  2.0.9
-              ./emsdk activate 2.0.9
+              ./emsdk activate 2.0.9 --permanent
               source "emsdk_env.sh"
          elif [ "$RUNNER_OS" == "Windows" ]; then
               ./emsdk.bat install  2.0.9
-              ./emsdk.bat activate 2.0.9
+              ./emsdk.bat activate 2.0.9 --permanent
          else
               echo "$RUNNER_OS not supported"
               exit 1
