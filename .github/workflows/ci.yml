@@ -11,13 +11,28 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        include:
-          - os: ubuntu-latest
-          - os: windows-latest
+        os: [ubuntu-latest, windows-latest]
     steps:
     - uses: actions/checkout@v2
     - run: rustup target add wasm32-unknown-emscripten
     - run: rustup target add asmjs-unknown-emscripten
+    - name: Install Emscripten SDK
+      shell: bash
+      run:   |
+         git clone https://github.com/emscripten-core/emsdk.git
+         cd emsdk
+         if [ "$RUNNER_OS" == "Linux" ]; then
+              ./emsdk install  2.0.9
+              ./emsdk activate 2.0.9
+              source "emsdk_env.sh"
+         elif [ "$RUNNER_OS" == "Windows" ]; then
+              emsdk.bat install  2.0.9
+              emsdk.bat activate 2.0.9
+         else
+              echo "$RUNNER_OS not supported"
+              exit 1
+         fi
+         cd ..
     - run: cargo build --release --target=wasm32-unknown-emscripten
     - run: cargo build --release --target=asmjs-unknown-emscripten
     - run: cargo install cargo-vcpkg
