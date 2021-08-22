@@ -11,7 +11,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, windows-latest]
     steps:
     - uses: actions/checkout@v2
     - run: rustup target add wasm32-unknown-emscripten
@@ -31,19 +31,25 @@ jobs:
               echo "$RUNNER_OS not supported"
               exit 1
          fi
-         cd ..
     - name: Build Emscripten targets 
       run: |
-        source "emsdk/emsdk_env.sh"
+        if [ "$RUNNER_OS" == "Linux" ]; then
+              source "emsdk/emsdk_env.sh"
+         elif [ "$RUNNER_OS" == "Windows" ]; then
+              ./emsdk/emsdk_env.bat
+         else
+              echo "$RUNNER_OS not supported"
+              exit 1
+         fi
         cargo build --release --target=wasm32-unknown-emscripten
         cargo build --release --target=asmjs-unknown-emscripten
     - name: Build native target
       run: | 
           cargo install cargo-vcpkg
           cargo vcpkg build
-          cargo build --release --verbose
+          cargo build --release
     - name: Run native tests
-      run: cargo test  --release --verbose
+      run: cargo test --release
     - name: Check for clippy warnings
       run: cargo clippy --all-targets --all-features -- -D warnings
     - name: Check formatting
