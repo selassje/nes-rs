@@ -5,37 +5,30 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  EMSDK_VER: 2.0.9
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+            os: [ubuntu-latest, windows-latest]
     steps:
-    - uses: actions/checkout@v2
-    - run: rustup target add wasm32-unknown-emscripten
-    - run: rustup target add asmjs-unknown-emscripten
+    - name: Checkout
+      uses: actions/checkout@v2
     - name: Install Emscripten SDK
       shell: bash
-      run:   |
+      run: |
          git clone https://github.com/emscripten-core/emsdk.git
          cd emsdk
-         if [ "$RUNNER_OS" == "Linux" ]; then
-              ./emsdk install  2.0.9
-              ./emsdk activate 2.0.9
-         elif [ "$RUNNER_OS" == "Windows" ]; then
-              ./emsdk install  2.0.9
-              ./emsdk activate 2.0.9
-         else
-              echo "$RUNNER_OS not supported"
-              exit 1
-         fi
+         ./emsdk install  $EMSDK_VER
+         ./emsdk activate $EMSDK_VER
     - name: Build Emscripten targets
       shell: bash 
       run: |
+        rustup target add wasm32-unknown-emscripten
+        rustup target add asmjs-unknown-emscripten
         source "emsdk/emsdk_env.sh"
-        echo $PATH
         cargo build --release --target=wasm32-unknown-emscripten
         cargo build --release --target=asmjs-unknown-emscripten
     - name: Build native target
