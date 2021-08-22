@@ -8,18 +8,20 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+          - os: windows-latest
     steps:
     - uses: actions/checkout@v2
+    - run: rustup target add wasm32-unknown-emscripten
+    - run: rustup target add asmjs-unknown-emscripten
+    - run: cargo build --release --target=wasm32-unknown-emscripten
+    - run: cargo build --release --target=asmjs-unknown-emscripten
     - run: cargo install cargo-vcpkg
     - run: cargo vcpkg build
     - run: cargo build --release --verbose
     - run: cargo test  --release --verbose
-  build:
-    runs-on: windows-latest 
-    steps:
-    - uses: actions/checkout@v2
-    - run: cargo install cargo-vcpkg
-    - run: cargo vcpkg build
-    - run: cargo build --release --verbose
-    - run: cargo test  --release --verbose
+
