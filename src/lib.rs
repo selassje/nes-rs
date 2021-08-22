@@ -57,7 +57,7 @@ impl Emulation {
         let args: Vec<String> = env::args().collect();
         if args.len() > 1 {
             let path = &args[1];
-            load(&mut nes, &path);
+            load(&mut nes, path);
             initial_title = Some(path.clone());
         };
 

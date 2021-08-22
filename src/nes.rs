@@ -1,4 +1,4 @@
-use crate::apu::APU;
+use crate::apu::Apu;
 use crate::common;
 use crate::controllers;
 use crate::io::AudioAccess;
@@ -6,21 +6,21 @@ use crate::io::ControllerAccess;
 use crate::io::VideoAccess;
 use crate::io::IO;
 use crate::nes_file::NesFile;
-use crate::ppu::PPU;
-use crate::ram::RAM;
-use crate::vram::VRAM;
-use crate::{cpu::CPU, mappers::Mapper, mappers::MapperNull};
+use crate::ppu::Ppu;
+use crate::ram::Ram;
+use crate::vram::VRam;
+use crate::{cpu::Cpu, mappers::Mapper, mappers::MapperNull};
 
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
 pub struct Nes {
-    cpu: CPU,
-    ram: Rc<RefCell<RAM>>,
-    ppu: Rc<RefCell<PPU>>,
-    vram: Rc<RefCell<VRAM>>,
-    apu: Rc<RefCell<APU>>,
+    cpu: Cpu,
+    ram: Rc<RefCell<Ram>>,
+    ppu: Rc<RefCell<Ppu>>,
+    vram: Rc<RefCell<VRam>>,
+    apu: Rc<RefCell<Apu>>,
     mapper: Rc<RefCell<dyn Mapper>>,
 }
 
@@ -31,14 +31,14 @@ impl Nes {
     {
         let controllers = Rc::new(RefCell::new(controllers::Controllers::new(io.clone())));
         let mapper = Rc::new(RefCell::new(MapperNull::new()));
-        let vram = Rc::new(RefCell::new(VRAM::new(mapper.clone())));
-        let ppu = Rc::new(RefCell::new(PPU::new(
+        let vram = Rc::new(RefCell::new(VRam::new(mapper.clone())));
+        let ppu = Rc::new(RefCell::new(Ppu::new(
             vram.clone(),
             io.clone(),
             mapper.clone(),
         )));
-        let apu = Rc::new(RefCell::new(APU::new(io)));
-        let ram = Rc::new(RefCell::new(RAM::new(
+        let apu = Rc::new(RefCell::new(Apu::new(io)));
+        let ram = Rc::new(RefCell::new(Ram::new(
             ppu.clone(),
             controllers,
             apu.clone(),
@@ -46,7 +46,7 @@ impl Nes {
         )));
 
         apu.borrow_mut().set_dmc_memory(ram.clone());
-        let cpu = CPU::new(ram.clone(), ppu.clone(), apu.clone(), mapper.clone());
+        let cpu = Cpu::new(ram.clone(), ppu.clone(), apu.clone(), mapper.clone());
 
         Nes {
             cpu,

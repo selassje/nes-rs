@@ -37,7 +37,7 @@ const CARTRIDGE_SPACE_RANGE: Range<u32> = Range {
 
 type RegisterLatch = RefCell<u8>;
 
-pub struct RAM {
+pub struct Ram {
     memory: [u8; 0x0808],
     mapper: Rc<RefCell<dyn Mapper>>,
     ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>,
@@ -50,14 +50,14 @@ pub struct RAM {
     oam_dma_register_latch: RegisterLatch,
 }
 
-impl RAM {
+impl Ram {
     pub fn new(
         ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>,
         controller_access: Rc<RefCell<dyn ControllerRegisterAccess>>,
         apu_access: Rc<RefCell<dyn ram_apu::ApuRegisterAccess>>,
         mapper: Rc<RefCell<dyn Mapper>>,
-    ) -> RAM {
-        RAM {
+    ) -> Ram {
+        Ram {
             memory: [0; 0x0808],
             mapper,
             ppu_access,
@@ -94,7 +94,7 @@ impl RAM {
     }
 }
 
-impl Memory for RAM {
+impl Memory for Ram {
     fn get_byte(&self, address_org: u16) -> u8 {
         let addr = self.get_real_address(address_org);
         if let Ok(reg) = ReadAccessRegister::try_from(addr) {
@@ -181,7 +181,7 @@ impl Memory for RAM {
     }
 }
 
-impl DmcMemory for RAM {
+impl DmcMemory for Ram {
     fn set_sample_address(&mut self, address: u8) {
         self.dmc_sample_address = 0xC000 + (address as usize * 64);
     }

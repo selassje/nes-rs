@@ -1,6 +1,6 @@
 use super::AddressingMode;
 use super::AddressingMode::*;
-use super::CPU;
+use super::Cpu;
 
 #[derive(Copy, Clone)]
 pub(super) struct OpCode {
@@ -23,7 +23,7 @@ macro_rules! fill_opcodes {
         $(extra_cycle_on_page_crossing = $optional;
         )?
 
-        opcodes[$op] = Some(OpCode{instruction:CPU::$ins, mode: $mode,base_cycles: $cycles,extra_cycle_on_page_crossing});
+        opcodes[$op] = Some(OpCode{instruction:Cpu::$ins, mode: $mode,base_cycles: $cycles,extra_cycle_on_page_crossing});
         )*
         opcodes
     }};

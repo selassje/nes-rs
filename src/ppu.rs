@@ -296,7 +296,7 @@ impl Display for VRAMAddress {
     }
 }
 
-pub struct PPU {
+pub struct Ppu {
     video_access: Rc<RefCell<dyn VideoAccess>>,
     vram: Rc<RefCell<dyn VideoMemory>>,
     control_reg: ControlRegister,
@@ -322,13 +322,13 @@ pub struct PPU {
     tile_data: [TileData; 3],
 }
 
-impl PPU {
+impl Ppu {
     pub fn new(
         vram: Rc<RefCell<dyn VideoMemory>>,
         video_access: Rc<RefCell<dyn VideoAccess>>,
         mapper: Rc<RefCell<dyn Mapper>>,
-    ) -> PPU {
-        PPU {
+    ) -> Ppu {
+        Ppu {
             vram,
             control_reg: ControlRegister { value: 0 },
             mask_reg: MaskRegister { value: 0 },
@@ -745,7 +745,7 @@ impl PPU {
     }
 }
 
-impl WritePpuRegisters for PPU {
+impl WritePpuRegisters for Ppu {
     fn write(&mut self, register: WriteAccessRegister, value: u8) {
         match register {
             WriteAccessRegister::PpuCtrl => {
@@ -822,14 +822,14 @@ impl WritePpuRegisters for PPU {
     }
 }
 
-impl WriteOamDma for PPU {
+impl WriteOamDma for Ppu {
     fn write_oam_dma(&mut self, data: [u8; 256]) {
         let write_len = 256 - self.oam_address as usize;
         self.oam[self.oam_address as usize..].copy_from_slice(&data[..write_len as usize])
     }
 }
 
-impl ReadPpuRegisters for PPU {
+impl ReadPpuRegisters for Ppu {
     fn read(&mut self, register: ReadAccessRegister) -> u8 {
         match register {
             ReadAccessRegister::PpuStatus => {
@@ -860,9 +860,9 @@ impl ReadPpuRegisters for PPU {
         }
     }
 }
-impl PpuRegisterAccess for PPU {}
+impl PpuRegisterAccess for Ppu {}
 
-impl PpuState for PPU {
+impl PpuState for Ppu {
     fn is_nmi_pending(&mut self) -> bool {
         if self.scanline == VBLANK_START_SCANLINE && self.ppu_cycle == VBLANK_START_CYCLE {
             self.update_vblank_flag_and_nmi()

@@ -318,7 +318,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 #[cfg(not(target_os = "emscripten"))]
                 {
                     while audio_queue.size() > audio_saturation_threshold {}
-                    audio_queue.queue(&self.sample_buffer.get_samples());
+                    audio_queue.queue(self.sample_buffer.get_samples());
                 }
                 #[cfg(target_os = "emscripten")]
                 if audio_queue.size() < audio_saturation_threshold {

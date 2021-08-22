@@ -81,7 +81,7 @@ enum ProcessorFlag {
     NegativeFlag = 0b10000000,
 }
 
-pub type InstructionFun = fn(&mut CPU);
+pub type InstructionFun = fn(&mut Cpu);
 #[derive(Copy, Clone)]
 struct Instruction {
     total_cycles: u16,
@@ -90,7 +90,7 @@ struct Instruction {
     fun: InstructionFun,
 }
 
-pub struct CPU {
+pub struct Cpu {
     pc: u16,
     sp: u8,
     ps: u8,
@@ -111,14 +111,14 @@ pub struct CPU {
     oam_dma_in_progress: Option<u16>,
 }
 
-impl CPU {
+impl Cpu {
     pub fn new(
         ram: Rc<RefCell<dyn Memory>>,
         ppu_state: Rc<RefCell<dyn PpuState>>,
         apu_state: Rc<RefCell<dyn ApuState>>,
         mapper: Rc<RefCell<dyn Mapper>>,
-    ) -> CPU {
-        CPU {
+    ) -> Cpu {
+        Cpu {
             pc: 0,
             sp: 0xFD,
             ps: 0x24,
@@ -358,14 +358,14 @@ impl CPU {
 
     fn is_current_instruction_branching(&self) -> bool {
         let ins = self.instruction.unwrap().fun as usize;
-        let bcc_fn: usize = CPU::bcc as usize;
-        let bcs_fn: usize = CPU::bcs as usize;
-        let bpl_fn: usize = CPU::bpl as usize;
-        let bmi_fn: usize = CPU::bmi as usize;
-        let bne_fn: usize = CPU::bne as usize;
-        let beq_fn: usize = CPU::beq as usize;
-        let bvc_fn: usize = CPU::bvc as usize;
-        let bvs_fn: usize = CPU::bvs as usize;
+        let bcc_fn: usize = Cpu::bcc as usize;
+        let bcs_fn: usize = Cpu::bcs as usize;
+        let bpl_fn: usize = Cpu::bpl as usize;
+        let bmi_fn: usize = Cpu::bmi as usize;
+        let bne_fn: usize = Cpu::bne as usize;
+        let beq_fn: usize = Cpu::beq as usize;
+        let bvc_fn: usize = Cpu::bvc as usize;
+        let bvs_fn: usize = Cpu::bvs as usize;
 
         ins == bcc_fn
             || ins == bcs_fn

@@ -6,7 +6,7 @@ pub fn run_simple_test(rom_path: &str, duration: Duration) {
         nes_test.run_for(duration);
     };
 
-    let mut nes_test = NesTest::new(&rom_path, None, test_fn);
+    let mut nes_test = NesTest::new(rom_path, None, test_fn);
     assert!(nes_test.run());
 }
 

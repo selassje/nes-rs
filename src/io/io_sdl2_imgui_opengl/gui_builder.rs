@@ -293,7 +293,7 @@ impl GuiBuilder {
     }
 
     fn build_emulation_window(&self, ui: &mut imgui::Ui) {
-        with_styles!(&ui, (imgui::StyleVar::WindowBorderSize(0.0)), {
+        with_styles!(ui, (imgui::StyleVar::WindowBorderSize(0.0)), {
             let vertical_offset = if self.build_menu_bar {
                 MENU_BAR_HEIGHT as f32
             } else {
@@ -404,7 +404,7 @@ impl GuiBuilder {
 
     fn build_controllers_setup_window(&mut self, ui: &mut imgui::Ui) {
         with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
-            with_styles!(&ui, (imgui::StyleVar::WindowBorderSize(2.0)), {
+            with_styles!(ui, (imgui::StyleVar::WindowBorderSize(2.0)), {
                 if let Some(token) = imgui::ChildWindow::new(im_str!("Controllers Setup"))
                     .size([230.0, 230.0])
                     .border(true)
@@ -444,7 +444,7 @@ impl GuiBuilder {
     pub(super) fn build(&mut self, mut ui: &mut imgui::Ui) {
         self.build_menu_bar = self.get_io_common().video_size != VideoSizeControl::FullScreen;
         with_styles!(
-            &ui,
+            ui,
             (
                 imgui::StyleVar::WindowRounding(0.0),
                 imgui::StyleVar::WindowBorderSize(0.0),

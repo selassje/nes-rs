@@ -663,7 +663,7 @@ impl Dmc {
     }
 }
 
-pub struct APU {
+pub struct Apu {
     audio_access: Rc<RefCell<dyn AudioAccess>>,
     frame_counter: FrameCounter,
     status: StatusRegister,
@@ -680,9 +680,9 @@ pub struct APU {
     irq_flag_setting_in_progress: bool,
 }
 
-impl APU {
+impl Apu {
     pub fn new(audio_access: Rc<RefCell<dyn AudioAccess>>) -> Self {
-        APU {
+        Apu {
             frame_counter: FrameCounter { data: 0 },
             status: StatusRegister { data: 0 },
             pulse_1: PulseWave::new(false),
@@ -869,7 +869,7 @@ impl APU {
     }
 }
 
-impl WriteAcessRegisters for APU {
+impl WriteAcessRegisters for Apu {
     fn write(&mut self, register: WriteAccessRegister, value: u8) {
         match register {
             WriteAccessRegister::Pulse1_0 => self.pulse_1.data[0] = value,
@@ -960,7 +960,7 @@ impl WriteAcessRegisters for APU {
     }
 }
 
-impl ReadAccessRegisters for APU {
+impl ReadAccessRegisters for Apu {
     fn read(&mut self, register: ReadAccessRegister) -> u8 {
         match register {
             ReadAccessRegister::Status => {
@@ -991,9 +991,9 @@ impl ReadAccessRegisters for APU {
     }
 }
 
-impl ApuRegisterAccess for APU {}
+impl ApuRegisterAccess for Apu {}
 
-impl ApuState for APU {
+impl ApuState for Apu {
     fn is_irq_pending(&self) -> bool {
         self.frame_interrupt || self.dmc.interrupt
     }

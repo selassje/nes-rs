@@ -35,15 +35,15 @@ const ATTRIBUTE_DATA_QUADRANT_MASKS: [u8; 4] = [
     BottomRight as u8,
 ];
 
-pub struct VRAM {
+pub struct VRam {
     memory: [u8; 0x0820],
     mapper: Rc<RefCell<dyn Mapper>>,
     read_buffer: RefCell<u8>,
 }
 
-impl VRAM {
+impl VRam {
     pub fn new(mapper: Rc<RefCell<dyn Mapper>>) -> Self {
-        VRAM {
+        VRam {
             memory: [0; 0x0820],
             mapper,
             read_buffer: RefCell::new(0),
@@ -117,7 +117,7 @@ impl VRAM {
     }
 }
 
-impl Memory for VRAM {
+impl Memory for VRam {
     fn store_byte(&mut self, address: u16, byte: u8) {
         let adress = address & 0x3FFF;
         if adress < NAMETABLES_START {
@@ -141,7 +141,7 @@ impl Memory for VRAM {
         }
     }
 }
-impl VideoMemory for VRAM {
+impl VideoMemory for VRam {
     fn get_background_pallete_index(
         &self,
         table_index: u8,
