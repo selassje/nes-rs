@@ -16,19 +16,18 @@ pub(super) const IRQ_OPCODE: usize = 0x32;
 pub(super) type OpCodes = [Option<OpCode>; 256];
 
 macro_rules! fill_opcodes {
-    ($(($op:expr,$ins:ident,$mode:expr,$cycles:expr $(,$optional:expr)?)),*) => {{
+    ($(($op:expr,$ins:ident,$mode:expr,$cycles:expr $(,$extra_cycle_on_page_crossing:expr)?)),*) => {{
         let mut opcodes: OpCodes = [None; 256];
         $(
-        let mut extra_cycle_on_page_crossing = false;
-        $(extra_cycle_on_page_crossing = $optional;
+        let _extra_cycle_on_page_crossing = false;
+        $( let _extra_cycle_on_page_crossing = $extra_cycle_on_page_crossing;
         )?
 
-        opcodes[$op] = Some(OpCode{instruction:Cpu::$ins, mode: $mode,base_cycles: $cycles,extra_cycle_on_page_crossing});
+        opcodes[$op] = Some(OpCode{instruction:Cpu::$ins, mode: $mode,base_cycles: $cycles,extra_cycle_on_page_crossing: _extra_cycle_on_page_crossing});
         )*
         opcodes
     }};
 }
-#[allow(unused_assignments, unused_mut)]
 pub(super) fn get_opcodes() -> OpCodes {
     fill_opcodes!(
         (NMI_OPCODE, nmi, Implicit, 7),

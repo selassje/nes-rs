@@ -11,12 +11,11 @@ const PRG_RAM_RANGE: Range<u16> = Range {
     end: 0x8000,
 };
 
-#[allow(dead_code)]
 pub(super) enum MMC3_6Variant {
     MMC3HkROM,
-    MMC3TkTlSROM,
-    MMC3TqSROM,
-    MMC6,
+    _MMC3TkTlSROM,
+    _MMC3TqSROM,
+    _MMC6,
 }
 
 trait BankSelectRegister {
@@ -38,10 +37,9 @@ impl BankSelectRegister for u8 {
         ((self & 0b1000_0000) >> 7) as usize
     }
 }
-#[allow(dead_code)]
 pub(super) struct MMC3_6 {
     mapper_internal: MapperInternal,
-    variant: MMC3_6Variant,
+    _variant: MMC3_6Variant,
     prg_rom_banks: [BankSelect; 4],
     chr_rom_banks: [BankSelect; 8],
     prg_rom_banks_count: usize,
@@ -62,7 +60,7 @@ impl MMC3_6 {
         let prg_rom_banks_count = mapper_internal.get_prg_rom_bank_count(_8KB);
         let mut mapper = Self {
             mapper_internal,
-            variant,
+            _variant: variant,
             prg_rom_banks: [BankSelect {
                 size: _8KB,
                 bank: prg_rom_banks_count - 1,

@@ -8,31 +8,27 @@ enum NesFormat {
     Nes2_0,
     INes,
 }
-#[allow(dead_code)]
 enum HeaderFlag6 {
     MirroringVertical = 0b00000001,
-    PrgRAMPresent = 0b00000010,
+    _PrgRAMPresent = 0b00000010,
     TrainerPresent = 0b00000100,
-    IgnoreMirroring = 0b00001000,
+    _IgnoreMirroring = 0b00001000,
 }
 
-#[allow(dead_code)]
 enum HeaderFlag7 {
-    VsSystem = 0b00000001,
+    _VsSystem = 0b00000001,
     PlayChoice10 = 0b00000010,
-    Flags8_15InNes2 = 0b00001100,
+    _Flags8_15InNes2 = 0b00001100,
 }
 
-#[allow(dead_code)]
-enum HeaderFlag9 {
+enum _HeaderFlag9 {
     TvSystem = 0b00000001,
 }
 
-#[allow(dead_code)]
 enum HeaderFlag10 {
-    TvSystem = 0b00000011,
+    _TvSystem = 0b00000011,
     PrgRAMPresent = 0b00010000,
-    BusConflictPresent = 0b00100000,
+    _BusConflictPresent = 0b00100000,
 }
 
 #[derive(Debug)]
@@ -55,20 +51,18 @@ type ChrRomUnit = [u8; common::CHR_ROM_UNIT_SIZE];
 type PlayChoiceInstRom = [u8; 8192];
 type PlayChoiceDecryptData = [u8; 16];
 
-#[allow(dead_code)]
 struct PlayChoiceRom {
-    inst_rom: PlayChoiceInstRom,
-    data_output: PlayChoiceDecryptData,
-    counter_output: PlayChoiceDecryptData,
+    _inst_rom: PlayChoiceInstRom,
+    _data_output: PlayChoiceDecryptData,
+    _counter_output: PlayChoiceDecryptData,
 }
 
-#[allow(dead_code)]
 pub struct NesFile {
-    trainer: Option<Trainer>,
+    _trainer: Option<Trainer>,
     prg_rom: Vec<PrgRomUnit>,
     chr_rom: Vec<ChrRomUnit>,
-    play_choice_rom: Option<PlayChoiceRom>,
-    prg_ram_size: u32,
+    _play_choice_rom: Option<PlayChoiceRom>,
+    _prg_ram_size: u32,
     mapper_number: u32,
     mirroring: common::Mirroring,
 }
@@ -187,9 +181,9 @@ impl NesFile {
             read_to_array(&mut counter_output, &in_bytes[read_index..]);
 
             play_choice_rom = Some(PlayChoiceRom {
-                inst_rom,
-                data_output,
-                counter_output,
+                _inst_rom: inst_rom,
+                _data_output: data_output,
+                _counter_output: counter_output,
             });
         }
 
@@ -214,11 +208,11 @@ impl NesFile {
 
         let mapper_number = (ho_n_mapper_number << 4) + header.lo_n_mapper_number as u32;
         NesFile {
-            trainer,
+            _trainer: trainer,
             prg_rom,
             chr_rom,
-            play_choice_rom,
-            prg_ram_size,
+            _play_choice_rom: play_choice_rom,
+            _prg_ram_size: prg_ram_size,
             mapper_number,
             mirroring,
         }
