@@ -1,3 +1,4 @@
+#[path = "common.rs"]
 mod common;
 use common::run_simple_test;
 use std::time::Duration;

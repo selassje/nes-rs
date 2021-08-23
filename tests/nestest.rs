@@ -1,3 +1,4 @@
+#[path = "common.rs"]
 mod common;
 use nes_rs::nes_test::NesTest;
 use std::time::Duration;
