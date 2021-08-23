@@ -7,3 +7,4 @@ Cargo.lock
 !/tests/*/*.expected.bmp
 *.log
 *.zip
+/.vscode
