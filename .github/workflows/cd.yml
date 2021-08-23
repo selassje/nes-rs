@@ -34,19 +34,19 @@ jobs:
   publish:
     runs-on: ubuntu-latest 
     steps:
-    - name: Copy aterfacts
+    - name: Copy Artefacts
       shell: bash
       run: |
         cp target/wasm32-unknown-emscripten/release/nes-rs.js static
-        cp target/wasm32-unknown-emscripten/release/nes_wasm.js static
+        cp target/wasm32-unknown-emscripten/release/nes_rs.wasm static
 
     - name: Deploy to GitHub Pages
-        if: success()
-        uses: crazy-max/ghaction-github-pages@v2
-        with:
-          target_branch: deploy_on_github
-          build_dir: static
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      if: success()
+      uses: crazy-max/ghaction-github-pages@v2
+      with:
+        target_branch: deploy_on_github
+        build_dir: static
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 
