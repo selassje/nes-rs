@@ -51,10 +51,6 @@ impl Display for Button {
     }
 }
 
-pub trait Controller {
-    fn is_button_pressed(&self, button: Button) -> u8;
-}
-
 pub struct Controllers {
     controller_1: ControllerState,
     controller_2: ControllerState,
