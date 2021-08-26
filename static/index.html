@@ -4,20 +4,20 @@
 <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta lang="en" />
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=1" name="viewport" />
+    <link rel="stylesheet" href="styles.css" />
     <script>
         var Module = {};
-        var __cargo_web = {};
+        var emulatorCanvas = null;
         Object.defineProperty(Module, 'canvas', {
             get: function () {
-                if (__cargo_web.canvas) {
-                    return __cargo_web.canvas;
+                if (emulatorCanvas) {
+                    return emulatorCanvas;
                 }
-
                 var canvas = document.createElement('canvas');
-                document.querySelector('body').appendChild(canvas);
-                __cargo_web.canvas = canvas;
-
+                document.querySelector('#main').appendChild(canvas);
+                emulatorCanvas = canvas;
                 return canvas;
             }
         });
@@ -25,25 +25,14 @@
 </head>
 
 <body>
-    <script src="nes-rs.js"></script>
-    <label for="load_nes_file">Select a NES file to upload to the Emulator file system:</label>
-    <input type="file" id="load_nes_file" name="NES file" accept=".NES" value="ROM" />
+    <div id="mySidenav" class="sidenav">
+        <input type="file" id="load_nes_file" name="NES file" accept=".NES" title="ROM" />
+    </div>
+    <div id="main">
+        <script src="nes-rs.js"></script>
+        <script src="script.js"></script>
+    </div>
     <script>
-        function load_nes_file() {
-            let nes_file = this.files[0];
-            var reader = new FileReader();
-            reader.readAsArrayBuffer(nes_file);
-            reader.onload = function (evt) {
-                var buf = new Uint8Array(evt.target.result);
-                FS.writeFile('games/' + nes_file.name, buf);
-            }
-        }
-        FS.rmdir("home/web_user");
-        FS.rmdir("home");
-        FS.rmdir("tmp");
-        FS.mkdir("games");
-        document.getElementById("load_nes_file").addEventListener("change", load_nes_file, false);
-
     </script>
 </body>
 
