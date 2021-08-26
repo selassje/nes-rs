@@ -7,7 +7,11 @@ function closeNav() {
     emulatorCanvas.style.marginLeft = "0";
 }
 
-function load_nes_file() {
+function upload_nes_file_btn_click() {
+    document.getElementById("upload_nes_file").click()
+}
+
+function upload_nes_file() {
     let nes_file = this.files[0];
     var reader = new FileReader();
     reader.readAsArrayBuffer(nes_file);
@@ -21,4 +25,4 @@ FS.rmdir("home/web_user");
 FS.rmdir("home");
 FS.rmdir("tmp");
 FS.mkdir("games")
-document.getElementById("load_nes_file").addEventListener("change", load_nes_file, false);
+document.getElementById("upload_nes_file").addEventListener("change", upload_nes_file, false);

@@ -89,7 +89,7 @@ impl IOSdl2ImGuiOpenGl {
             .unwrap();
 
         window.set_icon(
-            sdl2::rwops::RWops::from_bytes(include_bytes!("../../res/icon/Nintendo-gray-icon.png"))
+            sdl2::rwops::RWops::from_bytes(include_bytes!("../../static/favicon.ico"))
                 .unwrap()
                 .load_png()
                 .unwrap(),

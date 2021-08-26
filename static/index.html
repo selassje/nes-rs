@@ -26,7 +26,9 @@
 
 <body>
     <div id="mySidenav" class="sidenav">
-        <input type="file" id="load_nes_file" name="NES file" accept=".NES" title="ROM" />
+        <img src="img/upload-file-svgrepo-com.svg" id="upload_nes_file_btn" style="cursor:pointer"
+            onclick="upload_nes_file_btn_click()" accesskey="o" title="Upload NES file to the Emulator's file system" />
+        <input type="file" id="upload_nes_file" name="upload_nes_file" accept=".NES" style="display:none;" />
     </div>
     <div id="main">
         <script src="nes-rs.js"></script>
