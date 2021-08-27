@@ -1,12 +1,3 @@
-function openNav() {
-    document.getElementById("mySidenav").style.width = "50px";
-    emulatorCanvas.style.marginLeft = "50px";
-}
-function closeNav() {
-    document.getElementById("mySidenav").style.width = "0";
-    emulatorCanvas.style.marginLeft = "0";
-}
-
 function upload_nes_file_btn_click() {
     document.getElementById("upload_nes_file").click()
 }
