@@ -36,7 +36,7 @@ pub enum MenuBarItem {
     VideoSizeQuadrupal,
     VideoSizeFullScreen,
     ControllersSetup,
-    None,
+    Count,
 }
 
 pub struct IOSdl2ImGuiOpenGl {
@@ -318,7 +318,10 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                     audio_queue.queue(&self.sample_buffer.get_samples());
                 }
 
-                let volume = if self.gui_builder.is_audio_enabled() {
+                let volume = if self
+                    .gui_builder
+                    .is_menu_bar_item_selected(MenuBarItem::AudioEnabled)
+                {
                     self.gui_builder.audio_volume as f32 / 100.0
                 } else {
                     0.0

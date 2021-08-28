@@ -38,7 +38,7 @@ fn is_shortcut(scancode: Scancode, key_mod: Mod) -> Option<MenuBarItem> {
 }
 #[derive(Default)]
 pub(super) struct KeyboardShortcuts {
-    menu_bar_item_selected: [bool; MenuBarItem::None as usize],
+    menu_bar_item_selected: [bool; MenuBarItem::Count as usize],
 }
 impl KeyboardShortcuts {
     pub(super) fn is_menu_bar_item_selected(&self, item: MenuBarItem) -> bool {

@@ -100,7 +100,7 @@ pub(super) fn prepare_fonts(imgui: &mut imgui::Context) -> GuiFonts {
 pub(super) struct GuiBuilder {
     emulation_texture: imgui::TextureId,
     fonts: GuiFonts,
-    menu_bar_item_selected: [bool; MenuBarItem::None as usize],
+    menu_bar_item_selected: [bool; MenuBarItem::Count as usize],
     io_control: IOControl,
     rom_path: Option<String>,
     video_size: super::Size,
@@ -141,10 +141,6 @@ impl GuiBuilder {
 
     pub fn get_io_common(&self) -> IOCommon {
         self.io_control.common
-    }
-
-    pub fn is_audio_enabled(&self) -> bool {
-        self.is_menu_bar_item_selected(MenuBarItem::AudioEnabled)
     }
 
     pub fn get_rom_path(&mut self) -> Option<String> {
