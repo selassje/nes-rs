@@ -74,7 +74,6 @@ impl Emulation {
                 pause: false,
                 choose_nes_file: false,
                 controllers_setup: false,
-                volume: 100,
                 video_size: VideoSizeControl::Double,
                 controller_configs: [ControllerConfig::new(0), ControllerConfig::new(1)],
             },
@@ -162,14 +161,6 @@ fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut 
             io::Speed::Increase => io_control.target_fps += 5,
             io::Speed::Decrease => {
                 io_control.target_fps = std::cmp::max(0, io_control.target_fps as i32 - 5) as u16
-            }
-        }
-    }
-    if let Some(ref volume_control) = io_state.audio_volume_control {
-        io_control.common.volume = match volume_control {
-            io::AudioVolumeControl::Increase => std::cmp::min(100, io_control.common.volume + 5),
-            io::AudioVolumeControl::Decrease => {
-                std::cmp::max(0, io_control.common.volume as i32 - 5) as u8
             }
         }
     }

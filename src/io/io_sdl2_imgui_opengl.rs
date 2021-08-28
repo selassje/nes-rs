@@ -52,6 +52,7 @@ pub struct IOSdl2ImGuiOpenGl {
     _gl_context: sdl2::video::GLContext,
     gui_builder: gui_builder::GuiBuilder,
     keyboard_shortcuts: keyboard_shortcuts::KeyboardShortcuts,
+    audio_volume: u8,
 }
 
 impl IOSdl2ImGuiOpenGl {
@@ -146,6 +147,7 @@ impl IOSdl2ImGuiOpenGl {
             _gl_context,
             gui_builder,
             keyboard_shortcuts: Default::default(),
+            audio_volume: 100,
         }
     }
 
@@ -153,7 +155,6 @@ impl IOSdl2ImGuiOpenGl {
         let io_common = self.gui_builder.get_io_common();
 
         io_state.common.choose_nes_file = self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile);
-        io_state.common.volume = io_common.volume;
 
         io_state.quit |= self.is_menu_bar_item_selected(MenuBarItem::Quit);
         io_state.power_cycle = self.is_menu_bar_item_selected(MenuBarItem::PowerCycle);
@@ -172,23 +173,17 @@ impl IOSdl2ImGuiOpenGl {
             set_speed_selection(MenuBarItem::SpeedHalf, io::Speed::Half);
             set_speed_selection(MenuBarItem::SpeedDouble, io::Speed::Double);
         }
-        io_state.audio_volume_control = None;
-        {
-            let mut set_volume_control =
-                |item: MenuBarItem, volume_control: io::AudioVolumeControl| {
-                    if self.is_menu_bar_item_selected(item) {
-                        io_state.audio_volume_control = Some(volume_control)
-                    }
-                };
-            set_volume_control(
-                MenuBarItem::VolumeIncrease,
-                io::AudioVolumeControl::Increase,
-            );
-            set_volume_control(
-                MenuBarItem::VolumeDecrease,
-                io::AudioVolumeControl::Decrease,
-            );
+
+        self.audio_volume = self.gui_builder.get_audio_volume();
+
+        if self.is_menu_bar_item_selected(MenuBarItem::VolumeIncrease) {
+            self.audio_volume = std::cmp::min(100, self.audio_volume + 5);
         }
+
+        if self.is_menu_bar_item_selected(MenuBarItem::VolumeDecrease) {
+            self.audio_volume = std::cmp::max(0, self.audio_volume as i32 - 5) as u8
+        }
+
         io_state.common.video_size = io_common.video_size;
         {
             let mut set_video_size_selection =
@@ -289,7 +284,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         self.set_window_tile(&control);
         let video_size = self.set_window_size_and_get_video_size(&control);
         self.gui_builder
-            .prepare_for_new_frame(control.clone(), video_size);
+            .prepare_for_new_frame(control.clone(), video_size, self.audio_volume);
         self.keyboard_shortcuts = Default::default();
 
         self.keyboard_state = self
@@ -326,10 +321,11 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 }
 
                 let volume = if self.gui_builder.is_audio_enabled() {
-                    control.common.volume as f32 / 100.0
+                    self.audio_volume as f32 / 100.0
                 } else {
                     0.0
                 };
+
                 self.sample_buffer.reset(control.target_fps, volume);
             }
         }

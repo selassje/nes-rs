@@ -106,6 +106,7 @@ pub(super) struct GuiBuilder {
     video_size: super::Size,
     build_menu_bar: bool,
     fd: imgui_filedialog::FileDialog,
+    audio_volume: u8,
 }
 
 impl GuiBuilder {
@@ -134,6 +135,7 @@ impl GuiBuilder {
                     2.0 * FRAME_WIDTH as f32,
                     (2 * FRAME_HEIGHT - MENU_BAR_HEIGHT as usize) as _,
                 ]),
+            audio_volume: 100,
         }
     }
 
@@ -145,14 +147,24 @@ impl GuiBuilder {
         self.is_menu_bar_item_selected(MenuBarItem::AudioEnabled)
     }
 
+    pub fn get_audio_volume(&self) -> u8 {
+        self.audio_volume
+    }
+
     pub fn get_rom_path(&mut self) -> Option<String> {
         self.rom_path.take()
     }
 
-    pub fn prepare_for_new_frame(&mut self, io_control: IOControl, video_size: super::Size) {
+    pub fn prepare_for_new_frame(
+        &mut self,
+        io_control: IOControl,
+        video_size: super::Size,
+        audio_volume: u8,
+    ) {
         self.rom_path = None;
         self.io_control = io_control;
         self.video_size = video_size;
+        self.audio_volume = audio_volume;
     }
 
     pub fn is_menu_bar_item_selected(&self, item: MenuBarItem) -> bool {
@@ -265,7 +277,7 @@ impl GuiBuilder {
                             imgui::Slider::new(im_str!("Volume"))
                                 .range(range)
                                 .display_format(im_str!("%d%%"))
-                                .build(ui, &mut self.io_control.common.volume);
+                                .build(ui, &mut self.audio_volume);
                         });
                     ui.separator();
                     create_menu_item!("Increase", "=").build(ui);

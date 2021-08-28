@@ -18,10 +18,6 @@ pub enum Speed {
     Decrease,
 }
 
-pub enum AudioVolumeControl {
-    Increase,
-    Decrease,
-}
 #[derive(Clone, Copy, PartialEq)]
 pub enum VideoSizeControl {
     _Normal = 1,
@@ -123,7 +119,6 @@ impl ControllerConfig {
 pub struct IOCommon {
     pub pause: bool,
     pub choose_nes_file: bool,
-    pub volume: u8,
     pub video_size: VideoSizeControl,
     pub controllers_setup: bool,
     pub controller_configs: [ControllerConfig; 2],
@@ -135,7 +130,6 @@ pub struct IOState {
     pub power_cycle: bool,
     pub load_nes_file: Option<String>,
     pub speed: Option<Speed>,
-    pub audio_volume_control: Option<AudioVolumeControl>,
 }
 
 #[derive(Clone, Default)]
