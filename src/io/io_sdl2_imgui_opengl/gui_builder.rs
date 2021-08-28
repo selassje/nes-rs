@@ -106,7 +106,7 @@ pub(super) struct GuiBuilder {
     video_size: super::Size,
     build_menu_bar: bool,
     fd: imgui_filedialog::FileDialog,
-    audio_volume: u8,
+    pub audio_volume: u8,
 }
 
 impl GuiBuilder {
@@ -147,24 +147,14 @@ impl GuiBuilder {
         self.is_menu_bar_item_selected(MenuBarItem::AudioEnabled)
     }
 
-    pub fn get_audio_volume(&self) -> u8 {
-        self.audio_volume
-    }
-
     pub fn get_rom_path(&mut self) -> Option<String> {
         self.rom_path.take()
     }
 
-    pub fn prepare_for_new_frame(
-        &mut self,
-        io_control: IOControl,
-        video_size: super::Size,
-        audio_volume: u8,
-    ) {
+    pub fn prepare_for_new_frame(&mut self, io_control: IOControl, video_size: super::Size) {
         self.rom_path = None;
         self.io_control = io_control;
         self.video_size = video_size;
-        self.audio_volume = audio_volume;
     }
 
     pub fn is_menu_bar_item_selected(&self, item: MenuBarItem) -> bool {

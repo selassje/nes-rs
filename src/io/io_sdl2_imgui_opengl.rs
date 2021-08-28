@@ -52,7 +52,6 @@ pub struct IOSdl2ImGuiOpenGl {
     _gl_context: sdl2::video::GLContext,
     gui_builder: gui_builder::GuiBuilder,
     keyboard_shortcuts: keyboard_shortcuts::KeyboardShortcuts,
-    audio_volume: u8,
 }
 
 impl IOSdl2ImGuiOpenGl {
@@ -147,7 +146,6 @@ impl IOSdl2ImGuiOpenGl {
             _gl_context,
             gui_builder,
             keyboard_shortcuts: Default::default(),
-            audio_volume: 100,
         }
     }
 
@@ -174,14 +172,14 @@ impl IOSdl2ImGuiOpenGl {
             set_speed_selection(MenuBarItem::SpeedDouble, io::Speed::Double);
         }
 
-        self.audio_volume = self.gui_builder.get_audio_volume();
+        let audio_volume = self.gui_builder.audio_volume;
 
         if self.is_menu_bar_item_selected(MenuBarItem::VolumeIncrease) {
-            self.audio_volume = std::cmp::min(100, self.audio_volume + 5);
+            self.gui_builder.audio_volume = std::cmp::min(100, audio_volume + 5);
         }
 
         if self.is_menu_bar_item_selected(MenuBarItem::VolumeDecrease) {
-            self.audio_volume = std::cmp::max(0, self.audio_volume as i32 - 5) as u8
+            self.gui_builder.audio_volume = std::cmp::max(0, audio_volume as i32 - 5) as u8
         }
 
         io_state.common.video_size = io_common.video_size;
@@ -284,7 +282,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         self.set_window_tile(&control);
         let video_size = self.set_window_size_and_get_video_size(&control);
         self.gui_builder
-            .prepare_for_new_frame(control.clone(), video_size, self.audio_volume);
+            .prepare_for_new_frame(control.clone(), video_size);
         self.keyboard_shortcuts = Default::default();
 
         self.keyboard_state = self
@@ -321,7 +319,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 }
 
                 let volume = if self.gui_builder.is_audio_enabled() {
-                    self.audio_volume as f32 / 100.0
+                    self.gui_builder.audio_volume as f32 / 100.0
                 } else {
                     0.0
                 };
