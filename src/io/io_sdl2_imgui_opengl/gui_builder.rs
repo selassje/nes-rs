@@ -5,8 +5,8 @@ use imgui::im_str;
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
     common,
+    io::IOCommon,
     io::{ControllerConfig, IOControl, FRAME_HEIGHT, FRAME_WIDTH},
-    io::{IOCommon, VideoSizeControl},
 };
 
 macro_rules! add_font_from_ttf {
@@ -97,13 +97,47 @@ pub(super) fn prepare_fonts(imgui: &mut imgui::Context) -> GuiFonts {
         add_font_from_ttf!("../../../res/fonts/Roboto-Regular.ttf", 20.0, imgui);
     fonts
 }
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum VideoSizeControl {
+    _Normal = 1,
+    Double = 2,
+    Triple = 3,
+    Quadrupal = 4,
+    FullScreen = 5,
+}
+
+impl From<VideoSizeControl> for [u32; 2] {
+    fn from(val: VideoSizeControl) -> Self {
+        if val == VideoSizeControl::FullScreen {
+            panic!("VideoSizeControl::FullScreen size can't be converted to [u32;2]")
+        }
+
+        let scaling = val as u32;
+        [scaling * FRAME_WIDTH as u32, scaling * FRAME_HEIGHT as u32]
+    }
+}
+
+impl From<VideoSizeControl> for [f32; 2] {
+    fn from(val: VideoSizeControl) -> Self {
+        let [width, height]: [u32; 2] = val.into();
+        [width as _, height as _]
+    }
+}
+
+impl Default for VideoSizeControl {
+    fn default() -> Self {
+        Self::Double
+    }
+}
 pub(super) struct GuiBuilder {
     emulation_texture: imgui::TextureId,
     fonts: GuiFonts,
     menu_bar_item_selected: [bool; MenuBarItem::Count as usize],
     io_control: IOControl,
     rom_path: Option<String>,
-    video_size: super::Size,
+    pub video_size: [f32; 2],
+    pub video_size_control: VideoSizeControl,
     build_menu_bar: bool,
     fd: imgui_filedialog::FileDialog,
     pub audio_volume: u8,
@@ -125,7 +159,8 @@ impl GuiBuilder {
                 common,
                 ..Default::default()
             },
-            video_size: Default::default(),
+            video_size_control: VideoSizeControl::Double,
+            video_size: [FRAME_WIDTH as f32 * 2.0, FRAME_HEIGHT as f32 * 2.0],
             build_menu_bar: Default::default(),
             fd: imgui_filedialog::FileDialog::new(im_str!("nes_file"))
                 .title(im_str!("Open NES file"))
@@ -147,10 +182,9 @@ impl GuiBuilder {
         self.rom_path.take()
     }
 
-    pub fn prepare_for_new_frame(&mut self, io_control: IOControl, video_size: super::Size) {
+    pub fn prepare_for_new_frame(&mut self, io_control: IOControl) {
         self.rom_path = None;
         self.io_control = io_control;
-        self.video_size = video_size;
     }
 
     pub fn is_menu_bar_item_selected(&self, item: MenuBarItem) -> bool {
@@ -224,23 +258,19 @@ impl GuiBuilder {
                 with_token!(ui, begin_menu, (im_str!("Video"), true), {
                     with_token!(ui, begin_menu, (im_str!("Size"), true), {
                         create_menu_item!("200%", "F9")
-                            .selected(self.io_control.common.video_size == VideoSizeControl::Double)
+                            .selected(self.video_size_control == VideoSizeControl::Double)
                             .build(ui);
                         self.update_menu_item_status(ui, VideoSizeDouble);
                         create_menu_item!("300%", "F10")
-                            .selected(self.io_control.common.video_size == VideoSizeControl::Triple)
+                            .selected(self.video_size_control == VideoSizeControl::Triple)
                             .build(ui);
                         self.update_menu_item_status(ui, VideoSizeTriple);
                         create_menu_item!("400%", "F11")
-                            .selected(
-                                self.io_control.common.video_size == VideoSizeControl::Quadrupal,
-                            )
+                            .selected(self.video_size_control == VideoSizeControl::Quadrupal)
                             .build(ui);
                         self.update_menu_item_status(ui, VideoSizeQuadrupal);
                         create_menu_item!("Full screen", "F12")
-                            .selected(
-                                self.io_control.common.video_size == VideoSizeControl::FullScreen,
-                            )
+                            .selected(self.video_size_control == VideoSizeControl::FullScreen)
                             .build(ui);
                         self.update_menu_item_status(ui, VideoSizeFullScreen);
                     });
@@ -440,7 +470,7 @@ impl GuiBuilder {
     }
 
     pub(super) fn build(&mut self, mut ui: &mut imgui::Ui) {
-        self.build_menu_bar = self.get_io_common().video_size != VideoSizeControl::FullScreen;
+        self.build_menu_bar = !self.is_menu_bar_item_selected(MenuBarItem::VideoSizeFullScreen);
         with_styles!(
             ui,
             (

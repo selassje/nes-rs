@@ -18,39 +18,6 @@ pub enum Speed {
     Decrease,
 }
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum VideoSizeControl {
-    _Normal = 1,
-    Double = 2,
-    Triple = 3,
-    Quadrupal = 4,
-    FullScreen = 5,
-}
-
-impl From<VideoSizeControl> for [u32; 2] {
-    fn from(val: VideoSizeControl) -> Self {
-        if val == VideoSizeControl::FullScreen {
-            panic!("VideoSizeControl::FullScreen size can't be converted to [u32;2]")
-        }
-
-        let scaling = val as u32;
-        [scaling * FRAME_WIDTH as u32, scaling * FRAME_HEIGHT as u32]
-    }
-}
-
-impl From<VideoSizeControl> for [f32; 2] {
-    fn from(val: VideoSizeControl) -> Self {
-        let [width, height]: [u32; 2] = val.into();
-        [width as _, height as _]
-    }
-}
-
-impl Default for VideoSizeControl {
-    fn default() -> Self {
-        Self::Double
-    }
-}
-
 #[derive(Clone, Copy)]
 pub struct ButtonMapping {
     pub waiting_for_input: bool,
@@ -119,7 +86,6 @@ impl ControllerConfig {
 pub struct IOCommon {
     pub pause: bool,
     pub choose_nes_file: bool,
-    pub video_size: VideoSizeControl,
     pub controllers_setup: bool,
     pub controller_configs: [ControllerConfig; 2],
 }

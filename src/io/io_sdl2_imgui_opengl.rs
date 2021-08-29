@@ -5,7 +5,7 @@ mod keyboard_shortcuts;
 use std::default::Default;
 use std::{borrow::BorrowMut, collections::HashMap};
 
-use super::{io_internal, VideoSizeControl};
+use super::io_internal;
 use crate::{controllers, io};
 
 use gl::types::*;
@@ -80,7 +80,7 @@ impl IOSdl2ImGuiOpenGl {
                 gl_attr.set_context_version(4, 3);
             };
         }
-        let [video_width, video_height]: [u32; 2] = io::VideoSizeControl::Double.into();
+        let [video_width, video_height]: [u32; 2] = gui_builder::VideoSizeControl::Double.into();
         let mut window = video_subsys
             .window("NES-RS", video_width, MENU_BAR_HEIGHT as u32 + video_height)
             .position_centered()
@@ -182,23 +182,28 @@ impl IOSdl2ImGuiOpenGl {
             self.gui_builder.audio_volume = std::cmp::max(0, audio_volume as i32 - 5) as u8
         }
 
-        io_state.common.video_size = io_common.video_size;
         {
             let mut set_video_size_selection =
-                |item: MenuBarItem, video_size: io::VideoSizeControl| {
+                |item: MenuBarItem, video_size_ctrl: gui_builder::VideoSizeControl| {
                     if self.is_menu_bar_item_selected(item) {
-                        io_state.common.video_size = video_size;
+                        self.gui_builder.video_size_control = video_size_ctrl;
                     }
                 };
-            set_video_size_selection(MenuBarItem::VideoSizeDouble, io::VideoSizeControl::Double);
-            set_video_size_selection(MenuBarItem::VideoSizeTriple, io::VideoSizeControl::Triple);
+            set_video_size_selection(
+                MenuBarItem::VideoSizeDouble,
+                gui_builder::VideoSizeControl::Double,
+            );
+            set_video_size_selection(
+                MenuBarItem::VideoSizeTriple,
+                gui_builder::VideoSizeControl::Triple,
+            );
             set_video_size_selection(
                 MenuBarItem::VideoSizeQuadrupal,
-                io::VideoSizeControl::Quadrupal,
+                gui_builder::VideoSizeControl::Quadrupal,
             );
             set_video_size_selection(
                 MenuBarItem::VideoSizeFullScreen,
-                io::VideoSizeControl::FullScreen,
+                gui_builder::VideoSizeControl::FullScreen,
             );
         }
         {
@@ -250,9 +255,9 @@ impl IOSdl2ImGuiOpenGl {
         }
     }
 
-    fn set_window_size_and_get_video_size(&mut self, control: &io::IOControl) -> Size {
-        if control.common.video_size != VideoSizeControl::FullScreen {
-            let [video_width, video_height]: [u32; 2] = control.common.video_size.into();
+    fn set_window_size_and_get_video_size(&mut self) -> Size {
+        if self.gui_builder.video_size_control != gui_builder::VideoSizeControl::FullScreen {
+            let [video_width, video_height]: [u32; 2] = self.gui_builder.video_size_control.into();
             self.window
                 .borrow_mut()
                 .set_fullscreen(sdl2::video::FullscreenType::Off)
@@ -280,9 +285,9 @@ impl io::IO for IOSdl2ImGuiOpenGl {
     fn present_frame(&mut self, control: io::IOControl) -> io::IOState {
         let mut io_state: io::IOState = Default::default();
         self.set_window_tile(&control);
-        let video_size = self.set_window_size_and_get_video_size(&control);
-        self.gui_builder
-            .prepare_for_new_frame(control.clone(), video_size);
+        let video_size = self.set_window_size_and_get_video_size();
+        self.gui_builder.video_size = video_size;
+        self.gui_builder.prepare_for_new_frame(control.clone());
         self.keyboard_shortcuts = Default::default();
 
         self.keyboard_state = self

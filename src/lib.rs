@@ -1,10 +1,7 @@
 use std::{cell::RefCell, env, fs::File, io::Read, rc::Rc};
 
 use emscripten_main_loop::MainLoop;
-use io::{
-    io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl, ControllerConfig, IOControl, IOState,
-    VideoSizeControl, IO,
-};
+use io::{io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl, ControllerConfig, IOControl, IOState, IO};
 use nes::Nes;
 
 mod apu;
@@ -74,7 +71,6 @@ impl Emulation {
                 pause: false,
                 choose_nes_file: false,
                 controllers_setup: false,
-                video_size: VideoSizeControl::Double,
                 controller_configs: [ControllerConfig::new(0), ControllerConfig::new(1)],
             },
         };
