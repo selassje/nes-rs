@@ -1,54 +1,12 @@
-use self::Button::*;
+use crate::io::Button;
+use crate::io::Button::*;
 use crate::{io::ControllerAccess, ram_controllers::*};
-use std::{cell::RefCell, fmt::Display, rc::Rc};
-
-#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
-pub enum Button {
-    A,
-    B,
-    Select,
-    Start,
-    Up,
-    Down,
-    Left,
-    Right,
-}
+use std::{cell::RefCell, rc::Rc};
 
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub enum ControllerId {
     Controller1,
     Controller2,
-}
-
-impl From<u8> for Button {
-    fn from(value: u8) -> Self {
-        match value {
-            0 => A,
-            1 => B,
-            2 => Select,
-            3 => Start,
-            4 => Up,
-            5 => Down,
-            6 => Left,
-            7 => Right,
-            _ => panic!("Can't cast {} to Button", value),
-        }
-    }
-}
-
-impl Display for Button {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            A => "A",
-            B => "B",
-            Select => "Select",
-            Start => "Start",
-            Up => "Up",
-            Down => "Down",
-            Left => "Left",
-            Right => "Right",
-        })
-    }
 }
 
 pub struct Controllers {

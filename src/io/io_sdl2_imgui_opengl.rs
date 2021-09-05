@@ -224,10 +224,11 @@ impl IOSdl2ImGuiOpenGl {
         };
 
         io_state.common.pause = toggle(MenuBarItem::Pause, io_common.pause);
-        io_state.common.controllers_setup =
-            toggle(MenuBarItem::ControllersSetup, io_common.controllers_setup);
+        self.gui_builder.controllers_setup = toggle(
+            MenuBarItem::ControllersSetup,
+            self.gui_builder.controllers_setup,
+        );
         io_state.common.pause |= io_state.common.choose_nes_file;
-        io_state.common.controller_configs = io_common.controller_configs;
     }
 
     fn check_for_keyboard_shortcuts(
@@ -388,11 +389,10 @@ impl io::ControllerAccess for IOSdl2ImGuiOpenGl {
     fn is_button_pressed(
         &self,
         controller_id: controllers::ControllerId,
-        button: controllers::Button,
+        button: io::Button,
     ) -> bool {
-        let sdl2_scancode = self.gui_builder.get_io_common().controller_configs
-            [controller_id as usize]
-            .mapping[button as usize]
+        let sdl2_scancode = self.gui_builder.controller_configs[controller_id as usize].mapping
+            [button as usize]
             .key;
         let key_state = self.keyboard_state.get(&sdl2_scancode);
         *key_state.unwrap_or(&false)

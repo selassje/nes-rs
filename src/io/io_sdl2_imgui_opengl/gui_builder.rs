@@ -6,7 +6,7 @@ use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
     common,
     io::IOCommon,
-    io::{ControllerConfig, IOControl, FRAME_HEIGHT, FRAME_WIDTH},
+    io::{IOControl, FRAME_HEIGHT, FRAME_WIDTH},
 };
 
 macro_rules! add_font_from_ttf {
@@ -130,6 +130,68 @@ impl Default for VideoSizeControl {
         Self::Double
     }
 }
+#[derive(Clone, Copy)]
+pub struct ButtonMapping {
+    pub waiting_for_input: bool,
+    pub key: sdl2::keyboard::Scancode,
+}
+
+impl Default for ButtonMapping {
+    fn default() -> Self {
+        Self {
+            waiting_for_input: false,
+            key: sdl2::keyboard::Scancode::A,
+        }
+    }
+}
+
+impl ButtonMapping {
+    pub fn new(key: sdl2::keyboard::Scancode) -> Self {
+        Self {
+            waiting_for_input: false,
+            key,
+        }
+    }
+}
+#[derive(Clone, Copy, Default)]
+pub struct ControllerConfig {
+    pub use_zapper: bool,
+    pub mapping: [ButtonMapping; crate::io::Button::Right as usize + 1],
+    pub pending_key_select: Option<u8>,
+}
+
+impl ControllerConfig {
+    pub fn new(player: u8) -> Self {
+        use sdl2::keyboard::Scancode::*;
+        Self {
+            use_zapper: false,
+            pending_key_select: None,
+            mapping: match player {
+                0 => [
+                    ButtonMapping::new(Q),
+                    ButtonMapping::new(E),
+                    ButtonMapping::new(C),
+                    ButtonMapping::new(Space),
+                    ButtonMapping::new(W),
+                    ButtonMapping::new(S),
+                    ButtonMapping::new(A),
+                    ButtonMapping::new(D),
+                ],
+                1 => [
+                    ButtonMapping::new(Kp4),
+                    ButtonMapping::new(Kp5),
+                    ButtonMapping::new(Kp6),
+                    ButtonMapping::new(KpPlus),
+                    ButtonMapping::new(Up),
+                    ButtonMapping::new(Down),
+                    ButtonMapping::new(Left),
+                    ButtonMapping::new(Right),
+                ],
+                _ => panic!("Wrong player!"),
+            },
+        }
+    }
+}
 pub(super) struct GuiBuilder {
     emulation_texture: imgui::TextureId,
     fonts: GuiFonts,
@@ -141,12 +203,13 @@ pub(super) struct GuiBuilder {
     build_menu_bar: bool,
     fd: imgui_filedialog::FileDialog,
     pub audio_volume: u8,
+    pub controllers_setup: bool,
+    pub controller_configs: [ControllerConfig; 2],
 }
 
 impl GuiBuilder {
     pub fn new(emulation_texture: imgui::TextureId, fonts: GuiFonts) -> Self {
         let common = IOCommon {
-            controller_configs: [ControllerConfig::new(0), ControllerConfig::new(1)],
             ..Default::default()
         };
 
@@ -171,6 +234,8 @@ impl GuiBuilder {
                     (2 * FRAME_HEIGHT - MENU_BAR_HEIGHT as usize) as _,
                 ]),
             audio_volume: 100,
+            controller_configs: [ControllerConfig::new(0), ControllerConfig::new(1)],
+            controllers_setup: false,
         }
     }
 
@@ -304,16 +369,14 @@ impl GuiBuilder {
             });
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("Controllers"), true), {
-                    self.io_control.common.controllers_setup =
+                    self.controllers_setup =
                         with_token!(ui, begin_menu, (im_str!("Setup"), true), {
                             self.build_controllers_setup_window(ui);
                         });
 
-                    if !self.io_control.common.controllers_setup {
-                        self.io_control.common.controller_configs[0].pending_key_select =
-                            Option::None;
-                        self.io_control.common.controller_configs[1].pending_key_select =
-                            Option::None;
+                    if !self.controllers_setup {
+                        self.controller_configs[0].pending_key_select = Option::None;
+                        self.controller_configs[1].pending_key_select = Option::None;
                     }
                 });
             });
@@ -382,40 +445,30 @@ impl GuiBuilder {
         {
             if keymod & sdl2::keyboard::Mod::NOMOD == sdl2::keyboard::Mod::NOMOD {
                 if let Some(scancode) = scancode {
-                    if let Some(button) = self.io_control.common.controller_configs[0]
-                        .pending_key_select
-                        .take()
-                    {
-                        self.io_control.common.controller_configs[0].mapping[button as usize].key =
-                            scancode;
+                    if let Some(button) = self.controller_configs[0].pending_key_select.take() {
+                        self.controller_configs[0].mapping[button as usize].key = scancode;
 
-                        self.io_control.common.controller_configs[0].pending_key_select = None;
-                    } else if let Some(button) = self.io_control.common.controller_configs[1]
-                        .pending_key_select
-                        .take()
+                        self.controller_configs[0].pending_key_select = None;
+                    } else if let Some(button) =
+                        self.controller_configs[1].pending_key_select.take()
                     {
-                        self.io_control.common.controller_configs[1].mapping[button as usize].key =
-                            scancode;
+                        self.controller_configs[1].mapping[button as usize].key = scancode;
                     }
                 }
             }
         };
     }
     pub fn is_key_selection_pending(&self) -> bool {
-        self.io_control.common.controllers_setup
-            && (self.io_control.common.controller_configs[0]
-                .pending_key_select
-                .is_some()
-                || self.io_control.common.controller_configs[1]
-                    .pending_key_select
-                    .is_some())
+        self.controllers_setup
+            && (self.controller_configs[0].pending_key_select.is_some()
+                || self.controller_configs[1].pending_key_select.is_some())
     }
 
     fn build_controller_setup_for_player(&mut self, player_index: usize, ui: &mut imgui::Ui) {
-        let mut controller_config = &mut self.io_control.common.controller_configs[player_index];
+        let mut controller_config = &mut self.controller_configs[player_index];
 
         for i in 0..8u8 {
-            let button = crate::controllers::Button::from(i);
+            let button = crate::io::Button::from(i);
             let caption = imgui::ImString::from(button.to_string());
             let key = controller_config.mapping[i as usize].key;
             let mut text = key.to_string();
@@ -439,10 +492,7 @@ impl GuiBuilder {
                     .begin(ui)
                 {
                     if let Some(tab_bar) = imgui::TabBar::new(im_str!("Players")).begin(ui) {
-                        if self.io_control.common.controller_configs[1]
-                            .pending_key_select
-                            .is_none()
-                        {
+                        if self.controller_configs[1].pending_key_select.is_none() {
                             if let Some(player_1_tab) =
                                 imgui::TabItem::new(im_str!("Player 1")).begin(ui)
                             {
@@ -450,10 +500,7 @@ impl GuiBuilder {
                                 player_1_tab.end(ui);
                             }
                         }
-                        if self.io_control.common.controller_configs[0]
-                            .pending_key_select
-                            .is_none()
-                        {
+                        if self.controller_configs[0].pending_key_select.is_none() {
                             if let Some(player_2_tab) =
                                 imgui::TabItem::new(im_str!("Player 2")).begin(ui)
                             {

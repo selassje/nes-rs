@@ -1,9 +1,4 @@
-use crate::{
-    controllers::{Button, ControllerId},
-    io::io_test,
-    nes::Nes,
-    read_nes_file,
-};
+use crate::{controllers::ControllerId, io::io_test, nes::Nes, read_nes_file};
 use fs::File;
 use std::{cell::RefCell, fs, io::Read, path::Path, path::PathBuf, rc::Rc, time::Duration};
 
@@ -81,20 +76,24 @@ impl NesTest {
     }
 
     pub fn press_player_1_start(&mut self) {
-        self.io_test
-            .borrow_mut()
-            .set_button_state(Button::Start, ControllerId::Controller1, true);
+        self.io_test.borrow_mut().set_button_state(
+            crate::io::Button::Start,
+            ControllerId::Controller1,
+            true,
+        );
     }
 
     pub fn press_player_1_select(&mut self) {
-        self.io_test
-            .borrow_mut()
-            .set_button_state(Button::Select, ControllerId::Controller1, true);
+        self.io_test.borrow_mut().set_button_state(
+            crate::io::Button::Select,
+            ControllerId::Controller1,
+            true,
+        );
     }
 
     pub fn release_player_1_select(&mut self) {
         self.io_test.borrow_mut().set_button_state(
-            Button::Select,
+            crate::io::Button::Select,
             ControllerId::Controller1,
             false,
         );

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::io::{AudioAccess, ControllerAccess, RgbColor, VideoAccess, IO};
-use crate::{controllers::Button, controllers::ControllerId, io::io_internal::IOInternal};
+use crate::{controllers::ControllerId, io::io_internal::IOInternal, io::Button};
 
 use super::{IOControl, IOState};
 

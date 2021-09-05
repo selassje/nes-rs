@@ -1,7 +1,7 @@
 use std::{cell::RefCell, env, fs::File, io::Read, rc::Rc};
 
 use emscripten_main_loop::MainLoop;
-use io::{io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl, ControllerConfig, IOControl, IOState, IO};
+use io::{io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl, IOControl, IOState, IO};
 use nes::Nes;
 
 mod apu;
@@ -70,8 +70,6 @@ impl Emulation {
             common: io::IOCommon {
                 pause: false,
                 choose_nes_file: false,
-                controllers_setup: false,
-                controller_configs: [ControllerConfig::new(0), ControllerConfig::new(1)],
             },
         };
         let is_audio_available = io.borrow().is_audio_available();
