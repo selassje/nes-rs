@@ -5,7 +5,6 @@ use imgui::im_str;
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
     common,
-    io::IOCommon,
     io::{IOControl, FRAME_HEIGHT, FRAME_WIDTH},
 };
 
@@ -205,21 +204,18 @@ pub(super) struct GuiBuilder {
     pub audio_volume: u8,
     pub controllers_setup: bool,
     pub controller_configs: [ControllerConfig; 2],
+    pub pause: bool,
+    pub choose_nes_file: bool,
 }
 
 impl GuiBuilder {
     pub fn new(emulation_texture: imgui::TextureId, fonts: GuiFonts) -> Self {
-        let common = IOCommon {
-            ..Default::default()
-        };
-
         Self {
             emulation_texture,
             menu_bar_item_selected: Default::default(),
             fonts,
             rom_path: None,
             io_control: IOControl {
-                common,
                 ..Default::default()
             },
             video_size_control: VideoSizeControl::Double,
@@ -236,11 +232,9 @@ impl GuiBuilder {
             audio_volume: 100,
             controller_configs: [ControllerConfig::new(0), ControllerConfig::new(1)],
             controllers_setup: false,
+            pause: false,
+            choose_nes_file: false,
         }
-    }
-
-    pub fn get_io_common(&self) -> IOCommon {
-        self.io_control.common
     }
 
     pub fn get_rom_path(&mut self) -> Option<String> {
@@ -278,7 +272,7 @@ impl GuiBuilder {
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("File"), true), {
                     create_menu_item!("Load Nes File", "Ctrl + O").build(ui);
-                    if !self.io_control.common.choose_nes_file {
+                    if !self.choose_nes_file {
                         self.update_menu_item_status(ui, LoadNesFile);
                     }
                     create_menu_item!("Quit", "Alt + F4").build(ui);
@@ -291,7 +285,7 @@ impl GuiBuilder {
                     self.update_menu_item_status(ui, PowerCycle);
 
                     create_menu_item!("Pause", "Ctrl + P")
-                        .selected(self.io_control.common.pause)
+                        .selected(self.pause)
                         .build(ui);
                     self.update_menu_item_status(ui, Pause);
 
@@ -423,9 +417,9 @@ impl GuiBuilder {
     }
 
     fn build_load_nes_file_explorer(&mut self) {
-        if self.io_control.common.choose_nes_file {
-            self.io_control.common.choose_nes_file = false;
-            self.io_control.common.pause = false;
+        if self.choose_nes_file {
+            self.choose_nes_file = false;
+            self.pause = false;
             self.toggle_menu_bar_item(MenuBarItem::LoadNesFile);
             self.fd.open_modal();
         }

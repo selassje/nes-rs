@@ -150,9 +150,7 @@ impl IOSdl2ImGuiOpenGl {
     }
 
     fn update_io_state(&mut self, io_state: &mut io::IOState) {
-        let io_common = self.gui_builder.get_io_common();
-
-        io_state.common.choose_nes_file = self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile);
+        self.gui_builder.choose_nes_file = self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile);
 
         io_state.quit |= self.is_menu_bar_item_selected(MenuBarItem::Quit);
         io_state.power_cycle = self.is_menu_bar_item_selected(MenuBarItem::PowerCycle);
@@ -214,21 +212,31 @@ impl IOSdl2ImGuiOpenGl {
             };
             toggle(MenuBarItem::AudioEnabled);
         }
-
-        let toggle = |item: MenuBarItem, value: bool| {
-            if self.is_menu_bar_item_selected(item) {
-                !value
-            } else {
-                value
-            }
-        };
-
-        io_state.common.pause = toggle(MenuBarItem::Pause, io_common.pause);
-        self.gui_builder.controllers_setup = toggle(
-            MenuBarItem::ControllersSetup,
-            self.gui_builder.controllers_setup,
-        );
-        io_state.common.pause |= io_state.common.choose_nes_file;
+        {
+            let toggle = |item: MenuBarItem, value: bool| {
+                if self.is_menu_bar_item_selected(item) {
+                    !value
+                } else {
+                    value
+                }
+            };
+            //   let pause = self.gui_builder.pause;
+            self.gui_builder.pause = toggle(MenuBarItem::Pause, self.gui_builder.pause);
+        } //   self.gui_builder.pause = toogled_pause;
+        {
+            let toggle = |item: MenuBarItem, value: bool| {
+                if self.is_menu_bar_item_selected(item) {
+                    !value
+                } else {
+                    value
+                }
+            };
+            self.gui_builder.controllers_setup = toggle(
+                MenuBarItem::ControllersSetup,
+                self.gui_builder.controllers_setup,
+            );
+        }
+        io_state.pause = self.gui_builder.choose_nes_file | self.gui_builder.pause;
     }
 
     fn check_for_keyboard_shortcuts(
@@ -309,7 +317,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         }
 
         if let Some(ref audio_queue) = self.maybe_audio_queue {
-            if control.common.pause {
+            if self.gui_builder.pause {
                 audio_queue.pause();
             } else {
                 audio_queue.resume();

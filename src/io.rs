@@ -55,6 +55,7 @@ impl Display for Button {
         })
     }
 }
+#[derive(Clone)]
 pub enum Speed {
     Half,
     Normal,
@@ -63,23 +64,17 @@ pub enum Speed {
     Decrease,
 }
 
-#[derive(Copy, Clone, Default)]
-pub struct IOCommon {
-    pub pause: bool,
-    pub choose_nes_file: bool,
-}
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct IOState {
-    pub common: IOCommon,
     pub quit: bool,
     pub power_cycle: bool,
     pub load_nes_file: Option<String>,
     pub speed: Option<Speed>,
+    pub pause: bool,
 }
 
 #[derive(Clone, Default)]
 pub struct IOControl {
-    pub common: IOCommon,
     pub target_fps: u16,
     pub current_fps: u16,
     pub title: Option<String>,

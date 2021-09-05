@@ -67,10 +67,6 @@ impl Emulation {
             target_fps: common::DEFAULT_FPS as u16,
             current_fps: 0,
             title: initial_title,
-            common: io::IOCommon {
-                pause: false,
-                choose_nes_file: false,
-            },
         };
         let is_audio_available = io.borrow().is_audio_available();
         Self {
@@ -88,7 +84,7 @@ impl Emulation {
 
 impl emscripten_main_loop::MainLoop for Emulation {
     fn main_loop(&mut self) -> emscripten_main_loop::MainLoopEvent {
-        if !self.io_state.common.pause {
+        if !self.io_state.pause {
             self.nes.run_single_frame();
             if self.one_second_timer.elapsed() < std::time::Duration::from_secs(1) {
                 self.fps += 1;
@@ -102,7 +98,7 @@ impl emscripten_main_loop::MainLoop for Emulation {
 
         handle_io_state(&mut self.nes, &self.io_state, &mut self.io_control);
 
-        if !self.io_state.common.pause {
+        if !self.io_state.pause {
             {
                 let elapsed_time_since_frame_start = self.frame_start.elapsed();
                 if !self.is_audio_available && elapsed_time_since_frame_start < FRAME_DURATION {
@@ -136,8 +132,6 @@ pub fn run(mut emulation: Emulation) {
 }
 
 fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut io::IOControl) {
-    io_control.common = io_state.common;
-
     if io_state.power_cycle {
         nes.power_cycle();
     }
