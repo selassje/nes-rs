@@ -212,30 +212,20 @@ impl IOSdl2ImGuiOpenGl {
             };
             toggle(MenuBarItem::AudioEnabled);
         }
-        {
-            let toggle = |item: MenuBarItem, value: bool| {
-                if self.is_menu_bar_item_selected(item) {
-                    !value
-                } else {
-                    value
-                }
-            };
-            //   let pause = self.gui_builder.pause;
-            self.gui_builder.pause = toggle(MenuBarItem::Pause, self.gui_builder.pause);
-        } //   self.gui_builder.pause = toogled_pause;
-        {
-            let toggle = |item: MenuBarItem, value: bool| {
-                if self.is_menu_bar_item_selected(item) {
-                    !value
-                } else {
-                    value
-                }
-            };
-            self.gui_builder.controllers_setup = toggle(
-                MenuBarItem::ControllersSetup,
-                self.gui_builder.controllers_setup,
-            );
-        }
+        let toggle = |item: MenuBarItem, value: bool| {
+            if self.is_menu_bar_item_selected(item) {
+                !value
+            } else {
+                value
+            }
+        };
+
+        let toggled_pause = toggle(MenuBarItem::Pause, self.gui_builder.pause);
+        self.gui_builder.controllers_setup = toggle(
+            MenuBarItem::ControllersSetup,
+            self.gui_builder.controllers_setup,
+        );
+        self.gui_builder.pause = toggled_pause;
         io_state.pause = self.gui_builder.choose_nes_file | self.gui_builder.pause;
     }
 
