@@ -191,7 +191,7 @@ impl ControllerConfig {
         }
     }
 }
-pub(super) struct GuiBuilder {
+pub(super) struct Gui {
     emulation_texture: imgui::TextureId,
     fonts: GuiFonts,
     menu_bar_item_selected: [bool; MenuBarItem::Count as usize],
@@ -208,7 +208,7 @@ pub(super) struct GuiBuilder {
     pub choose_nes_file: bool,
 }
 
-impl GuiBuilder {
+impl Gui {
     pub fn new(emulation_texture: imgui::TextureId, fonts: GuiFonts) -> Self {
         Self {
             emulation_texture,
