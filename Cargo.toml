@@ -48,6 +48,7 @@ cfg-if = "0.1"
 enum-tryfrom = "0.2.1"
 enum-tryfrom-derive = "0.2.1"
 imgui = "0.7.0"
+imgui-sys = "0.7.0"
 imgui-opengl-renderer = { git = "https://github.com/selassje/rust-imgui-opengl-renderer" }
 imgui-sdl2 = "0.14"
 imgui-filedialog = { git = "https://github.com/selassje/imgui-filedialog-rs.git"}

@@ -363,6 +363,12 @@ impl Gui {
             });
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("Controllers"), true), {
+                    unsafe {
+                        imgui_sys::igSetNextWindowSize(
+                            imgui_sys::ImVec2 { x: 230.0, y: 230.0 },
+                            imgui::Condition::Always as i32,
+                        );
+                    }
                     self.controllers_setup =
                         with_token!(ui, begin_menu, (im_str!("Setup"), true), {
                             self.build_controllers_setup_window(ui);
@@ -480,10 +486,6 @@ impl Gui {
     fn build_controllers_setup_window(&mut self, ui: &mut imgui::Ui) {
         with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
             with_styles!(ui, (imgui::StyleVar::WindowBorderSize(2.0)), {
-                if let Some(token) = imgui::ChildWindow::new(im_str!("Controllers Setup"))
-                    .size([230.0, 230.0])
-                    .border(true)
-                    .begin(ui)
                 {
                     if let Some(tab_bar) = imgui::TabBar::new(im_str!("Players")).begin(ui) {
                         if self.controller_configs[1].pending_key_select.is_none() {
@@ -504,7 +506,6 @@ impl Gui {
                         }
                         tab_bar.end(ui);
                     }
-                    token.end(ui);
                 }
             });
         });

@@ -292,11 +292,11 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 self.gui_builder.try_get_key_selection(&event);
             } else {
                 Self::check_for_keyboard_shortcuts(&event, &mut self.keyboard_shortcuts);
+                self.imgui_sdl2.handle_event(&mut self.imgui, &event);
             }
             if let sdl2::event::Event::Window { win_event, .. } = event {
                 io_state.quit = win_event == sdl2::event::WindowEvent::Close
             };
-            self.imgui_sdl2.handle_event(&mut self.imgui, &event);
         }
 
         if let Some(ref audio_queue) = self.maybe_audio_queue {
