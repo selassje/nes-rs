@@ -197,15 +197,14 @@ pub(super) struct Gui {
     menu_bar_item_selected: [bool; MenuBarItem::Count as usize],
     io_control: IOControl,
     rom_path: Option<String>,
-    pub video_size: [f32; 2],
-    pub video_size_control: VideoSizeControl,
     build_menu_bar: bool,
     fd: imgui_filedialog::FileDialog,
+    pub video_size: [f32; 2],
+    pub video_size_control: VideoSizeControl,
     pub audio_volume: u8,
     pub controllers_setup: bool,
     pub controller_configs: [ControllerConfig; 2],
     pub pause: bool,
-    pub choose_nes_file: bool,
 }
 
 impl Gui {
@@ -233,7 +232,6 @@ impl Gui {
             controller_configs: [ControllerConfig::new(0), ControllerConfig::new(1)],
             controllers_setup: false,
             pause: false,
-            choose_nes_file: false,
         }
     }
 
@@ -272,7 +270,7 @@ impl Gui {
             with_token!(ui, begin_main_menu_bar, (), {
                 with_token!(ui, begin_menu, (im_str!("File"), true), {
                     create_menu_item!("Load Nes File", "Ctrl + O").build(ui);
-                    if !self.choose_nes_file {
+                    if !self.is_menu_bar_item_selected(LoadNesFile) {
                         self.update_menu_item_status(ui, LoadNesFile);
                     }
                     create_menu_item!("Quit", "Alt + F4").build(ui);
@@ -423,8 +421,7 @@ impl Gui {
     }
 
     fn build_load_nes_file_explorer(&mut self) {
-        if self.choose_nes_file {
-            self.choose_nes_file = false;
+        if self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile) {
             self.pause = false;
             self.toggle_menu_bar_item(MenuBarItem::LoadNesFile);
             self.fd.open_modal();

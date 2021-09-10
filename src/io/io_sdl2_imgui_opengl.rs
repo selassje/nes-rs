@@ -149,8 +149,6 @@ impl IOSdl2ImGuiOpenGl {
     }
 
     fn update_io_state(&mut self, io_state: &mut io::IOState) {
-        self.gui.choose_nes_file = self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile);
-
         io_state.quit |= self.is_menu_bar_item_selected(MenuBarItem::Quit);
         io_state.power_cycle = self.is_menu_bar_item_selected(MenuBarItem::PowerCycle);
         io_state.load_nes_file = self.gui.get_rom_path();
@@ -217,7 +215,7 @@ impl IOSdl2ImGuiOpenGl {
         self.gui.controllers_setup =
             toggle(MenuBarItem::ControllersSetup, self.gui.controllers_setup);
         self.gui.pause = toggled_pause;
-        io_state.pause = self.gui.choose_nes_file | self.gui.pause;
+        io_state.pause = self.gui.pause;
     }
 
     fn check_for_keyboard_shortcuts(
