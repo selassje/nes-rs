@@ -50,7 +50,7 @@ pub struct IOSdl2ImGuiOpenGl {
     window: sdl2::video::Window,
     renderer: imgui_opengl_renderer::Renderer,
     _gl_context: sdl2::video::GLContext,
-    gui_builder: gui::Gui,
+    gui: gui::Gui,
     keyboard_shortcuts: keyboard_shortcuts::KeyboardShortcuts,
 }
 
@@ -143,17 +143,17 @@ impl IOSdl2ImGuiOpenGl {
             imgui_sdl2,
             renderer,
             _gl_context,
-            gui_builder,
+            gui: gui_builder,
             keyboard_shortcuts: Default::default(),
         }
     }
 
     fn update_io_state(&mut self, io_state: &mut io::IOState) {
-        self.gui_builder.choose_nes_file = self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile);
+        self.gui.choose_nes_file = self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile);
 
         io_state.quit |= self.is_menu_bar_item_selected(MenuBarItem::Quit);
         io_state.power_cycle = self.is_menu_bar_item_selected(MenuBarItem::PowerCycle);
-        io_state.load_nes_file = self.gui_builder.get_rom_path();
+        io_state.load_nes_file = self.gui.get_rom_path();
 
         io_state.speed = None;
         {
@@ -169,21 +169,21 @@ impl IOSdl2ImGuiOpenGl {
             set_speed_selection(MenuBarItem::SpeedDouble, io::Speed::Double);
         }
 
-        let audio_volume = self.gui_builder.audio_volume;
+        let audio_volume = self.gui.audio_volume;
 
         if self.is_menu_bar_item_selected(MenuBarItem::VolumeIncrease) {
-            self.gui_builder.audio_volume = std::cmp::min(100, audio_volume + 5);
+            self.gui.audio_volume = std::cmp::min(100, audio_volume + 5);
         }
 
         if self.is_menu_bar_item_selected(MenuBarItem::VolumeDecrease) {
-            self.gui_builder.audio_volume = std::cmp::max(0, audio_volume as i32 - 5) as u8
+            self.gui.audio_volume = std::cmp::max(0, audio_volume as i32 - 5) as u8
         }
 
         {
             let mut set_video_size_selection =
                 |item: MenuBarItem, video_size_ctrl: gui::VideoSizeControl| {
                     if self.is_menu_bar_item_selected(item) {
-                        self.gui_builder.video_size_control = video_size_ctrl;
+                        self.gui.video_size_control = video_size_ctrl;
                     }
                 };
             set_video_size_selection(MenuBarItem::VideoSizeDouble, gui::VideoSizeControl::Double);
@@ -200,7 +200,7 @@ impl IOSdl2ImGuiOpenGl {
         {
             let mut toggle = |item: MenuBarItem| {
                 if self.keyboard_shortcuts.is_menu_bar_item_selected(item) {
-                    self.gui_builder.toggle_menu_bar_item(item)
+                    self.gui.toggle_menu_bar_item(item)
                 }
             };
             toggle(MenuBarItem::AudioEnabled);
@@ -213,13 +213,11 @@ impl IOSdl2ImGuiOpenGl {
             }
         };
 
-        let toggled_pause = toggle(MenuBarItem::Pause, self.gui_builder.pause);
-        self.gui_builder.controllers_setup = toggle(
-            MenuBarItem::ControllersSetup,
-            self.gui_builder.controllers_setup,
-        );
-        self.gui_builder.pause = toggled_pause;
-        io_state.pause = self.gui_builder.choose_nes_file | self.gui_builder.pause;
+        let toggled_pause = toggle(MenuBarItem::Pause, self.gui.pause);
+        self.gui.controllers_setup =
+            toggle(MenuBarItem::ControllersSetup, self.gui.controllers_setup);
+        self.gui.pause = toggled_pause;
+        io_state.pause = self.gui.choose_nes_file | self.gui.pause;
     }
 
     fn check_for_keyboard_shortcuts(
@@ -238,7 +236,7 @@ impl IOSdl2ImGuiOpenGl {
 
     fn is_menu_bar_item_selected(&self, item: MenuBarItem) -> bool {
         self.keyboard_shortcuts.is_menu_bar_item_selected(item)
-            || self.gui_builder.is_menu_bar_item_selected(item)
+            || self.gui.is_menu_bar_item_selected(item)
     }
 
     fn set_window_tile(&mut self, control: &io::IOControl) {
@@ -248,8 +246,8 @@ impl IOSdl2ImGuiOpenGl {
     }
 
     fn set_window_size_and_get_video_size(&mut self) -> Size {
-        if self.gui_builder.video_size_control != gui::VideoSizeControl::FullScreen {
-            let [video_width, video_height]: [u32; 2] = self.gui_builder.video_size_control.into();
+        if self.gui.video_size_control != gui::VideoSizeControl::FullScreen {
+            let [video_width, video_height]: [u32; 2] = self.gui.video_size_control.into();
             self.window
                 .borrow_mut()
                 .set_fullscreen(sdl2::video::FullscreenType::Off)
@@ -278,8 +276,8 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         let mut io_state: io::IOState = Default::default();
         self.set_window_tile(&control);
         let video_size = self.set_window_size_and_get_video_size();
-        self.gui_builder.video_size = video_size;
-        self.gui_builder.prepare_for_new_frame(control.clone());
+        self.gui.video_size = video_size;
+        self.gui.prepare_for_new_frame(control.clone());
         self.keyboard_shortcuts = Default::default();
 
         self.keyboard_state = self
@@ -288,8 +286,8 @@ impl io::IO for IOSdl2ImGuiOpenGl {
             .scancodes()
             .collect::<HashMap<_, _>>();
         for event in self.events.poll_iter() {
-            if self.gui_builder.is_key_selection_pending() {
-                self.gui_builder.try_get_key_selection(&event);
+            if self.gui.is_key_selection_pending() {
+                self.gui.try_get_key_selection(&event);
             } else {
                 Self::check_for_keyboard_shortcuts(&event, &mut self.keyboard_shortcuts);
                 self.imgui_sdl2.handle_event(&mut self.imgui, &event);
@@ -300,7 +298,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         }
 
         if let Some(ref audio_queue) = self.maybe_audio_queue {
-            if self.gui_builder.pause {
+            if self.gui.pause {
                 audio_queue.pause();
             } else {
                 audio_queue.resume();
@@ -316,10 +314,10 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 }
 
                 let volume = if self
-                    .gui_builder
+                    .gui
                     .is_menu_bar_item_selected(MenuBarItem::AudioEnabled)
                 {
-                    self.gui_builder.audio_volume as f32 / 100.0
+                    self.gui.audio_volume as f32 / 100.0
                 } else {
                     0.0
                 };
@@ -350,7 +348,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         let mut ui = self.imgui.frame();
         self.imgui_sdl2.prepare_render(&ui, &self.window);
 
-        self.gui_builder.build(&mut ui);
+        self.gui.build(&mut ui);
 
         self.renderer.render(ui);
         self.update_io_state(&mut io_state);
@@ -382,9 +380,8 @@ impl io::ControllerAccess for IOSdl2ImGuiOpenGl {
         controller_id: controllers::ControllerId,
         button: io::Button,
     ) -> bool {
-        let sdl2_scancode = self.gui_builder.controller_configs[controller_id as usize].mapping
-            [button as usize]
-            .key;
+        let sdl2_scancode =
+            self.gui.controller_configs[controller_id as usize].mapping[button as usize].key;
         let key_state = self.keyboard_state.get(&sdl2_scancode);
         *key_state.unwrap_or(&false)
     }
