@@ -201,6 +201,7 @@ pub(super) struct Gui {
     fd: imgui_filedialog::FileDialog,
     pub video_size: [f32; 2],
     pub video_size_control: VideoSizeControl,
+    pub previous_video_size_control: VideoSizeControl,
     pub audio_volume: u8,
     pub controllers_setup: bool,
     pub controller_configs: [ControllerConfig; 2],
@@ -218,6 +219,7 @@ impl Gui {
                 ..Default::default()
             },
             video_size_control: VideoSizeControl::Double,
+            previous_video_size_control: VideoSizeControl::Double,
             video_size: [FRAME_WIDTH as f32 * 2.0, FRAME_HEIGHT as f32 * 2.0],
             build_menu_bar: Default::default(),
             fd: imgui_filedialog::FileDialog::new(im_str!("nes_file"))
@@ -256,6 +258,7 @@ impl Gui {
     pub fn toggle_menu_bar_item(&mut self, item: MenuBarItem) {
         self.menu_bar_item_selected[item as usize] = !self.menu_bar_item_selected[item as usize];
     }
+
     fn toggle_menu_bar_item_if_clicked(&mut self, ui: &imgui::Ui, item: MenuBarItem) {
         if ui.is_item_clicked(imgui::MouseButton::Left)
             || (ui.is_item_hovered() && ui.key_pressed_amount(imgui::Key::Enter, 0.0, 0.0) == 1)
@@ -264,7 +267,7 @@ impl Gui {
                 !self.menu_bar_item_selected[item as usize];
         }
     }
-    fn build_menu_bar_and_check_for_mouse_events(&mut self, ui: &mut imgui::Ui) {
+    fn build_menu_bar(&mut self, ui: &mut imgui::Ui) {
         use MenuBarItem::*;
         with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
             with_token!(ui, begin_main_menu_bar, (), {
@@ -509,7 +512,7 @@ impl Gui {
     }
 
     pub(super) fn build(&mut self, mut ui: &mut imgui::Ui) {
-        self.build_menu_bar = !self.is_menu_bar_item_selected(MenuBarItem::VideoSizeFullScreen);
+        self.build_menu_bar = !(self.video_size_control == VideoSizeControl::FullScreen);
         with_styles!(
             ui,
             (
@@ -519,7 +522,7 @@ impl Gui {
             ),
             {
                 if self.build_menu_bar {
-                    self.build_menu_bar_and_check_for_mouse_events(&mut ui);
+                    self.build_menu_bar(&mut ui);
                 }
                 self.build_emulation_window(&mut ui);
                 self.build_fps_counter(&mut ui);

@@ -5,6 +5,8 @@ mod keyboard_shortcuts;
 use std::default::Default;
 use std::{borrow::BorrowMut, collections::HashMap};
 
+use self::gui::VideoSizeControl;
+
 use super::io_internal;
 use crate::{controllers, io};
 
@@ -51,6 +53,8 @@ pub struct IOSdl2ImGuiOpenGl {
     renderer: imgui_opengl_renderer::Renderer,
     _gl_context: sdl2::video::GLContext,
     gui: gui::Gui,
+    cancel: bool,
+    is_video_size_change_pending: bool,
     keyboard_shortcuts: keyboard_shortcuts::KeyboardShortcuts,
 }
 
@@ -145,6 +149,8 @@ impl IOSdl2ImGuiOpenGl {
             _gl_context,
             gui: gui_builder,
             keyboard_shortcuts: Default::default(),
+            cancel: false,
+            is_video_size_change_pending: false,
         }
     }
 
@@ -178,10 +184,29 @@ impl IOSdl2ImGuiOpenGl {
         }
 
         {
+            #[cfg(target_os = "emscripten")]
+            if self.gui.video_size_control == VideoSizeControl::FullScreen
+                && self.window.fullscreen_state() != sdl2::video::FullscreenType::Desktop
+            {
+                self.cancel = true;
+            } else if self.gui.video_size_control != VideoSizeControl::FullScreen {
+                let [expected_width, _]: [u32; 2] = self.gui.video_size_control.into();
+                let (actual_width, _) = self.window.size();
+                if actual_width as u32 != expected_width {
+                    self.is_video_size_change_pending = true;
+                }
+            }
+
             let mut set_video_size_selection =
                 |item: MenuBarItem, video_size_ctrl: gui::VideoSizeControl| {
-                    if self.is_menu_bar_item_selected(item) {
+                    if self.is_menu_bar_item_selected(item)
+                        && video_size_ctrl != self.gui.video_size_control
+                    {
+                        if self.gui.video_size_control != gui::VideoSizeControl::FullScreen {
+                            self.gui.previous_video_size_control = self.gui.video_size_control;
+                        }
                         self.gui.video_size_control = video_size_ctrl;
+                        self.is_video_size_change_pending = true;
                     }
                 };
             set_video_size_selection(MenuBarItem::VideoSizeDouble, gui::VideoSizeControl::Double);
@@ -194,6 +219,11 @@ impl IOSdl2ImGuiOpenGl {
                 MenuBarItem::VideoSizeFullScreen,
                 gui::VideoSizeControl::FullScreen,
             );
+
+            if self.cancel && self.gui.video_size_control == VideoSizeControl::FullScreen {
+                self.gui.video_size_control = self.gui.previous_video_size_control;
+                self.is_video_size_change_pending = true;
+            }
         }
         {
             let mut toggle = |item: MenuBarItem| {
@@ -273,10 +303,14 @@ impl io::IO for IOSdl2ImGuiOpenGl {
     fn present_frame(&mut self, control: io::IOControl) -> io::IOState {
         let mut io_state: io::IOState = Default::default();
         self.set_window_tile(&control);
-        let video_size = self.set_window_size_and_get_video_size();
-        self.gui.video_size = video_size;
+        if self.is_video_size_change_pending {
+            let video_size = self.set_window_size_and_get_video_size();
+            self.gui.video_size = video_size;
+            self.is_video_size_change_pending = false;
+        }
         self.gui.prepare_for_new_frame(control.clone());
         self.keyboard_shortcuts = Default::default();
+        self.cancel = false;
 
         self.keyboard_state = self
             .events
@@ -288,6 +322,13 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 self.gui.try_get_key_selection(&event);
             } else {
                 Self::check_for_keyboard_shortcuts(&event, &mut self.keyboard_shortcuts);
+                if let sdl2::event::Event::KeyDown {
+                    scancode: Some(sdl2::keyboard::Scancode::Escape),
+                    ..
+                } = event
+                {
+                    self.cancel = true;
+                }
                 self.imgui_sdl2.handle_event(&mut self.imgui, &event);
             }
             if let sdl2::event::Event::Window { win_event, .. } = event {
