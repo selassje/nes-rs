@@ -15,9 +15,9 @@ pub trait Memory {
         }
     }
 
-    fn store_word(&mut self, addr: u16, bytes: u16) {
-        self.store_byte(addr, (bytes & 0x00FF) as u8);
-        self.store_byte(addr + 1, ((bytes & 0xFF00) >> 8) as u8);
+    fn store_word(&mut self, addr: u16, word: u16) {
+        self.store_byte(addr, (word & 0x00FF) as u8);
+        self.store_byte(addr + 1, ((word & 0xFF00) >> 8) as u8);
     }
 }
 pub struct MemoryImpl<const N: usize> {
@@ -35,21 +35,6 @@ impl<const N: usize> MemoryImpl<N> {
 
     pub fn store_byte(&mut self, addr: u16, byte: u8) {
         self.memory[addr as usize] = byte;
-    }
-
-    pub fn get_word(&self, addr: u16) -> u16 {
-        common::convert_2u8_to_u16(self.get_byte(addr), self.get_byte(addr + 1))
-    }
-
-    pub fn store_bytes(&mut self, addr: u16, bytes: &[u8]) {
-        for (i, b) in bytes.iter().enumerate() {
-            self.store_byte(addr + i as u16, *b);
-        }
-    }
-
-    pub fn store_word(&mut self, addr: u16, bytes: u16) {
-        self.store_byte(addr, (bytes & 0x00FF) as u8);
-        self.store_byte(addr + 1, ((bytes & 0xFF00) >> 8) as u8);
     }
 
     pub fn clear(&mut self) {

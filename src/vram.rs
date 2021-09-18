@@ -58,7 +58,7 @@ impl VRam {
         self.memory.clear()
     }
 
-    fn get_memory_index(&self, address: u16) -> u16 {
+    fn get_target_address(&self, address: u16) -> u16 {
         if NAMETABLES_RANGE.contains(&address) {
             let nametable_mirror_offset = address % NAMETABLE_MIRROR_SIZE;
             (address % NAMETABLE_SIZE)
@@ -104,7 +104,7 @@ impl VRam {
         if address < NAMETABLES_START {
             self.mapper.borrow_mut().get_chr_byte(address)
         } else {
-            self.memory.get_byte(self.get_memory_index(address))
+            self.memory.get_byte(self.get_target_address(address))
         }
     }
 
@@ -123,7 +123,8 @@ impl Memory for VRam {
         if adress < NAMETABLES_START {
             self.mapper.borrow_mut().store_chr_byte(adress, byte);
         } else {
-            self.memory.store_byte(self.get_memory_index(adress), byte);
+            self.memory
+                .store_byte(self.get_target_address(adress), byte);
         }
     }
 
@@ -155,7 +156,7 @@ impl VideoMemory for VRam {
 
     fn get_attribute_data(&self, table_index: u8, color_tile_x: u8, color_tile_y: u8) -> u8 {
         let attrib_table_addr =
-            self.get_memory_index(NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE + 960);
+            self.get_target_address(NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE + 960);
         let attribute_index = (color_tile_y / 2) * 8 + color_tile_x / 2;
         let attribute_data = self
             .memory

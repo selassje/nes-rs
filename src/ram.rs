@@ -38,7 +38,7 @@ const CARTRIDGE_SPACE_RANGE: Range<u32> = Range {
 type RegisterLatch = RefCell<u8>;
 
 pub struct Ram {
-    memory: [u8; 0x0808],
+    memory: MemoryImpl<0x0808>,
     mapper: Rc<RefCell<dyn Mapper>>,
     ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>,
     controller_access: Rc<RefCell<dyn ControllerRegisterAccess>>,
@@ -58,7 +58,7 @@ impl Ram {
         mapper: Rc<RefCell<dyn Mapper>>,
     ) -> Ram {
         Ram {
-            memory: [0; 0x0808],
+            memory: MemoryImpl::new(),
             mapper,
             ppu_access,
             controller_access,
@@ -76,7 +76,7 @@ impl Ram {
     }
 
     pub fn power_cycle(&mut self) {
-        self.memory.iter_mut().for_each(|m| *m = 0);
+        self.memory.clear();
         *self.ppu_register_latch.borrow_mut() = 0;
         *self.apu_register_latch.borrow_mut() = 0;
         *self.controller_register_latch.borrow_mut() = 0;
@@ -124,9 +124,10 @@ impl Memory for Ram {
         } else if CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)) {
             self.mapper.borrow_mut().get_prg_byte(addr)
         } else if addr >= CPU_TEST_MODE_SPACE_START {
-            self.memory[(INTERNAL_MIRROR_SIZE + addr - CPU_TEST_MODE_SPACE_START) as usize]
+            self.memory
+                .get_byte(INTERNAL_MIRROR_SIZE + addr - CPU_TEST_MODE_SPACE_START)
         } else if addr < INTERNAL_MIRROR_SIZE {
-            self.memory[addr as usize]
+            self.memory.get_byte(addr)
         } else {
             panic!("Address org {:X} real {:X}", address_org, addr);
         }
@@ -161,23 +162,8 @@ impl Memory for Ram {
             self.mapper.borrow_mut().store_prg_byte(addr, byte)
         } else if addr < CPU_TEST_MODE_SPACE_START {
             assert!(addr < INTERNAL_MIRROR_SIZE);
-            self.memory[addr as usize] = byte;
+            self.memory.store_byte(addr, byte);
         }
-    }
-
-    fn get_word(&self, addr: u16) -> u16 {
-        crate::common::convert_2u8_to_u16(self.get_byte(addr), self.get_byte(addr + 1))
-    }
-
-    fn store_bytes(&mut self, addr: u16, bytes: &[u8]) {
-        for (i, b) in bytes.iter().enumerate() {
-            self.store_byte(addr + i as u16, *b);
-        }
-    }
-
-    fn store_word(&mut self, addr: u16, bytes: u16) {
-        self.store_byte(addr, (bytes & 0x00FF) as u8);
-        self.store_byte(addr + 1, ((bytes & 0xFF00) >> 8) as u8);
     }
 }
 
