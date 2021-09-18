@@ -36,7 +36,7 @@ const ATTRIBUTE_DATA_QUADRANT_MASKS: [u8; 4] = [
 ];
 
 pub struct VRam {
-    memory: [u8; 0x0820],
+    memory: crate::memory::MemoryImpl<0x0820>,
     mapper: Rc<RefCell<dyn Mapper>>,
     read_buffer: RefCell<u8>,
 }
@@ -44,7 +44,7 @@ pub struct VRam {
 impl VRam {
     pub fn new(mapper: Rc<RefCell<dyn Mapper>>) -> Self {
         VRam {
-            memory: [0; 0x0820],
+            memory: crate::memory::MemoryImpl::new(),
             mapper,
             read_buffer: RefCell::new(0),
         }
@@ -55,13 +55,13 @@ impl VRam {
     }
 
     pub fn power_cycle(&mut self) {
-        self.memory.iter_mut().for_each(|m| *m = 0);
+        self.memory.clear()
     }
 
-    fn get_memory_index(&self, address: u16) -> usize {
+    fn get_memory_index(&self, address: u16) -> u16 {
         if NAMETABLES_RANGE.contains(&address) {
             let nametable_mirror_offset = address % NAMETABLE_MIRROR_SIZE;
-            (address % NAMETABLE_SIZE) as usize
+            (address % NAMETABLE_SIZE)
                 + match self.mapper.borrow().get_mirroring() {
                     Mirroring::Vertical => match nametable_mirror_offset {
                         0x0000..=0x03FF => 0x0000,
@@ -81,7 +81,7 @@ impl VRam {
                     Mirroring::SingleScreenUpperBank => 0x0400,
                 }
         } else if PALETTES_RANGE.contains(&address) {
-            let palettes_mirror_offset = (address as usize) % 0x20;
+            let palettes_mirror_offset = address % 0x20;
             let maybe_internal_mirror = match palettes_mirror_offset {
                 0x10 => Some(0x00),
                 0x14 => Some(0x04),
@@ -104,7 +104,7 @@ impl VRam {
         if address < NAMETABLES_START {
             self.mapper.borrow_mut().get_chr_byte(address)
         } else {
-            self.memory[self.get_memory_index(address)]
+            self.memory.get_byte(self.get_memory_index(address))
         }
     }
 
@@ -123,7 +123,7 @@ impl Memory for VRam {
         if adress < NAMETABLES_START {
             self.mapper.borrow_mut().store_chr_byte(adress, byte);
         } else {
-            self.memory[self.get_memory_index(adress)] = byte;
+            self.memory.store_byte(self.get_memory_index(adress), byte);
         }
     }
 
@@ -157,7 +157,9 @@ impl VideoMemory for VRam {
         let attrib_table_addr =
             self.get_memory_index(NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE + 960);
         let attribute_index = (color_tile_y / 2) * 8 + color_tile_x / 2;
-        let attribute_data = self.memory[attrib_table_addr + attribute_index as usize];
+        let attribute_data = self
+            .memory
+            .get_byte(attrib_table_addr + attribute_index as u16);
         let quadrant: u8 = (color_tile_y % 2) * 2 + (color_tile_x % 2);
         (attribute_data & ATTRIBUTE_DATA_QUADRANT_MASKS[quadrant as usize] as u8) >> (2 * quadrant)
     }

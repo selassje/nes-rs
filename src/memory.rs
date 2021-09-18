@@ -20,6 +20,42 @@ pub trait Memory {
         self.store_byte(addr + 1, ((bytes & 0xFF00) >> 8) as u8);
     }
 }
+pub struct MemoryImpl<const N: usize> {
+    memory: [u8; N],
+}
+
+impl<const N: usize> MemoryImpl<N> {
+    pub fn new() -> Self {
+        Self { memory: [0; N] }
+    }
+
+    pub fn get_byte(&self, addr: u16) -> u8 {
+        self.memory[addr as usize]
+    }
+
+    pub fn store_byte(&mut self, addr: u16, byte: u8) {
+        self.memory[addr as usize] = byte;
+    }
+
+    pub fn get_word(&self, addr: u16) -> u16 {
+        common::convert_2u8_to_u16(self.get_byte(addr), self.get_byte(addr + 1))
+    }
+
+    pub fn store_bytes(&mut self, addr: u16, bytes: &[u8]) {
+        for (i, b) in bytes.iter().enumerate() {
+            self.store_byte(addr + i as u16, *b);
+        }
+    }
+
+    pub fn store_word(&mut self, addr: u16, bytes: u16) {
+        self.store_byte(addr, (bytes & 0x00FF) as u8);
+        self.store_byte(addr + 1, ((bytes & 0xFF00) >> 8) as u8);
+    }
+
+    pub fn clear(&mut self) {
+        self.memory.iter_mut().for_each(|m| *m = 0);
+    }
+}
 
 pub trait VideoMemory: Memory {
     fn get_background_pallete_index(
