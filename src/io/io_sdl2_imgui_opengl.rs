@@ -208,6 +208,7 @@ impl IOSdl2ImGuiOpenGl {
                         self.gui.video_size_control = video_size_ctrl;
                         self.is_video_size_change_pending = true;
                     }
+                    self.gui.clear_menu_bar_item(item);
                 };
             set_video_size_selection(MenuBarItem::VideoSizeDouble, gui::VideoSizeControl::Double);
             set_video_size_selection(MenuBarItem::VideoSizeTriple, gui::VideoSizeControl::Triple);

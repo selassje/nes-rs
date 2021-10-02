@@ -259,6 +259,10 @@ impl Gui {
         self.menu_bar_item_selected[item as usize] = !self.menu_bar_item_selected[item as usize];
     }
 
+    pub fn clear_menu_bar_item(&mut self, item: MenuBarItem) {
+        self.menu_bar_item_selected[item as usize] = false;
+    }
+
     fn toggle_menu_bar_item_if_clicked(&mut self, ui: &imgui::Ui, item: MenuBarItem) {
         if ui.is_item_clicked(imgui::MouseButton::Left)
             || (ui.is_item_hovered() && ui.key_pressed_amount(imgui::Key::Enter, 0.0, 0.0) == 1)
