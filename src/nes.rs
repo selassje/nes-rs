@@ -15,6 +15,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
 pub struct Nes {
     cpu: Cpu,
     ram: Rc<RefCell<Ram>>,

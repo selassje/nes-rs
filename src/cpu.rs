@@ -6,13 +6,14 @@ use crate::ppu::PpuState;
 use crate::{common::*, memory::Memory};
 use crate::{mappers::Mapper, ram_ppu::DmaWriteAccessRegister::OamDma};
 use opcodes::{get_opcodes, OpCodes, NMI_OPCODE};
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter, Result};
 use std::rc::Rc;
 
 const STACK_PAGE: u16 = 0x0100;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 enum AddressingMode {
     Implicit,
     Accumulator,
@@ -49,7 +50,7 @@ impl AddressingMode {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 enum Address {
     Implicit,
     Accumulator,
@@ -82,14 +83,21 @@ enum ProcessorFlag {
 }
 
 pub type InstructionFun = fn(&mut Cpu);
-#[derive(Copy, Clone)]
+
+fn default_instruction_fun() -> InstructionFun {
+    Cpu::nop
+}
+
+#[derive(Copy, Clone, Serialize, Deserialize)]
 struct Instruction {
     total_cycles: u16,
     cycle: u16,
     bytes: u8,
+    #[serde(skip, default = "default_instruction_fun")]
     fun: InstructionFun,
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct Cpu {
     pc: u16,
     sp: u8,
@@ -105,6 +113,7 @@ pub struct Cpu {
     mapper: Rc<RefCell<dyn Mapper>>,
     apu_state: Rc<RefCell<dyn ApuState>>,
     code_segment: (u16, u16),
+    #[serde(skip, default = "get_opcodes")]
     opcodes: OpCodes,
     interrupt: Option<u8>,
     is_brk_or_irq_hijacked_by_nmi: bool,
