@@ -1,5 +1,6 @@
 use crate::common;
 
+use serde::{Deserialize, Serialize};
 pub trait Memory {
     fn get_byte(&self, addr: u16) -> u8;
 
@@ -20,7 +21,9 @@ pub trait Memory {
         self.store_byte(addr + 1, ((word & 0xFF00) >> 8) as u8);
     }
 }
+#[derive(Serialize)]
 pub struct MemoryImpl<const N: usize> {
+    #[serde(with = "serde_arrays")]
     memory: [u8; N],
 }
 

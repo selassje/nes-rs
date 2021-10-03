@@ -3,6 +3,7 @@ use crate::common::Mirroring;
 use crate::mappers::mapper_internal::BankSize;
 use crate::mappers::mapper_internal::BankSize::*;
 use crate::mappers::mapper_internal::MapperInternal;
+use serde::{Deserialize, Serialize};
 
 trait Register {
     fn is_last_prg_page_mode(&self) -> bool;
@@ -49,6 +50,7 @@ impl Register for u16 {
     }
 }
 
+#[derive(Serialize)]
 pub struct Mapper227 {
     mapper_internal: MapperInternal,
     register: u16,

@@ -1,8 +1,10 @@
+use serde::{Deserialize, Serialize};
 const PRG_RAM_DATA_SIZE: usize = 0x20000;
 const PRG_ROM_DATA_SIZE: usize = 0x80000;
 const CHR_ROM_DATA_SIZE: usize = 0x40000;
 const CHR_RAM_DATA_SIZE: usize = 0x2000;
-#[derive(Debug, Clone, Copy, PartialEq)]
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub(super) enum BankSize {
     _1KB = 0x0400,
     _2KB = 0x0800,
@@ -12,7 +14,7 @@ pub(super) enum BankSize {
     _32KB = 0x8000,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize)]
 pub(super) struct BankSelect {
     pub size: BankSize,
     pub bank: usize,
@@ -27,12 +29,17 @@ impl Default for BankSelect {
     }
 }
 
+#[derive(Serialize)]
 pub(super) struct MapperInternal {
+    #[serde(with = "serde_arrays")]
     prg_ram: Box<[u8; PRG_RAM_DATA_SIZE]>,
+    #[serde(with = "serde_arrays")]
     prg_rom: Box<[u8; PRG_ROM_DATA_SIZE]>,
     prg_rom_size: usize,
+    #[serde(with = "serde_arrays")]
     chr_rom: Box<[u8; CHR_ROM_DATA_SIZE]>,
     chr_rom_size: usize,
+    #[serde(with = "serde_arrays")]
     chr_ram: Box<[u8; CHR_RAM_DATA_SIZE]>,
 }
 

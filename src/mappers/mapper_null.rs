@@ -1,5 +1,7 @@
 use crate::common::Mirroring;
 
+use serde::{Deserialize, Serialize};
+#[derive(Serialize)]
 pub struct MapperNull {}
 
 impl MapperNull {

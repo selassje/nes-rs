@@ -16,8 +16,8 @@ use crate::{
 use crate::{io::VideoAccess, memory::VideoMemory};
 use crate::{mappers::Mapper, ram_ppu::*};
 
+use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, default::Default, fmt::Display, rc::Rc};
-
 enum ControlRegisterFlag {
     BaseNametableAddress = 0b00000011,
     VramIncrement = 0b00000100,
@@ -45,6 +45,7 @@ const FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET: u16 = FETCH_LOW_PATTERN_DATA_CYCLE_O
 
 const VBLANK_START_CYCLE: u16 = 4;
 
+#[derive(Serialize)]
 struct ControlRegister {
     value: u8,
 }
@@ -84,6 +85,7 @@ impl ControlRegister {
     }
 }
 
+#[derive(Serialize)]
 enum MaskRegisterFlag {
     _GrayScale = 0b00000001,
     ShowBackgroundInLeftMost8Pixels = 0b00000010,
@@ -95,6 +97,7 @@ enum MaskRegisterFlag {
     _EmphasizeBlue = 0b10000000,
 }
 
+#[derive(Serialize)]
 struct MaskRegister {
     value: u8,
 }
@@ -111,7 +114,7 @@ enum StatusRegisterFlag {
     VerticalBlankStarted = 0b10000000,
 }
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Serialize)]
 struct StatusRegister {
     value: u8,
 }
@@ -130,7 +133,7 @@ impl StatusRegister {
     }
 }
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Serialize)]
 struct Tile {
     data: [u8; 16],
 }
@@ -145,7 +148,9 @@ impl Tile {
         (2 * hi_bit + lo_bit) as usize
     }
 }
+#[derive(Serialize)]
 struct PatternTable {
+    #[serde(with = "serde_arrays")]
     tiles: [Option<Tile>; 256],
 }
 
@@ -158,7 +163,7 @@ impl Default for PatternTable {
 type Palette = [RgbColor; 4];
 type Palettes = [Palette; 4];
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Serialize)]
 struct Sprite {
     oam_index: u8,
     data: [u8; 4],
@@ -218,12 +223,12 @@ const BIT_14: VRAMAddressFlag = (0b0100_0000_0000_0000, 14);
 const BITS_8_13: VRAMAddressFlag = (0b0011_1111_0000_0000, 8);
 const LOW_BYTE: VRAMAddressFlag = (0b0000_0000_1111_1111, 0);
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Serialize)]
 struct VRAMAddress {
     address: u16,
 }
 
-#[derive(Default, Copy, Clone, Debug)]
+#[derive(Default, Copy, Clone, Debug, Serialize)]
 struct TileData {
     index: u8,
     attribute_byte: u8,
@@ -296,13 +301,17 @@ impl Display for VRAMAddress {
     }
 }
 
+#[derive(Serialize)]
 pub struct Ppu {
+    #[serde(skip)]
     video_access: Rc<RefCell<dyn VideoAccess>>,
+    #[serde(skip)]
     vram: Rc<RefCell<dyn VideoMemory>>,
     control_reg: ControlRegister,
     mask_reg: MaskRegister,
     status_reg: StatusRegister,
     oam_address: u8,
+    #[serde(with = "serde_arrays")]
     oam: Oam,
     pattern_tables: [RefCell<PatternTable>; 2],
     ppu_cycle: u16,
@@ -318,6 +327,7 @@ pub struct Ppu {
     fine_x_scroll: u8,
     sprite_palettes: Palettes,
     background_palletes: Palettes,
+    #[serde(skip)]
     mapper: Rc<RefCell<dyn Mapper>>,
     tile_data: [TileData; 3],
 }

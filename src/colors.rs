@@ -1,10 +1,13 @@
 pub type RgbColor = (u8, u8, u8);
 
-pub trait ColorMapper {
+use serde::{Deserialize, Serialize};
+pub trait ColorMapper: erased_serde::Serialize {
     fn map_nes_color(&self, color: u8) -> RgbColor;
 }
-
+erased_serde::serialize_trait_object!(ColorMapper);
+#[derive(Serialize)]
 pub struct DefaultColorMapper {
+    #[serde(with = "serde_arrays")]
     color_map: [RgbColor; 64],
 }
 

@@ -2,6 +2,7 @@ use crate::ram_apu;
 use crate::ram_controllers::*;
 use crate::ram_ppu::*;
 use crate::{mappers::Mapper, memory::*};
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::ops::Range;
@@ -37,11 +38,16 @@ const CARTRIDGE_SPACE_RANGE: Range<u32> = Range {
 
 type RegisterLatch = RefCell<u8>;
 
+#[derive(Serialize)]
 pub struct Ram {
     memory: MemoryImpl<0x0808>,
+    #[serde(skip)]
     mapper: Rc<RefCell<dyn Mapper>>,
+    #[serde(skip)]
     ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>,
+    #[serde(skip)]
     controller_access: Rc<RefCell<dyn ControllerRegisterAccess>>,
+    #[serde(skip)]
     apu_access: Rc<RefCell<dyn ram_apu::ApuRegisterAccess>>,
     dmc_sample_address: usize,
     ppu_register_latch: RegisterLatch,

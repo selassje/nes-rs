@@ -2,6 +2,8 @@ use super::{mapper_internal::BankSize::*, Mapper};
 use crate::common::Mirroring;
 use crate::mappers::mapper_internal::MapperInternal;
 
+use serde::{Deserialize, Serialize};
+#[derive(Serialize)]
 pub struct Mapper0 {
     mapper_internal: MapperInternal,
     mirroring: Mirroring,

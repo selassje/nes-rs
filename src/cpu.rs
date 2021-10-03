@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter, Result};
 use std::rc::Rc;
-
 const STACK_PAGE: u16 = 0x0100;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -97,7 +96,7 @@ struct Instruction {
     fun: InstructionFun,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 pub struct Cpu {
     pc: u16,
     sp: u8,
@@ -108,9 +107,13 @@ pub struct Cpu {
     cycle: u128,
     instruction: Option<Instruction>,
     address: Address,
+    #[serde(skip)]
     ram: Rc<RefCell<dyn Memory>>,
+    #[serde(skip)]
     ppu_state: Rc<RefCell<dyn PpuState>>,
+    #[serde(skip)]
     mapper: Rc<RefCell<dyn Mapper>>,
+    #[serde(skip)]
     apu_state: Rc<RefCell<dyn ApuState>>,
     code_segment: (u16, u16),
     #[serde(skip, default = "get_opcodes")]
@@ -119,6 +122,24 @@ pub struct Cpu {
     is_brk_or_irq_hijacked_by_nmi: bool,
     oam_dma_in_progress: Option<u16>,
 }
+
+//#// impl Serialize for Cpu {
+//     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+//     where
+//         S: serde::Serializer,
+//     {
+//         serializer.serialize_u16(self.pc)
+//     }
+// }
+
+// impl<'de> Deserialize<'de> for Cpu {
+//     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+//     where
+//         D: serde::Deserializer<'de>,
+//     {
+//         self.pc.dese
+//     }
+// }
 
 impl Cpu {
     pub fn new(

@@ -2,6 +2,9 @@ use super::mmc3_6::MMC3_6Variant;
 use super::mmc3_6::MMC3_6;
 use super::Mapper;
 use crate::common::Mirroring;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize)]
 pub struct Mapper4 {
     mmc3: MMC3_6,
 }
