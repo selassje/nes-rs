@@ -4,7 +4,7 @@ use crate::mappers::mapper_internal::BankSize::*;
 use crate::mappers::mapper_internal::MapperInternal;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Mapper2 {
     mapper_internal: MapperInternal,
     mirroring: Mirroring,
@@ -22,6 +22,7 @@ impl Mapper2 {
     }
 }
 
+#[typetag::serde]
 impl Mapper for Mapper2 {
     fn get_chr_byte(&mut self, address: u16) -> u8 {
         self.mapper_internal.get_chr_byte(address, 0, _8KB)

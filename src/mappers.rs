@@ -23,7 +23,8 @@ pub use self::mapper7::Mapper7;
 pub use self::mapper71::Mapper71;
 pub use self::mapper_null::MapperNull;
 
-pub trait Mapper: erased_serde::Serialize {
+#[typetag::serde(tag = "mapper_tag")]
+pub trait Mapper {
     fn get_chr_byte(&mut self, _: u16) -> u8;
     fn store_chr_byte(&mut self, _: u16, _: u8);
 
@@ -40,4 +41,4 @@ pub trait Mapper: erased_serde::Serialize {
     fn ppu_a12_rising_edge_triggered(&mut self) {}
 }
 
-erased_serde::serialize_trait_object!(Mapper);
+//erased_serde::serialize_trait_object!(Mapper);

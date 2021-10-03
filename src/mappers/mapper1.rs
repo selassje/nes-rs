@@ -29,14 +29,14 @@ impl ControlRegister for u8 {
         (self & 0b10000) >> 4
     }
 }
-#[derive(Default, serde::Serialize)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 struct ShiftRegister {
     value: u8,
     write_count: u8,
 }
 
 use serde::{Deserialize, Serialize};
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Mapper1 {
     mapper_internal: MapperInternal,
     shift_register: ShiftRegister,
@@ -75,6 +75,7 @@ impl Mapper1 {
     }
 }
 
+#[typetag::serde]
 impl Mapper for Mapper1 {
     fn get_chr_byte(&mut self, address: u16) -> u8 {
         let (bank, bank_size) = self.get_chr_bank_info_from_address(address);

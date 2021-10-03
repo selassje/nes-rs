@@ -1,7 +1,7 @@
 use crate::common::Mirroring;
 
 use serde::{Deserialize, Serialize};
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct MapperNull {}
 
 impl MapperNull {
@@ -10,6 +10,7 @@ impl MapperNull {
     }
 }
 
+#[typetag::serde]
 impl super::Mapper for MapperNull {
     fn get_chr_byte(&mut self, _address: u16) -> u8 {
         0

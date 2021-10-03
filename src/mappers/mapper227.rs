@@ -50,7 +50,7 @@ impl Register for u16 {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Mapper227 {
     mapper_internal: MapperInternal,
     register: u16,
@@ -96,6 +96,7 @@ impl Mapper227 {
         }
     }
 }
+#[typetag::serde]
 impl Mapper for Mapper227 {
     fn get_prg_byte(&mut self, address: u16) -> u8 {
         let bank = if (self.register.get_prg_bank_size() == _32KB

@@ -28,6 +28,14 @@ where
     mapper.borrow().serialize(serializer)
 }
 
+fn deserialize_mapper<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Rc<RefCell<dyn Mapper>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    todo!()
+}
 #[derive(serde::Serialize, Deserialize)]
 pub struct Nes {
     cpu: Cpu,
@@ -35,7 +43,10 @@ pub struct Nes {
     ppu: Rc<RefCell<Ppu>>,
     vram: Rc<RefCell<VRam>>,
     apu: Rc<RefCell<Apu>>,
-    #[serde(serialize_with = "serialize_mapper")]
+    #[serde(
+        serialize_with = "serialize_mapper",
+        deserialize_with = "deserialize_mapper"
+    )]
     mapper: Rc<RefCell<dyn Mapper>>,
 }
 

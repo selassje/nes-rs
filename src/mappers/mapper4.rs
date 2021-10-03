@@ -4,7 +4,7 @@ use super::Mapper;
 use crate::common::Mirroring;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub struct Mapper4 {
     mmc3: MMC3_6,
 }
@@ -17,6 +17,7 @@ impl Mapper4 {
     }
 }
 
+#[typetag::serde]
 impl Mapper for Mapper4 {
     fn get_chr_byte(&mut self, address: u16) -> u8 {
         self.mmc3.get_chr_byte(address)

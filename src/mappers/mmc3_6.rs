@@ -12,7 +12,7 @@ const PRG_RAM_RANGE: Range<u16> = Range {
     end: 0x8000,
 };
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub(super) enum MMC3_6Variant {
     MMC3HkROM,
     _MMC3TkTlSROM,
@@ -39,7 +39,7 @@ impl BankSelectRegister for u8 {
         ((self & 0b1000_0000) >> 7) as usize
     }
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub(super) struct MMC3_6 {
     mapper_internal: MapperInternal,
     _variant: MMC3_6Variant,
@@ -155,6 +155,7 @@ impl MMC3_6 {
     }
 }
 
+#[typetag::serde]
 impl Mapper for MMC3_6 {
     fn get_chr_byte(&mut self, address: u16) -> u8 {
         let bank_select = self.chr_rom_banks[address as usize / _1KB as usize];

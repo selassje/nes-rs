@@ -14,7 +14,7 @@ pub(super) enum BankSize {
     _32KB = 0x8000,
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub(super) struct BankSelect {
     pub size: BankSize,
     pub bank: usize,
@@ -29,7 +29,7 @@ impl Default for BankSelect {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 pub(super) struct MapperInternal {
     #[serde(with = "serde_arrays")]
     prg_ram: Box<[u8; PRG_RAM_DATA_SIZE]>,
