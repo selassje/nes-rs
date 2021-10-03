@@ -22,3 +22,25 @@ pub trait WriteOutputRegisters {
 }
 
 pub trait ControllerRegisterAccess: ReadInputRegisters + WriteOutputRegisters {}
+
+pub struct DummyControllerRegisterAccessImpl {}
+
+impl DummyControllerRegisterAccessImpl {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl ReadInputRegisters for DummyControllerRegisterAccessImpl {
+    fn read(&mut self, port: InputRegister) -> u8 {
+        todo!()
+    }
+}
+
+impl WriteOutputRegisters for DummyControllerRegisterAccessImpl {
+    fn write(&mut self, port: OutputRegister, value: u8) {
+        todo!()
+    }
+}
+
+impl ControllerRegisterAccess for DummyControllerRegisterAccessImpl {}

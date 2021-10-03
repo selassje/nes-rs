@@ -96,7 +96,22 @@ struct Instruction {
     fun: InstructionFun,
 }
 
-#[derive(Serialize)]
+fn default_memory() -> Rc<RefCell<dyn Memory>> {
+    Rc::new(RefCell::new(crate::memory::DummyMemoryImpl::new()))
+}
+
+fn default_ppu_state() -> Rc<RefCell<dyn PpuState>> {
+    Rc::new(RefCell::new(crate::ppu::DummyPpuStateImpl::new()))
+}
+
+fn default_mapper() -> Rc<RefCell<dyn Mapper>> {
+    Rc::new(RefCell::new(crate::mappers::MapperNull::new()))
+}
+
+fn default_apu_state() -> Rc<RefCell<dyn ApuState>> {
+    Rc::new(RefCell::new(crate::apu::DummyApuStateImpl::new()))
+}
+#[derive(Serialize, Deserialize)]
 pub struct Cpu {
     pc: u16,
     sp: u8,
@@ -107,13 +122,13 @@ pub struct Cpu {
     cycle: u128,
     instruction: Option<Instruction>,
     address: Address,
-    #[serde(skip)]
+    #[serde(skip, default = "default_memory")]
     ram: Rc<RefCell<dyn Memory>>,
-    #[serde(skip)]
+    #[serde(skip, default = "default_ppu_state")]
     ppu_state: Rc<RefCell<dyn PpuState>>,
-    #[serde(skip)]
+    #[serde(skip, default = "default_mapper")]
     mapper: Rc<RefCell<dyn Mapper>>,
-    #[serde(skip)]
+    #[serde(skip, default = "default_apu_state")]
     apu_state: Rc<RefCell<dyn ApuState>>,
     code_segment: (u16, u16),
     #[serde(skip, default = "get_opcodes")]

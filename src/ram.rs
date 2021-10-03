@@ -38,16 +38,37 @@ const CARTRIDGE_SPACE_RANGE: Range<u32> = Range {
 
 type RegisterLatch = RefCell<u8>;
 
-#[derive(Serialize)]
+fn default_ppu_regsiter_access() -> Rc<RefCell<dyn PpuRegisterAccess>> {
+    Rc::new(RefCell::new(
+        crate::ram_ppu::DummyPpuRegisterAccessImpl::new(),
+    ))
+}
+
+fn default_mapper() -> Rc<RefCell<dyn Mapper>> {
+    Rc::new(RefCell::new(crate::mappers::MapperNull::new()))
+}
+
+fn default_controler_access() -> Rc<RefCell<dyn ControllerRegisterAccess>> {
+    Rc::new(RefCell::new(
+        crate::ram_controllers::DummyControllerRegisterAccessImpl::new(),
+    ))
+}
+
+fn default_apu_register_access() -> Rc<RefCell<dyn ram_apu::ApuRegisterAccess>> {
+    Rc::new(RefCell::new(
+        crate::ram_apu::DummyApuRegisterAccessImpl::new(),
+    ))
+}
+#[derive(Serialize, Deserialize)]
 pub struct Ram {
     memory: MemoryImpl<0x0808>,
-    #[serde(skip)]
+    #[serde(skip, default = "default_mapper")]
     mapper: Rc<RefCell<dyn Mapper>>,
-    #[serde(skip)]
+    #[serde(skip, default = "default_ppu_regsiter_access")]
     ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>,
-    #[serde(skip)]
+    #[serde(skip, default = "default_controler_access")]
     controller_access: Rc<RefCell<dyn ControllerRegisterAccess>>,
-    #[serde(skip)]
+    #[serde(skip, default = "default_apu_register_access")]
     apu_access: Rc<RefCell<dyn ram_apu::ApuRegisterAccess>>,
     dmc_sample_address: usize,
     ppu_register_latch: RegisterLatch,

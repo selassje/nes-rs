@@ -28,7 +28,7 @@ where
     mapper.borrow().serialize(serializer)
 }
 
-#[derive(serde::Serialize)]
+#[derive(serde::Serialize, Deserialize)]
 pub struct Nes {
     cpu: Cpu,
     ram: Rc<RefCell<Ram>>,
@@ -39,14 +39,14 @@ pub struct Nes {
     mapper: Rc<RefCell<dyn Mapper>>,
 }
 
-impl<'de> Deserialize<'de> for Nes {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        todo!()
-    }
-}
+// impl<'de> Deserialize<'de> for Nes {
+//     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+//     where
+//         D: serde::Deserializer<'de>,
+//     {
+//         todo!()
+//     }
+// }
 
 impl Nes {
     pub fn new<T>(io: Rc<RefCell<T>>) -> Self

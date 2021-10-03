@@ -88,6 +88,33 @@ pub trait VideoAccess {
     fn set_pixel(&mut self, x: usize, y: usize, color: RgbColor);
 }
 
+pub struct DummyVideoAccessImpl {}
+
+impl DummyVideoAccessImpl {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl VideoAccess for DummyVideoAccessImpl {
+    fn set_pixel(&mut self, x: usize, y: usize, color: RgbColor) {
+        todo!()
+    }
+}
+
+pub struct DummyAudioAccessImpl {}
+
+impl DummyAudioAccessImpl {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl AudioAccess for DummyAudioAccessImpl {
+    fn add_sample(&mut self, sample: AudioSampleFormat) {
+        todo!()
+    }
+}
 pub trait IO {
     fn present_frame(&mut self, control: IOControl) -> IOState;
     fn is_audio_available(&self) -> bool;

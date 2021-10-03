@@ -36,10 +36,13 @@ const ATTRIBUTE_DATA_QUADRANT_MASKS: [u8; 4] = [
     BottomRight as u8,
 ];
 
-#[derive(Serialize)]
+fn default_mapper() -> Rc<RefCell<dyn Mapper>> {
+    Rc::new(RefCell::new(crate::mappers::MapperNull::new()))
+}
+#[derive(Serialize, Deserialize)]
 pub struct VRam {
     memory: crate::memory::MemoryImpl<0x0820>,
-    #[serde(skip)]
+    #[serde(skip, default = "default_mapper")]
     mapper: Rc<RefCell<dyn Mapper>>,
     read_buffer: RefCell<u8>,
 }

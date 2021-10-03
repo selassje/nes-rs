@@ -9,6 +9,29 @@ pub trait PpuState {
     fn clear_nmi_pending(&mut self);
     fn get_time(&self) -> PpuTime;
 }
+
+pub struct DummyPpuStateImpl {}
+
+impl DummyPpuStateImpl {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl PpuState for DummyPpuStateImpl {
+    fn is_nmi_pending(&mut self) -> bool {
+        todo!()
+    }
+
+    fn clear_nmi_pending(&mut self) {
+        todo!()
+    }
+
+    fn get_time(&self) -> PpuTime {
+        todo!()
+    }
+}
+
 use crate::{
     colors::{ColorMapper, DefaultColorMapper, RgbColor},
     io::FRAME_WIDTH,
@@ -45,7 +68,7 @@ const FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET: u16 = FETCH_LOW_PATTERN_DATA_CYCLE_O
 
 const VBLANK_START_CYCLE: u16 = 4;
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct ControlRegister {
     value: u8,
 }
@@ -97,7 +120,7 @@ enum MaskRegisterFlag {
     _EmphasizeBlue = 0b10000000,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct MaskRegister {
     value: u8,
 }
@@ -114,7 +137,7 @@ enum StatusRegisterFlag {
     VerticalBlankStarted = 0b10000000,
 }
 
-#[derive(Copy, Clone, Default, Serialize)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize)]
 struct StatusRegister {
     value: u8,
 }
@@ -133,7 +156,7 @@ impl StatusRegister {
     }
 }
 
-#[derive(Copy, Clone, Default, Serialize)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize)]
 struct Tile {
     data: [u8; 16],
 }
@@ -148,7 +171,7 @@ impl Tile {
         (2 * hi_bit + lo_bit) as usize
     }
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct PatternTable {
     #[serde(with = "serde_arrays")]
     tiles: [Option<Tile>; 256],
@@ -163,7 +186,7 @@ impl Default for PatternTable {
 type Palette = [RgbColor; 4];
 type Palettes = [Palette; 4];
 
-#[derive(Copy, Clone, Default, Serialize)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize)]
 struct Sprite {
     oam_index: u8,
     data: [u8; 4],
@@ -223,12 +246,12 @@ const BIT_14: VRAMAddressFlag = (0b0100_0000_0000_0000, 14);
 const BITS_8_13: VRAMAddressFlag = (0b0011_1111_0000_0000, 8);
 const LOW_BYTE: VRAMAddressFlag = (0b0000_0000_1111_1111, 0);
 
-#[derive(Copy, Clone, Default, Serialize)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize)]
 struct VRAMAddress {
     address: u16,
 }
 
-#[derive(Default, Copy, Clone, Debug, Serialize)]
+#[derive(Default, Copy, Clone, Debug, Serialize, Deserialize)]
 struct TileData {
     index: u8,
     attribute_byte: u8,
@@ -301,11 +324,20 @@ impl Display for VRAMAddress {
     }
 }
 
-#[derive(Serialize)]
+fn default_mapper() -> Rc<RefCell<dyn Mapper>> {
+    Rc::new(RefCell::new(crate::mappers::MapperNull::new()))
+}
+fn default_video_access() -> Rc<RefCell<dyn VideoAccess>> {
+    Rc::new(RefCell::new(crate::io::DummyVideoAccessImpl::new()))
+}
+fn default_video_memory() -> Rc<RefCell<dyn VideoMemory>> {
+    Rc::new(RefCell::new(crate::memory::DummyVideoMemoryImpl::new()))
+}
+#[derive(Serialize, Deserialize)]
 pub struct Ppu {
-    #[serde(skip)]
+    #[serde(skip, default = "default_video_access")]
     video_access: Rc<RefCell<dyn VideoAccess>>,
-    #[serde(skip)]
+    #[serde(skip, default = "default_video_memory")]
     vram: Rc<RefCell<dyn VideoMemory>>,
     control_reg: ControlRegister,
     mask_reg: MaskRegister,
@@ -327,7 +359,7 @@ pub struct Ppu {
     fine_x_scroll: u8,
     sprite_palettes: Palettes,
     background_palletes: Palettes,
-    #[serde(skip)]
+    #[serde(skip, default = "default_mapper")]
     mapper: Rc<RefCell<dyn Mapper>>,
     tile_data: [TileData; 3],
 }
