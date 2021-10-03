@@ -17,30 +17,26 @@ use std::time::Duration;
 
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use serde::Deserialize;
-//#[derive(serde::Serialize)]
+
+fn serialize_mapper<S>(
+    mapper: &Rc<RefCell<dyn Mapper>>,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    mapper.borrow().serialize(serializer)
+}
+
+#[derive(serde::Serialize)]
 pub struct Nes {
     cpu: Cpu,
     ram: Rc<RefCell<Ram>>,
     ppu: Rc<RefCell<Ppu>>,
     vram: Rc<RefCell<VRam>>,
     apu: Rc<RefCell<Apu>>,
+    #[serde(serialize_with = "serialize_mapper")]
     mapper: Rc<RefCell<dyn Mapper>>,
-}
-
-impl Serialize for Nes {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("Nes", 6)?;
-        state.serialize_field("cpu", &self.cpu)?;
-        state.serialize_field("ram", &*self.ram.borrow())?;
-        state.serialize_field("ppu", &*self.ppu.borrow())?;
-        state.serialize_field("vram", &*self.vram.borrow())?;
-        state.serialize_field("apu", &*self.apu.borrow())?;
-        state.serialize_field("mapper", &*self.mapper.borrow())?;
-        state.end()
-    }
 }
 
 impl<'de> Deserialize<'de> for Nes {
@@ -90,7 +86,10 @@ impl Nes {
         serde_yaml::to_string(self).unwrap()
     }
 
-    pub fn deserialize(&mut self, state: String) {}
+    pub fn deserialize(&mut self, state: String) {
+        let new_nes: Nes = serde_yaml::from_str(&state).unwrap();
+        *self = new_nes
+    }
 
     pub fn load(&mut self, nes_file: &NesFile) {
         let mapper = nes_file.create_mapper();
