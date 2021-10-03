@@ -4,7 +4,7 @@ const PRG_ROM_DATA_SIZE: usize = 0x80000;
 const CHR_ROM_DATA_SIZE: usize = 0x40000;
 const CHR_RAM_DATA_SIZE: usize = 0x2000;
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub(super) enum BankSize {
     _1KB = 0x0400,
     _2KB = 0x0800,
@@ -29,17 +29,39 @@ impl Default for BankSelect {
     }
 }
 
+pub fn deserialize_array_and_box<'de, D, T, const N: usize>(
+    deserialize: D,
+) -> Result<Box<[T; N]>, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Result::Ok(Box::new(serde_arrays::deserialize(deserialize).unwrap()))
+}
+
 #[derive(Serialize, Deserialize)]
 pub(super) struct MapperInternal {
-    #[serde(with = "serde_arrays")]
+    #[serde(
+        serialize_with = "serde_arrays::serialize",
+        deserialize_with = "deserialize_array_and_box"
+    )]
     prg_ram: Box<[u8; PRG_RAM_DATA_SIZE]>,
-    #[serde(with = "serde_arrays")]
+    #[serde(
+        serialize_with = "serde_arrays::serialize",
+        deserialize_with = "deserialize_array_and_box"
+    )]
     prg_rom: Box<[u8; PRG_ROM_DATA_SIZE]>,
     prg_rom_size: usize,
-    #[serde(with = "serde_arrays")]
+    #[serde(
+        serialize_with = "serde_arrays::serialize",
+        deserialize_with = "deserialize_array_and_box"
+    )]
     chr_rom: Box<[u8; CHR_ROM_DATA_SIZE]>,
     chr_rom_size: usize,
-    #[serde(with = "serde_arrays")]
+    #[serde(
+        serialize_with = "serde_arrays::serialize",
+        deserialize_with = "deserialize_array_and_box"
+    )]
     chr_ram: Box<[u8; CHR_RAM_DATA_SIZE]>,
 }
 
