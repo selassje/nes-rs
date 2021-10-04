@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::common::Mirroring;
 
 mod mapper0;
@@ -24,7 +27,7 @@ pub use self::mapper71::Mapper71;
 pub use self::mapper_null::MapperNull;
 
 #[typetag::serde(tag = "mapper_tag")]
-pub trait Mapper {
+pub trait Mapper: BoxToRcRefCell {
     fn get_chr_byte(&mut self, _: u16) -> u8;
     fn store_chr_byte(&mut self, _: u16, _: u8);
 
@@ -39,6 +42,15 @@ pub trait Mapper {
     }
 
     fn ppu_a12_rising_edge_triggered(&mut self) {}
+}
+
+pub trait BoxToRcRefCell {
+    fn wrap_in_refcell(self: Box<Self>) -> Rc<RefCell<dyn Mapper>>;
+}
+impl<T: Mapper + 'static> BoxToRcRefCell for T {
+    fn wrap_in_refcell(self: Box<Self>) -> Rc<RefCell<dyn Mapper>> {
+        Rc::new(RefCell::new(*self))
+    }
 }
 
 //erased_serde::serialize_trait_object!(Mapper);

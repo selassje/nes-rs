@@ -189,6 +189,17 @@ impl Cpu {
         self.mapper = mapper;
     }
 
+    pub fn set_ram(&mut self, ram: Rc<RefCell<dyn Memory>>) {
+        self.ram = ram;
+    }
+
+    pub fn set_ppu_state(&mut self, ppu_state: Rc<RefCell<dyn PpuState>>) {
+        self.ppu_state = ppu_state;
+    }
+    pub fn set_apu_state(&mut self, apu_state: Rc<RefCell<dyn ApuState>>) {
+        self.apu_state = apu_state;
+    }
+
     pub fn power_cycle(&mut self) {
         self.pc = 0xC000;
         self.pc = self.ram.borrow().get_word(0xFFFC);

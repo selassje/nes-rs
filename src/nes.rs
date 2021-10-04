@@ -15,7 +15,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use serde::ser::{Serialize, SerializeStruct, Serializer};
+use serde::ser::{Serialize, Serializer};
 use serde::Deserialize;
 
 fn serialize_mapper<S>(
@@ -34,8 +34,21 @@ fn deserialize_mapper<'de, D>(
 where
     D: serde::Deserializer<'de>,
 {
-    todo!()
+    let boxed_mapper: Box<dyn Mapper> =
+        typetag::serde::Deserialize::deserialize(deserializer).unwrap();
+    Result::Ok(boxed_mapper.wrap_in_refcell())
 }
+
+fn default_video_access() -> Rc<RefCell<dyn VideoAccess>> {
+    Rc::new(RefCell::new(crate::io::DummyIOImpl::new()))
+}
+fn default_audio_access() -> Rc<RefCell<dyn AudioAccess>> {
+    Rc::new(RefCell::new(crate::io::DummyIOImpl::new()))
+}
+fn default_controller_access() -> Rc<RefCell<dyn ControllerAccess>> {
+    Rc::new(RefCell::new(crate::io::DummyIOImpl::new()))
+}
+
 #[derive(serde::Serialize, Deserialize)]
 pub struct Nes {
     cpu: Cpu,
@@ -48,6 +61,12 @@ pub struct Nes {
         deserialize_with = "deserialize_mapper"
     )]
     mapper: Rc<RefCell<dyn Mapper>>,
+    #[serde(skip, default = "default_video_access")]
+    video_access: Rc<RefCell<dyn VideoAccess>>,
+    #[serde(skip, default = "default_audio_access")]
+    audio_access: Rc<RefCell<dyn AudioAccess>>,
+    #[serde(skip, default = "default_controller_access")]
+    controller_access: Rc<RefCell<dyn ControllerAccess>>,
 }
 
 // impl<'de> Deserialize<'de> for Nes {
@@ -72,7 +91,7 @@ impl Nes {
             io.clone(),
             mapper.clone(),
         )));
-        let apu = Rc::new(RefCell::new(Apu::new(io)));
+        let apu = Rc::new(RefCell::new(Apu::new(io.clone())));
         let ram = Rc::new(RefCell::new(Ram::new(
             ppu.clone(),
             controllers,
@@ -90,6 +109,9 @@ impl Nes {
             vram,
             apu,
             mapper,
+            video_access: io.clone(),
+            audio_access: io.clone(),
+            controller_access: io,
         }
     }
 
@@ -98,8 +120,43 @@ impl Nes {
     }
 
     pub fn deserialize(&mut self, state: String) {
-        let new_nes: Nes = serde_yaml::from_str(&state).unwrap();
-        *self = new_nes
+        let mut new_nes: Nes = serde_yaml::from_str(&state).unwrap();
+        let mapper = new_nes.mapper.clone();
+        let video_access = self.video_access.clone();
+        let audio_access = self.audio_access.clone();
+        let controller_access = self.controller_access.clone();
+
+        let controllers = Rc::new(RefCell::new(controllers::Controllers::new(
+            controller_access.clone(),
+        )));
+        new_nes.vram.borrow_mut().set_mapper(mapper.clone());
+        new_nes.ppu.borrow_mut().set_mapper(mapper.clone());
+        new_nes.ppu.borrow_mut().set_vram(new_nes.vram.clone());
+        new_nes
+            .ppu
+            .borrow_mut()
+            .set_video_access(video_access.clone());
+
+        new_nes
+            .apu
+            .borrow_mut()
+            .set_audio_access(audio_access.clone());
+
+        new_nes.ram.borrow_mut().set_apu_access(new_nes.apu.clone());
+        new_nes.ram.borrow_mut().set_ppu_access(new_nes.ppu.clone());
+        new_nes.ram.borrow_mut().set_controller_access(controllers);
+        new_nes.ram.borrow_mut().set_mapper(mapper.clone());
+
+        new_nes.cpu.set_mapper(mapper);
+        new_nes.cpu.set_ram(new_nes.ram.clone());
+        new_nes.cpu.set_ppu_state(new_nes.ppu.clone());
+        new_nes.cpu.set_apu_state(new_nes.apu.clone());
+
+        new_nes.video_access = video_access;
+        new_nes.audio_access = audio_access;
+        new_nes.controller_access = controller_access;
+
+        *self = new_nes;
     }
 
     pub fn load(&mut self, nes_file: &NesFile) {

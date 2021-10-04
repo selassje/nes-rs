@@ -115,11 +115,46 @@ impl AudioAccess for DummyAudioAccessImpl {
         todo!()
     }
 }
-pub trait IO {
+
+pub trait ControllerAccess {
+    fn is_button_pressed(&self, controller_id: controllers::ControllerId, button: Button) -> bool;
+}
+
+pub trait IO: VideoAccess + AudioAccess + ControllerAccess {
     fn present_frame(&mut self, control: IOControl) -> IOState;
     fn is_audio_available(&self) -> bool;
 }
 
-pub trait ControllerAccess {
-    fn is_button_pressed(&self, controller_id: controllers::ControllerId, button: Button) -> bool;
+pub struct DummyIOImpl {}
+
+impl DummyIOImpl {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl IO for DummyIOImpl {
+    fn present_frame(&mut self, control: IOControl) -> IOState {
+        todo!()
+    }
+
+    fn is_audio_available(&self) -> bool {
+        todo!()
+    }
+}
+
+impl VideoAccess for DummyIOImpl {
+    fn set_pixel(&mut self, x: usize, y: usize, color: RgbColor) {
+        todo!()
+    }
+}
+impl AudioAccess for DummyIOImpl {
+    fn add_sample(&mut self, sample: AudioSampleFormat) {
+        todo!()
+    }
+}
+impl ControllerAccess for DummyIOImpl {
+    fn is_button_pressed(&self, controller_id: controllers::ControllerId, button: Button) -> bool {
+        todo!()
+    }
 }

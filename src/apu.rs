@@ -745,6 +745,10 @@ impl Apu {
         self.dmc.dmc_memory = Some(dmc_memory);
     }
 
+    pub fn set_audio_access(&mut self, audio_access: Rc<RefCell<dyn AudioAccess>>) {
+        self.audio_access = audio_access;
+    }
+
     fn get_length_counter_channel(
         &mut self,
         flag: StatusRegisterFlag,

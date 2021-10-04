@@ -1,4 +1,5 @@
 use crate::ram_apu;
+use crate::ram_apu::ApuRegisterAccess;
 use crate::ram_controllers::*;
 use crate::ram_ppu::*;
 use crate::{mappers::Mapper, memory::*};
@@ -100,6 +101,19 @@ impl Ram {
 
     pub fn set_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
         self.mapper = mapper;
+    }
+
+    pub fn set_ppu_access(&mut self, ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>) {
+        self.ppu_access = ppu_access;
+    }
+    pub fn set_apu_access(&mut self, apu_access: Rc<RefCell<dyn ApuRegisterAccess>>) {
+        self.apu_access = apu_access;
+    }
+    pub fn set_controller_access(
+        &mut self,
+        controller_access: Rc<RefCell<dyn ControllerRegisterAccess>>,
+    ) {
+        self.controller_access = controller_access;
     }
 
     pub fn power_cycle(&mut self) {

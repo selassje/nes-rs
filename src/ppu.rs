@@ -35,6 +35,7 @@ impl PpuState for DummyPpuStateImpl {
 use crate::{
     colors::{ColorMapper, DefaultColorMapper, RgbColor},
     io::FRAME_WIDTH,
+    vram::VRam,
 };
 use crate::{io::VideoAccess, memory::VideoMemory};
 use crate::{mappers::Mapper, ram_ppu::*};
@@ -399,6 +400,12 @@ impl Ppu {
 
     pub fn set_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
         self.mapper = mapper;
+    }
+    pub fn set_vram(&mut self, vram: Rc<RefCell<VRam>>) {
+        self.vram = vram;
+    }
+    pub fn set_video_access(&mut self, video_access: Rc<RefCell<dyn VideoAccess>>) {
+        self.video_access = video_access;
     }
 
     pub fn power_cycle(&mut self) {
