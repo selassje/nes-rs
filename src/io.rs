@@ -97,7 +97,7 @@ impl DummyVideoAccessImpl {
 }
 
 impl VideoAccess for DummyVideoAccessImpl {
-    fn set_pixel(&mut self, x: usize, y: usize, color: RgbColor) {
+    fn set_pixel(&mut self, _x: usize, _y: usize, _color: RgbColor) {
         todo!()
     }
 }
@@ -111,7 +111,7 @@ impl DummyAudioAccessImpl {
 }
 
 impl AudioAccess for DummyAudioAccessImpl {
-    fn add_sample(&mut self, sample: AudioSampleFormat) {
+    fn add_sample(&mut self, _sample: AudioSampleFormat) {
         todo!()
     }
 }
@@ -134,7 +134,7 @@ impl DummyIOImpl {
 }
 
 impl IO for DummyIOImpl {
-    fn present_frame(&mut self, control: IOControl) -> IOState {
+    fn present_frame(&mut self, _control: IOControl) -> IOState {
         todo!()
     }
 
@@ -144,17 +144,21 @@ impl IO for DummyIOImpl {
 }
 
 impl VideoAccess for DummyIOImpl {
-    fn set_pixel(&mut self, x: usize, y: usize, color: RgbColor) {
+    fn set_pixel(&mut self, _x: usize, _y: usize, _color: RgbColor) {
         todo!()
     }
 }
 impl AudioAccess for DummyIOImpl {
-    fn add_sample(&mut self, sample: AudioSampleFormat) {
+    fn add_sample(&mut self, _sample: AudioSampleFormat) {
         todo!()
     }
 }
 impl ControllerAccess for DummyIOImpl {
-    fn is_button_pressed(&self, controller_id: controllers::ControllerId, button: Button) -> bool {
+    fn is_button_pressed(
+        &self,
+        _controller_id: controllers::ControllerId,
+        _button: Button,
+    ) -> bool {
         todo!()
     }
 }

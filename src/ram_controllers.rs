@@ -32,13 +32,13 @@ impl DummyControllerRegisterAccessImpl {
 }
 
 impl ReadInputRegisters for DummyControllerRegisterAccessImpl {
-    fn read(&mut self, port: InputRegister) -> u8 {
+    fn read(&mut self, _port: InputRegister) -> u8 {
         todo!()
     }
 }
 
 impl WriteOutputRegisters for DummyControllerRegisterAccessImpl {
-    fn write(&mut self, port: OutputRegister, value: u8) {
+    fn write(&mut self, _port: OutputRegister, _value: u8) {
         todo!()
     }
 }

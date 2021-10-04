@@ -52,13 +52,13 @@ impl DummyApuRegisterAccessImpl {
 }
 
 impl WriteAcessRegisters for DummyApuRegisterAccessImpl {
-    fn write(&mut self, register: WriteAccessRegister, value: u8) {
+    fn write(&mut self, _register: WriteAccessRegister, _value: u8) {
         todo!()
     }
 }
 
 impl ReadAccessRegisters for DummyApuRegisterAccessImpl {
-    fn read(&mut self, register: ReadAccessRegister) -> u8 {
+    fn read(&mut self, _register: ReadAccessRegister) -> u8 {
         todo!()
     }
 }

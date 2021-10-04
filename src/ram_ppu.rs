@@ -49,19 +49,19 @@ impl DummyPpuRegisterAccessImpl {
 }
 
 impl WritePpuRegisters for DummyPpuRegisterAccessImpl {
-    fn write(&mut self, register: WriteAccessRegister, value: u8) {
+    fn write(&mut self, _register: WriteAccessRegister, _value: u8) {
         todo!()
     }
 }
 
 impl WriteOamDma for DummyPpuRegisterAccessImpl {
-    fn write_oam_dma(&mut self, data: [u8; 256]) {
+    fn write_oam_dma(&mut self, _data: [u8; 256]) {
         todo!()
     }
 }
 
 impl ReadPpuRegisters for DummyPpuRegisterAccessImpl {
-    fn read(&mut self, register: ReadAccessRegister) -> u8 {
+    fn read(&mut self, _register: ReadAccessRegister) -> u8 {
         todo!()
     }
 }
