@@ -12,6 +12,8 @@ fn shortcut_to_menu_bar_item(key: KeyboardShortcut) -> Option<MenuBarItem> {
     match key {
         LeftCtrl(Scancode::R) => Some(MenuBarItem::PowerCycle),
         LeftCtrl(Scancode::O) => Some(MenuBarItem::LoadNesFile),
+        LeftCtrl(Scancode::S) => Some(MenuBarItem::SaveState),
+        LeftCtrl(Scancode::L) => Some(MenuBarItem::LoadState),
         LeftCtrl(Scancode::P) => Some(MenuBarItem::Pause),
         LeftCtrl(Scancode::Equals) => Some(MenuBarItem::SpeedIncrease),
         LeftCtrl(Scancode::Minus) => Some(MenuBarItem::SpeedDecrease),

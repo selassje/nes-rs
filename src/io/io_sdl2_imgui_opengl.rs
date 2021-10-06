@@ -21,6 +21,8 @@ type Size = [f32; 2];
 #[derive(Copy, Clone, PartialEq)]
 pub enum MenuBarItem {
     LoadNesFile,
+    SaveState,
+    LoadState,
     Quit,
     PowerCycle,
     Pause,
