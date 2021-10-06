@@ -138,24 +138,6 @@ pub struct Cpu {
     oam_dma_in_progress: Option<u16>,
 }
 
-//#// impl Serialize for Cpu {
-//     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-//     where
-//         S: serde::Serializer,
-//     {
-//         serializer.serialize_u16(self.pc)
-//     }
-// }
-
-// impl<'de> Deserialize<'de> for Cpu {
-//     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-//     where
-//         D: serde::Deserializer<'de>,
-//     {
-//         self.pc.dese
-//     }
-// }
-
 impl Cpu {
     pub fn new(
         ram: Rc<RefCell<dyn Memory>>,
