@@ -69,15 +69,6 @@ pub struct Nes {
     controller_access: Rc<RefCell<dyn ControllerAccess>>,
 }
 
-// impl<'de> Deserialize<'de> for Nes {
-//     fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-//     where
-//         D: serde::Deserializer<'de>,
-//     {
-//         todo!()
-//     }
-// }
-
 impl Nes {
     pub fn new<T>(io: Rc<RefCell<T>>) -> Self
     where
@@ -141,7 +132,7 @@ impl Nes {
             .apu
             .borrow_mut()
             .set_audio_access(audio_access.clone());
-        
+
         new_nes.apu.borrow_mut().set_dmc_memory(new_nes.ram.clone());
 
         new_nes.ram.borrow_mut().set_apu_access(new_nes.apu.clone());

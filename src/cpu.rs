@@ -83,17 +83,12 @@ enum ProcessorFlag {
 
 pub type InstructionFun = fn(&mut Cpu);
 
-fn default_instruction_fun() -> InstructionFun {
-    Cpu::nop
-}
-
 #[derive(Copy, Clone, Serialize, Deserialize)]
 struct Instruction {
+    opcode: u8,
     total_cycles: u16,
     cycle: u16,
     bytes: u8,
-    #[serde(skip, default = "default_instruction_fun")]
-    fun: InstructionFun,
 }
 
 fn default_memory() -> Rc<RefCell<dyn Memory>> {
@@ -315,10 +310,10 @@ impl Cpu {
                 + extra_cycles_from_oam_dma;
 
             self.instruction = Some(Instruction {
+                opcode: op,
                 total_cycles,
                 cycle: 0,
                 bytes: opcode.mode.get_bytes(),
-                fun: opcode.instruction,
             });
 
             if false {
@@ -350,12 +345,15 @@ impl Cpu {
     pub fn run_single_cycle(&mut self) {
         self.instruction.as_mut().unwrap().cycle += 1;
         let instruction = self.instruction.unwrap();
-        let ins = instruction.fun as usize;
-        let is_brk_or_irq_executing = ins == Self::brk as usize || ins == Self::irq as usize;
-        let is_nmi_executing = ins == Self::nmi as usize;
+        let ins_fun = self.opcodes[instruction.opcode as usize]
+            .unwrap()
+            .instruction;
+        let is_brk_or_irq_executing =
+            ins_fun as usize == Self::brk as usize || ins_fun as usize == Self::irq as usize;
+        let is_nmi_executing = ins_fun as usize == Self::nmi as usize;
         let is_branching_executing = self.is_current_instruction_branching();
         if instruction.cycle == instruction.total_cycles {
-            (instruction.fun)(self);
+            (ins_fun)(self);
             self.pc = ((self.pc as u32 + instruction.bytes as u32) % u16::MAX as u32) as u16;
             let cycles_left = std::u128::MAX - self.cycle;
             if cycles_left < instruction.total_cycles as u128 {
@@ -395,7 +393,9 @@ impl Cpu {
     }
 
     fn is_current_instruction_branching(&self) -> bool {
-        let ins = self.instruction.unwrap().fun as usize;
+        let ins = self.opcodes[self.instruction.unwrap().opcode as usize]
+            .unwrap()
+            .instruction as usize;
         let bcc_fn: usize = Cpu::bcc as usize;
         let bcs_fn: usize = Cpu::bcs as usize;
         let bpl_fn: usize = Cpu::bpl as usize;
@@ -701,7 +701,12 @@ impl Cpu {
     }
 
     fn rti(&mut self) {
-        self.pc = self.pop_word() - 1;
+        let popped = self.pop_word();
+        if popped == 0 {
+            println!("what?");
+        }
+
+        self.pc = popped - 1;
     }
 
     fn jmp(&mut self) {
