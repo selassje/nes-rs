@@ -69,6 +69,8 @@ pub struct IOState {
     pub quit: bool,
     pub power_cycle: bool,
     pub load_nes_file: Option<String>,
+    pub save_state: Option<String>,
+    pub load_state: Option<String>,
     pub speed: Option<Speed>,
     pub pause: bool,
 }

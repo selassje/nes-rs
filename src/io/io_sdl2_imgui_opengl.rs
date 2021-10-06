@@ -160,6 +160,8 @@ impl IOSdl2ImGuiOpenGl {
         io_state.quit |= self.is_menu_bar_item_selected(MenuBarItem::Quit);
         io_state.power_cycle = self.is_menu_bar_item_selected(MenuBarItem::PowerCycle);
         io_state.load_nes_file = self.gui.get_rom_path();
+        io_state.save_state = self.gui.get_save_state_path();
+        io_state.load_state = self.gui.get_load_state_path();
 
         io_state.speed = None;
         {

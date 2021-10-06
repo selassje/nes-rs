@@ -141,6 +141,8 @@ impl Nes {
             .apu
             .borrow_mut()
             .set_audio_access(audio_access.clone());
+        
+        new_nes.apu.borrow_mut().set_dmc_memory(new_nes.ram.clone());
 
         new_nes.ram.borrow_mut().set_apu_access(new_nes.apu.clone());
         new_nes.ram.borrow_mut().set_ppu_access(new_nes.ppu.clone());
