@@ -5,12 +5,14 @@ use crate::common::Mirroring;
 use crate::mappers::mapper_internal::BankSelect;
 use crate::mappers::mapper_internal::BankSize::*;
 use crate::mappers::mapper_internal::MapperInternal;
+use serde::{Deserialize, Serialize};
 
 const PRG_RAM_RANGE: Range<u16> = Range {
     start: 0x6000,
     end: 0x8000,
 };
 
+#[derive(Serialize, Deserialize)]
 pub(super) enum MMC3_6Variant {
     MMC3HkROM,
     _MMC3TkTlSROM,
@@ -37,6 +39,7 @@ impl BankSelectRegister for u8 {
         ((self & 0b1000_0000) >> 7) as usize
     }
 }
+#[derive(Serialize, Deserialize)]
 pub(super) struct MMC3_6 {
     mapper_internal: MapperInternal,
     _variant: MMC3_6Variant,
@@ -255,5 +258,9 @@ impl Mapper for MMC3_6 {
         self.irq_enabled = false;
         self.irq_triggered = false;
         self.scanline_counter = 0;
+    }
+
+    fn get_mapper_id(&self) -> u8 {
+        panic!()
     }
 }

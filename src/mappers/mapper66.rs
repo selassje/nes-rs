@@ -2,6 +2,9 @@ use super::Mapper;
 use crate::common::Mirroring;
 use crate::mappers::mapper_internal::BankSize::*;
 use crate::mappers::mapper_internal::MapperInternal;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
 pub struct Mapper66 {
     mapper_internal: MapperInternal,
     mirroring: Mirroring,
@@ -48,5 +51,9 @@ impl Mapper for Mapper66 {
     fn store_prg_byte(&mut self, _: u16, byte: u8) {
         self.chr_bank = (byte & 3) as usize;
         self.prg_bank = ((byte & 0b00110000) >> 4) as usize;
+    }
+
+    fn get_mapper_id(&self) -> u8 {
+        66
     }
 }

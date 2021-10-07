@@ -6,13 +6,13 @@ use crate::ppu::PpuState;
 use crate::{common::*, memory::Memory};
 use crate::{mappers::Mapper, ram_ppu::DmaWriteAccessRegister::OamDma};
 use opcodes::{get_opcodes, OpCodes, NMI_OPCODE};
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::fmt::{Display, Formatter, Result};
 use std::rc::Rc;
-
 const STACK_PAGE: u16 = 0x0100;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 enum AddressingMode {
     Implicit,
     Accumulator,
@@ -49,7 +49,7 @@ impl AddressingMode {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 enum Address {
     Implicit,
     Accumulator,
@@ -82,14 +82,31 @@ enum ProcessorFlag {
 }
 
 pub type InstructionFun = fn(&mut Cpu);
-#[derive(Copy, Clone)]
+
+#[derive(Copy, Clone, Serialize, Deserialize)]
 struct Instruction {
+    opcode: u8,
     total_cycles: u16,
     cycle: u16,
     bytes: u8,
-    fun: InstructionFun,
 }
 
+fn default_memory() -> Rc<RefCell<dyn Memory>> {
+    Rc::new(RefCell::new(crate::memory::DummyMemoryImpl::new()))
+}
+
+fn default_ppu_state() -> Rc<RefCell<dyn PpuState>> {
+    Rc::new(RefCell::new(crate::ppu::DummyPpuStateImpl::new()))
+}
+
+fn default_mapper() -> Rc<RefCell<dyn Mapper>> {
+    Rc::new(RefCell::new(crate::mappers::MapperNull::new()))
+}
+
+fn default_apu_state() -> Rc<RefCell<dyn ApuState>> {
+    Rc::new(RefCell::new(crate::apu::DummyApuStateImpl::new()))
+}
+#[derive(Serialize, Deserialize)]
 pub struct Cpu {
     pc: u16,
     sp: u8,
@@ -100,11 +117,16 @@ pub struct Cpu {
     cycle: u128,
     instruction: Option<Instruction>,
     address: Address,
+    #[serde(skip, default = "default_memory")]
     ram: Rc<RefCell<dyn Memory>>,
+    #[serde(skip, default = "default_ppu_state")]
     ppu_state: Rc<RefCell<dyn PpuState>>,
+    #[serde(skip, default = "default_mapper")]
     mapper: Rc<RefCell<dyn Mapper>>,
+    #[serde(skip, default = "default_apu_state")]
     apu_state: Rc<RefCell<dyn ApuState>>,
     code_segment: (u16, u16),
+    #[serde(skip, default = "get_opcodes")]
     opcodes: OpCodes,
     interrupt: Option<u8>,
     is_brk_or_irq_hijacked_by_nmi: bool,
@@ -142,6 +164,17 @@ impl Cpu {
 
     pub fn set_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
         self.mapper = mapper;
+    }
+
+    pub fn set_ram(&mut self, ram: Rc<RefCell<dyn Memory>>) {
+        self.ram = ram;
+    }
+
+    pub fn set_ppu_state(&mut self, ppu_state: Rc<RefCell<dyn PpuState>>) {
+        self.ppu_state = ppu_state;
+    }
+    pub fn set_apu_state(&mut self, apu_state: Rc<RefCell<dyn ApuState>>) {
+        self.apu_state = apu_state;
     }
 
     pub fn power_cycle(&mut self) {
@@ -277,10 +310,10 @@ impl Cpu {
                 + extra_cycles_from_oam_dma;
 
             self.instruction = Some(Instruction {
+                opcode: op,
                 total_cycles,
                 cycle: 0,
                 bytes: opcode.mode.get_bytes(),
-                fun: opcode.instruction,
             });
 
             if false {
@@ -312,12 +345,15 @@ impl Cpu {
     pub fn run_single_cycle(&mut self) {
         self.instruction.as_mut().unwrap().cycle += 1;
         let instruction = self.instruction.unwrap();
-        let ins = instruction.fun as usize;
-        let is_brk_or_irq_executing = ins == Self::brk as usize || ins == Self::irq as usize;
-        let is_nmi_executing = ins == Self::nmi as usize;
+        let ins_fun = self.opcodes[instruction.opcode as usize]
+            .unwrap()
+            .instruction;
+        let is_brk_or_irq_executing =
+            ins_fun as usize == Self::brk as usize || ins_fun as usize == Self::irq as usize;
+        let is_nmi_executing = ins_fun as usize == Self::nmi as usize;
         let is_branching_executing = self.is_current_instruction_branching();
         if instruction.cycle == instruction.total_cycles {
-            (instruction.fun)(self);
+            (ins_fun)(self);
             self.pc = ((self.pc as u32 + instruction.bytes as u32) % u16::MAX as u32) as u16;
             let cycles_left = std::u128::MAX - self.cycle;
             if cycles_left < instruction.total_cycles as u128 {
@@ -357,7 +393,9 @@ impl Cpu {
     }
 
     fn is_current_instruction_branching(&self) -> bool {
-        let ins = self.instruction.unwrap().fun as usize;
+        let ins = self.opcodes[self.instruction.unwrap().opcode as usize]
+            .unwrap()
+            .instruction as usize;
         let bcc_fn: usize = Cpu::bcc as usize;
         let bcs_fn: usize = Cpu::bcs as usize;
         let bpl_fn: usize = Cpu::bpl as usize;
@@ -663,7 +701,12 @@ impl Cpu {
     }
 
     fn rti(&mut self) {
-        self.pc = self.pop_word() - 1;
+        let popped = self.pop_word();
+        if popped == 0 {
+            println!("what?");
+        }
+
+        self.pc = popped - 1;
     }
 
     fn jmp(&mut self) {

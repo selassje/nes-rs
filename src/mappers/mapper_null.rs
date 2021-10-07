@@ -1,5 +1,7 @@
 use crate::common::Mirroring;
 
+use serde::{Deserialize, Serialize};
+#[derive(Serialize, Deserialize)]
 pub struct MapperNull {}
 
 impl MapperNull {
@@ -26,4 +28,8 @@ impl super::Mapper for MapperNull {
     }
 
     fn power_cycle(&mut self) {}
+
+    fn get_mapper_id(&self) -> u8 {
+        255
+    }
 }

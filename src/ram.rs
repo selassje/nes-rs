@@ -1,7 +1,9 @@
 use crate::ram_apu;
+use crate::ram_apu::ApuRegisterAccess;
 use crate::ram_controllers::*;
 use crate::ram_ppu::*;
 use crate::{mappers::Mapper, memory::*};
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::ops::Range;
@@ -37,11 +39,37 @@ const CARTRIDGE_SPACE_RANGE: Range<u32> = Range {
 
 type RegisterLatch = RefCell<u8>;
 
+fn default_ppu_regsiter_access() -> Rc<RefCell<dyn PpuRegisterAccess>> {
+    Rc::new(RefCell::new(
+        crate::ram_ppu::DummyPpuRegisterAccessImpl::new(),
+    ))
+}
+
+fn default_mapper() -> Rc<RefCell<dyn Mapper>> {
+    Rc::new(RefCell::new(crate::mappers::MapperNull::new()))
+}
+
+fn default_controler_access() -> Rc<RefCell<dyn ControllerRegisterAccess>> {
+    Rc::new(RefCell::new(
+        crate::ram_controllers::DummyControllerRegisterAccessImpl::new(),
+    ))
+}
+
+fn default_apu_register_access() -> Rc<RefCell<dyn ram_apu::ApuRegisterAccess>> {
+    Rc::new(RefCell::new(
+        crate::ram_apu::DummyApuRegisterAccessImpl::new(),
+    ))
+}
+#[derive(Serialize, Deserialize)]
 pub struct Ram {
     memory: MemoryImpl<0x0808>,
+    #[serde(skip, default = "default_mapper")]
     mapper: Rc<RefCell<dyn Mapper>>,
+    #[serde(skip, default = "default_ppu_regsiter_access")]
     ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>,
+    #[serde(skip, default = "default_controler_access")]
     controller_access: Rc<RefCell<dyn ControllerRegisterAccess>>,
+    #[serde(skip, default = "default_apu_register_access")]
     apu_access: Rc<RefCell<dyn ram_apu::ApuRegisterAccess>>,
     dmc_sample_address: usize,
     ppu_register_latch: RegisterLatch,
@@ -73,6 +101,19 @@ impl Ram {
 
     pub fn set_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
         self.mapper = mapper;
+    }
+
+    pub fn set_ppu_access(&mut self, ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>) {
+        self.ppu_access = ppu_access;
+    }
+    pub fn set_apu_access(&mut self, apu_access: Rc<RefCell<dyn ApuRegisterAccess>>) {
+        self.apu_access = apu_access;
+    }
+    pub fn set_controller_access(
+        &mut self,
+        controller_access: Rc<RefCell<dyn ControllerRegisterAccess>>,
+    ) {
+        self.controller_access = controller_access;
     }
 
     pub fn power_cycle(&mut self) {

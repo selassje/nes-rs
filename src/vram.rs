@@ -2,6 +2,7 @@ use self::AttributeDataQuadrantMask::*;
 use crate::{common::Mirroring, memory::Memory};
 use crate::{mappers::Mapper, memory::VideoMemory};
 
+use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, ops::Range, rc::Rc};
 
 const PATTERN_TABLE_SIZE: u16 = 0x1000;
@@ -35,8 +36,13 @@ const ATTRIBUTE_DATA_QUADRANT_MASKS: [u8; 4] = [
     BottomRight as u8,
 ];
 
+fn default_mapper() -> Rc<RefCell<dyn Mapper>> {
+    Rc::new(RefCell::new(crate::mappers::MapperNull::new()))
+}
+#[derive(Serialize, Deserialize)]
 pub struct VRam {
     memory: crate::memory::MemoryImpl<0x0820>,
+    #[serde(skip, default = "default_mapper")]
     mapper: Rc<RefCell<dyn Mapper>>,
     read_buffer: RefCell<u8>,
 }

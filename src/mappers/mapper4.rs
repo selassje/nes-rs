@@ -2,6 +2,10 @@ use super::mmc3_6::MMC3_6Variant;
 use super::mmc3_6::MMC3_6;
 use super::Mapper;
 use crate::common::Mirroring;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename(serialize = "concretemapper"))]
 pub struct Mapper4 {
     mmc3: MMC3_6,
 }
@@ -44,5 +48,9 @@ impl Mapper for Mapper4 {
 
     fn is_irq_pending(&mut self) -> bool {
         self.mmc3.is_irq_pending()
+    }
+
+    fn get_mapper_id(&self) -> u8 {
+        4
     }
 }

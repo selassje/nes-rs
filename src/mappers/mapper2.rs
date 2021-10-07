@@ -2,6 +2,10 @@ use super::Mapper;
 use crate::common::Mirroring;
 use crate::mappers::mapper_internal::BankSize::*;
 use crate::mappers::mapper_internal::MapperInternal;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+//#[serde(rename(deserialize = "concretemapper"))]
 pub struct Mapper2 {
     mapper_internal: MapperInternal,
     mirroring: Mirroring,
@@ -47,5 +51,9 @@ impl Mapper for Mapper2 {
 
     fn store_prg_byte(&mut self, _: u16, byte: u8) {
         self.switchable_bank_0 = byte as usize;
+    }
+
+    fn get_mapper_id(&self) -> u8 {
+        2
     }
 }

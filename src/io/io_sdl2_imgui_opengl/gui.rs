@@ -196,9 +196,13 @@ pub(super) struct Gui {
     fonts: GuiFonts,
     menu_bar_item_selected: [bool; MenuBarItem::Count as usize],
     io_control: IOControl,
-    rom_path: Option<String>,
+    nes_file_path: Option<String>,
+    save_state_path: Option<String>,
+    load_state_path: Option<String>,
     build_menu_bar: bool,
-    fd: imgui_filedialog::FileDialog,
+    fd_load_nes_file: imgui_filedialog::FileDialog,
+    fd_save_state: imgui_filedialog::FileDialog,
+    fd_load_state: imgui_filedialog::FileDialog,
     pub video_size: [f32; 2],
     pub video_size_control: VideoSizeControl,
     pub previous_video_size_control: VideoSizeControl,
@@ -208,13 +212,30 @@ pub(super) struct Gui {
     pub pause: bool,
 }
 
+fn create_file_dialog(
+    name: &imgui::ImStr,
+    title: &imgui::ImStr,
+    filters: &imgui::ImStr,
+) -> imgui_filedialog::FileDialog {
+    imgui_filedialog::FileDialog::new(name)
+        .title(title)
+        .filters(filters)
+        .min_size([2.0 * FRAME_WIDTH as f32 - 30.0, 200.0])
+        .max_size([
+            2.0 * FRAME_WIDTH as f32,
+            (2 * FRAME_HEIGHT - MENU_BAR_HEIGHT as usize) as _,
+        ])
+}
+
 impl Gui {
     pub fn new(emulation_texture: imgui::TextureId, fonts: GuiFonts) -> Self {
         Self {
             emulation_texture,
             menu_bar_item_selected: Default::default(),
             fonts,
-            rom_path: None,
+            nes_file_path: None,
+            save_state_path: None,
+            load_state_path: None,
             io_control: IOControl {
                 ..Default::default()
             },
@@ -222,14 +243,21 @@ impl Gui {
             previous_video_size_control: VideoSizeControl::Double,
             video_size: [FRAME_WIDTH as f32 * 2.0, FRAME_HEIGHT as f32 * 2.0],
             build_menu_bar: Default::default(),
-            fd: imgui_filedialog::FileDialog::new(im_str!("nes_file"))
-                .title(im_str!("Open NES file"))
-                .filters(im_str!(".nes,.NES"))
-                .min_size([2.0 * FRAME_WIDTH as f32 - 30.0, 200.0])
-                .max_size([
-                    2.0 * FRAME_WIDTH as f32,
-                    (2 * FRAME_HEIGHT - MENU_BAR_HEIGHT as usize) as _,
-                ]),
+            fd_load_nes_file: create_file_dialog(
+                im_str!("nes_file"),
+                im_str!("Open NES file"),
+                im_str!(".nes,.NES"),
+            ),
+            fd_save_state: create_file_dialog(
+                im_str!("save_state"),
+                im_str!("Save Emulation state"),
+                im_str!(".nesrs,.NESRS"),
+            ),
+            fd_load_state: create_file_dialog(
+                im_str!("load_state"),
+                im_str!("Load Emulation state"),
+                im_str!(".nesrs,.NESRS"),
+            ),
             audio_volume: 100,
             controller_configs: [ControllerConfig::new(0), ControllerConfig::new(1)],
             controllers_setup: false,
@@ -238,11 +266,17 @@ impl Gui {
     }
 
     pub fn get_rom_path(&mut self) -> Option<String> {
-        self.rom_path.take()
+        self.nes_file_path.take()
+    }
+    pub fn get_save_state_path(&mut self) -> Option<String> {
+        self.save_state_path.take()
+    }
+    pub fn get_load_state_path(&mut self) -> Option<String> {
+        self.load_state_path.take()
     }
 
     pub fn prepare_for_new_frame(&mut self, io_control: IOControl) {
-        self.rom_path = None;
+        self.nes_file_path = None;
         self.io_control = io_control;
     }
 
@@ -279,6 +313,14 @@ impl Gui {
                     create_menu_item!("Load Nes File", "Ctrl + O").build(ui);
                     if !self.is_menu_bar_item_selected(LoadNesFile) {
                         self.update_menu_item_status(ui, LoadNesFile);
+                    }
+                    create_menu_item!("Save State", "Ctrl + S").build(ui);
+                    if !self.is_menu_bar_item_selected(SaveState) {
+                        self.update_menu_item_status(ui, SaveState);
+                    }
+                    create_menu_item!("Load State", "Ctrl + L").build(ui);
+                    if !self.is_menu_bar_item_selected(LoadState) {
+                        self.update_menu_item_status(ui, LoadState);
                     }
                     create_menu_item!("Quit", "Alt + F4").build(ui);
                     self.update_menu_item_status(ui, Quit);
@@ -431,17 +473,49 @@ impl Gui {
         if self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile) {
             self.pause = false;
             self.toggle_menu_bar_item(MenuBarItem::LoadNesFile);
-            self.fd.open_modal();
+            self.fd_load_nes_file.open_modal();
         }
-        if self.fd.display() {
-            if self.fd.is_ok() {
-                let file = &self.fd.selection().unwrap().files()[0];
-                self.rom_path = Some(file.to_str().unwrap().to_owned());
+        if self.fd_load_nes_file.display() {
+            if self.fd_load_nes_file.is_ok() {
+                let file = &self.fd_load_nes_file.selection().unwrap().files()[0];
+                self.nes_file_path = Some(file.to_str().unwrap().to_owned());
             }
 
-            self.fd.close();
+            self.fd_load_nes_file.close();
         }
     }
+
+    fn build_save_state_file_explorer(&mut self) {
+        if self.is_menu_bar_item_selected(MenuBarItem::SaveState) {
+            self.pause = false;
+            self.toggle_menu_bar_item(MenuBarItem::SaveState);
+            self.fd_save_state.open_modal();
+        }
+        if self.fd_save_state.display() {
+            if self.fd_save_state.is_ok() {
+                let file = self.fd_save_state.current_file_path().unwrap();
+                self.save_state_path = Some(file);
+            }
+
+            self.fd_save_state.close();
+        }
+    }
+
+    fn build_load_state_file_explorer(&mut self) {
+        if self.is_menu_bar_item_selected(MenuBarItem::LoadState) {
+            self.pause = false;
+            self.toggle_menu_bar_item(MenuBarItem::LoadState);
+            self.fd_load_state.open_modal();
+        }
+        if self.fd_load_state.display() {
+            if self.fd_load_state.is_ok() {
+                let file = &self.fd_load_state.selection().unwrap().files()[0];
+                self.load_state_path = Some(file.to_str().unwrap().to_owned());
+            }
+            self.fd_load_state.close();
+        }
+    }
+
     pub fn try_get_key_selection(&mut self, event: &sdl2::event::Event) {
         if let sdl2::event::Event::KeyDown {
             scancode, keymod, ..
@@ -531,6 +605,8 @@ impl Gui {
                 self.build_emulation_window(&mut ui);
                 self.build_fps_counter(&mut ui);
                 self.build_load_nes_file_explorer();
+                self.build_save_state_file_explorer();
+                self.build_load_state_file_explorer();
             }
         );
     }

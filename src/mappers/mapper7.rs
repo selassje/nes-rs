@@ -2,6 +2,9 @@ use super::Mapper;
 use crate::common::Mirroring;
 use crate::mappers::mapper_internal::BankSize::*;
 use crate::mappers::mapper_internal::MapperInternal;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
 pub struct Mapper7 {
     mapper_internal: MapperInternal,
     register: usize,
@@ -52,5 +55,9 @@ impl Mapper for Mapper7 {
         if address >= 0x8000 {
             self.register = byte as usize;
         }
+    }
+
+    fn get_mapper_id(&self) -> u8 {
+        7
     }
 }

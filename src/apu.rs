@@ -1,12 +1,27 @@
 pub trait ApuState {
     fn is_irq_pending(&self) -> bool;
 }
+
+pub struct DummyApuStateImpl {}
+
+impl DummyApuStateImpl {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl ApuState for DummyApuStateImpl {
+    fn is_irq_pending(&self) -> bool {
+        todo!()
+    }
+}
+
 use self::StatusRegisterFlag::*;
 use crate::{io::AudioAccess, memory::DmcMemory, ram_apu::*};
 use std::{cell::RefCell, default::Default, rc::Rc};
 
 use crate::io::AudioSampleFormat;
-
+use serde::{Deserialize, Serialize};
 const LENGTH_COUNTER_LOOKUP_TABLE: [u8; 32] = [
     10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22,
     192, 24, 72, 26, 16, 28, 32, 30,
@@ -53,6 +68,7 @@ const FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES: u16 = 22371;
 const FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES: u16 = 29829;
 const FRAME_COUNTER_HALF_FRAME_0_MOD_1_CPU_CYCLES: u16 = 37281;
 
+#[derive(Serialize, Deserialize)]
 struct FrameCounter {
     data: u8,
 }
@@ -78,7 +94,7 @@ enum StatusRegisterFlag {
     DMCInterrupt = 0b10000000,
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 struct StatusRegister {
     data: u8,
 }
@@ -100,7 +116,7 @@ impl StatusRegister {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 struct Envelope {
     start_flag: bool,
     divider: u8,
@@ -126,7 +142,7 @@ impl Envelope {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 struct SweepUnit {
     enabled: bool,
     reload_flag: bool,
@@ -183,6 +199,7 @@ impl SweepUnit {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 struct PulseWave {
     data: [u8; 4],
     length_counter: u8,
@@ -337,7 +354,7 @@ impl LengthCounterChannel for PulseWave {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 struct TriangleWave {
     data: [u8; 4],
     length_counter: u8,
@@ -422,6 +439,7 @@ impl LengthCounterChannel for TriangleWave {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 struct Noise {
     data: [u8; 4],
     length_counter: u8,
@@ -526,6 +544,7 @@ impl LengthCounterChannel for Noise {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 struct Dmc {
     data: [u8; 4],
     timer_tick: u16,
@@ -538,6 +557,7 @@ struct Dmc {
     output_value: u8,
     start_pending: bool,
     interrupt: bool,
+    #[serde(skip)]
     dmc_memory: Option<Rc<RefCell<dyn DmcMemory>>>,
 }
 
@@ -663,7 +683,12 @@ impl Dmc {
     }
 }
 
+fn default_audio_access() -> Rc<RefCell<dyn AudioAccess>> {
+    Rc::new(RefCell::new(crate::io::DummyAudioAccessImpl::new()))
+}
+#[derive(Serialize, Deserialize)]
 pub struct Apu {
+    #[serde(skip, default = "default_audio_access")]
     audio_access: Rc<RefCell<dyn AudioAccess>>,
     frame_counter: FrameCounter,
     status: StatusRegister,
@@ -718,6 +743,10 @@ impl Apu {
 
     pub fn set_dmc_memory(&mut self, dmc_memory: Rc<RefCell<dyn DmcMemory>>) {
         self.dmc.dmc_memory = Some(dmc_memory);
+    }
+
+    pub fn set_audio_access(&mut self, audio_access: Rc<RefCell<dyn AudioAccess>>) {
+        self.audio_access = audio_access;
     }
 
     fn get_length_counter_channel(

@@ -8,7 +8,7 @@ pub const DEFAULT_FPS: u16 = 60;
 pub const DOUBLE_FPS: u16 = 120;
 pub const HALF_FPS: u16 = 30;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Mirroring {
     Vertical,
     Horizontal,

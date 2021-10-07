@@ -1,8 +1,71 @@
+use serde::{Deserialize, Deserializer, Serialize};
+
+trait BoxedArrayDeserialize<'de>: Sized {
+    fn deserialize<D, const N: usize>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>;
+}
+
+impl<'de, T, const M: usize> BoxedArrayDeserialize<'de> for Box<[T; M]>
+where
+    T: Default + Copy + Deserialize<'de>,
+{
+    fn deserialize<D, const N: usize>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use std::marker::PhantomData;
+        struct ArrayVisitor<T, const N: usize> {
+            element: PhantomData<T>,
+        }
+
+        impl<'de, T, const N: usize> serde::de::Visitor<'de> for ArrayVisitor<T, N>
+        where
+            T: Default + Copy + serde::Deserialize<'de>,
+        {
+            type Value = Box<[T; N]>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                macro_rules! write_len {
+                    ($l:literal) => {
+                        write!(formatter, concat!("an array of length ", $l))
+                    };
+                    ($l:tt) => {
+                        write!(formatter, "an array of length {}", $l)
+                    };
+                }
+
+                write_len!(N)
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let mut arr = Box::new([T::default(); N]);
+                for i in 0..N {
+                    arr[i] = seq
+                        .next_element()?
+                        .ok_or_else(|| serde::de::Error::invalid_length(i, &self))?;
+                }
+                Ok(arr)
+            }
+        }
+
+        let visitor = ArrayVisitor {
+            element: PhantomData,
+        };
+        #[allow(unused_parens)]
+        deserializer.deserialize_tuple(N, visitor)
+    }
+}
+
 const PRG_RAM_DATA_SIZE: usize = 0x20000;
 const PRG_ROM_DATA_SIZE: usize = 0x80000;
 const CHR_ROM_DATA_SIZE: usize = 0x40000;
 const CHR_RAM_DATA_SIZE: usize = 0x2000;
-#[derive(Debug, Clone, Copy, PartialEq)]
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub(super) enum BankSize {
     _1KB = 0x0400,
     _2KB = 0x0800,
@@ -12,7 +75,7 @@ pub(super) enum BankSize {
     _32KB = 0x8000,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub(super) struct BankSelect {
     pub size: BankSize,
     pub bank: usize,
@@ -26,13 +89,29 @@ impl Default for BankSelect {
         }
     }
 }
-
+#[derive(Serialize, Deserialize)]
 pub(super) struct MapperInternal {
+    #[serde(
+        serialize_with = "serde_arrays::serialize",
+        deserialize_with = "BoxedArrayDeserialize::deserialize::<_,PRG_RAM_DATA_SIZE>"
+    )]
     prg_ram: Box<[u8; PRG_RAM_DATA_SIZE]>,
+    #[serde(
+        serialize_with = "serde_arrays::serialize",
+        deserialize_with = "BoxedArrayDeserialize::deserialize::<_,PRG_ROM_DATA_SIZE>"
+    )]
     prg_rom: Box<[u8; PRG_ROM_DATA_SIZE]>,
     prg_rom_size: usize,
+    #[serde(
+        serialize_with = "serde_arrays::serialize",
+        deserialize_with = "BoxedArrayDeserialize::deserialize::<_,CHR_ROM_DATA_SIZE>"
+    )]
     chr_rom: Box<[u8; CHR_ROM_DATA_SIZE]>,
     chr_rom_size: usize,
+    #[serde(
+        serialize_with = "serde_arrays::serialize",
+        deserialize_with = "BoxedArrayDeserialize::deserialize::<_,CHR_RAM_DATA_SIZE>"
+    )]
     chr_ram: Box<[u8; CHR_RAM_DATA_SIZE]>,
 }
 
@@ -58,7 +137,6 @@ impl MapperInternal {
 
     pub fn get_prg_rom_byte(&mut self, address: u16, bank: usize, prg_bank_size: BankSize) -> u8 {
         let index = self.get_address_index(address, bank, prg_bank_size);
-        //assert!(index < self.prg_rom_size);
         self.prg_rom[index]
     }
 

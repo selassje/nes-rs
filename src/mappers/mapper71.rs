@@ -2,6 +2,9 @@ use super::Mapper;
 use crate::common::Mirroring;
 use crate::mappers::mapper_internal::BankSize::*;
 use crate::mappers::mapper_internal::MapperInternal;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
 pub struct Mapper71 {
     mapper_internal: MapperInternal,
     mirroring: Mirroring,
@@ -63,5 +66,9 @@ impl Mapper for Mapper71 {
             }
             _ => (),
         }
+    }
+
+    fn get_mapper_id(&self) -> u8 {
+        71
     }
 }

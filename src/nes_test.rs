@@ -75,11 +75,28 @@ impl NesTest {
         self.nes.run_for(duration)
     }
 
+    pub fn serialize_and_reset(&mut self) -> String {
+        let serialized = self.nes.serialize();
+        self.nes.power_cycle();
+        serialized
+    }
+
+    pub fn deserialize(&mut self, state: String) {
+        self.nes.deserialize(state);
+    }
+
     pub fn press_player_1_start(&mut self) {
         self.io_test.borrow_mut().set_button_state(
             crate::io::Button::Start,
             ControllerId::Controller1,
             true,
+        );
+    }
+    pub fn release_player_1_start(&mut self) {
+        self.io_test.borrow_mut().set_button_state(
+            crate::io::Button::Start,
+            ControllerId::Controller1,
+            false,
         );
     }
 

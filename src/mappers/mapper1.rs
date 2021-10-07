@@ -29,12 +29,14 @@ impl ControlRegister for u8 {
         (self & 0b10000) >> 4
     }
 }
-#[derive(Default)]
+#[derive(Default, serde::Serialize, serde::Deserialize)]
 struct ShiftRegister {
     value: u8,
     write_count: u8,
 }
 
+use serde::{Deserialize, Serialize};
+#[derive(Serialize, Deserialize)]
 pub struct Mapper1 {
     mapper_internal: MapperInternal,
     shift_register: ShiftRegister,
@@ -143,5 +145,9 @@ impl Mapper for Mapper1 {
         self.chr_bank_1 = 0;
         self.shift_register.value = 0;
         self.shift_register.write_count = 0;
+    }
+
+    fn get_mapper_id(&self) -> u8 {
+        1
     }
 }
