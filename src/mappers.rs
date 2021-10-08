@@ -43,12 +43,3 @@ pub trait Mapper: erased_serde::Serialize {
 }
 
 erased_serde::serialize_trait_object!(Mapper);
-
-// pub trait BoxToRcRefCell {
-//     fn wrap_in_refcell(self: Box<Self>) -> Rc<RefCell<dyn Mapper>>;
-// }
-// impl<T: Mapper + 'static> BoxToRcRefCell for T {
-//     fn wrap_in_refcell(self: Box<Self>) -> Rc<RefCell<dyn Mapper>> {
-//         Rc::new(RefCell::new(*self))
-//     }
-// }

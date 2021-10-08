@@ -1,16 +1,16 @@
 use serde::{Deserialize, Deserializer, Serialize};
 
 trait BoxedArrayDeserialize<'de>: Sized {
-    fn deserialize<D, const N: usize>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>;
 }
 
-impl<'de, T, const M: usize> BoxedArrayDeserialize<'de> for Box<[T; M]>
+impl<'de, T, const N: usize> BoxedArrayDeserialize<'de> for Box<[T; N]>
 where
     T: Default + Copy + Deserialize<'de>,
 {
-    fn deserialize<D, const N: usize>(deserializer: D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -93,24 +93,24 @@ impl Default for BankSelect {
 pub(super) struct MapperInternal {
     #[serde(
         serialize_with = "serde_arrays::serialize",
-        deserialize_with = "BoxedArrayDeserialize::deserialize::<_,PRG_RAM_DATA_SIZE>"
+        deserialize_with = "BoxedArrayDeserialize::deserialize"
     )]
     prg_ram: Box<[u8; PRG_RAM_DATA_SIZE]>,
     #[serde(
         serialize_with = "serde_arrays::serialize",
-        deserialize_with = "BoxedArrayDeserialize::deserialize::<_,PRG_ROM_DATA_SIZE>"
+        deserialize_with = "BoxedArrayDeserialize::deserialize"
     )]
     prg_rom: Box<[u8; PRG_ROM_DATA_SIZE]>,
     prg_rom_size: usize,
     #[serde(
         serialize_with = "serde_arrays::serialize",
-        deserialize_with = "BoxedArrayDeserialize::deserialize::<_,CHR_ROM_DATA_SIZE>"
+        deserialize_with = "BoxedArrayDeserialize::deserialize"
     )]
     chr_rom: Box<[u8; CHR_ROM_DATA_SIZE]>,
     chr_rom_size: usize,
     #[serde(
         serialize_with = "serde_arrays::serialize",
-        deserialize_with = "BoxedArrayDeserialize::deserialize::<_,CHR_RAM_DATA_SIZE>"
+        deserialize_with = "BoxedArrayDeserialize::deserialize"
     )]
     chr_ram: Box<[u8; CHR_RAM_DATA_SIZE]>,
 }

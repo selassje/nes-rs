@@ -29,6 +29,9 @@ path = "tests/mmc3_irq_tests.rs"
 [[test]]
 name = "cpu_interrupts_v2"
 path = "tests/cpu_interrupts_v2.rs"
+[[test]]
+name = "serialization"
+path = "tests/serialization.rs"
 
 [profile.release] 
 debug = false
