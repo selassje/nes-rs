@@ -371,7 +371,6 @@ pub struct Ppu<VRAM: VideoMemory> {
 
 impl<VRAM: VideoMemory> Ppu<VRAM> {
     pub fn new(
-        vram: Rc<RefCell<dyn VideoMemory>>,
         video_access: Rc<RefCell<dyn VideoAccess>>,
         mapper: Rc<RefCell<dyn Mapper>>,
     ) -> Self {
@@ -405,8 +404,8 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
     pub fn set_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
         self.mapper = mapper;
     }
-    pub fn set_vram(&mut self, vram: Rc<RefCell<VRAM>>) {
-        self.vram = NonNull::new(vram.as_ptr()).unwrap();
+    pub fn set_vram(&mut self, vram: NonNull<VRAM>) {
+        self.vram = vram;
     }
     pub fn set_video_access(&mut self, video_access: Rc<RefCell<dyn VideoAccess>>) {
         self.video_access = video_access;

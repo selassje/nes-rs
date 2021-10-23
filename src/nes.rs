@@ -137,7 +137,7 @@ pub struct Nes {
     cpu: Cpu,
     ram: Rc<RefCell<Ram>>,
     ppu: Rc<RefCell<Ppu<VRam>>>,
-    vram: Rc<RefCell<VRam>>,
+    vram: VRam,
     apu: Rc<RefCell<Apu>>,
     #[serde(
         serialize_with = "serialize_mapper",
@@ -159,12 +159,8 @@ impl Nes {
     {
         let controllers = Rc::new(RefCell::new(controllers::Controllers::new(io.clone())));
         let mapper = Rc::new(RefCell::new(MapperNull::new()));
-        let vram = Rc::new(RefCell::new(VRam::new(mapper.clone())));
-        let ppu = Rc::new(RefCell::new(Ppu::new(
-            vram.clone(),
-            io.clone(),
-            mapper.clone(),
-        )));
+        let mut vram = VRam::new(mapper.clone());
+        let ppu = Rc::new(RefCell::new(Ppu::new(io.clone(), mapper.clone())));
         let apu = Rc::new(RefCell::new(Apu::new(io.clone())));
         let ram = Rc::new(RefCell::new(Ram::new(
             ppu.clone(),
@@ -176,18 +172,18 @@ impl Nes {
         apu.borrow_mut().set_dmc_memory(ram.clone());
         let cpu = Cpu::new(ram.clone(), ppu.clone(), apu.clone(), mapper.clone());
 
-        let mut nes = Nes {
+        let nes = Nes {
             cpu,
             ram,
             ppu,
-            vram : vram.clone(),
+            vram,
             apu,
             mapper,
             video_access: io.clone(),
             audio_access: io.clone(),
             controller_access: io,
         };
-        nes.ppu.borrow_mut().set_vram(vram);
+        nes.ppu.borrow_mut().set_vram(NonNull::from(&nes.vram));
         nes
     }
 
@@ -205,9 +201,12 @@ impl Nes {
         let controllers = Rc::new(RefCell::new(controllers::Controllers::new(
             controller_access.clone(),
         )));
-        new_nes.vram.borrow_mut().set_mapper(mapper.clone());
+        new_nes.vram.set_mapper(mapper.clone());
         new_nes.ppu.borrow_mut().set_mapper(mapper.clone());
-        new_nes.ppu.borrow_mut().set_vram(new_nes.vram.clone());
+        new_nes
+            .ppu
+            .borrow_mut()
+            .set_vram(NonNull::from(&new_nes.vram));
         new_nes
             .ppu
             .borrow_mut()
@@ -239,7 +238,7 @@ impl Nes {
 
     pub fn load(&mut self, nes_file: &NesFile) {
         let mapper = nes_file.create_mapper();
-        self.vram.borrow_mut().set_mapper(mapper.clone());
+        self.vram.set_mapper(mapper.clone());
         self.ppu.borrow_mut().set_mapper(mapper.clone());
         self.ram.borrow_mut().set_mapper(mapper.clone());
         self.cpu.set_mapper(mapper.clone());
@@ -248,7 +247,7 @@ impl Nes {
     }
 
     pub fn power_cycle(&mut self) {
-        self.vram.borrow_mut().power_cycle();
+        self.vram.power_cycle();
         self.ppu.borrow_mut().power_cycle();
         self.apu.borrow_mut().power_cycle();
         self.ram.borrow_mut().power_cycle();
