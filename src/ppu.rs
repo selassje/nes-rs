@@ -41,7 +41,7 @@ use crate::{io::VideoAccess, memory::VideoMemory};
 use crate::{mappers::Mapper, ram_ppu::*};
 
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, default::Default, fmt::Display, rc::Rc};
+use std::{cell::RefCell, default::Default, fmt::Display, ptr::NonNull, rc::Rc};
 enum ControlRegisterFlag {
     BaseNametableAddress = 0b00000011,
     VramIncrement = 0b00000100,
@@ -338,11 +338,11 @@ fn default_color_mapper() -> Box<dyn ColorMapper> {
     Box::new(DefaultColorMapper::new())
 }
 #[derive(Serialize, Deserialize)]
-pub struct Ppu {
+pub struct Ppu<VRAM: VideoMemory> {
     #[serde(skip, default = "default_video_access")]
     video_access: Rc<RefCell<dyn VideoAccess>>,
-    #[serde(skip, default = "default_video_memory")]
-    vram: Rc<RefCell<dyn VideoMemory>>,
+    #[serde(skip, default = "NonNull::dangling")]
+    vram: NonNull<VRAM>,
     control_reg: ControlRegister,
     mask_reg: MaskRegister,
     status_reg: StatusRegister,
@@ -369,14 +369,14 @@ pub struct Ppu {
     tile_data: [TileData; 3],
 }
 
-impl Ppu {
+impl<VRAM: VideoMemory> Ppu<VRAM> {
     pub fn new(
         vram: Rc<RefCell<dyn VideoMemory>>,
         video_access: Rc<RefCell<dyn VideoAccess>>,
         mapper: Rc<RefCell<dyn Mapper>>,
-    ) -> Ppu {
-        Ppu {
-            vram,
+    ) -> Self {
+        Self {
+            vram: NonNull::dangling(),
             control_reg: ControlRegister { value: 0 },
             mask_reg: MaskRegister { value: 0 },
             status_reg: StatusRegister { value: 0 },
@@ -405,8 +405,8 @@ impl Ppu {
     pub fn set_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
         self.mapper = mapper;
     }
-    pub fn set_vram(&mut self, vram: Rc<RefCell<VRam>>) {
-        self.vram = vram;
+    pub fn set_vram(&mut self, vram: Rc<RefCell<VRAM>>) {
+        self.vram = NonNull::new(vram.as_ptr()).unwrap();
     }
     pub fn set_video_access(&mut self, video_access: Rc<RefCell<dyn VideoAccess>>) {
         self.video_access = video_access;
@@ -446,33 +446,36 @@ impl Ppu {
             }
 
             FETCH_NAMETABLE_DATA_CYCLE_OFFSET => {
-                self.tile_data[2].index = self.vram.borrow_mut().get_nametable_tile_index(
-                    nametable_index,
-                    tile_x,
-                    tile_y,
-                );
+                self.tile_data[2].index = unsafe {
+                    self.vram
+                        .as_mut()
+                        .get_nametable_tile_index(nametable_index, tile_x, tile_y)
+                };
             }
             FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET => {
-                self.tile_data[2].attribute_byte = self.vram.borrow_mut().get_attribute_data(
-                    nametable_index,
-                    tile_x / 2,
-                    tile_y / 2,
-                )
+                self.tile_data[2].attribute_byte = unsafe {
+                    self.vram
+                        .as_mut()
+                        .get_attribute_data(nametable_index, tile_x / 2, tile_y / 2)
+                };
             }
             FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET => {
-                self.tile_data[2].low_bg_pattern_byte = self.vram.borrow_mut().get_low_pattern_data(
-                    pattern_table_index,
-                    self.tile_data[2].index,
-                    fine_y as u8,
-                )
-            }
-            FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET => {
-                self.tile_data[2].high_bg_pattern_byte =
-                    self.vram.borrow_mut().get_high_pattern_data(
+                self.tile_data[2].low_bg_pattern_byte = unsafe {
+                    self.vram.as_mut().get_low_pattern_data(
                         pattern_table_index,
                         self.tile_data[2].index,
                         fine_y as u8,
                     )
+                };
+            }
+            FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET => {
+                self.tile_data[2].high_bg_pattern_byte = unsafe {
+                    self.vram.as_mut().get_high_pattern_data(
+                        pattern_table_index,
+                        self.tile_data[2].index,
+                        fine_y as u8,
+                    )
+                }
             }
             _ => {}
         }
@@ -652,10 +655,11 @@ impl Ppu {
         let tiles = &mut pattern_table.borrow_mut().tiles;
         if true {
             tiles[tile_index as usize] = Some(Tile {
-                data: self
-                    .vram
-                    .borrow_mut()
-                    .get_pattern_table_tile_data(table_index as u8, tile_index as u8),
+                data: unsafe {
+                    self.vram
+                        .as_ref()
+                        .get_pattern_table_tile_data(table_index as u8, tile_index as u8)
+                },
             });
         }
         tiles[tile_index as usize].unwrap()
@@ -747,12 +751,13 @@ impl Ppu {
 
     fn get_palettes(&self, for_background: bool) -> Palettes {
         let mut palletes: Palettes = Default::default();
-        let raw_universal_bckg_color = self.vram.borrow().get_universal_background_color();
+        let raw_universal_bckg_color =
+            unsafe { self.vram.as_ref().get_universal_background_color() };
         for (i, p) in palletes.iter_mut().enumerate() {
             let raw_colors = if for_background {
-                self.vram.borrow().get_background_palette(i as u8)
+                unsafe { self.vram.as_ref().get_background_palette(i as u8) }
             } else {
-                self.vram.borrow().get_sprite_palette(i as u8)
+                unsafe { self.vram.as_ref().get_sprite_palette(i as u8) }
             };
             *p = [
                 self.color_mapper
@@ -798,7 +803,7 @@ impl Ppu {
     }
 }
 
-impl WritePpuRegisters for Ppu {
+impl<VRAM: VideoMemory> WritePpuRegisters for Ppu<VRAM> {
     fn write(&mut self, register: WriteAccessRegister, value: u8) {
         match register {
             WriteAccessRegister::PpuCtrl => {
@@ -855,9 +860,11 @@ impl WritePpuRegisters for Ppu {
             }
             WriteAccessRegister::PpuData => {
                 if !self.is_rendering_in_progress() {
-                    self.vram
-                        .borrow_mut()
-                        .store_byte(self.vram_address.address, value);
+                    unsafe {
+                        self.vram
+                            .as_mut()
+                            .store_byte(self.vram_address.address, value)
+                    };
                     let old_vram_address = self.vram_address;
                     self.vram_address.address += self.control_reg.get_vram_increment();
                     self.check_for_a12_rising_toggle(old_vram_address);
@@ -875,14 +882,14 @@ impl WritePpuRegisters for Ppu {
     }
 }
 
-impl WriteOamDma for Ppu {
+impl<VRAM: VideoMemory> WriteOamDma for Ppu<VRAM> {
     fn write_oam_dma(&mut self, data: [u8; 256]) {
         let write_len = 256 - self.oam_address as usize;
         self.oam[self.oam_address as usize..].copy_from_slice(&data[..write_len as usize])
     }
 }
 
-impl ReadPpuRegisters for Ppu {
+impl<VRAM: VideoMemory> ReadPpuRegisters for Ppu<VRAM> {
     fn read(&mut self, register: ReadAccessRegister) -> u8 {
         match register {
             ReadAccessRegister::PpuStatus => {
@@ -903,7 +910,7 @@ impl ReadPpuRegisters for Ppu {
                 current_status
             }
             ReadAccessRegister::PpuData => {
-                let val = self.vram.borrow_mut().get_byte(self.vram_address.address);
+                let val = unsafe { self.vram.as_mut().get_byte(self.vram_address.address) };
                 let old_vram_address = self.vram_address;
                 self.vram_address.address += self.control_reg.get_vram_increment();
                 self.check_for_a12_rising_toggle(old_vram_address);
@@ -913,9 +920,9 @@ impl ReadPpuRegisters for Ppu {
         }
     }
 }
-impl PpuRegisterAccess for Ppu {}
+impl<VRAM: VideoMemory> PpuRegisterAccess for Ppu<VRAM> {}
 
-impl PpuState for Ppu {
+impl<VRAM: VideoMemory> PpuState for Ppu<VRAM> {
     fn is_nmi_pending(&mut self) -> bool {
         if self.scanline == VBLANK_START_SCANLINE && self.ppu_cycle == VBLANK_START_CYCLE {
             self.update_vblank_flag_and_nmi()

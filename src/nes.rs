@@ -19,6 +19,45 @@ use std::time::Duration;
 use serde::ser::SerializeStruct;
 use serde::ser::Serializer;
 use serde::Deserialize;
+use std::marker::PhantomPinned;
+use std::pin::Pin;
+use std::ptr::NonNull;
+struct Unmovable {
+    data: String,
+    slice: NonNull<String>,
+    //  _pin: PhantomPinned,
+}
+
+impl Unmovable {
+    // To ensure the data doesn't move when the function returns,
+    // we place it in the heap where it will stay for the lifetime of the object,
+    // and the only way to access it would be through a pointer to it.
+    fn new(data: String) -> Box<Self> {
+        let res = Unmovable {
+            data,
+            // we only create the pointer once the data is in place
+            // otherwise it will have already moved before we even started
+            slice: NonNull::dangling(),
+            // _pin: PhantomPinned,
+        };
+        let mut boxed = Box::new(res);
+        let slice = NonNull::from(&boxed.data);
+        boxed.slice = slice;
+        boxed
+    }
+    fn new2(data: String) -> Self {
+        let mut res = Unmovable {
+            data,
+            // we only create the pointer once the data is in place
+            // otherwise it will have already moved before we even started
+            slice: NonNull::dangling(),
+            // _pin: PhantomPinned,
+        };
+        let slice = NonNull::from(&res.data);
+        res.slice = slice;
+        res
+    }
+}
 
 fn serialize_mapper<S>(
     mapper: &Rc<RefCell<dyn Mapper>>,
@@ -97,7 +136,7 @@ fn default_controller_access() -> Rc<RefCell<dyn ControllerAccess>> {
 pub struct Nes {
     cpu: Cpu,
     ram: Rc<RefCell<Ram>>,
-    ppu: Rc<RefCell<Ppu>>,
+    ppu: Rc<RefCell<Ppu<VRam>>>,
     vram: Rc<RefCell<VRam>>,
     apu: Rc<RefCell<Apu>>,
     #[serde(
@@ -137,17 +176,19 @@ impl Nes {
         apu.borrow_mut().set_dmc_memory(ram.clone());
         let cpu = Cpu::new(ram.clone(), ppu.clone(), apu.clone(), mapper.clone());
 
-        Nes {
+        let mut nes = Nes {
             cpu,
             ram,
             ppu,
-            vram,
+            vram : vram.clone(),
             apu,
             mapper,
             video_access: io.clone(),
             audio_access: io.clone(),
             controller_access: io,
-        }
+        };
+        nes.ppu.borrow_mut().set_vram(vram);
+        nes
     }
 
     pub fn serialize(&self) -> String {
