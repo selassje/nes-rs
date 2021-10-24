@@ -122,6 +122,22 @@ pub trait ControllerAccess {
     fn is_button_pressed(&self, controller_id: controllers::ControllerId, button: Button) -> bool;
 }
 
+pub struct DummyControllerAccessImplementation {}
+impl DummyControllerAccessImplementation {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+impl ControllerAccess for DummyControllerAccessImplementation {
+    fn is_button_pressed(
+        &self,
+        _controller_id: controllers::ControllerId,
+        _button: Button,
+    ) -> bool {
+        todo!()
+    }
+}
+
 pub trait IO: VideoAccess + AudioAccess + ControllerAccess {
     fn present_frame(&mut self, control: IOControl) -> IOState;
     fn is_audio_available(&self) -> bool;

@@ -1,3 +1,13 @@
+use crate::common::NonNullPtr;
+use crate::{
+    colors::{ColorMapper, DefaultColorMapper, RgbColor},
+    io::FRAME_WIDTH,
+};
+use crate::{io::VideoAccess, memory::VideoMemory};
+use crate::{mappers::Mapper, ram_ppu::*};
+
+use serde::{Deserialize, Serialize};
+use std::{cell::RefCell, default::Default, fmt::Display, rc::Rc};
 pub struct PpuTime {
     pub scanline: i16,
     pub cycle: u16,
@@ -10,38 +20,6 @@ pub trait PpuState {
     fn get_time(&self) -> PpuTime;
 }
 
-pub struct DummyPpuStateImpl {}
-
-impl DummyPpuStateImpl {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl PpuState for DummyPpuStateImpl {
-    fn is_nmi_pending(&mut self) -> bool {
-        todo!()
-    }
-
-    fn clear_nmi_pending(&mut self) {
-        todo!()
-    }
-
-    fn get_time(&self) -> PpuTime {
-        todo!()
-    }
-}
-
-use crate::{
-    colors::{ColorMapper, DefaultColorMapper, RgbColor},
-    io::FRAME_WIDTH,
-    vram::VRam,
-};
-use crate::{io::VideoAccess, memory::VideoMemory};
-use crate::{mappers::Mapper, ram_ppu::*};
-
-use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, default::Default, fmt::Display, ptr::NonNull, rc::Rc};
 enum ControlRegisterFlag {
     BaseNametableAddress = 0b00000011,
     VramIncrement = 0b00000100,
@@ -331,9 +309,6 @@ fn default_mapper() -> Rc<RefCell<dyn Mapper>> {
 fn default_video_access() -> Rc<RefCell<dyn VideoAccess>> {
     Rc::new(RefCell::new(crate::io::DummyVideoAccessImpl::new()))
 }
-fn default_video_memory() -> Rc<RefCell<dyn VideoMemory>> {
-    Rc::new(RefCell::new(crate::memory::DummyVideoMemoryImpl::new()))
-}
 fn default_color_mapper() -> Box<dyn ColorMapper> {
     Box::new(DefaultColorMapper::new())
 }
@@ -341,8 +316,8 @@ fn default_color_mapper() -> Box<dyn ColorMapper> {
 pub struct Ppu<VRAM: VideoMemory> {
     #[serde(skip, default = "default_video_access")]
     video_access: Rc<RefCell<dyn VideoAccess>>,
-    #[serde(skip, default = "NonNull::dangling")]
-    vram: NonNull<VRAM>,
+    #[serde(skip)]
+    vram: NonNullPtr<VRAM>,
     control_reg: ControlRegister,
     mask_reg: MaskRegister,
     status_reg: StatusRegister,
@@ -369,13 +344,24 @@ pub struct Ppu<VRAM: VideoMemory> {
     tile_data: [TileData; 3],
 }
 
+impl<VRAM: VideoMemory> Default for Ppu<VRAM> {
+    fn default() -> Self {
+        Self {
+            video_access: default_video_access(),
+            color_mapper: default_color_mapper(),
+            mapper: default_mapper(),
+            ..Default::default()
+        }
+    }
+}
+
 impl<VRAM: VideoMemory> Ppu<VRAM> {
     pub fn new(
         video_access: Rc<RefCell<dyn VideoAccess>>,
         mapper: Rc<RefCell<dyn Mapper>>,
     ) -> Self {
         Self {
-            vram: NonNull::dangling(),
+            vram: Default::default(),
             control_reg: ControlRegister { value: 0 },
             mask_reg: MaskRegister { value: 0 },
             status_reg: StatusRegister { value: 0 },
@@ -404,7 +390,7 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
     pub fn set_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
         self.mapper = mapper;
     }
-    pub fn set_vram(&mut self, vram: NonNull<VRAM>) {
+    pub fn set_vram(&mut self, vram: NonNullPtr<VRAM>) {
         self.vram = vram;
     }
     pub fn set_video_access(&mut self, video_access: Rc<RefCell<dyn VideoAccess>>) {
@@ -445,36 +431,30 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
             }
 
             FETCH_NAMETABLE_DATA_CYCLE_OFFSET => {
-                self.tile_data[2].index = unsafe {
+                self.tile_data[2].index =
                     self.vram
                         .as_mut()
                         .get_nametable_tile_index(nametable_index, tile_x, tile_y)
-                };
             }
             FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET => {
-                self.tile_data[2].attribute_byte = unsafe {
+                self.tile_data[2].attribute_byte =
                     self.vram
                         .as_mut()
                         .get_attribute_data(nametable_index, tile_x / 2, tile_y / 2)
-                };
             }
             FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET => {
-                self.tile_data[2].low_bg_pattern_byte = unsafe {
-                    self.vram.as_mut().get_low_pattern_data(
-                        pattern_table_index,
-                        self.tile_data[2].index,
-                        fine_y as u8,
-                    )
-                };
+                self.tile_data[2].low_bg_pattern_byte = self.vram.as_mut().get_low_pattern_data(
+                    pattern_table_index,
+                    self.tile_data[2].index,
+                    fine_y as u8,
+                );
             }
             FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET => {
-                self.tile_data[2].high_bg_pattern_byte = unsafe {
-                    self.vram.as_mut().get_high_pattern_data(
-                        pattern_table_index,
-                        self.tile_data[2].index,
-                        fine_y as u8,
-                    )
-                }
+                self.tile_data[2].high_bg_pattern_byte = self.vram.as_mut().get_high_pattern_data(
+                    pattern_table_index,
+                    self.tile_data[2].index,
+                    fine_y as u8,
+                )
             }
             _ => {}
         }
@@ -654,11 +634,10 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
         let tiles = &mut pattern_table.borrow_mut().tiles;
         if true {
             tiles[tile_index as usize] = Some(Tile {
-                data: unsafe {
-                    self.vram
-                        .as_ref()
-                        .get_pattern_table_tile_data(table_index as u8, tile_index as u8)
-                },
+                data: self
+                    .vram
+                    .as_ref()
+                    .get_pattern_table_tile_data(table_index as u8, tile_index as u8),
             });
         }
         tiles[tile_index as usize].unwrap()
@@ -750,13 +729,12 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
 
     fn get_palettes(&self, for_background: bool) -> Palettes {
         let mut palletes: Palettes = Default::default();
-        let raw_universal_bckg_color =
-            unsafe { self.vram.as_ref().get_universal_background_color() };
+        let raw_universal_bckg_color = self.vram.as_ref().get_universal_background_color();
         for (i, p) in palletes.iter_mut().enumerate() {
             let raw_colors = if for_background {
-                unsafe { self.vram.as_ref().get_background_palette(i as u8) }
+                self.vram.as_ref().get_background_palette(i as u8)
             } else {
-                unsafe { self.vram.as_ref().get_sprite_palette(i as u8) }
+                self.vram.as_ref().get_sprite_palette(i as u8)
             };
             *p = [
                 self.color_mapper
@@ -859,11 +837,9 @@ impl<VRAM: VideoMemory> WritePpuRegisters for Ppu<VRAM> {
             }
             WriteAccessRegister::PpuData => {
                 if !self.is_rendering_in_progress() {
-                    unsafe {
-                        self.vram
-                            .as_mut()
-                            .store_byte(self.vram_address.address, value)
-                    };
+                    self.vram
+                        .as_mut()
+                        .store_byte(self.vram_address.address, value);
                     let old_vram_address = self.vram_address;
                     self.vram_address.address += self.control_reg.get_vram_increment();
                     self.check_for_a12_rising_toggle(old_vram_address);
@@ -909,7 +885,7 @@ impl<VRAM: VideoMemory> ReadPpuRegisters for Ppu<VRAM> {
                 current_status
             }
             ReadAccessRegister::PpuData => {
-                let val = unsafe { self.vram.as_mut().get_byte(self.vram_address.address) };
+                let val = self.vram.as_mut().get_byte(self.vram_address.address);
                 let old_vram_address = self.vram_address;
                 self.vram_address.address += self.control_reg.get_vram_increment();
                 self.check_for_a12_rising_toggle(old_vram_address);

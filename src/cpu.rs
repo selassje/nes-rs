@@ -81,7 +81,7 @@ enum ProcessorFlag {
     NegativeFlag = 0b10000000,
 }
 
-pub type InstructionFun = fn(&mut Cpu);
+pub type InstructionFun<M, P, A> = fn(&mut Cpu<M, P, A>);
 
 #[derive(Copy, Clone, Serialize, Deserialize)]
 struct Instruction {
@@ -91,23 +91,12 @@ struct Instruction {
     bytes: u8,
 }
 
-fn default_memory() -> Rc<RefCell<dyn Memory>> {
-    Rc::new(RefCell::new(crate::memory::DummyMemoryImpl::new()))
-}
-
-fn default_ppu_state() -> Rc<RefCell<dyn PpuState>> {
-    Rc::new(RefCell::new(crate::ppu::DummyPpuStateImpl::new()))
-}
-
 fn default_mapper() -> Rc<RefCell<dyn Mapper>> {
     Rc::new(RefCell::new(crate::mappers::MapperNull::new()))
 }
 
-fn default_apu_state() -> Rc<RefCell<dyn ApuState>> {
-    Rc::new(RefCell::new(crate::apu::DummyApuStateImpl::new()))
-}
 #[derive(Serialize, Deserialize)]
-pub struct Cpu {
+pub struct Cpu<M: Memory, P: PpuState, A: ApuState> {
     pc: u16,
     sp: u8,
     ps: u8,
@@ -117,30 +106,35 @@ pub struct Cpu {
     cycle: u128,
     instruction: Option<Instruction>,
     address: Address,
-    #[serde(skip, default = "default_memory")]
-    ram: Rc<RefCell<dyn Memory>>,
-    #[serde(skip, default = "default_ppu_state")]
-    ppu_state: Rc<RefCell<dyn PpuState>>,
+    #[serde(skip)]
+    ram: NonNullPtr<M>,
+    #[serde(skip)]
+    ppu_state: NonNullPtr<P>,
+    #[serde(skip)]
+    apu_state: NonNullPtr<A>,
     #[serde(skip, default = "default_mapper")]
     mapper: Rc<RefCell<dyn Mapper>>,
-    #[serde(skip, default = "default_apu_state")]
-    apu_state: Rc<RefCell<dyn ApuState>>,
     code_segment: (u16, u16),
     #[serde(skip, default = "get_opcodes")]
-    opcodes: OpCodes,
+    opcodes: OpCodes<M, P, A>,
     interrupt: Option<u8>,
     is_brk_or_irq_hijacked_by_nmi: bool,
     oam_dma_in_progress: Option<u16>,
 }
 
-impl Cpu {
-    pub fn new(
-        ram: Rc<RefCell<dyn Memory>>,
-        ppu_state: Rc<RefCell<dyn PpuState>>,
-        apu_state: Rc<RefCell<dyn ApuState>>,
-        mapper: Rc<RefCell<dyn Mapper>>,
-    ) -> Cpu {
-        Cpu {
+impl<M: Memory, P: PpuState, A: ApuState> Default for Cpu<M, P, A> {
+    fn default() -> Self {
+        Self {
+            mapper: default_mapper(),
+            opcodes: get_opcodes(),
+            ..Default::default()
+        }
+    }
+}
+
+impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
+    pub fn new(mapper: Rc<RefCell<dyn Mapper>>) -> Self {
+        Self {
             pc: 0,
             sp: 0xFD,
             ps: 0x24,
@@ -149,11 +143,11 @@ impl Cpu {
             y: 0,
             cycle: 0,
             instruction: None,
-            ram,
-            code_segment: (0, 0),
-            ppu_state,
-            apu_state,
+            ram: Default::default(),
+            ppu_state: Default::default(),
+            apu_state: Default::default(),
             mapper,
+            code_segment: (0, 0),
             interrupt: None,
             address: Address::Implicit,
             opcodes: get_opcodes(),
@@ -166,20 +160,21 @@ impl Cpu {
         self.mapper = mapper;
     }
 
-    pub fn set_ram(&mut self, ram: Rc<RefCell<dyn Memory>>) {
+    pub fn set_ram(&mut self, ram: NonNullPtr<M>) {
         self.ram = ram;
     }
 
-    pub fn set_ppu_state(&mut self, ppu_state: Rc<RefCell<dyn PpuState>>) {
+    pub fn set_ppu_state(&mut self, ppu_state: NonNullPtr<P>) {
         self.ppu_state = ppu_state;
     }
-    pub fn set_apu_state(&mut self, apu_state: Rc<RefCell<dyn ApuState>>) {
+
+    pub fn set_apu_state(&mut self, apu_state: NonNullPtr<A>) {
         self.apu_state = apu_state;
     }
 
     pub fn power_cycle(&mut self) {
         self.pc = 0xC000;
-        self.pc = self.ram.borrow().get_word(0xFFFC);
+        self.pc = self.ram.as_ref().get_word(0xFFFC);
         self.sp = 0xFD;
         self.ps = 0x04;
         self.a = 0;
@@ -223,12 +218,12 @@ impl Cpu {
 
     fn pop_byte(&mut self) -> u8 {
         self.sp = ((self.sp as u16 + 1) & 0xFF) as u8;
-        self.ram.borrow().get_byte(self.sp as u16 + STACK_PAGE)
+        self.ram.as_ref().get_byte(self.sp as u16 + STACK_PAGE)
     }
 
     fn push_byte(&mut self, val: u8) {
         self.ram
-            .borrow_mut()
+            .as_mut()
             .store_byte(self.sp as u16 + STACK_PAGE, val);
         self.sp = ((self.sp as i16 - 1) & 0xFF) as u8;
     }
@@ -250,23 +245,23 @@ impl Cpu {
     }
 
     fn check_for_interrupts(&mut self) {
-        if self.ppu_state.borrow_mut().is_nmi_pending() {
-            self.ppu_state.borrow_mut().clear_nmi_pending();
+        if self.ppu_state.as_mut().is_nmi_pending() {
+            self.ppu_state.as_mut().clear_nmi_pending();
             self.interrupt = Some(NMI_OPCODE as u8);
         } else if !self.get_flag(ProcessorFlag::InterruptDisable)
             && (self.mapper.borrow_mut().is_irq_pending()
-                || self.apu_state.borrow().is_irq_pending())
+                || self.apu_state.as_ref().is_irq_pending())
         {
             self.interrupt = Some(IRQ_OPCODE as u8)
         }
     }
 
     fn fetch_next_instruction(&mut self) {
-        let ppu_time = self.ppu_state.borrow_mut().get_time();
+        let ppu_time = self.ppu_state.as_mut().get_time();
         let op = if let Some(op) = self.interrupt.take() {
             op
         } else {
-            self.ram.borrow().get_byte(self.pc)
+            self.ram.as_ref().get_byte(self.pc)
         };
 
         let (_, code_segment_end) = self.code_segment;
@@ -275,10 +270,10 @@ impl Cpu {
             let mut operand_2 = 0;
 
             if self.pc < code_segment_end {
-                operand_1 = self.ram.borrow().get_byte(self.pc + 1);
+                operand_1 = self.ram.as_ref().get_byte(self.pc + 1);
             }
             if self.pc + 1 < code_segment_end {
-                operand_2 = self.ram.borrow().get_byte(self.pc + 2);
+                operand_2 = self.ram.as_ref().get_byte(self.pc + 2);
             }
 
             let (address, extra_cycles_from_page_crossing) = self
@@ -363,9 +358,9 @@ impl Cpu {
             }
             self.instruction = None;
         } else if is_brk_or_irq_executing {
-            if self.ppu_state.borrow_mut().is_nmi_pending() && instruction.cycle <= 4 {
+            if self.ppu_state.as_mut().is_nmi_pending() && instruction.cycle <= 4 {
                 self.is_brk_or_irq_hijacked_by_nmi = true;
-                self.ppu_state.borrow_mut().clear_nmi_pending()
+                self.ppu_state.as_mut().clear_nmi_pending()
             }
         } else if is_branching_executing {
             if instruction.cycle == 1 || (instruction.cycle == 3 && instruction.total_cycles == 4) {
@@ -396,14 +391,14 @@ impl Cpu {
         let ins = self.opcodes[self.instruction.unwrap().opcode as usize]
             .unwrap()
             .instruction as usize;
-        let bcc_fn: usize = Cpu::bcc as usize;
-        let bcs_fn: usize = Cpu::bcs as usize;
-        let bpl_fn: usize = Cpu::bpl as usize;
-        let bmi_fn: usize = Cpu::bmi as usize;
-        let bne_fn: usize = Cpu::bne as usize;
-        let beq_fn: usize = Cpu::beq as usize;
-        let bvc_fn: usize = Cpu::bvc as usize;
-        let bvs_fn: usize = Cpu::bvs as usize;
+        let bcc_fn: usize = Cpu::<M, P, A>::bcc as usize;
+        let bcs_fn: usize = Cpu::<M, P, A>::bcs as usize;
+        let bpl_fn: usize = Cpu::<M, P, A>::bpl as usize;
+        let bmi_fn: usize = Cpu::<M, P, A>::bmi as usize;
+        let bne_fn: usize = Cpu::<M, P, A>::bne as usize;
+        let beq_fn: usize = Cpu::<M, P, A>::beq as usize;
+        let bvc_fn: usize = Cpu::<M, P, A>::bvc as usize;
+        let bvs_fn: usize = Cpu::<M, P, A>::bvs as usize;
 
         ins == bcc_fn
             || ins == bcs_fn
@@ -489,15 +484,15 @@ impl Cpu {
             }
             AddressingMode::IndexedIndirectX => {
                 let indexed_indirect = convert_2u8_to_u16(
-                    self.ram.borrow().get_byte(zero_page_x),
-                    self.ram.borrow().get_byte(zero_page_x_hi),
+                    self.ram.as_ref().get_byte(zero_page_x),
+                    self.ram.as_ref().get_byte(zero_page_x_hi),
                 );
                 Address::Ram(indexed_indirect)
             }
             AddressingMode::IndirectIndexedY => {
                 let indirect = convert_2u8_to_u16(
-                    self.ram.borrow().get_byte(b0_u16),
-                    self.ram.borrow().get_byte((b0_u16 + 1) & 0xFF),
+                    self.ram.as_ref().get_byte(b0_u16),
+                    self.ram.as_ref().get_byte((b0_u16 + 1) & 0xFF),
                 );
                 let indirect_indexed = (indirect as u32 + y_u16 as u32) as u16;
                 if extra_cycle_on_page_crossing && indirect_indexed & 0xFF00 != indirect & 0xFF00 {
@@ -512,13 +507,13 @@ impl Cpu {
             AddressingMode::Indirect => {
                 let indirect = if b0_u16 == 0xFF {
                     convert_2u8_to_u16(
-                        self.ram.borrow().get_byte(b0_u16 + (b1_u16 << 8)),
-                        self.ram.borrow().get_byte(b1_u16 << 8),
+                        self.ram.as_ref().get_byte(b0_u16 + (b1_u16 << 8)),
+                        self.ram.as_ref().get_byte(b1_u16 << 8),
                     )
                 } else {
                     convert_2u8_to_u16(
-                        self.ram.borrow().get_byte(b0_u16 + (b1_u16 << 8)),
-                        self.ram.borrow().get_byte(b0_u16 + (b1_u16 << 8) + 1),
+                        self.ram.as_ref().get_byte(b0_u16 + (b1_u16 << 8)),
+                        self.ram.as_ref().get_byte(b0_u16 + (b1_u16 << 8) + 1),
                     )
                 };
                 Address::Ram(indirect)
@@ -532,7 +527,7 @@ impl Cpu {
             Address::Implicit => panic!("load_from_address can't be used for implicit mode"),
             Address::Accumulator => self.a,
             Address::Immediate(i) => *i,
-            Address::Ram(address) => self.ram.borrow().get_byte(*address),
+            Address::Ram(address) => self.ram.as_ref().get_byte(*address),
             Address::Relative(_) => panic!("load_from_address can't be used for the Relative mode"),
         }
     }
@@ -549,7 +544,7 @@ impl Cpu {
             Address::Implicit => panic!("store_to_address can't be used for implicit mode"),
             Address::Accumulator => self.a = byte,
             Address::Immediate(_) => panic!("Not possible to store in Immediate addressing"),
-            Address::Ram(address) => self.ram.borrow_mut().store_byte(*address, byte),
+            Address::Ram(address) => self.ram.as_mut().store_byte(*address, byte),
             Address::Relative(_) => panic!("store_to_address can't be used for the Relative mode"),
         }
     }
@@ -641,9 +636,9 @@ impl Cpu {
 
     fn update_pc_for_brk_or_irq(&mut self) {
         let new_pc = if self.is_brk_or_irq_hijacked_by_nmi {
-            self.ram.borrow().get_word(0xFFFA)
+            self.ram.as_ref().get_word(0xFFFA)
         } else {
-            self.ram.borrow().get_word(0xFFFE)
+            self.ram.as_ref().get_word(0xFFFE)
         };
         if new_pc > 0 {
             self.pc = new_pc - 1;
@@ -680,7 +675,7 @@ impl Cpu {
         ps |= ProcessorFlag::BFlagBit5 as u8;
         self.push_byte(ps);
         self.set_flag(ProcessorFlag::InterruptDisable);
-        self.pc = self.ram.borrow().get_word(0xFFFA) - 1;
+        self.pc = self.ram.as_ref().get_word(0xFFFA) - 1;
     }
 
     fn jsr(&mut self) {

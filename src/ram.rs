@@ -9,6 +9,8 @@ use std::convert::TryFrom;
 use std::ops::Range;
 use std::rc::Rc;
 
+use crate::common::NonNullPtr;
+
 const INTERNAL_START: u16 = 0x0000;
 const INTERNAL_END: u16 = 0x2000;
 const INTERNAL_MIRROR_SIZE: u16 = 0x0800;
@@ -39,38 +41,21 @@ const CARTRIDGE_SPACE_RANGE: Range<u32> = Range {
 
 type RegisterLatch = RefCell<u8>;
 
-fn default_ppu_regsiter_access() -> Rc<RefCell<dyn PpuRegisterAccess>> {
-    Rc::new(RefCell::new(
-        crate::ram_ppu::DummyPpuRegisterAccessImpl::new(),
-    ))
-}
-
 fn default_mapper() -> Rc<RefCell<dyn Mapper>> {
     Rc::new(RefCell::new(crate::mappers::MapperNull::new()))
 }
 
-fn default_controler_access() -> Rc<RefCell<dyn ControllerRegisterAccess>> {
-    Rc::new(RefCell::new(
-        crate::ram_controllers::DummyControllerRegisterAccessImpl::new(),
-    ))
-}
-
-fn default_apu_register_access() -> Rc<RefCell<dyn ram_apu::ApuRegisterAccess>> {
-    Rc::new(RefCell::new(
-        crate::ram_apu::DummyApuRegisterAccessImpl::new(),
-    ))
-}
 #[derive(Serialize, Deserialize)]
-pub struct Ram {
+pub struct Ram<P: PpuRegisterAccess, A: ApuRegisterAccess, C: ControllerRegisterAccess> {
     memory: MemoryImpl<0x0808>,
     #[serde(skip, default = "default_mapper")]
     mapper: Rc<RefCell<dyn Mapper>>,
-    #[serde(skip, default = "default_ppu_regsiter_access")]
-    ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>,
-    #[serde(skip, default = "default_controler_access")]
-    controller_access: Rc<RefCell<dyn ControllerRegisterAccess>>,
-    #[serde(skip, default = "default_apu_register_access")]
-    apu_access: Rc<RefCell<dyn ram_apu::ApuRegisterAccess>>,
+    #[serde(skip)]
+    ppu_access: RefCell<NonNullPtr<P>>,
+    #[serde(skip)]
+    apu_access: RefCell<NonNullPtr<A>>,
+    #[serde(skip)]
+    controller_access: NonNullPtr<C>,
     dmc_sample_address: usize,
     ppu_register_latch: RegisterLatch,
     apu_register_latch: RegisterLatch,
@@ -78,19 +63,25 @@ pub struct Ram {
     oam_dma_register_latch: RegisterLatch,
 }
 
-impl Ram {
-    pub fn new(
-        ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>,
-        controller_access: Rc<RefCell<dyn ControllerRegisterAccess>>,
-        apu_access: Rc<RefCell<dyn ram_apu::ApuRegisterAccess>>,
-        mapper: Rc<RefCell<dyn Mapper>>,
-    ) -> Ram {
-        Ram {
+impl<P: PpuRegisterAccess, A: ApuRegisterAccess, C: ControllerRegisterAccess> Default
+    for Ram<P, A, C>
+{
+    fn default() -> Self {
+        Self {
+            mapper: default_mapper(),
+            ..Default::default()
+        }
+    }
+}
+
+impl<P: PpuRegisterAccess, A: ApuRegisterAccess, C: ControllerRegisterAccess> Ram<P, A, C> {
+    pub fn new(mapper: Rc<RefCell<dyn Mapper>>) -> Self {
+        Self {
             memory: MemoryImpl::new(),
             mapper,
-            ppu_access,
-            controller_access,
-            apu_access,
+            ppu_access: Default::default(),
+            apu_access: Default::default(),
+            controller_access: Default::default(),
             dmc_sample_address: 0,
             ppu_register_latch: RegisterLatch::new(0),
             apu_register_latch: RegisterLatch::new(0),
@@ -103,16 +94,13 @@ impl Ram {
         self.mapper = mapper;
     }
 
-    pub fn set_ppu_access(&mut self, ppu_access: Rc<RefCell<dyn PpuRegisterAccess>>) {
-        self.ppu_access = ppu_access;
+    pub fn set_ppu_access(&mut self, ppu_access: NonNullPtr<P>) {
+        self.ppu_access.replace(ppu_access);
     }
-    pub fn set_apu_access(&mut self, apu_access: Rc<RefCell<dyn ApuRegisterAccess>>) {
-        self.apu_access = apu_access;
+    pub fn set_apu_access(&mut self, apu_access: NonNullPtr<A>) {
+        self.apu_access.replace(apu_access);
     }
-    pub fn set_controller_access(
-        &mut self,
-        controller_access: Rc<RefCell<dyn ControllerRegisterAccess>>,
-    ) {
+    pub fn set_controller_access(&mut self, controller_access: NonNullPtr<C>) {
         self.controller_access = controller_access;
     }
 
@@ -135,11 +123,13 @@ impl Ram {
     }
 }
 
-impl Memory for Ram {
+impl<P: PpuRegisterAccess, A: ApuRegisterAccess, C: ControllerRegisterAccess> Memory
+    for Ram<P, A, C>
+{
     fn get_byte(&self, address_org: u16) -> u8 {
         let addr = self.get_real_address(address_org);
         if let Ok(reg) = ReadAccessRegister::try_from(addr) {
-            let mut ppu_register_value = self.ppu_access.borrow_mut().read(reg);
+            let mut ppu_register_value = self.ppu_access.borrow_mut().as_mut().read(reg);
             if reg == ReadAccessRegister::PpuStatus {
                 const LOW_5_BITS: u8 = 0b00011111;
                 ppu_register_value &= !LOW_5_BITS;
@@ -148,11 +138,11 @@ impl Memory for Ram {
             *self.ppu_register_latch.borrow_mut() = ppu_register_value;
             *self.ppu_register_latch.borrow()
         } else if let Ok(reg) = ram_apu::ReadAccessRegister::try_from(addr) {
-            *self.apu_register_latch.borrow_mut() = self.apu_access.borrow_mut().read(reg);
+            *self.apu_register_latch.borrow_mut() = self.apu_access.borrow_mut().as_mut().read(reg);
             *self.apu_register_latch.borrow()
         } else if let Ok(input_port) = InputRegister::try_from(addr) {
             *self.controller_register_latch.borrow_mut() =
-                self.controller_access.borrow_mut().read(input_port);
+                self.controller_access.as_ref().read(input_port);
             *self.controller_register_latch.borrow()
         } else if WriteAccessRegister::try_from(addr).is_ok() {
             *self.ppu_register_latch.borrow_mut()
@@ -177,7 +167,7 @@ impl Memory for Ram {
     fn store_byte(&mut self, address: u16, byte: u8) {
         let addr = self.get_real_address(address);
         if let Ok(reg) = WriteAccessRegister::try_from(addr) {
-            self.ppu_access.borrow_mut().write(reg, byte);
+            self.ppu_access.borrow_mut().as_mut().write(reg, byte);
             *self.ppu_register_latch.borrow_mut() = byte;
         } else if DmaWriteAccessRegister::try_from(addr).is_ok() {
             let mut dma_data = [0; 256];
@@ -185,13 +175,16 @@ impl Memory for Ram {
                 let page_adress = (byte as u16) << 8;
                 *e = self.get_byte(page_adress + i as u16);
             }
-            self.ppu_access.borrow_mut().write_oam_dma(dma_data);
+            self.ppu_access
+                .borrow_mut()
+                .as_mut()
+                .write_oam_dma(dma_data);
             *self.oam_dma_register_latch.borrow_mut() = byte;
         } else if let Ok(output_port) = OutputRegister::try_from(addr) {
-            self.controller_access.borrow_mut().write(output_port, byte);
+            self.controller_access.as_mut().write(output_port, byte);
             *self.controller_register_latch.borrow_mut() = byte;
         } else if let Ok(reg) = ram_apu::WriteAccessRegister::try_from(addr) {
-            self.apu_access.borrow_mut().write(reg, byte);
+            self.apu_access.borrow_mut().as_mut().write(reg, byte);
             *self.apu_register_latch.borrow_mut() = byte;
         } else if InputRegister::try_from(addr).is_ok() {
             *self.controller_register_latch.borrow_mut() = byte;
@@ -208,7 +201,9 @@ impl Memory for Ram {
     }
 }
 
-impl DmcMemory for Ram {
+impl<P: PpuRegisterAccess, A: ApuRegisterAccess, C: ControllerRegisterAccess> DmcMemory
+    for Ram<P, A, C>
+{
     fn set_sample_address(&mut self, address: u8) {
         self.dmc_sample_address = 0xC000 + (address as usize * 64);
     }

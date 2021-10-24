@@ -1,14 +1,17 @@
+use self::StatusRegisterFlag::*;
+use crate::common::NonNullPtr;
+use crate::io::AudioSampleFormat;
+use crate::{io::AudioAccess, memory::DmcMemory, ram_apu::*};
+
+use serde::{Deserialize, Serialize};
+use std::{cell::RefCell, default::Default, rc::Rc};
 pub trait ApuState {
     fn is_irq_pending(&self) -> bool;
 }
 
 pub struct DummyApuStateImpl {}
 
-impl DummyApuStateImpl {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+impl DummyApuStateImpl {}
 
 impl ApuState for DummyApuStateImpl {
     fn is_irq_pending(&self) -> bool {
@@ -16,12 +19,6 @@ impl ApuState for DummyApuStateImpl {
     }
 }
 
-use self::StatusRegisterFlag::*;
-use crate::{io::AudioAccess, memory::DmcMemory, ram_apu::*};
-use std::{cell::RefCell, default::Default, rc::Rc};
-
-use crate::io::AudioSampleFormat;
-use serde::{Deserialize, Serialize};
 const LENGTH_COUNTER_LOOKUP_TABLE: [u8; 32] = [
     10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22,
     192, 24, 72, 26, 16, 28, 32, 30,
@@ -544,7 +541,11 @@ impl LengthCounterChannel for Noise {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+// fn default_dmc_memory() -> *mut dyn DmcMemory {
+//     std::ptr::Nu
+// }
+
+#[derive(Serialize, Deserialize, Default)]
 struct Dmc {
     data: [u8; 4],
     timer_tick: u16,
@@ -558,7 +559,7 @@ struct Dmc {
     start_pending: bool,
     interrupt: bool,
     #[serde(skip)]
-    dmc_memory: Option<Rc<RefCell<dyn DmcMemory>>>,
+    dmc_memory: NonNullPtr<crate::nes::Ram>,
 }
 
 impl Dmc {
@@ -573,7 +574,7 @@ impl Dmc {
             sample_buffer: None,
             shift_register: 0,
             output_value: 0,
-            dmc_memory: None,
+            dmc_memory: Default::default(),
             start_pending: false,
             interrupt: false,
         }
@@ -595,9 +596,7 @@ impl Dmc {
     fn start_sample(&mut self) {
         self.bytes_remaining = self.next_bytes_remaining;
         self.dmc_memory
-            .as_ref()
-            .unwrap()
-            .borrow_mut()
+            .as_mut()
             .set_sample_address(self.get_sample_address());
     }
 
@@ -655,13 +654,7 @@ impl Dmc {
     fn fetch_next_sample_buffer(&mut self) {
         if self.sample_buffer.is_none() {
             if self.bytes_remaining > 0 {
-                self.sample_buffer = Some(
-                    self.dmc_memory
-                        .as_ref()
-                        .unwrap()
-                        .borrow_mut()
-                        .get_next_sample_byte(),
-                );
+                self.sample_buffer = Some(self.dmc_memory.as_mut().get_next_sample_byte());
                 self.bytes_remaining -= 1;
                 if self.bytes_remaining == 0 {
                     if self.is_loop_enabled() {
@@ -696,6 +689,7 @@ pub struct Apu {
     pulse_2: PulseWave,
     triangle: TriangleWave,
     noise: Noise,
+    #[serde(skip)]
     dmc: Dmc,
     cpu_cycle: u16,
     is_during_apu_cycle: bool,
@@ -705,9 +699,18 @@ pub struct Apu {
     irq_flag_setting_in_progress: bool,
 }
 
+impl Default for Apu {
+    fn default() -> Self {
+        Self {
+            audio_access: default_audio_access(),
+            ..Default::default()
+        }
+    }
+}
+
 impl Apu {
     pub fn new(audio_access: Rc<RefCell<dyn AudioAccess>>) -> Self {
-        Apu {
+        Self {
             frame_counter: FrameCounter { data: 0 },
             status: StatusRegister { data: 0 },
             pulse_1: PulseWave::new(false),
@@ -741,8 +744,8 @@ impl Apu {
         self.irq_flag_setting_in_progress = false;
     }
 
-    pub fn set_dmc_memory(&mut self, dmc_memory: Rc<RefCell<dyn DmcMemory>>) {
-        self.dmc.dmc_memory = Some(dmc_memory);
+    pub fn set_dmc_memory(&mut self, dmc_memory: NonNullPtr<crate::nes::Ram>) {
+        self.dmc.dmc_memory = dmc_memory;
     }
 
     pub fn set_audio_access(&mut self, audio_access: Rc<RefCell<dyn AudioAccess>>) {

@@ -42,25 +42,3 @@ pub trait ReadAccessRegisters {
 }
 
 pub trait ApuRegisterAccess: WriteAcessRegisters + ReadAccessRegisters {}
-
-pub struct DummyApuRegisterAccessImpl {}
-
-impl DummyApuRegisterAccessImpl {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl WriteAcessRegisters for DummyApuRegisterAccessImpl {
-    fn write(&mut self, _register: WriteAccessRegister, _value: u8) {
-        todo!()
-    }
-}
-
-impl ReadAccessRegisters for DummyApuRegisterAccessImpl {
-    fn read(&mut self, _register: ReadAccessRegister) -> u8 {
-        todo!()
-    }
-}
-
-impl ApuRegisterAccess for DummyApuRegisterAccessImpl {}

@@ -14,7 +14,7 @@ pub enum OutputRegister {
 }
 
 pub trait ReadInputRegisters {
-    fn read(&mut self, port: InputRegister) -> u8;
+    fn read(&self, port: InputRegister) -> u8;
 }
 
 pub trait WriteOutputRegisters {
@@ -25,14 +25,8 @@ pub trait ControllerRegisterAccess: ReadInputRegisters + WriteOutputRegisters {}
 
 pub struct DummyControllerRegisterAccessImpl {}
 
-impl DummyControllerRegisterAccessImpl {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
 impl ReadInputRegisters for DummyControllerRegisterAccessImpl {
-    fn read(&mut self, _port: InputRegister) -> u8 {
+    fn read(&self, _port: InputRegister) -> u8 {
         todo!()
     }
 }

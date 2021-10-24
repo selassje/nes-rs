@@ -42,12 +42,6 @@ pub trait PpuRegisterAccess: WritePpuRegisters + WriteOamDma + ReadPpuRegisters 
 
 pub struct DummyPpuRegisterAccessImpl {}
 
-impl DummyPpuRegisterAccessImpl {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
 impl WritePpuRegisters for DummyPpuRegisterAccessImpl {
     fn write(&mut self, _register: WriteAccessRegister, _value: u8) {
         todo!()

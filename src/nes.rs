@@ -1,16 +1,15 @@
 use crate::apu::Apu;
 use crate::common;
-use crate::controllers;
+use crate::common::NonNullPtr;
+use crate::controllers::Controllers;
 use crate::io::AudioAccess;
 use crate::io::ControllerAccess;
 use crate::io::VideoAccess;
 use crate::io::IO;
 use crate::mappers::*;
 use crate::nes_file::NesFile;
-use crate::ppu::Ppu;
-use crate::ram::Ram;
 use crate::vram::VRam;
-use crate::{cpu::Cpu, mappers::Mapper, mappers::MapperNull};
+use crate::{mappers::Mapper, mappers::MapperNull};
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -19,45 +18,6 @@ use std::time::Duration;
 use serde::ser::SerializeStruct;
 use serde::ser::Serializer;
 use serde::Deserialize;
-use std::marker::PhantomPinned;
-use std::pin::Pin;
-use std::ptr::NonNull;
-struct Unmovable {
-    data: String,
-    slice: NonNull<String>,
-    //  _pin: PhantomPinned,
-}
-
-impl Unmovable {
-    // To ensure the data doesn't move when the function returns,
-    // we place it in the heap where it will stay for the lifetime of the object,
-    // and the only way to access it would be through a pointer to it.
-    fn new(data: String) -> Box<Self> {
-        let res = Unmovable {
-            data,
-            // we only create the pointer once the data is in place
-            // otherwise it will have already moved before we even started
-            slice: NonNull::dangling(),
-            // _pin: PhantomPinned,
-        };
-        let mut boxed = Box::new(res);
-        let slice = NonNull::from(&boxed.data);
-        boxed.slice = slice;
-        boxed
-    }
-    fn new2(data: String) -> Self {
-        let mut res = Unmovable {
-            data,
-            // we only create the pointer once the data is in place
-            // otherwise it will have already moved before we even started
-            slice: NonNull::dangling(),
-            // _pin: PhantomPinned,
-        };
-        let slice = NonNull::from(&res.data);
-        res.slice = slice;
-        res
-    }
-}
 
 fn serialize_mapper<S>(
     mapper: &Rc<RefCell<dyn Mapper>>,
@@ -132,13 +92,18 @@ fn default_controller_access() -> Rc<RefCell<dyn ControllerAccess>> {
     Rc::new(RefCell::new(crate::io::DummyIOImpl::new()))
 }
 
+type Ppu = crate::ppu::Ppu<VRam>;
+pub type Ram = crate::ram::Ram<Ppu, Apu, Controllers>;
+type Cpu = crate::cpu::Cpu<Ram, Ppu, Apu>;
+
 #[derive(serde::Serialize, Deserialize)]
 pub struct Nes {
     cpu: Cpu,
-    ram: Rc<RefCell<Ram>>,
-    ppu: Rc<RefCell<Ppu<VRam>>>,
+    ram: Ram,
+    ppu: Ppu,
     vram: VRam,
-    apu: Rc<RefCell<Apu>>,
+    apu: Apu,
+    controllers: Controllers,
     #[serde(
         serialize_with = "serialize_mapper",
         deserialize_with = "deserialize_mapper"
@@ -157,33 +122,28 @@ impl Nes {
     where
         T: IO + VideoAccess + AudioAccess + ControllerAccess + 'static,
     {
-        let controllers = Rc::new(RefCell::new(controllers::Controllers::new(io.clone())));
+        let controllers = Controllers::new(io.clone());
         let mapper = Rc::new(RefCell::new(MapperNull::new()));
-        let mut vram = VRam::new(mapper.clone());
-        let ppu = Rc::new(RefCell::new(Ppu::new(io.clone(), mapper.clone())));
-        let apu = Rc::new(RefCell::new(Apu::new(io.clone())));
-        let ram = Rc::new(RefCell::new(Ram::new(
-            ppu.clone(),
-            controllers,
-            apu.clone(),
-            mapper.clone(),
-        )));
+        let vram = VRam::new(mapper.clone());
+        let ppu = Ppu::new(io.clone(), mapper.clone());
+        let apu = Apu::new(io.clone());
+        let ram = Ram::new(mapper.clone());
+        let cpu = Cpu::new(mapper.clone());
 
-        apu.borrow_mut().set_dmc_memory(ram.clone());
-        let cpu = Cpu::new(ram.clone(), ppu.clone(), apu.clone(), mapper.clone());
-
-        let nes = Nes {
+        let mut nes = Nes {
             cpu,
             ram,
             ppu,
             vram,
             apu,
+            controllers,
             mapper,
             video_access: io.clone(),
             audio_access: io.clone(),
             controller_access: io,
         };
-        nes.ppu.borrow_mut().set_vram(NonNull::from(&nes.vram));
+        nes.ppu.set_vram(NonNullPtr::from(&nes.vram));
+        nes.apu.set_dmc_memory(NonNullPtr::from(&nes.ram));
         nes
     }
 
@@ -198,36 +158,26 @@ impl Nes {
         let audio_access = self.audio_access.clone();
         let controller_access = self.controller_access.clone();
 
-        let controllers = Rc::new(RefCell::new(controllers::Controllers::new(
-            controller_access.clone(),
-        )));
         new_nes.vram.set_mapper(mapper.clone());
-        new_nes.ppu.borrow_mut().set_mapper(mapper.clone());
-        new_nes
-            .ppu
-            .borrow_mut()
-            .set_vram(NonNull::from(&new_nes.vram));
-        new_nes
-            .ppu
-            .borrow_mut()
-            .set_video_access(video_access.clone());
+        new_nes.ppu.set_mapper(mapper.clone());
+        new_nes.ppu.set_vram(NonNullPtr::from(&new_nes.vram));
+        new_nes.ppu.set_video_access(video_access.clone());
 
+        new_nes.apu.set_audio_access(audio_access.clone());
+
+        new_nes.apu.set_dmc_memory(NonNullPtr::from(&new_nes.ram));
+
+        new_nes.ram.set_apu_access(NonNullPtr::from(&new_nes.apu));
+        new_nes.ram.set_ppu_access(NonNullPtr::from(&new_nes.ppu));
         new_nes
-            .apu
-            .borrow_mut()
-            .set_audio_access(audio_access.clone());
-
-        new_nes.apu.borrow_mut().set_dmc_memory(new_nes.ram.clone());
-
-        new_nes.ram.borrow_mut().set_apu_access(new_nes.apu.clone());
-        new_nes.ram.borrow_mut().set_ppu_access(new_nes.ppu.clone());
-        new_nes.ram.borrow_mut().set_controller_access(controllers);
-        new_nes.ram.borrow_mut().set_mapper(mapper.clone());
+            .ram
+            .set_controller_access(NonNullPtr::from(&new_nes.controllers));
+        new_nes.ram.set_mapper(mapper.clone());
 
         new_nes.cpu.set_mapper(mapper);
-        new_nes.cpu.set_ram(new_nes.ram.clone());
-        new_nes.cpu.set_ppu_state(new_nes.ppu.clone());
-        new_nes.cpu.set_apu_state(new_nes.apu.clone());
+        new_nes.cpu.set_ram(NonNullPtr::from(&new_nes.ram));
+        new_nes.cpu.set_ppu_state(NonNullPtr::from(&new_nes.ppu));
+        new_nes.cpu.set_apu_state(NonNullPtr::from(&new_nes.apu));
 
         new_nes.video_access = video_access;
         new_nes.audio_access = audio_access;
@@ -239,8 +189,8 @@ impl Nes {
     pub fn load(&mut self, nes_file: &NesFile) {
         let mapper = nes_file.create_mapper();
         self.vram.set_mapper(mapper.clone());
-        self.ppu.borrow_mut().set_mapper(mapper.clone());
-        self.ram.borrow_mut().set_mapper(mapper.clone());
+        self.ppu.set_mapper(mapper.clone());
+        self.ram.set_mapper(mapper.clone());
         self.cpu.set_mapper(mapper.clone());
         self.mapper = mapper;
         self.power_cycle();
@@ -248,9 +198,9 @@ impl Nes {
 
     pub fn power_cycle(&mut self) {
         self.vram.power_cycle();
-        self.ppu.borrow_mut().power_cycle();
-        self.apu.borrow_mut().power_cycle();
-        self.ram.borrow_mut().power_cycle();
+        self.ppu.power_cycle();
+        self.apu.power_cycle();
+        self.ram.power_cycle();
         self.mapper.borrow_mut().power_cycle();
         self.cpu.power_cycle();
     }
@@ -272,9 +222,9 @@ impl Nes {
     fn run_single_cpu_cycle(&mut self) {
         self.cpu.maybe_fetch_next_instruction();
 
-        self.ppu.borrow_mut().run_single_cpu_cycle();
+        self.ppu.run_single_cpu_cycle();
 
-        self.apu.borrow_mut().run_single_cpu_cycle();
+        self.apu.run_single_cpu_cycle();
 
         self.cpu.run_single_cycle();
     }

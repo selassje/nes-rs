@@ -47,12 +47,20 @@ pub struct VRam {
     read_buffer: RefCell<u8>,
 }
 
+impl Default for VRam {
+    fn default() -> Self {
+        Self {
+            mapper: default_mapper(),
+            ..Default::default()
+        }
+    }
+}
+
 impl VRam {
     pub fn new(mapper: Rc<RefCell<dyn Mapper>>) -> Self {
         VRam {
-            memory: crate::memory::MemoryImpl::new(),
             mapper,
-            read_buffer: RefCell::new(0),
+            ..Default::default()
         }
     }
 

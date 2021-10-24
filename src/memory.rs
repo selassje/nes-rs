@@ -24,11 +24,7 @@ pub trait Memory {
 
 pub struct DummyMemoryImpl {}
 
-impl DummyMemoryImpl {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+impl DummyMemoryImpl {}
 
 impl Memory for DummyMemoryImpl {
     fn get_byte(&self, _addr: u16) -> u8 {
@@ -64,6 +60,12 @@ impl<const N: usize> MemoryImpl<N> {
     }
 }
 
+impl<const N: usize> Default for MemoryImpl<N> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub trait VideoMemory: Memory {
     fn get_background_pallete_index(
         &self,
@@ -87,67 +89,6 @@ pub trait VideoMemory: Memory {
     fn get_high_pattern_data(&self, table_index: u8, tile_index: u8, y: u8) -> u8;
 
     fn get_sprite_palette(&self, palette_index: u8) -> [u8; 3];
-}
-
-pub struct DummyVideoMemoryImpl {}
-
-impl DummyVideoMemoryImpl {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl VideoMemory for DummyVideoMemoryImpl {
-    fn get_background_pallete_index(
-        &self,
-        _table_index: u8,
-        _color_tile_x: u8,
-        _color_tile_y: u8,
-    ) -> u8 {
-        todo!()
-    }
-
-    fn get_nametable_tile_index(&self, _table_index: u8, _tile_x: u8, _tile_y: u8) -> u8 {
-        todo!()
-    }
-
-    fn get_pattern_table_tile_data(&self, _table_index: u8, _tile_index: u8) -> [u8; 16] {
-        todo!()
-    }
-
-    fn get_universal_background_color(&self) -> u8 {
-        todo!()
-    }
-
-    fn get_background_palette(&self, _palette_index: u8) -> [u8; 3] {
-        todo!()
-    }
-
-    fn get_attribute_data(&self, _table_index: u8, _color_tile_x: u8, _color_tile_y: u8) -> u8 {
-        todo!()
-    }
-
-    fn get_low_pattern_data(&self, _table_index: u8, _tile_index: u8, _y: u8) -> u8 {
-        todo!()
-    }
-
-    fn get_high_pattern_data(&self, _table_index: u8, _tile_index: u8, _y: u8) -> u8 {
-        todo!()
-    }
-
-    fn get_sprite_palette(&self, _palette_index: u8) -> [u8; 3] {
-        todo!()
-    }
-}
-
-impl Memory for DummyVideoMemoryImpl {
-    fn get_byte(&self, _addr: u16) -> u8 {
-        todo!()
-    }
-
-    fn store_byte(&mut self, _addr: u16, _byte: u8) {
-        todo!()
-    }
 }
 
 pub trait DmcMemory {
