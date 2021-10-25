@@ -22,8 +22,6 @@ pub fn convert_2u8_to_u16(b0: u8, b1: u8) -> u16 {
 
 pub struct NonNullPtr<T: ?Sized>(std::ptr::NonNull<T>);
 
-impl<T: ?Sized> NonNullPtr<T> {}
-
 impl<T> NonNullPtr<T> {
     pub fn as_ref<'a>(&self) -> &'a T {
         unsafe { self.0.as_ref() }
@@ -42,3 +40,11 @@ impl<T> Default for NonNullPtr<T> {
         Self(std::ptr::NonNull::dangling())
     }
 }
+
+impl<T> Clone for NonNullPtr<T> {
+    fn clone(&self) -> Self {
+        Self(self.0)
+    }
+}
+
+impl<T> Copy for NonNullPtr<T> {}

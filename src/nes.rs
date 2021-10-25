@@ -12,6 +12,8 @@ use crate::vram::VRam;
 use crate::{mappers::Mapper, mappers::MapperNull};
 
 use std::cell::RefCell;
+use std::marker::PhantomPinned;
+use std::pin::Pin;
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -115,10 +117,12 @@ pub struct NesInternal {
     audio_access: Rc<RefCell<dyn AudioAccess>>,
     #[serde(skip, default = "default_controller_access")]
     controller_access: Rc<RefCell<dyn ControllerAccess>>,
+    #[serde(skip)]
+    _pin: PhantomPinned,
 }
 
 impl NesInternal {
-    fn new<T>(io: Rc<RefCell<T>>) -> Self
+    fn new<T>(io: Rc<RefCell<T>>) -> Pin<Box<Self>>
     where
         T: IO + VideoAccess + AudioAccess + ControllerAccess + 'static,
     {
@@ -130,7 +134,7 @@ impl NesInternal {
         let ram = Ram::new(mapper.clone());
         let cpu = Cpu::new(mapper.clone());
 
-        let mut nes = NesInternal {
+        let mut nes = Box::pin(NesInternal {
             cpu,
             ram,
             ppu,
@@ -141,18 +145,27 @@ impl NesInternal {
             video_access: io.clone(),
             audio_access: io.clone(),
             controller_access: io,
-        };
+            _pin: PhantomPinned,
+        });
 
-        nes.cpu.set_ram(NonNullPtr::from(&nes.ram));
-        nes.cpu.set_ppu_state(NonNullPtr::from(&nes.ppu));
-        nes.cpu.set_apu_state(NonNullPtr::from(&nes.apu));
+        let ram = NonNullPtr::from(&nes.ram);
+        let ppu = NonNullPtr::from(&nes.ppu);
+        let apu = NonNullPtr::from(&nes.apu);
+        let vram = NonNullPtr::from(&nes.vram);
+        let controllers = NonNullPtr::from(&nes.controllers);
 
-        nes.ram
-            .set_controller_access(NonNullPtr::from(&nes.controllers));
-        nes.ram.set_ppu_access(NonNullPtr::from(&nes.ppu));
-        nes.ram.set_apu_access(NonNullPtr::from(&nes.apu));
-        nes.ppu.set_vram(NonNullPtr::from(&nes.vram));
-        nes.apu.set_dmc_memory(NonNullPtr::from(&nes.ram));
+        unsafe {
+            let pin_ref: Pin<&mut Self> = Pin::as_mut(&mut nes);
+            let nes = Pin::get_unchecked_mut(pin_ref);
+            nes.cpu.set_ram(ram);
+            nes.cpu.set_ppu_state(ppu);
+            nes.cpu.set_apu_state(apu);
+            nes.ram.set_controller_access(controllers);
+            nes.ram.set_ppu_access(ppu);
+            nes.ram.set_apu_access(apu);
+            nes.apu.set_dmc_memory(ram);
+            nes.ppu.set_vram(vram);
+        }
         nes
     }
 
@@ -240,7 +253,7 @@ impl NesInternal {
 }
 
 pub struct Nes {
-    nes: Box<NesInternal>,
+    nes: Pin<Box<NesInternal>>,
 }
 
 impl Nes {
@@ -249,8 +262,13 @@ impl Nes {
         T: IO + VideoAccess + AudioAccess + ControllerAccess + 'static,
     {
         Self {
-            nes: Box::new(NesInternal::new(io)),
+            nes: NesInternal::new(io),
         }
+    }
+
+    fn as_mut(&mut self) -> &mut NesInternal {
+        let pin_ref = Pin::as_mut(&mut self.nes);
+        unsafe { Pin::get_unchecked_mut(pin_ref) }
     }
 
     pub fn serialize(&self) -> String {
@@ -258,22 +276,22 @@ impl Nes {
     }
 
     pub fn deserialize(&mut self, state: String) {
-        self.nes.deserialize(state);
+        self.as_mut().deserialize(state);
     }
 
     pub fn load(&mut self, nes_file: &NesFile) {
-        self.nes.load(nes_file);
+        self.as_mut().load(nes_file);
     }
 
     pub fn power_cycle(&mut self) {
-        self.nes.power_cycle();
+        self.as_mut().power_cycle();
     }
 
     pub fn run_for(&mut self, duration: Duration) {
-        self.nes.run_for(duration);
+        self.as_mut().run_for(duration);
     }
 
     pub fn run_single_frame(&mut self) {
-        self.nes.run_single_frame();
+        self.as_mut().run_single_frame();
     }
 }
