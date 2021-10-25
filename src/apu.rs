@@ -541,10 +541,6 @@ impl LengthCounterChannel for Noise {
     }
 }
 
-// fn default_dmc_memory() -> *mut dyn DmcMemory {
-//     std::ptr::Nu
-// }
-
 #[derive(Serialize, Deserialize, Default)]
 struct Dmc<D: DmcMemory> {
     data: [u8; 4],
