@@ -50,8 +50,9 @@ pub struct VRam {
 impl Default for VRam {
     fn default() -> Self {
         Self {
+            memory: Default::default(),
             mapper: default_mapper(),
-            ..Default::default()
+            read_buffer: Default::default(),
         }
     }
 }

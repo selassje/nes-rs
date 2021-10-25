@@ -97,7 +97,7 @@ pub type Ram = crate::ram::Ram<Ppu, Apu, Controllers>;
 type Cpu = crate::cpu::Cpu<Ram, Ppu, Apu>;
 
 #[derive(serde::Serialize, Deserialize)]
-pub struct Nes {
+pub struct NesInternal {
     cpu: Cpu,
     ram: Ram,
     ppu: Ppu,
@@ -117,8 +117,8 @@ pub struct Nes {
     controller_access: Rc<RefCell<dyn ControllerAccess>>,
 }
 
-impl Nes {
-    pub fn new<T>(io: Rc<RefCell<T>>) -> Self
+impl NesInternal {
+    fn new<T>(io: Rc<RefCell<T>>) -> Self
     where
         T: IO + VideoAccess + AudioAccess + ControllerAccess + 'static,
     {
@@ -130,7 +130,7 @@ impl Nes {
         let ram = Ram::new(mapper.clone());
         let cpu = Cpu::new(mapper.clone());
 
-        let mut nes = Nes {
+        let mut nes = NesInternal {
             cpu,
             ram,
             ppu,
@@ -142,17 +142,26 @@ impl Nes {
             audio_access: io.clone(),
             controller_access: io,
         };
+
+        nes.cpu.set_ram(NonNullPtr::from(&nes.ram));
+        nes.cpu.set_ppu_state(NonNullPtr::from(&nes.ppu));
+        nes.cpu.set_apu_state(NonNullPtr::from(&nes.apu));
+
+        nes.ram
+            .set_controller_access(NonNullPtr::from(&nes.controllers));
+        nes.ram.set_ppu_access(NonNullPtr::from(&nes.ppu));
+        nes.ram.set_apu_access(NonNullPtr::from(&nes.apu));
         nes.ppu.set_vram(NonNullPtr::from(&nes.vram));
         nes.apu.set_dmc_memory(NonNullPtr::from(&nes.ram));
         nes
     }
 
-    pub fn serialize(&self) -> String {
+    fn serialize(&self) -> String {
         serde_yaml::to_string(self).unwrap()
     }
 
-    pub fn deserialize(&mut self, state: String) {
-        let mut new_nes: Nes = serde_yaml::from_str(&state).unwrap();
+    fn deserialize(&mut self, state: String) {
+        let mut new_nes: NesInternal = serde_yaml::from_str(&state).unwrap();
         let mapper = new_nes.mapper.clone();
         let video_access = self.video_access.clone();
         let audio_access = self.audio_access.clone();
@@ -186,7 +195,7 @@ impl Nes {
         *self = new_nes;
     }
 
-    pub fn load(&mut self, nes_file: &NesFile) {
+    fn load(&mut self, nes_file: &NesFile) {
         let mapper = nes_file.create_mapper();
         self.vram.set_mapper(mapper.clone());
         self.ppu.set_mapper(mapper.clone());
@@ -196,7 +205,7 @@ impl Nes {
         self.power_cycle();
     }
 
-    pub fn power_cycle(&mut self) {
+    fn power_cycle(&mut self) {
         self.vram.power_cycle();
         self.ppu.power_cycle();
         self.apu.power_cycle();
@@ -205,7 +214,7 @@ impl Nes {
         self.cpu.power_cycle();
     }
 
-    pub fn run_for(&mut self, duration: Duration) {
+    fn run_for(&mut self, duration: Duration) {
         let mut elapsed_frames = 0;
         while elapsed_frames < duration.as_secs() as u128 * common::DEFAULT_FPS as u128 {
             self.run_single_frame();
@@ -213,7 +222,7 @@ impl Nes {
         }
     }
 
-    pub fn run_single_frame(&mut self) {
+    fn run_single_frame(&mut self) {
         for _ in 0..common::CPU_CYCLES_PER_FRAME {
             self.run_single_cpu_cycle();
         }
@@ -227,5 +236,44 @@ impl Nes {
         self.apu.run_single_cpu_cycle();
 
         self.cpu.run_single_cycle();
+    }
+}
+
+pub struct Nes {
+    nes: Box<NesInternal>,
+}
+
+impl Nes {
+    pub fn new<T>(io: Rc<RefCell<T>>) -> Self
+    where
+        T: IO + VideoAccess + AudioAccess + ControllerAccess + 'static,
+    {
+        Self {
+            nes: Box::new(NesInternal::new(io)),
+        }
+    }
+
+    pub fn serialize(&self) -> String {
+        self.nes.serialize()
+    }
+
+    pub fn deserialize(&mut self, state: String) {
+        self.nes.deserialize(state);
+    }
+
+    pub fn load(&mut self, nes_file: &NesFile) {
+        self.nes.load(nes_file);
+    }
+
+    pub fn power_cycle(&mut self) {
+        self.nes.power_cycle();
+    }
+
+    pub fn run_for(&mut self, duration: Duration) {
+        self.nes.run_for(duration);
+    }
+
+    pub fn run_single_frame(&mut self) {
+        self.nes.run_single_frame();
     }
 }
