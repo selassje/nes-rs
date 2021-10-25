@@ -546,7 +546,7 @@ impl LengthCounterChannel for Noise {
 // }
 
 #[derive(Serialize, Deserialize, Default)]
-struct Dmc {
+struct Dmc<D: DmcMemory> {
     data: [u8; 4],
     timer_tick: u16,
     sample_buffer: Option<u8>,
@@ -559,10 +559,10 @@ struct Dmc {
     start_pending: bool,
     interrupt: bool,
     #[serde(skip)]
-    dmc_memory: NonNullPtr<crate::nes::Ram>,
+    dmc_memory: NonNullPtr<D>,
 }
 
-impl Dmc {
+impl<D: DmcMemory> Dmc<D> {
     fn new() -> Self {
         Dmc {
             data: [0; 4],
@@ -690,7 +690,7 @@ pub struct Apu {
     triangle: TriangleWave,
     noise: Noise,
     #[serde(skip)]
-    dmc: Dmc,
+    dmc: Dmc<crate::nes::Ram>,
     cpu_cycle: u16,
     is_during_apu_cycle: bool,
     frame_interrupt: bool,
