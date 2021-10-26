@@ -164,4 +164,32 @@ impl Mapper for MapperEnum {
             MapperEnum::Mapper227(mapper) => mapper.power_cycle(),
         }
     }
+
+    fn ppu_a12_rising_edge_triggered(&mut self) {
+        match self {
+            MapperEnum::MapperNull(mapper) => mapper.ppu_a12_rising_edge_triggered(),
+            MapperEnum::Mapper0(mapper) => mapper.ppu_a12_rising_edge_triggered(),
+            MapperEnum::Mapper1(mapper) => mapper.ppu_a12_rising_edge_triggered(),
+            MapperEnum::Mapper2(mapper) => mapper.ppu_a12_rising_edge_triggered(),
+            MapperEnum::Mapper4(mapper) => mapper.ppu_a12_rising_edge_triggered(),
+            MapperEnum::Mapper7(mapper) => mapper.ppu_a12_rising_edge_triggered(),
+            MapperEnum::Mapper66(mapper) => mapper.ppu_a12_rising_edge_triggered(),
+            MapperEnum::Mapper71(mapper) => mapper.ppu_a12_rising_edge_triggered(),
+            MapperEnum::Mapper227(mapper) => mapper.ppu_a12_rising_edge_triggered(),
+        }
+    }
+
+    fn is_irq_pending(&mut self) -> bool {
+        match self {
+            MapperEnum::MapperNull(mapper) => mapper.is_irq_pending(),
+            MapperEnum::Mapper0(mapper) => mapper.is_irq_pending(),
+            MapperEnum::Mapper1(mapper) => mapper.is_irq_pending(),
+            MapperEnum::Mapper2(mapper) => mapper.is_irq_pending(),
+            MapperEnum::Mapper4(mapper) => mapper.is_irq_pending(),
+            MapperEnum::Mapper7(mapper) => mapper.is_irq_pending(),
+            MapperEnum::Mapper66(mapper) => mapper.is_irq_pending(),
+            MapperEnum::Mapper71(mapper) => mapper.is_irq_pending(),
+            MapperEnum::Mapper227(mapper) => mapper.is_irq_pending(),
+        }
+    }
 }

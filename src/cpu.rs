@@ -182,6 +182,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.address = Address::Implicit;
         self.is_brk_or_irq_hijacked_by_nmi = false;
         self.oam_dma_in_progress = None;
+        self.opcodes = get_opcodes();
     }
 
     fn set_flag(&mut self, flag: ProcessorFlag) {
