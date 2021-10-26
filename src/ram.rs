@@ -1,3 +1,4 @@
+use crate::mappers::MapperEnum;
 use crate::ram_apu;
 use crate::ram_apu::ApuRegisterAccess;
 use crate::ram_controllers::*;
@@ -7,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::ops::Range;
-use std::rc::Rc;
 
 use crate::common::NonNullPtr;
 
@@ -40,16 +40,11 @@ const CARTRIDGE_SPACE_RANGE: Range<u32> = Range {
 };
 
 type RegisterLatch = RefCell<u8>;
-
-fn default_mapper() -> Rc<RefCell<dyn Mapper>> {
-    Rc::new(RefCell::new(crate::mappers::MapperNull::new()))
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct Ram<P: PpuRegisterAccess, A: ApuRegisterAccess, C: ControllerRegisterAccess> {
     memory: MemoryImpl<0x0808>,
-    #[serde(skip, default = "default_mapper")]
-    mapper: Rc<RefCell<dyn Mapper>>,
+    #[serde(skip)]
+    mapper: RefCell<NonNullPtr<MapperEnum>>,
     #[serde(skip)]
     ppu_access: RefCell<NonNullPtr<P>>,
     #[serde(skip)]
@@ -68,17 +63,25 @@ impl<P: PpuRegisterAccess, A: ApuRegisterAccess, C: ControllerRegisterAccess> De
 {
     fn default() -> Self {
         Self {
-            mapper: default_mapper(),
-            ..Default::default()
+            memory: Default::default(),
+            mapper: Default::default(),
+            ppu_access: Default::default(),
+            apu_access: Default::default(),
+            controller_access: Default::default(),
+            dmc_sample_address: Default::default(),
+            ppu_register_latch: Default::default(),
+            apu_register_latch: Default::default(),
+            controller_register_latch: Default::default(),
+            oam_dma_register_latch: Default::default(),
         }
     }
 }
 
 impl<P: PpuRegisterAccess, A: ApuRegisterAccess, C: ControllerRegisterAccess> Ram<P, A, C> {
-    pub fn new(mapper: Rc<RefCell<dyn Mapper>>) -> Self {
+    pub fn new() -> Self {
         Self {
             memory: MemoryImpl::new(),
-            mapper,
+            mapper: Default::default(),
             ppu_access: Default::default(),
             apu_access: Default::default(),
             controller_access: Default::default(),
@@ -90,8 +93,8 @@ impl<P: PpuRegisterAccess, A: ApuRegisterAccess, C: ControllerRegisterAccess> Ra
         }
     }
 
-    pub fn set_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
-        self.mapper = mapper;
+    pub fn set_mapper(&mut self, mapper: NonNullPtr<MapperEnum>) {
+        self.mapper.replace(mapper);
     }
 
     pub fn set_ppu_access(&mut self, ppu_access: NonNullPtr<P>) {
@@ -153,7 +156,7 @@ impl<P: PpuRegisterAccess, A: ApuRegisterAccess, C: ControllerRegisterAccess> Me
         } else if ram_apu::WriteAccessRegister::try_from(addr).is_ok() {
             *self.apu_register_latch.borrow()
         } else if CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)) {
-            self.mapper.borrow_mut().get_prg_byte(addr)
+            self.mapper.borrow_mut().as_mut().get_prg_byte(addr)
         } else if addr >= CPU_TEST_MODE_SPACE_START {
             self.memory
                 .get_byte(INTERNAL_MIRROR_SIZE + addr - CPU_TEST_MODE_SPACE_START)
@@ -193,7 +196,7 @@ impl<P: PpuRegisterAccess, A: ApuRegisterAccess, C: ControllerRegisterAccess> Me
         } else if ram_apu::ReadAccessRegister::try_from(addr).is_ok() {
             *self.apu_register_latch.borrow_mut() = byte;
         } else if CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)) {
-            self.mapper.borrow_mut().store_prg_byte(addr, byte)
+            self.mapper.borrow_mut().as_mut().store_prg_byte(addr, byte)
         } else if addr < CPU_TEST_MODE_SPACE_START {
             assert!(addr < INTERNAL_MIRROR_SIZE);
             self.memory.store_byte(addr, byte);

@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use crate::common;
 use crate::mappers::*;
 
@@ -74,7 +72,7 @@ fn read_to_array(array: &mut [u8], in_bytes: &[u8]) -> usize {
 }
 
 impl NesFile {
-    pub fn create_mapper(&self) -> Rc<RefCell<dyn Mapper>> {
+    pub fn create_mapper(&self) -> MapperEnum {
         let mut prg_rom = Vec::<u8>::new();
         for prg_rom_chunk in &self.prg_rom {
             prg_rom.extend_from_slice(prg_rom_chunk);
@@ -86,18 +84,14 @@ impl NesFile {
         }
 
         match self.mapper_number {
-            0 => Rc::new(RefCell::new(Mapper0::new(prg_rom, chr_rom, self.mirroring))),
-            1 => Rc::new(RefCell::new(Mapper1::new(prg_rom, chr_rom))),
-            2 => Rc::new(RefCell::new(Mapper2::new(prg_rom, chr_rom, self.mirroring))),
-            4 => Rc::new(RefCell::new(Mapper4::new(prg_rom, chr_rom))),
-            7 => Rc::new(RefCell::new(Mapper7::new(prg_rom, chr_rom))),
-            66 => Rc::new(RefCell::new(Mapper66::new(
-                prg_rom,
-                chr_rom,
-                self.mirroring,
-            ))),
-            71 => Rc::new(RefCell::new(Mapper71::new(prg_rom, self.mirroring))),
-            227 => Rc::new(RefCell::new(Mapper227::new(prg_rom, chr_rom))),
+            0 => MapperEnum::Mapper0(Mapper0::new(prg_rom, chr_rom, self.mirroring)),
+            1 => MapperEnum::Mapper1(Mapper1::new(prg_rom, chr_rom)),
+            2 => MapperEnum::Mapper2(Mapper2::new(prg_rom, chr_rom, self.mirroring)),
+            4 => MapperEnum::Mapper4(Mapper4::new(prg_rom, chr_rom)),
+            7 => MapperEnum::Mapper7(Mapper7::new(prg_rom, chr_rom)),
+            66 => MapperEnum::Mapper66(Mapper66::new(prg_rom, chr_rom, self.mirroring)),
+            71 => MapperEnum::Mapper71(Mapper71::new(prg_rom, self.mirroring)),
+            227 => MapperEnum::Mapper227(Mapper227::new(prg_rom, chr_rom)),
             _ => panic!("Unsupported mapper {}", self.mapper_number),
         }
     }

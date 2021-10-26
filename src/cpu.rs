@@ -2,14 +2,15 @@ mod opcodes;
 
 use self::{opcodes::IRQ_OPCODE, AddressingMode::*};
 use crate::apu::ApuState;
+use crate::mappers::MapperEnum;
 use crate::ppu::PpuState;
 use crate::{common::*, memory::Memory};
 use crate::{mappers::Mapper, ram_ppu::DmaWriteAccessRegister::OamDma};
 use opcodes::{get_opcodes, OpCodes, NMI_OPCODE};
 use serde::{Deserialize, Serialize};
-use std::cell::RefCell;
+
 use std::fmt::{Display, Formatter, Result};
-use std::rc::Rc;
+
 const STACK_PAGE: u16 = 0x0100;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
@@ -91,10 +92,6 @@ struct Instruction {
     bytes: u8,
 }
 
-fn default_mapper() -> Rc<RefCell<dyn Mapper>> {
-    Rc::new(RefCell::new(crate::mappers::MapperNull::new()))
-}
-
 #[derive(Serialize, Deserialize)]
 pub struct Cpu<M: Memory, P: PpuState, A: ApuState> {
     pc: u16,
@@ -112,8 +109,8 @@ pub struct Cpu<M: Memory, P: PpuState, A: ApuState> {
     ppu_state: NonNullPtr<P>,
     #[serde(skip)]
     apu_state: NonNullPtr<A>,
-    #[serde(skip, default = "default_mapper")]
-    mapper: Rc<RefCell<dyn Mapper>>,
+    #[serde(skip)]
+    mapper: NonNullPtr<MapperEnum>,
     code_segment: (u16, u16),
     #[serde(skip, default = "get_opcodes")]
     opcodes: OpCodes<M, P, A>,
@@ -125,7 +122,6 @@ pub struct Cpu<M: Memory, P: PpuState, A: ApuState> {
 impl<M: Memory, P: PpuState, A: ApuState> Default for Cpu<M, P, A> {
     fn default() -> Self {
         Self {
-            mapper: default_mapper(),
             opcodes: get_opcodes(),
             ..Default::default()
         }
@@ -133,7 +129,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Default for Cpu<M, P, A> {
 }
 
 impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
-    pub fn new(mapper: Rc<RefCell<dyn Mapper>>) -> Self {
+    pub fn new() -> Self {
         Self {
             pc: 0,
             sp: 0xFD,
@@ -146,7 +142,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
             ram: Default::default(),
             ppu_state: Default::default(),
             apu_state: Default::default(),
-            mapper,
+            mapper: Default::default(),
             code_segment: (0, 0),
             interrupt: None,
             address: Address::Implicit,
@@ -156,7 +152,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         }
     }
 
-    pub fn set_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
+    pub fn set_mapper(&mut self, mapper: NonNullPtr<MapperEnum>) {
         self.mapper = mapper;
     }
 
@@ -249,8 +245,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
             self.ppu_state.as_mut().clear_nmi_pending();
             self.interrupt = Some(NMI_OPCODE as u8);
         } else if !self.get_flag(ProcessorFlag::InterruptDisable)
-            && (self.mapper.borrow_mut().is_irq_pending()
-                || self.apu_state.as_ref().is_irq_pending())
+            && (self.mapper.as_mut().is_irq_pending() || self.apu_state.as_ref().is_irq_pending())
         {
             self.interrupt = Some(IRQ_OPCODE as u8)
         }

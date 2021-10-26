@@ -4,7 +4,7 @@ use crate::{
     io::FRAME_WIDTH,
 };
 use crate::{io::VideoAccess, memory::VideoMemory};
-use crate::{mappers::Mapper, ram_ppu::*};
+use crate::{mappers::Mapper, mappers::MapperEnum, ram_ppu::*};
 
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, default::Default, fmt::Display, rc::Rc};
@@ -303,9 +303,6 @@ impl Display for VRAMAddress {
     }
 }
 
-fn default_mapper() -> Rc<RefCell<dyn Mapper>> {
-    Rc::new(RefCell::new(crate::mappers::MapperNull::new()))
-}
 fn default_video_access() -> Rc<RefCell<dyn VideoAccess>> {
     Rc::new(RefCell::new(crate::io::DummyVideoAccessImpl::new()))
 }
@@ -339,8 +336,8 @@ pub struct Ppu<VRAM: VideoMemory> {
     fine_x_scroll: u8,
     sprite_palettes: Palettes,
     background_palletes: Palettes,
-    #[serde(skip, default = "default_mapper")]
-    mapper: Rc<RefCell<dyn Mapper>>,
+    #[serde(skip)]
+    mapper: NonNullPtr<MapperEnum>,
     tile_data: [TileData; 3],
 }
 
@@ -349,17 +346,13 @@ impl<VRAM: VideoMemory> Default for Ppu<VRAM> {
         Self {
             video_access: default_video_access(),
             color_mapper: default_color_mapper(),
-            mapper: default_mapper(),
             ..Default::default()
         }
     }
 }
 
 impl<VRAM: VideoMemory> Ppu<VRAM> {
-    pub fn new(
-        video_access: Rc<RefCell<dyn VideoAccess>>,
-        mapper: Rc<RefCell<dyn Mapper>>,
-    ) -> Self {
+    pub fn new(video_access: Rc<RefCell<dyn VideoAccess>>) -> Self {
         Self {
             vram: Default::default(),
             control_reg: ControlRegister { value: 0 },
@@ -382,12 +375,12 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
             video_access,
             sprite_palettes: Default::default(),
             background_palletes: Default::default(),
-            mapper,
+            mapper: Default::default(),
             tile_data: [Default::default(); 3],
         }
     }
 
-    pub fn set_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
+    pub fn set_mapper(&mut self, mapper: NonNullPtr<MapperEnum>) {
         self.mapper = mapper;
     }
     pub fn set_vram(&mut self, vram: NonNullPtr<VRAM>) {
@@ -500,7 +493,7 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
     fn run_single_ppu_cycle(&mut self) {
         if self.ppu_cycle == ACTIVE_PIXELS_CYCLE_END + 1 && self.is_rendering_in_progress() {
             self.vram_address.inc_y();
-            self.mapper.borrow_mut().ppu_a12_rising_edge_triggered();
+            self.mapper.as_mut().ppu_a12_rising_edge_triggered();
             self.vram_address
                 .set(COARSE_X, self.t_vram_address.get(COARSE_X));
             self.vram_address
@@ -751,7 +744,7 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
         let old_bit12 = old_vram_address.get(BIT_12);
         let new_bit12 = self.vram_address.get(BIT_12);
         if old_bit12 != new_bit12 && new_bit12 != 0 {
-            self.mapper.borrow_mut().ppu_a12_rising_edge_triggered();
+            self.mapper.as_mut().ppu_a12_rising_edge_triggered();
         }
     }
     fn is_rendering_in_progress(&self) -> bool {

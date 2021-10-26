@@ -21,7 +21,6 @@ pub fn convert_2u8_to_u16(b0: u8, b1: u8) -> u16 {
 }
 
 pub struct NonNullPtr<T: ?Sized>(std::ptr::NonNull<T>);
-
 impl<T> NonNullPtr<T> {
     pub fn as_ref<'a>(&self) -> &'a T {
         unsafe { self.0.as_ref() }
@@ -48,3 +47,18 @@ impl<T> Clone for NonNullPtr<T> {
 }
 
 impl<T> Copy for NonNullPtr<T> {}
+
+// pub struct RefCellNonNullPtr<T: ?Sized>(RefCell<NonNullPtr<T>>);
+
+// impl<T> RefCellNonNullPtr<T> {
+//     pub fn borrow<'a>(&self) -> &'a T {
+//         self.0.borrow().as_ref()
+//     }
+//     pub fn borrow_mut<'a>(&self) -> &'a mut T {
+//         self.0.borrow_mut().as_mut()
+//     }
+
+//     pub fn from(reference: &T) -> Self {
+//         Self(RefCell::new(NonNullPtr::from(reference)))
+//     }
+// }

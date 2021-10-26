@@ -17,72 +17,7 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::time::Duration;
 
-use serde::ser::SerializeStruct;
-use serde::ser::Serializer;
 use serde::Deserialize;
-
-fn serialize_mapper<S>(
-    mapper: &Rc<RefCell<dyn Mapper>>,
-    serializer: S,
-) -> std::result::Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let mut state = serializer.serialize_struct("mapper", 2)?;
-    state.serialize_field("mapperid", &mapper.borrow().get_mapper_id())?;
-    state.serialize_field("concretemapper", &*mapper.borrow())?;
-    state.end()
-}
-
-fn deserialize_mapper<'de, D>(
-    deserializer: D,
-) -> std::result::Result<Rc<RefCell<dyn Mapper>>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    #[derive(PartialEq, Deserialize)]
-    #[serde(field_identifier, rename_all = "lowercase")]
-    enum Field {
-        MapperId,
-        ConcreteMapper,
-    }
-
-    struct MapperVisitor;
-    impl<'de> serde::de::Visitor<'de> for MapperVisitor {
-        type Value = Rc<RefCell<dyn Mapper>>;
-
-        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-            formatter.write_str("Mapper trait")
-        }
-
-        fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
-        where
-            V: serde::de::MapAccess<'de>,
-        {
-            let mut mapperfield: Field = map.next_key().unwrap().unwrap();
-            assert!(mapperfield == Field::MapperId);
-            let mapperid: u8 = map.next_value().unwrap();
-            mapperfield = map.next_key().unwrap().unwrap();
-            assert!(mapperfield == Field::ConcreteMapper);
-
-            let mapper: Self::Value = match mapperid {
-                0 => Rc::new(RefCell::new(map.next_value::<Mapper0>().unwrap())),
-                1 => Rc::new(RefCell::new(map.next_value::<Mapper1>().unwrap())),
-                2 => Rc::new(RefCell::new(map.next_value::<Mapper2>().unwrap())),
-                4 => Rc::new(RefCell::new(map.next_value::<Mapper4>().unwrap())),
-                7 => Rc::new(RefCell::new(map.next_value::<Mapper7>().unwrap())),
-                66 => Rc::new(RefCell::new(map.next_value::<Mapper66>().unwrap())),
-                71 => Rc::new(RefCell::new(map.next_value::<Mapper71>().unwrap())),
-                227 => Rc::new(RefCell::new(map.next_value::<Mapper227>().unwrap())),
-                255 => Rc::new(RefCell::new(map.next_value::<MapperNull>().unwrap())),
-                _ => panic!("Unsupported mapper {}", mapperid),
-            };
-            Ok(mapper)
-        }
-    }
-    const FIELDS: &[&str] = &["mapperid", "concretemapper"];
-    deserializer.deserialize_struct("mapper", FIELDS, MapperVisitor)
-}
 
 fn default_video_access() -> Rc<RefCell<dyn VideoAccess>> {
     Rc::new(RefCell::new(crate::io::DummyIOImpl::new()))
@@ -106,11 +41,7 @@ pub struct NesInternal {
     vram: VRam,
     apu: Apu,
     controllers: Controllers,
-    #[serde(
-        serialize_with = "serialize_mapper",
-        deserialize_with = "deserialize_mapper"
-    )]
-    mapper: Rc<RefCell<dyn Mapper>>,
+    mapper: MapperEnum,
     #[serde(skip, default = "default_video_access")]
     video_access: Rc<RefCell<dyn VideoAccess>>,
     #[serde(skip, default = "default_audio_access")]
@@ -119,6 +50,8 @@ pub struct NesInternal {
     controller_access: Rc<RefCell<dyn ControllerAccess>>,
     #[serde(skip)]
     _pin: PhantomPinned,
+    //  #[serde(with = "serde_arrays")]
+    //prg_ram: [u8; 0x80000],
 }
 
 impl NesInternal {
@@ -127,46 +60,52 @@ impl NesInternal {
         T: IO + VideoAccess + AudioAccess + ControllerAccess + 'static,
     {
         let controllers = Controllers::new(io.clone());
-        let mapper = Rc::new(RefCell::new(MapperNull::new()));
-        let vram = VRam::new(mapper.clone());
-        let ppu = Ppu::new(io.clone(), mapper.clone());
+        let mapper = MapperEnum::MapperNull(MapperNull::new());
+        let vram = VRam::new();
+        let ppu = Ppu::new(io.clone());
         let apu = Apu::new(io.clone());
-        let ram = Ram::new(mapper.clone());
-        let cpu = Cpu::new(mapper.clone());
-
-        let mut nes = Box::pin(NesInternal {
-            cpu,
-            ram,
-            ppu,
-            vram,
-            apu,
-            controllers,
-            mapper,
-            video_access: io.clone(),
-            audio_access: io.clone(),
-            controller_access: io,
-            _pin: PhantomPinned,
-        });
-
-        let ram = NonNullPtr::from(&nes.ram);
-        let ppu = NonNullPtr::from(&nes.ppu);
-        let apu = NonNullPtr::from(&nes.apu);
-        let vram = NonNullPtr::from(&nes.vram);
-        let controllers = NonNullPtr::from(&nes.controllers);
+        let ram = Ram::new();
+        let cpu = Cpu::new();
 
         unsafe {
-            let pin_ref: Pin<&mut Self> = Pin::as_mut(&mut nes);
+            let mut pinned_nes = std::pin::Pin::new_unchecked(Box::new(NesInternal {
+                cpu,
+                ram,
+                ppu,
+                vram,
+                apu,
+                controllers,
+                mapper,
+                video_access: io.clone(),
+                audio_access: io.clone(),
+                controller_access: io,
+                _pin: PhantomPinned,
+                //   prg_ram: [0; 0x80000],
+            }));
+
+            let ram = NonNullPtr::from(&pinned_nes.ram);
+            let ppu = NonNullPtr::from(&pinned_nes.ppu);
+            let apu = NonNullPtr::from(&pinned_nes.apu);
+            let vram = NonNullPtr::from(&pinned_nes.vram);
+            let controllers = NonNullPtr::from(&pinned_nes.controllers);
+            let mapper = NonNullPtr::from(&pinned_nes.mapper);
+
+            let pin_ref: Pin<&mut Self> = Pin::as_mut(&mut pinned_nes);
             let nes = Pin::get_unchecked_mut(pin_ref);
             nes.cpu.set_ram(ram);
             nes.cpu.set_ppu_state(ppu);
             nes.cpu.set_apu_state(apu);
+            nes.cpu.set_mapper(mapper);
             nes.ram.set_controller_access(controllers);
             nes.ram.set_ppu_access(ppu);
             nes.ram.set_apu_access(apu);
+            nes.ram.set_mapper(mapper);
+            nes.vram.set_mapper(mapper);
             nes.apu.set_dmc_memory(ram);
             nes.ppu.set_vram(vram);
+            nes.ppu.set_mapper(mapper);
+            pinned_nes
         }
-        nes
     }
 
     fn serialize(&self) -> String {
@@ -175,13 +114,16 @@ impl NesInternal {
 
     fn deserialize(&mut self, state: String) {
         let mut new_nes: NesInternal = serde_yaml::from_str(&state).unwrap();
-        let mapper = new_nes.mapper.clone();
         let video_access = self.video_access.clone();
         let audio_access = self.audio_access.clone();
         let controller_access = self.controller_access.clone();
+        let mapper = NonNullPtr::from(&new_nes.mapper);
 
-        new_nes.vram.set_mapper(mapper.clone());
-        new_nes.ppu.set_mapper(mapper.clone());
+        new_nes.vram.set_mapper(mapper);
+        new_nes.ppu.set_mapper(mapper);
+        new_nes.ram.set_mapper(mapper);
+        new_nes.cpu.set_mapper(mapper);
+
         new_nes.ppu.set_vram(NonNullPtr::from(&new_nes.vram));
         new_nes.ppu.set_video_access(video_access.clone());
 
@@ -194,12 +136,13 @@ impl NesInternal {
         new_nes
             .ram
             .set_controller_access(NonNullPtr::from(&new_nes.controllers));
-        new_nes.ram.set_mapper(mapper.clone());
-
-        new_nes.cpu.set_mapper(mapper);
         new_nes.cpu.set_ram(NonNullPtr::from(&new_nes.ram));
         new_nes.cpu.set_ppu_state(NonNullPtr::from(&new_nes.ppu));
         new_nes.cpu.set_apu_state(NonNullPtr::from(&new_nes.apu));
+
+        new_nes
+            .controllers
+            .set_controller_access(controller_access.clone());
 
         new_nes.video_access = video_access;
         new_nes.audio_access = audio_access;
@@ -209,12 +152,7 @@ impl NesInternal {
     }
 
     fn load(&mut self, nes_file: &NesFile) {
-        let mapper = nes_file.create_mapper();
-        self.vram.set_mapper(mapper.clone());
-        self.ppu.set_mapper(mapper.clone());
-        self.ram.set_mapper(mapper.clone());
-        self.cpu.set_mapper(mapper.clone());
-        self.mapper = mapper;
+        self.mapper = nes_file.create_mapper();
         self.power_cycle();
     }
 
@@ -223,7 +161,7 @@ impl NesInternal {
         self.ppu.power_cycle();
         self.apu.power_cycle();
         self.ram.power_cycle();
-        self.mapper.borrow_mut().power_cycle();
+        self.mapper.power_cycle();
         self.cpu.power_cycle();
     }
 

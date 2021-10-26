@@ -1,9 +1,11 @@
 use self::AttributeDataQuadrantMask::*;
-use crate::{common::Mirroring, memory::Memory};
+use crate::mappers::MapperEnum;
+use crate::{common::Mirroring, common::NonNullPtr, memory::Memory};
+
 use crate::{mappers::Mapper, memory::VideoMemory};
 
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, ops::Range, rc::Rc};
+use std::{cell::RefCell, ops::Range};
 
 const PATTERN_TABLE_SIZE: u16 = 0x1000;
 const NAMETABLE_SIZE: u16 = 0x400;
@@ -36,14 +38,11 @@ const ATTRIBUTE_DATA_QUADRANT_MASKS: [u8; 4] = [
     BottomRight as u8,
 ];
 
-fn default_mapper() -> Rc<RefCell<dyn Mapper>> {
-    Rc::new(RefCell::new(crate::mappers::MapperNull::new()))
-}
 #[derive(Serialize, Deserialize)]
 pub struct VRam {
     memory: crate::memory::MemoryImpl<0x0820>,
-    #[serde(skip, default = "default_mapper")]
-    mapper: Rc<RefCell<dyn Mapper>>,
+    #[serde(skip)]
+    mapper: RefCell<NonNullPtr<MapperEnum>>,
     read_buffer: RefCell<u8>,
 }
 
@@ -51,22 +50,21 @@ impl Default for VRam {
     fn default() -> Self {
         Self {
             memory: Default::default(),
-            mapper: default_mapper(),
+            mapper: Default::default(),
             read_buffer: Default::default(),
         }
     }
 }
 
 impl VRam {
-    pub fn new(mapper: Rc<RefCell<dyn Mapper>>) -> Self {
+    pub fn new() -> Self {
         VRam {
-            mapper,
             ..Default::default()
         }
     }
 
-    pub fn set_mapper(&mut self, mapper: Rc<RefCell<dyn Mapper>>) {
-        self.mapper = mapper;
+    pub fn set_mapper(&mut self, mapper: NonNullPtr<MapperEnum>) {
+        self.mapper.replace(mapper);
     }
 
     pub fn power_cycle(&mut self) {
@@ -77,7 +75,7 @@ impl VRam {
         if NAMETABLES_RANGE.contains(&address) {
             let nametable_mirror_offset = address % NAMETABLE_MIRROR_SIZE;
             (address % NAMETABLE_SIZE)
-                + match self.mapper.borrow().get_mirroring() {
+                + match self.mapper.borrow().as_ref().get_mirroring() {
                     Mirroring::Vertical => match nametable_mirror_offset {
                         0x0000..=0x03FF => 0x0000,
                         0x0400..=0x07FF => 0x0400,
@@ -117,7 +115,7 @@ impl VRam {
 
     fn get_byte_internal(&self, address: u16) -> u8 {
         if address < NAMETABLES_START {
-            self.mapper.borrow_mut().get_chr_byte(address)
+            self.mapper.borrow_mut().as_mut().get_chr_byte(address)
         } else {
             self.memory.get_byte(self.get_target_address(address))
         }
@@ -136,7 +134,10 @@ impl Memory for VRam {
     fn store_byte(&mut self, address: u16, byte: u8) {
         let adress = address & 0x3FFF;
         if adress < NAMETABLES_START {
-            self.mapper.borrow_mut().store_chr_byte(adress, byte);
+            self.mapper
+                .borrow_mut()
+                .as_mut()
+                .store_chr_byte(adress, byte);
         } else {
             self.memory
                 .store_byte(self.get_target_address(adress), byte);

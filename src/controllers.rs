@@ -103,6 +103,10 @@ impl Controllers {
             strobe: true,
         }
     }
+    pub fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>) {
+        self.controller_1.controller_access = controller_access.clone();
+        self.controller_2.controller_access = controller_access;
+    }
 }
 
 impl ReadInputRegisters for Controllers {
