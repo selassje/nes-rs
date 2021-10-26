@@ -113,42 +113,41 @@ impl NesInternal {
     }
 
     fn deserialize(&mut self, state: String) {
-        let mut new_nes: NesInternal = serde_yaml::from_str(&state).unwrap();
+        let new_nes: NesInternal = serde_yaml::from_str(&state).unwrap();
         let video_access = self.video_access.clone();
         let audio_access = self.audio_access.clone();
         let controller_access = self.controller_access.clone();
-        let mapper = NonNullPtr::from(&new_nes.mapper);
-
-        new_nes.vram.set_mapper(mapper);
-        new_nes.ppu.set_mapper(mapper);
-        new_nes.ram.set_mapper(mapper);
-        new_nes.cpu.set_mapper(mapper);
-
-        new_nes.ppu.set_vram(NonNullPtr::from(&new_nes.vram));
-        new_nes.ppu.set_video_access(video_access.clone());
-
-        new_nes.apu.set_audio_access(audio_access.clone());
-
-        new_nes.apu.set_dmc_memory(NonNullPtr::from(&new_nes.ram));
-
-        new_nes.ram.set_apu_access(NonNullPtr::from(&new_nes.apu));
-        new_nes.ram.set_ppu_access(NonNullPtr::from(&new_nes.ppu));
-        new_nes
-            .ram
-            .set_controller_access(NonNullPtr::from(&new_nes.controllers));
-        new_nes.cpu.set_ram(NonNullPtr::from(&new_nes.ram));
-        new_nes.cpu.set_ppu_state(NonNullPtr::from(&new_nes.ppu));
-        new_nes.cpu.set_apu_state(NonNullPtr::from(&new_nes.apu));
-
-        new_nes
-            .controllers
-            .set_controller_access(controller_access.clone());
-
-        new_nes.video_access = video_access;
-        new_nes.audio_access = audio_access;
-        new_nes.controller_access = controller_access;
 
         *self = new_nes;
+
+        let mapper = NonNullPtr::from(&self.mapper);
+
+        self.vram.set_mapper(mapper);
+        self.ppu.set_mapper(mapper);
+        self.ram.set_mapper(mapper);
+        self.cpu.set_mapper(mapper);
+
+        self.ppu.set_vram(NonNullPtr::from(&self.vram));
+        self.ppu.set_video_access(video_access.clone());
+
+        self.apu.set_audio_access(audio_access.clone());
+
+        self.apu.set_dmc_memory(NonNullPtr::from(&self.ram));
+
+        self.ram.set_apu_access(NonNullPtr::from(&self.apu));
+        self.ram.set_ppu_access(NonNullPtr::from(&self.ppu));
+        self.ram
+            .set_controller_access(NonNullPtr::from(&self.controllers));
+        self.cpu.set_ram(NonNullPtr::from(&self.ram));
+        self.cpu.set_ppu_state(NonNullPtr::from(&self.ppu));
+        self.cpu.set_apu_state(NonNullPtr::from(&self.apu));
+
+        self.controllers
+            .set_controller_access(controller_access.clone());
+
+        self.video_access = video_access;
+        self.audio_access = audio_access;
+        self.controller_access = controller_access;
     }
 
     fn load(&mut self, nes_file: &NesFile) {
@@ -190,6 +189,7 @@ impl NesInternal {
     }
 }
 
+//#[derive(serde::Serialize, Deserialize)]
 pub struct Nes {
     nes: Pin<Box<NesInternal>>,
 }
