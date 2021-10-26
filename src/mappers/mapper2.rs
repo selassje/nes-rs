@@ -52,8 +52,4 @@ impl Mapper for Mapper2 {
     fn store_prg_byte(&mut self, _: u16, byte: u8) {
         self.switchable_bank_0 = byte as usize;
     }
-
-    fn get_mapper_id(&self) -> u8 {
-        2
-    }
 }

@@ -67,8 +67,4 @@ impl Mapper for Mapper71 {
             _ => (),
         }
     }
-
-    fn get_mapper_id(&self) -> u8 {
-        71
-    }
 }

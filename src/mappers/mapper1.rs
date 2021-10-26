@@ -146,8 +146,4 @@ impl Mapper for Mapper1 {
         self.shift_register.value = 0;
         self.shift_register.write_count = 0;
     }
-
-    fn get_mapper_id(&self) -> u8 {
-        1
-    }
 }

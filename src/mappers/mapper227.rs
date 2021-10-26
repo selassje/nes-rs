@@ -133,8 +133,4 @@ impl Mapper for Mapper227 {
         self.register = 0;
         self.mapper_internal.reset();
     }
-
-    fn get_mapper_id(&self) -> u8 {
-        227
-    }
 }

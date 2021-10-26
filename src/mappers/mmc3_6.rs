@@ -259,8 +259,4 @@ impl Mapper for MMC3_6 {
         self.irq_triggered = false;
         self.scanline_counter = 0;
     }
-
-    fn get_mapper_id(&self) -> u8 {
-        panic!()
-    }
 }

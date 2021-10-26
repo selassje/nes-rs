@@ -49,8 +49,4 @@ impl Mapper for Mapper4 {
     fn is_irq_pending(&mut self) -> bool {
         self.mmc3.is_irq_pending()
     }
-
-    fn get_mapper_id(&self) -> u8 {
-        4
-    }
 }

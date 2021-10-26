@@ -50,8 +50,4 @@ impl Mapper for Mapper0 {
     fn power_cycle(&mut self) {
         self.mapper_internal.reset();
     }
-
-    fn get_mapper_id(&self) -> u8 {
-        0
-    }
 }

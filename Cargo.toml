@@ -34,7 +34,7 @@ name = "serialization"
 path = "tests/serialization.rs"
 
 [profile.release] 
-debug = false
+debug = true
 lto = true
 opt-level = 3
 panic = "abort"
@@ -58,11 +58,10 @@ imgui-filedialog = { git = "https://github.com/selassje/imgui-filedialog-rs.git"
 gl = "0.10.0"
 emscripten_main_loop = "0.1"
 serde = { version = "1.0", features = ["derive","rc"] }
-serde_yaml = "0.8"
+serde_json = "1.0.0"
 serde_arrays = "0.1"
-# typetag = "0.1.7"
-erased-serde = "0.3.0" 
 default-boxed = "0.1.10"
+serde_stacker = "0.1.4"
 
 
 [package.metadata.vcpkg]

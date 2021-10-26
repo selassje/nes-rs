@@ -109,11 +109,14 @@ impl NesInternal {
     }
 
     fn serialize(&self) -> String {
-        serde_yaml::to_string(self).unwrap()
+        serde_json::to_string(self).unwrap()
     }
 
     fn deserialize(&mut self, state: String) {
-        let new_nes: NesInternal = serde_yaml::from_str(&state).unwrap();
+        let mut deserializer = serde_json::Deserializer::from_str(&state);
+        let deserializer = serde_stacker::Deserializer::new(&mut deserializer);
+        let value = serde_json::Value::deserialize(deserializer).unwrap();
+        let new_nes: NesInternal = serde_json::from_value(value).unwrap();
         let video_access = self.video_access.clone();
         let audio_access = self.audio_access.clone();
         let controller_access = self.controller_access.clone();

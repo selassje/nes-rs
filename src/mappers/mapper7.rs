@@ -56,8 +56,4 @@ impl Mapper for Mapper7 {
             self.register = byte as usize;
         }
     }
-
-    fn get_mapper_id(&self) -> u8 {
-        7
-    }
 }

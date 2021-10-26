@@ -52,8 +52,4 @@ impl Mapper for Mapper66 {
         self.chr_bank = (byte & 3) as usize;
         self.prg_bank = ((byte & 0b00110000) >> 4) as usize;
     }
-
-    fn get_mapper_id(&self) -> u8 {
-        66
-    }
 }

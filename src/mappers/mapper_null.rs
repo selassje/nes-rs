@@ -28,8 +28,4 @@ impl super::Mapper for MapperNull {
     }
 
     fn power_cycle(&mut self) {}
-
-    fn get_mapper_id(&self) -> u8 {
-        255
-    }
 }

@@ -24,8 +24,6 @@ pub use self::mapper71::Mapper71;
 pub use self::mapper_null::MapperNull;
 
 pub trait Mapper {
-    fn get_mapper_id(&self) -> u8;
-
     fn get_chr_byte(&mut self, address: u16) -> u8;
     fn store_chr_byte(&mut self, address: u16, byte: u8);
 
@@ -42,8 +40,6 @@ pub trait Mapper {
     fn ppu_a12_rising_edge_triggered(&mut self) {}
 }
 
-erased_serde::serialize_trait_object!(Mapper);
-
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum MapperEnum {
     MapperNull(self::mapper_null::MapperNull),
@@ -57,39 +53,16 @@ pub enum MapperEnum {
     Mapper227(self::mapper227::Mapper227),
 }
 
-// impl erased_serde::Serialize for MapperEnum {
-//     fn erased_serialize(
-//         &self,
-//         v: &mut dyn erased_serde::Serializer,
-//     ) -> Result<erased_serde::Ok, erased_serde::Error> {
-//         todo!()
-//     }
-// }
-
 impl Mapper for MapperEnum {
-    fn get_mapper_id(&self) -> u8 {
-        match self {
-            MapperEnum::Mapper0(mapper) => mapper.get_mapper_id(),
-            MapperEnum::Mapper66(mapper) => mapper.get_mapper_id(),
-            MapperEnum::MapperNull(mapper) => mapper.get_mapper_id(),
-            MapperEnum::Mapper1(mapper) => mapper.get_mapper_id(),
-            MapperEnum::Mapper2(mapper) => mapper.get_mapper_id(),
-            MapperEnum::Mapper4(mapper) => mapper.get_mapper_id(),
-            MapperEnum::Mapper7(mapper) => mapper.get_mapper_id(),
-            MapperEnum::Mapper71(mapper) => mapper.get_mapper_id(),
-            MapperEnum::Mapper227(mapper) => mapper.get_mapper_id(),
-        }
-    }
-
     fn get_chr_byte(&mut self, address: u16) -> u8 {
         match self {
-            MapperEnum::Mapper0(mapper) => mapper.get_chr_byte(address),
-            MapperEnum::Mapper66(mapper) => mapper.get_chr_byte(address),
             MapperEnum::MapperNull(mapper) => mapper.get_chr_byte(address),
+            MapperEnum::Mapper0(mapper) => mapper.get_chr_byte(address),
             MapperEnum::Mapper1(mapper) => mapper.get_chr_byte(address),
             MapperEnum::Mapper2(mapper) => mapper.get_chr_byte(address),
             MapperEnum::Mapper4(mapper) => mapper.get_chr_byte(address),
             MapperEnum::Mapper7(mapper) => mapper.get_chr_byte(address),
+            MapperEnum::Mapper66(mapper) => mapper.get_chr_byte(address),
             MapperEnum::Mapper71(mapper) => mapper.get_chr_byte(address),
             MapperEnum::Mapper227(mapper) => mapper.get_chr_byte(address),
         }
@@ -97,13 +70,13 @@ impl Mapper for MapperEnum {
 
     fn store_chr_byte(&mut self, address: u16, byte: u8) {
         match self {
-            MapperEnum::Mapper0(mapper) => mapper.store_chr_byte(address, byte),
-            MapperEnum::Mapper66(mapper) => mapper.store_chr_byte(address, byte),
             MapperEnum::MapperNull(mapper) => mapper.store_chr_byte(address, byte),
+            MapperEnum::Mapper0(mapper) => mapper.store_chr_byte(address, byte),
             MapperEnum::Mapper1(mapper) => mapper.store_chr_byte(address, byte),
             MapperEnum::Mapper2(mapper) => mapper.store_chr_byte(address, byte),
             MapperEnum::Mapper4(mapper) => mapper.store_chr_byte(address, byte),
             MapperEnum::Mapper7(mapper) => mapper.store_chr_byte(address, byte),
+            MapperEnum::Mapper66(mapper) => mapper.store_chr_byte(address, byte),
             MapperEnum::Mapper71(mapper) => mapper.store_chr_byte(address, byte),
             MapperEnum::Mapper227(mapper) => mapper.store_chr_byte(address, byte),
         }
@@ -111,13 +84,13 @@ impl Mapper for MapperEnum {
 
     fn get_prg_byte(&mut self, address: u16) -> u8 {
         match self {
-            MapperEnum::Mapper0(mapper) => mapper.get_prg_byte(address),
-            MapperEnum::Mapper66(mapper) => mapper.get_prg_byte(address),
             MapperEnum::MapperNull(mapper) => mapper.get_prg_byte(address),
+            MapperEnum::Mapper0(mapper) => mapper.get_prg_byte(address),
             MapperEnum::Mapper1(mapper) => mapper.get_prg_byte(address),
             MapperEnum::Mapper2(mapper) => mapper.get_prg_byte(address),
             MapperEnum::Mapper4(mapper) => mapper.get_prg_byte(address),
             MapperEnum::Mapper7(mapper) => mapper.get_prg_byte(address),
+            MapperEnum::Mapper66(mapper) => mapper.get_prg_byte(address),
             MapperEnum::Mapper71(mapper) => mapper.get_prg_byte(address),
             MapperEnum::Mapper227(mapper) => mapper.get_prg_byte(address),
         }
@@ -125,13 +98,13 @@ impl Mapper for MapperEnum {
 
     fn store_prg_byte(&mut self, address: u16, byte: u8) {
         match self {
-            MapperEnum::Mapper0(mapper) => mapper.store_prg_byte(address, byte),
-            MapperEnum::Mapper66(mapper) => mapper.store_prg_byte(address, byte),
             MapperEnum::MapperNull(mapper) => mapper.store_prg_byte(address, byte),
+            MapperEnum::Mapper0(mapper) => mapper.store_prg_byte(address, byte),
             MapperEnum::Mapper1(mapper) => mapper.store_prg_byte(address, byte),
             MapperEnum::Mapper2(mapper) => mapper.store_prg_byte(address, byte),
             MapperEnum::Mapper4(mapper) => mapper.store_prg_byte(address, byte),
             MapperEnum::Mapper7(mapper) => mapper.store_prg_byte(address, byte),
+            MapperEnum::Mapper66(mapper) => mapper.store_prg_byte(address, byte),
             MapperEnum::Mapper71(mapper) => mapper.store_prg_byte(address, byte),
             MapperEnum::Mapper227(mapper) => mapper.store_prg_byte(address, byte),
         }
@@ -139,13 +112,13 @@ impl Mapper for MapperEnum {
 
     fn get_mirroring(&self) -> Mirroring {
         match self {
-            MapperEnum::Mapper0(mapper) => mapper.get_mirroring(),
-            MapperEnum::Mapper66(mapper) => mapper.get_mirroring(),
             MapperEnum::MapperNull(mapper) => mapper.get_mirroring(),
+            MapperEnum::Mapper0(mapper) => mapper.get_mirroring(),
             MapperEnum::Mapper1(mapper) => mapper.get_mirroring(),
             MapperEnum::Mapper2(mapper) => mapper.get_mirroring(),
             MapperEnum::Mapper4(mapper) => mapper.get_mirroring(),
             MapperEnum::Mapper7(mapper) => mapper.get_mirroring(),
+            MapperEnum::Mapper66(mapper) => mapper.get_mirroring(),
             MapperEnum::Mapper71(mapper) => mapper.get_mirroring(),
             MapperEnum::Mapper227(mapper) => mapper.get_mirroring(),
         }
