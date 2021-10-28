@@ -34,7 +34,7 @@ name = "serialization"
 path = "tests/serialization.rs"
 
 [profile.release] 
-debug = true
+debug = false
 lto = true
 opt-level = 3
 panic = "abort"
@@ -60,8 +60,8 @@ emscripten_main_loop = "0.1"
 serde = { version = "1.0", features = ["derive","rc"] }
 serde_json = "1.0.0"
 serde_arrays = "0.1"
-default-boxed = "0.1.10"
 serde_stacker = "0.1.4"
+enum_dispatch = "0.3.7"
 
 
 [package.metadata.vcpkg]

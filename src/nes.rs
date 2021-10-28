@@ -50,8 +50,6 @@ pub struct NesInternal {
     controller_access: Rc<RefCell<dyn ControllerAccess>>,
     #[serde(skip)]
     _pin: PhantomPinned,
-    //  #[serde(with = "serde_arrays")]
-    //prg_ram: [u8; 0x80000],
 }
 
 impl NesInternal {
@@ -80,7 +78,6 @@ impl NesInternal {
                 audio_access: io.clone(),
                 controller_access: io,
                 _pin: PhantomPinned,
-                //   prg_ram: [0; 0x80000],
             }));
 
             let ram = NonNullPtr::from(&pinned_nes.ram);
