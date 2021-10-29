@@ -17,8 +17,6 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::time::Duration;
 
-use serde::Deserialize;
-
 fn default_video_access() -> Rc<RefCell<dyn VideoAccess>> {
     Rc::new(RefCell::new(crate::io::DummyIOImpl::new()))
 }
@@ -33,7 +31,7 @@ type Ppu = crate::ppu::Ppu<VRam>;
 pub type Ram = crate::ram::Ram<Ppu, Apu, Controllers>;
 type Cpu = crate::cpu::Cpu<Ram, Ppu, Apu>;
 
-#[derive(serde::Serialize, Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesInternal {
     cpu: Cpu,
     ram: Ram,
@@ -112,7 +110,7 @@ impl NesInternal {
     fn deserialize(&mut self, state: String) {
         let mut deserializer = serde_json::Deserializer::from_str(&state);
         let deserializer = serde_stacker::Deserializer::new(&mut deserializer);
-        let value = serde_json::Value::deserialize(deserializer).unwrap();
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer).unwrap();
         let new_nes: NesInternal = serde_json::from_value(value).unwrap();
         let video_access = self.video_access.clone();
         let audio_access = self.audio_access.clone();
@@ -189,7 +187,6 @@ impl NesInternal {
     }
 }
 
-//#[derive(serde::Serialize, Deserialize)]
 pub struct Nes {
     nes: Pin<Box<NesInternal>>,
 }
