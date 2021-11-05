@@ -3,10 +3,20 @@
 
 # about
 
-This is my NES emulator implementation written in Rust. My main goal of this project is to practice the language :)
+This is my NES emulator implementation written in Rust. My main goal of this project is to practice the language :smile:
 
 You can check out the web version at:
 https://selassje.github.io/nes-rs/
+
+# features
+
+* faithfull implementation, down to single pixel rendering, based on [NESDev](https://wiki.nesdev.org/w/index.php/Nesdev_Wiki)
+* control of the emulation speed
+* state serialization support
+* customizable key mappings (currently only keyboard is supported)
+* fullscreen mode support
+* currently supported mappers:
+  * 1, 2, 4, 7, 66, 71, 227
 
 # building
 
