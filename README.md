@@ -38,4 +38,7 @@ I recommend using [cargo-web](https://github.com/koute/cargo-web) to build and r
 
 * `cargo web start --release`
 
+# testing
+
+Automatic testing is done by running test ROMS from https://github.com/christopherpow/nes-test-roms and comparing generated frames with the expected ones
 
