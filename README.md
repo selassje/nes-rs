@@ -8,6 +8,8 @@ This is my NES emulator implementation written in Rust. My main goal of this pro
 You can check out the web version at:
 https://selassje.github.io/nes-rs/
 
+![NES](https://github.com/selassje/nes-rs/blob/master/res/demo.png)
+
 # features
 
 * faithfull implementation, down to single pixel rendering, based on [NESDev](https://wiki.nesdev.org/w/index.php/Nesdev_Wiki)
