@@ -20,6 +20,19 @@ https://selassje.github.io/nes-rs/
 * currently supported mappers:
   * 1, 2, 4, 7, 66, 71, 227
 
+# default key bindings
+
+NES Button | Player1 | Player2
+-----------| ------- | -------
+A | Q | Keypad 4 
+B | E | Keypad 5 
+Select | C | Keypad 6 
+Start | Space | Keypad + 
+Up | W | Up Arrow
+Down | S | Down Arrow 
+Left | A | Left Arrow
+Right | D | Right Arrow
+
 # building
 
 The CI tested targets are **x86_64-pc-windows-msvc** and **x86_64-unknown-linux-gnu** 
