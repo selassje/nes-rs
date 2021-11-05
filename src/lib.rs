@@ -38,6 +38,11 @@ extern crate cfg_if;
 const FRAME_DURATION: std::time::Duration = std::time::Duration::from_nanos(
     (std::time::Duration::from_secs(1).as_nanos() / (common::DEFAULT_FPS) as u128) as u64,
 );
+
+#[cfg(target_os = "emscripten")]
+extern "C" {
+    fn emscripten_run_script(s: *const std::os::raw::c_char);
+}
 pub struct Emulation {
     nes: Nes,
     io: Rc<RefCell<IOSdl2ImGuiOpenGl>>,
@@ -158,6 +163,11 @@ fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut 
             )
         });
         file.write_all(serialized.as_bytes()).unwrap();
+        #[cfg(target_os = "emscripten")]
+        unsafe {
+            let script = std::ffi::CString::new("refreshDownloadList();").unwrap();
+            emscripten_run_script(script.as_ptr());
+        };
     }
 
     if let Some(ref load_state_path) = io_state.load_state {

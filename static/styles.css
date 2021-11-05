@@ -6,7 +6,6 @@ body {
 
 #sidenav {
   height: 100%;
-  width: 70px;
   position: fixed;
   z-index: 1;
   top: 0;
@@ -14,17 +13,41 @@ body {
   background-color: rgb(153, 79, 79);
   overflow-x: hidden;
   transition: 0.5s; 
+  display: inline-block;
+}
+
+#download_save_files {
+  display: none;
+}
+
+#download_save_files ul, #download_save_files li {
+  margin: 0;
+  padding: 0;
+  margin-left: 10px;
+  margin-right: 5px;
+}
+
+#download_save_files h3 {
+  margin-right: 5px;
+  font-family:Georgia, 'Times New Roman', Times, serif
+}
+
+.button{
+  cursor: pointer;
+  width:  90px;
+}
+
+input {
+  display: none;
 }
 
 #main {
   padding: 0px;
   margin: 0px;
   border: 0px;
-  left: 0px;
-  width: 100%;
   height: 100%;
+  left: 90px;
   position: relative;
-
 }
 
 canvas {
@@ -35,4 +58,9 @@ canvas {
   padding: 0px;
   border: 0px;
   left: 0px;
+  position:sticky;
+}
+
+tr,  th {
+  text-align: left;
 }

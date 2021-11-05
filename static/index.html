@@ -16,7 +16,8 @@
                     return emulatorCanvas;
                 }
                 var canvas = document.createElement('canvas');
-                document.querySelector('#main').appendChild(canvas);
+                var main = document.querySelector('#main');
+                main.insertBefore(canvas, main.firstElementChild);
                 emulatorCanvas = canvas;
                 return canvas;
             }
@@ -26,17 +27,86 @@
 
 <body>
     <div id="sidenav">
-        <img src="img/upload-file-svgrepo-com.svg" id="upload_nes_file_btn" style="cursor:pointer"
-            onclick="upload_nes_file_btn_click()" accesskey="o" title="Upload NES file to the Emulator's file system" />
-        <input type="file" id="upload_nes_file" name="upload_nes_file" accept=".NES" style="display:none;" />
-        <img src="img/upload-file-svgrepo-com.svg" id="upload_save_file_btn" style="cursor:pointer"
-            onclick="upload_save_file_btn_click()" accesskey="o"
-            title="Upload Save file to the Emulator's file system" />
-        <input type="file" id="upload_save_file" name="upload_save_file" accept=".nesrs" style="display:none;" />
+        <div>
+            <img id="upload_nes_file_btn" class="button" src="img/upload-file-svgrepo-com.svg"
+                onclick="upload_nes_file_btn_click()" accesskey="o"
+                title="Upload NES file to the Emulator's file system" />
+            <input type="file" id="upload_nes_file" name="upload_nes_file" accept=".NES" />
+        </div>
+        <div>
+            <img id="upload_save_file_btn" class="button" src="img/upload-file-svgrepo-com.svg"
+                onclick="upload_save_file_btn_click()" accesskey="s"
+                title="Upload Save file to the Emulator's file system" />
+            <input type="file" id="upload_save_file" name="upload_save_file" accept=".nesrs" />
+        </div>
+        <div id="download_save_files">
+            <h3>Download Save</h3>
+            <ul id="download_list">
+            </ul>
+        </div>
     </div>
     <div id="main">
         <script src="nes-rs.js"></script>
         <script src="script.js"></script>
+        <h3>About</h3>
+        <p>
+            Hi, Welcome to NES-RS, my Nintendo Entertainment System emulator.
+        </p>
+
+        <p id="text">Use buttons on the sidebar to upload a NES file or a previously saved state to the Emulator's file
+            system and then open them from the Emulator's file menu.
+            You can also download any save using links on the sidebar.
+        </p>
+        <h3>Controllers</h3>
+        <p> The default key mapping is as follows: </p>
+        <table>
+            <tr>
+                <th>NES Button</th>
+                <th>Player 1</th>
+                <th>Player 2</th>
+            </tr>
+            <tr>
+                <td>A</td>
+                <td>Q</td>
+                <td>Keypad 4</td>
+            </tr>
+            <tr>
+                <td>B</td>
+                <td>E</td>
+                <td>Keypad 5</td>
+            </tr>
+            <tr>
+                <td>Select</td>
+                <td>C</td>
+                <td>Keypad 6</td>
+            </tr>
+            <tr>
+                <td>Start</td>
+                <td>Space</td>
+                <td>Keypad +</td>
+            </tr>
+            <tr>
+                <td>Up</td>
+                <td>W</td>
+                <td>Up Arrow</td>
+            </tr>
+            <tr>
+                <td>Down </td>
+                <td>S</td>
+                <td>Down Arrow</td>
+            </tr>
+            <tr>
+                <td>Left</td>
+                <td>A</td>
+                <td>Left Arrow</td>
+            </tr>
+            <tr>
+                <td>Right</td>
+                <td>D</td>
+                <td>Right Arrow</td>
+            </tr>
+        </table>
+        <p>You can configure your own mapping from Emulator's Controllers menu</p>
     </div>
     <script>
     </script>

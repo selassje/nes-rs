@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 pub trait ColorMapper {
     fn map_nes_color(&self, color: u8) -> RgbColor;
 }
-//erased_serde::serialize_trait_object!(ColorMapper<'_>);
 #[derive(Serialize, Deserialize)]
 pub struct DefaultColorMapper {
     #[serde(with = "serde_arrays")]

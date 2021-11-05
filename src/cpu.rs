@@ -406,6 +406,10 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
             || ins == bvs_fn
     }
 
+    fn is_page_crossed(addr_1: u16, addr_2: u16) -> bool {
+        addr_1 & 0xFF00 != addr_2 & 0xFF00
+    }
+
     fn get_extra_cycles_from_branching(&self, ins: usize) -> u16 {
         let bcc_fn = Self::bcc as usize;
         let bcs_fn = Self::bcs as usize;
@@ -427,7 +431,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         {
             let mut extra_cycles = 1;
             if let Address::Relative(new_pc) = self.address {
-                if (new_pc + 2) & 0xFF00 != (self.pc + 2) & 0xFF00 {
+                if Self::is_page_crossed(new_pc + 2, self.pc + 2) {
                     extra_cycles += 1;
                 }
             } else {
@@ -491,7 +495,8 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
                     self.ram.as_ref().get_byte((b0_u16 + 1) & 0xFF),
                 );
                 let indirect_indexed = (indirect as u32 + y_u16 as u32) as u16;
-                if extra_cycle_on_page_crossing && indirect_indexed & 0xFF00 != indirect & 0xFF00 {
+                if extra_cycle_on_page_crossing && Self::is_page_crossed(indirect_indexed, indirect)
+                {
                     extra_cycle = 1;
                 }
                 Address::Ram(indirect_indexed)
