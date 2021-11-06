@@ -5,6 +5,23 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
 
+mod std_nes_controller;
+
+//pub use self::std_nes_controller::Mapper0;
+
+#[enum_dispatch::enum_dispatch(ControllerEnum)]
+pub trait Controller {
+    fn read(&self) -> u8;
+    fn write(&mut self, byte: u8);
+    fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>);
+}
+
+#[enum_dispatch::enum_dispatch]
+#[derive(Serialize, Deserialize)]
+pub enum ControllerEnum {
+    StdNesController(self::std_nes_controller::StdNesController),
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ControllerId {
     Controller1,
