@@ -15,9 +15,20 @@ pub struct StdNesController {
     strobe: bool,
 }
 
+impl StdNesController {
+    pub fn new(id: ControllerId) -> Self {
+        Self {
+            id,
+            button: Default::default(),
+            strobe: true,
+            controller_access: super::default_controller_access(),
+        }
+    }
+}
+
 impl super::Controller for StdNesController {
     fn read(&self) -> u8 {
-        if *self.button.borrow() < 8 {
+        0x40 | if *self.button.borrow() < 8 {
             let button = Into::<Button>::into(*self.button.borrow());
             let mut val = self
                 .controller_access

@@ -1,6 +1,8 @@
 use crate::apu::Apu;
 use crate::common;
 use crate::common::NonNullPtr;
+use crate::controllers::ControllerId;
+use crate::controllers::ControllerType;
 use crate::controllers::Controllers;
 use crate::io::AudioAccess;
 use crate::io::ControllerAccess;
@@ -55,7 +57,7 @@ impl NesInternal {
     where
         T: IO + VideoAccess + AudioAccess + ControllerAccess + 'static,
     {
-        let controllers = Controllers::new(io.clone());
+        let controllers = Controllers::new();
         let mapper = MapperEnum::MapperNull(MapperNull::new());
         let vram = VRam::new();
         let ppu = Ppu::new(io.clone());
@@ -74,7 +76,7 @@ impl NesInternal {
                 mapper,
                 video_access: io.clone(),
                 audio_access: io.clone(),
-                controller_access: io,
+                controller_access: io.clone(),
                 _pin: PhantomPinned,
             }));
 
@@ -99,6 +101,17 @@ impl NesInternal {
             nes.apu.set_dmc_memory(ram);
             nes.ppu.set_vram(vram);
             nes.ppu.set_mapper(mapper);
+
+            nes.controllers.set_controller(
+                ControllerId::Controller1,
+                ControllerType::StdNesController,
+                io.clone(),
+            );
+            nes.controllers.set_controller(
+                ControllerId::Controller2,
+                ControllerType::StdNesController,
+                io,
+            );
             pinned_nes
         }
     }
