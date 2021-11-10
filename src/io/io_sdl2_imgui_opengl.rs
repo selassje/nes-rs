@@ -414,6 +414,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
 impl io::VideoAccess for IOSdl2ImGuiOpenGl {
     fn set_pixel(&mut self, x: usize, y: usize, color: io::RgbColor) {
         self.io_internal.set_pixel(x, y, color);
+        // assert!(x >= 0 && x < FRAME_WIDTH && y >= 0 && y < FRAME_HEIGHT);
         self.render_frame = x == FRAME_WIDTH - 1 && y == 239;
     }
 }

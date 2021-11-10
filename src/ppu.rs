@@ -46,6 +46,8 @@ const FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET: u16 = FETCH_ATTRIBUTE_DATA_CYCLE_OFFS
 const FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET: u16 = FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET + 2;
 
 const VBLANK_START_CYCLE: u16 = 4;
+const POI_Y: i16 = 239;
+const POI_X: u16 = 255;
 
 #[derive(Serialize, Deserialize)]
 struct ControlRegister {
@@ -339,6 +341,8 @@ pub struct Ppu<VRAM: VideoMemory> {
     #[serde(skip)]
     mapper: NonNullPtr<MapperEnum>,
     tile_data: [TileData; 3],
+    poi_pixel_hit: bool,
+    log_pixel: bool,
 }
 
 impl<VRAM: VideoMemory> Default for Ppu<VRAM> {
@@ -377,6 +381,8 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
             background_palletes: Default::default(),
             mapper: Default::default(),
             tile_data: [Default::default(); 3],
+            poi_pixel_hit: false,
+            log_pixel: false,
         }
     }
 
@@ -471,6 +477,10 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
             .borrow_mut()
             .set_pixel(x as usize, self.scanline as usize, color);
 
+        if x == POI_X && self.scanline == POI_Y {
+            self.poi_pixel_hit = true;
+        }
+
         if !self.status_reg.get_flag(StatusRegisterFlag::Sprite0Hit)
             && x < 255
             && self
@@ -500,6 +510,9 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
                 .set(NM_TABLE_X, self.t_vram_address.get(NM_TABLE_X));
         }
 
+        if self.log_pixel {
+            println!("PPU cycle {} scanline {}", self.ppu_cycle, self.scanline);
+        }
         match self.scanline {
             PRE_RENDER_SCANLINE => match self.ppu_cycle {
                 VBLANK_START_CYCLE => {
@@ -584,6 +597,12 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
                 self.scanline = PRE_RENDER_SCANLINE;
             }
             if self.scanline == POST_RENDER_SCANLINE {
+                if self.poi_pixel_hit {
+                    self.log_pixel = false;
+                } else {
+                    self.log_pixel = true;
+                }
+                self.poi_pixel_hit = false;
                 if self.frame == std::u128::MAX {
                     self.frame = 0;
                 } else {
