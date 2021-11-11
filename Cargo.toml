@@ -62,6 +62,7 @@ serde_json = "1.0.0"
 serde_arrays = "0.1"
 serde_stacker = "0.1.4"
 enum_dispatch = "0.3.7"
+chlorine = "=1.0.7"
 
 
 [package.metadata.vcpkg]
