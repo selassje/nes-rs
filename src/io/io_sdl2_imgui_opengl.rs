@@ -7,7 +7,7 @@ use std::{borrow::BorrowMut, collections::HashMap};
 
 use self::gui::VideoSizeControl;
 
-use super::{io_internal, FRAME_HEIGHT, FRAME_WIDTH};
+use super::io_internal;
 use crate::{controllers, io};
 
 use gl::types::*;
@@ -58,7 +58,6 @@ pub struct IOSdl2ImGuiOpenGl {
     cancel: bool,
     is_video_size_change_pending: bool,
     keyboard_shortcuts: keyboard_shortcuts::KeyboardShortcuts,
-    render_frame: bool,
 }
 
 impl IOSdl2ImGuiOpenGl {
@@ -154,7 +153,6 @@ impl IOSdl2ImGuiOpenGl {
             keyboard_shortcuts: Default::default(),
             cancel: false,
             is_video_size_change_pending: false,
-            render_frame: false,
         }
     }
 
@@ -371,22 +369,19 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 self.sample_buffer.reset(control.target_fps, volume);
             }
         }
-        if self.render_frame {
-            unsafe {
-                gl::TexImage2D(
-                    gl::TEXTURE_2D,
-                    0,
-                    gl::RGB8 as _,
-                    io::FRAME_WIDTH as _,
-                    io::FRAME_HEIGHT as _,
-                    0,
-                    gl::RGB,
-                    gl::UNSIGNED_BYTE,
-                    self.io_internal.get_pixels_slice().as_ptr() as _,
-                );
-            };
-            self.render_frame = false;
-        }
+        unsafe {
+            gl::TexImage2D(
+                gl::TEXTURE_2D,
+                0,
+                gl::RGB8 as _,
+                io::FRAME_WIDTH as _,
+                io::FRAME_HEIGHT as _,
+                0,
+                gl::RGB,
+                gl::UNSIGNED_BYTE,
+                self.io_internal.get_pixels_slice().as_ptr() as _,
+            );
+        };
 
         self.imgui_sdl2.prepare_frame(
             self.imgui.io_mut(),
@@ -414,8 +409,6 @@ impl io::IO for IOSdl2ImGuiOpenGl {
 impl io::VideoAccess for IOSdl2ImGuiOpenGl {
     fn set_pixel(&mut self, x: usize, y: usize, color: io::RgbColor) {
         self.io_internal.set_pixel(x, y, color);
-        // assert!(x >= 0 && x < FRAME_WIDTH && y >= 0 && y < FRAME_HEIGHT);
-        self.render_frame = x == FRAME_WIDTH - 1 && y == 239;
     }
 }
 

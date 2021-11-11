@@ -184,7 +184,11 @@ impl NesInternal {
     }
 
     fn run_single_frame(&mut self) {
-        for _ in 0..common::CPU_CYCLES_PER_FRAME {
+        use crate::ppu::PpuState;
+
+        let current_frame = self.ppu.get_time().frame;
+
+        while self.ppu.get_time().frame == current_frame {
             self.run_single_cpu_cycle();
         }
     }
