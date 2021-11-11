@@ -75,13 +75,13 @@ impl NesTest {
         self.nes.run_for(duration)
     }
 
-    pub fn serialize_and_reset(&mut self) -> String {
+    pub fn serialize_and_reset(&mut self) -> Vec<u8> {
         let serialized = self.nes.serialize();
         self.nes.power_cycle();
         serialized
     }
 
-    pub fn deserialize(&mut self, state: String) {
+    pub fn deserialize(&mut self, state: Vec<u8>) {
         self.nes.deserialize(state);
     }
 

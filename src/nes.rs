@@ -116,12 +116,27 @@ impl NesInternal {
         }
     }
 
-    fn serialize(&self) -> String {
-        serde_json::to_string(self).unwrap()
+    fn serialize(&self) -> Vec<u8> {
+        let serialized = serde_json::to_vec(self).unwrap();
+        let compressed = yazi::compress(
+            serialized.as_slice(),
+            yazi::Format::Zlib,
+            yazi::CompressionLevel::Default,
+        )
+        .unwrap();
+        compressed
     }
 
-    fn deserialize(&mut self, state: String) {
-        let mut deserializer = serde_json::Deserializer::from_str(&state);
+    fn deserialize(&mut self, state: Vec<u8>) {
+        let (decompressed, checksum) =
+            yazi::decompress(state.as_slice(), yazi::Format::Zlib).unwrap();
+
+        assert_eq!(
+            yazi::Adler32::from_buf(&decompressed).finish(),
+            checksum.unwrap()
+        );
+
+        let mut deserializer = serde_json::Deserializer::from_slice(&decompressed);
         let deserializer = serde_stacker::Deserializer::new(&mut deserializer);
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer).unwrap();
         let new_nes: NesInternal = serde_json::from_value(value).unwrap();
@@ -223,11 +238,11 @@ impl Nes {
         unsafe { Pin::get_unchecked_mut(pin_ref) }
     }
 
-    pub fn serialize(&self) -> String {
+    pub fn serialize(&self) -> Vec<u8> {
         self.nes.serialize()
     }
 
-    pub fn deserialize(&mut self, state: String) {
+    pub fn deserialize(&mut self, state: Vec<u8>) {
         self.as_mut().deserialize(state);
     }
 

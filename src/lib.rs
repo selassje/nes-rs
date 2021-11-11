@@ -162,7 +162,7 @@ fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut 
                 std::env::current_dir().unwrap().display()
             )
         });
-        file.write_all(serialized.as_bytes()).unwrap();
+        file.write_all(serialized.as_slice()).unwrap();
         #[cfg(target_os = "emscripten")]
         unsafe {
             let script = std::ffi::CString::new("refreshDownloadList();").unwrap();
@@ -172,7 +172,7 @@ fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut 
 
     if let Some(ref load_state_path) = io_state.load_state {
         let file_name = load_state_path.as_str();
-        let save = std::fs::read_to_string(file_name).unwrap_or_else(|_| {
+        let save = std::fs::read(file_name).unwrap_or_else(|_| {
             panic!(
                 "Unable to open save file {} current dir {}",
                 file_name,
