@@ -251,6 +251,15 @@ impl IOSdl2ImGuiOpenGl {
             toggle(MenuBarItem::ControllersSetup, self.gui.controllers_setup);
         self.gui.pause = toggled_pause;
         io_state.pause = self.gui.pause;
+
+        let mut update_gui_item = |item: MenuBarItem| {
+            self.gui
+                .set_menu_bar_item(item, self.is_menu_bar_item_selected(item));
+        };
+
+        update_gui_item(MenuBarItem::LoadNesFile);
+        update_gui_item(MenuBarItem::SaveState);
+        update_gui_item(MenuBarItem::LoadState);
     }
 
     fn check_for_keyboard_shortcuts(
