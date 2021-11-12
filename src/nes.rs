@@ -19,6 +19,8 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::time::Duration;
 
+const SERIALIZATION_VER: &str = "1";
+
 fn default_video_access() -> Rc<RefCell<dyn VideoAccess>> {
     Rc::new(RefCell::new(crate::io::DummyIOImpl::new()))
 }
@@ -35,6 +37,7 @@ type Cpu = crate::cpu::Cpu<Ram, Ppu, Apu>;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesInternal {
+    version: String,
     cpu: Cpu,
     ram: Ram,
     ppu: Ppu,
@@ -67,6 +70,7 @@ impl NesInternal {
 
         unsafe {
             let mut pinned_nes = std::pin::Pin::new_unchecked(Box::new(NesInternal {
+                version: SERIALIZATION_VER.to_owned(),
                 cpu,
                 ram,
                 ppu,
@@ -140,6 +144,7 @@ impl NesInternal {
         let deserializer = serde_stacker::Deserializer::new(&mut deserializer);
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer).unwrap();
         let new_nes: NesInternal = serde_json::from_value(value).unwrap();
+        assert!(new_nes.version.eq(SERIALIZATION_VER));
         let video_access = self.video_access.clone();
         let audio_access = self.audio_access.clone();
         let controller_access = self.controller_access.clone();
