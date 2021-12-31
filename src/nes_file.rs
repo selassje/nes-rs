@@ -38,7 +38,7 @@ struct NesHeader {
     flag_7: u8,
     ho_n_mapper_number: u8,
     prg_ram_units: u8,
-    flag_9: u8,
+    _flag_9: u8,
     flag_10: u8,
 }
 
@@ -130,7 +130,7 @@ impl NesFile {
             flag_7: in_bytes[read_index + 3],
             ho_n_mapper_number: (in_bytes[read_index + 3] & 0xF0) >> 4,
             prg_ram_units: in_bytes[read_index + 4],
-            flag_9: in_bytes[read_index + 5],
+            _flag_9: in_bytes[read_index + 5],
             flag_10: in_bytes[read_index + 6],
         };
 

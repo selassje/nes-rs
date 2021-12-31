@@ -593,7 +593,7 @@ impl Gui {
         });
     }
 
-    pub(super) fn build(&mut self, mut ui: &mut imgui::Ui) {
+    pub(super) fn build(&mut self, ui: &mut imgui::Ui) {
         self.build_menu_bar = !(self.video_size_control == VideoSizeControl::FullScreen);
         with_styles!(
             ui,
@@ -604,10 +604,10 @@ impl Gui {
             ),
             {
                 if self.build_menu_bar {
-                    self.build_menu_bar(&mut ui);
+                    self.build_menu_bar(ui);
                 }
-                self.build_emulation_window(&mut ui);
-                self.build_fps_counter(&mut ui);
+                self.build_emulation_window(ui);
+                self.build_fps_counter(ui);
                 self.build_load_nes_file_explorer();
                 self.build_save_state_file_explorer();
                 self.build_load_state_file_explorer();

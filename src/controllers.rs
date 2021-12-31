@@ -49,20 +49,12 @@ pub enum ControllerId {
     Controller1,
     Controller2,
 }
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct Controllers {
     controller_1: ControllerEnum,
     controller_2: ControllerEnum,
 }
 
-impl Default for Controllers {
-    fn default() -> Self {
-        Self {
-            controller_1: Default::default(),
-            controller_2: Default::default(),
-        }
-    }
-}
 fn default_controller_access() -> Rc<RefCell<dyn ControllerAccess>> {
     Rc::new(RefCell::new(
         crate::io::DummyControllerAccessImplementation::new(),

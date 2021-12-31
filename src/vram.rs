@@ -38,22 +38,12 @@ const ATTRIBUTE_DATA_QUADRANT_MASKS: [u8; 4] = [
     BottomRight as u8,
 ];
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct VRam {
     memory: crate::memory::MemoryImpl<0x0820>,
     #[serde(skip)]
     mapper: RefCell<NonNullPtr<MapperEnum>>,
     read_buffer: RefCell<u8>,
-}
-
-impl Default for VRam {
-    fn default() -> Self {
-        Self {
-            memory: Default::default(),
-            mapper: Default::default(),
-            read_buffer: Default::default(),
-        }
-    }
 }
 
 impl VRam {
