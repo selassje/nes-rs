@@ -41,7 +41,7 @@ jobs:
     - name: Build native target
       run: | 
           cargo install cargo-vcpkg
-          cargo vcpkg build -v
+          cargo vcpkg -v build
           cargo build --release
 
     - name: Run native tests
