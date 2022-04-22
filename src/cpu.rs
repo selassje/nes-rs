@@ -122,8 +122,24 @@ pub struct Cpu<M: Memory, P: PpuState, A: ApuState> {
 impl<M: Memory, P: PpuState, A: ApuState> Default for Cpu<M, P, A> {
     fn default() -> Self {
         Self {
+            pc: 0,
+            sp: 0xFD,
+            ps: 0x24,
+            a: 0,
+            x: 0,
+            y: 0,
+            cycle: 0,
+            instruction: None,
+            ram: Default::default(),
+            ppu_state: Default::default(),
+            apu_state: Default::default(),
+            mapper: Default::default(),
+            code_segment: (0, 0),
+            interrupt: None,
+            address: Address::Implicit,
             opcodes: get_opcodes(),
-            ..Default::default()
+            is_brk_or_irq_hijacked_by_nmi: false,
+            oam_dma_in_progress: None,
         }
     }
 }

@@ -698,8 +698,20 @@ pub struct Apu {
 impl Default for Apu {
     fn default() -> Self {
         Self {
+            frame_counter: FrameCounter { data: 0 },
+            status: StatusRegister { data: 0 },
+            pulse_1: PulseWave::new(false),
+            pulse_2: PulseWave::new(true),
+            triangle: TriangleWave::default(),
+            noise: Noise::new(),
+            dmc: Dmc::new(),
+            cpu_cycle: 8,
+            is_during_apu_cycle: false,
+            frame_interrupt: false,
             audio_access: default_audio_access(),
-            ..Default::default()
+            frame: 1,
+            pending_reset_cycle: None,
+            irq_flag_setting_in_progress: false,     
         }
     }
 }

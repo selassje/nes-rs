@@ -47,7 +47,7 @@ const FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET: u16 = FETCH_LOW_PATTERN_DATA_CYCLE_O
 
 const VBLANK_START_CYCLE: u16 = 4;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 struct ControlRegister {
     value: u8,
 }
@@ -99,7 +99,7 @@ enum MaskRegisterFlag {
     _EmphasizeBlue = 0b10000000,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize,Default)]
 struct MaskRegister {
     value: u8,
 }
@@ -344,9 +344,29 @@ pub struct Ppu<VRAM: VideoMemory> {
 impl<VRAM: VideoMemory> Default for Ppu<VRAM> {
     fn default() -> Self {
         Self {
-            video_access: default_video_access(),
+            vram: Default::default(),
+            control_reg: ControlRegister { value: 0 },
+            mask_reg: MaskRegister { value: 0 },
+            status_reg: StatusRegister { value: 0 },
+            oam_address: 0,
+            oam: [0; 256],
+            pattern_tables: Default::default(),
+            ppu_cycle: 27,
+            scanline: 0,
+            scanline_sprites: Vec::new(),
+            frame: 1,
             color_mapper: default_color_mapper(),
-            ..Default::default()
+            vram_address: Default::default(),
+            t_vram_address: Default::default(),
+            fine_x_scroll: 0,
+            write_toggle: false,
+            nmi_pending: false,
+            vbl_flag_supressed: false,
+            video_access: default_video_access(),
+            sprite_palettes: Default::default(),
+            background_palletes: Default::default(),
+            mapper: Default::default(),
+            tile_data: [Default::default(); 3],   
         }
     }
 }
