@@ -711,7 +711,7 @@ impl Default for Apu {
             audio_access: default_audio_access(),
             frame: 1,
             pending_reset_cycle: None,
-            irq_flag_setting_in_progress: false,     
+            irq_flag_setting_in_progress: false,
         }
     }
 }

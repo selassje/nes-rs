@@ -99,7 +99,7 @@ enum MaskRegisterFlag {
     _EmphasizeBlue = 0b10000000,
 }
 
-#[derive(Serialize, Deserialize,Default)]
+#[derive(Serialize, Deserialize, Default)]
 struct MaskRegister {
     value: u8,
 }
@@ -366,7 +366,7 @@ impl<VRAM: VideoMemory> Default for Ppu<VRAM> {
             sprite_palettes: Default::default(),
             background_palletes: Default::default(),
             mapper: Default::default(),
-            tile_data: [Default::default(); 3],   
+            tile_data: [Default::default(); 3],
         }
     }
 }
