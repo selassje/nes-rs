@@ -131,28 +131,28 @@ impl MapperInternal {
         }
     }
 
-    fn get_address_index(&self, address: u16, bank: usize, bank_size: BankSize) -> usize {
+    fn get_address_index(address: u16, bank: usize, bank_size: BankSize) -> usize {
         bank_size as usize * bank + (address as usize % bank_size as usize)
     }
 
     pub fn get_prg_rom_byte(&mut self, address: u16, bank: usize, prg_bank_size: BankSize) -> u8 {
-        let index = self.get_address_index(address, bank, prg_bank_size);
+        let index = Self::get_address_index(address, bank, prg_bank_size);
         self.prg_rom[index]
     }
 
     pub fn get_prg_ram_byte(&mut self, address: u16, bank: usize, bank_size: BankSize) -> u8 {
-        self.prg_ram[self.get_address_index(address, bank, bank_size)]
+        self.prg_ram[Self::get_address_index(address, bank, bank_size)]
     }
 
     pub fn store_prg_ram_byte(&mut self, address: u16, bank: usize, bank_size: BankSize, byte: u8) {
-        self.prg_ram[self.get_address_index(address, bank, bank_size)] = byte
+        self.prg_ram[Self::get_address_index(address, bank, bank_size)] = byte
     }
 
     pub fn get_chr_byte(&mut self, address: u16, bank: usize, chr_bank_size: BankSize) -> u8 {
         if self.chr_rom_size == 0 {
             self.chr_ram[address as usize]
         } else {
-            let index = self.get_address_index(address, bank, chr_bank_size);
+            let index = Self::get_address_index(address, bank, chr_bank_size);
             self.chr_rom[index]
         }
     }
