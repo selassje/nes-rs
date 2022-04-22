@@ -15,7 +15,7 @@ pub struct PpuTime {
 }
 
 pub trait PpuState {
-    fn is_nmi_pending(&mut self) -> bool;
+    fn check_for_nmi_pending(&mut self) -> bool;
     fn clear_nmi_pending(&mut self);
     fn get_time(&self) -> PpuTime;
 }
@@ -911,7 +911,7 @@ impl<VRAM: VideoMemory> ReadPpuRegisters for Ppu<VRAM> {
 impl<VRAM: VideoMemory> PpuRegisterAccess for Ppu<VRAM> {}
 
 impl<VRAM: VideoMemory> PpuState for Ppu<VRAM> {
-    fn is_nmi_pending(&mut self) -> bool {
+    fn check_for_nmi_pending(&mut self) -> bool {
         if self.scanline == VBLANK_START_SCANLINE && self.ppu_cycle == VBLANK_START_CYCLE {
             self.update_vblank_flag_and_nmi()
         }

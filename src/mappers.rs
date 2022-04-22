@@ -34,7 +34,7 @@ pub trait Mapper {
     fn get_mirroring(&self) -> Mirroring;
     fn power_cycle(&mut self);
 
-    fn is_irq_pending(&mut self) -> bool {
+    fn is_irq_pending(&self) -> bool {
         false
     }
 

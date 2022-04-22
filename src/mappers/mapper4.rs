@@ -46,7 +46,7 @@ impl Mapper for Mapper4 {
         self.mmc3.ppu_a12_rising_edge_triggered()
     }
 
-    fn is_irq_pending(&mut self) -> bool {
+    fn is_irq_pending(&self) -> bool {
         self.mmc3.is_irq_pending()
     }
 }

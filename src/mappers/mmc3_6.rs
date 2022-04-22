@@ -242,7 +242,7 @@ impl Mapper for MMC3_6 {
         }
     }
 
-    fn is_irq_pending(&mut self) -> bool {
+    fn is_irq_pending(&self) -> bool {
         self.irq_triggered
     }
 

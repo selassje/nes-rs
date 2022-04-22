@@ -258,7 +258,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn check_for_interrupts(&mut self) {
-        if self.ppu_state.as_mut().is_nmi_pending() {
+        if self.ppu_state.as_mut().check_for_nmi_pending() {
             self.ppu_state.as_mut().clear_nmi_pending();
             self.interrupt = Some(NMI_OPCODE as u8);
         } else if !self.get_flag(ProcessorFlag::InterruptDisable)
@@ -370,7 +370,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
             }
             self.instruction = None;
         } else if is_brk_or_irq_executing {
-            if self.ppu_state.as_mut().is_nmi_pending() && instruction.cycle <= 4 {
+            if self.ppu_state.as_mut().check_for_nmi_pending() && instruction.cycle <= 4 {
                 self.is_brk_or_irq_hijacked_by_nmi = true;
                 self.ppu_state.as_mut().clear_nmi_pending()
             }
