@@ -547,7 +547,7 @@ impl Gui {
     }
 
     fn build_controller_setup_for_player(&mut self, player_index: usize, ui: &mut imgui::Ui) {
-        let mut controller_config = &mut self.controller_configs[player_index];
+        let controller_config = &mut self.controller_configs[player_index];
 
         for i in 0..8u8 {
             let button = crate::io::Button::from(i);
