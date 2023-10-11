@@ -8,7 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  EMSDK_VER: 3.1.47
+  EMSDK_VER: 2.0.9
 
 jobs:
   build:
