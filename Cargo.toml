@@ -2,8 +2,7 @@
 name = "nes-rs"
 version = "0.1.0"
 authors = ["Przemyslaw Koziol <przemkoz85@gmail.com>"]
-edition = "2018"
-resolver = "2"
+edition = "2021"
 
 [[test]]
 name = "branch_timing_tests"
