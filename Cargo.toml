@@ -67,7 +67,7 @@ yazi = "0.1.4"
 [package.metadata.vcpkg]
 dependencies = ["sdl2","sdl2-image[libjpeg-turbo,tiff,libwebp]"]
 git = "https://github.com/microsoft/vcpkg"
-rev = "2ac61f87f69f0484b8044f95ab274038fbaf7bdd"
+rev = "dfc21e3f283230d01dd564635aef30ad18fdb6e9"
 
 [package.metadata.vcpkg.target]
 x86_64-pc-windows-msvc = { triplet = "x64-windows-static-md" }
