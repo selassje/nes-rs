@@ -157,7 +157,7 @@ impl VideoMemory for VRam {
     ) -> u8 {
         let attribute_data = self.get_attribute_data(table_index, color_tile_x, color_tile_y);
         let quadrant: u8 = (color_tile_y % 2) * 2 + (color_tile_x % 2);
-        (attribute_data & ATTRIBUTE_DATA_QUADRANT_MASKS[quadrant as usize] as u8) >> (2 * quadrant)
+        (attribute_data & ATTRIBUTE_DATA_QUADRANT_MASKS[quadrant as usize]) >> (2 * quadrant)
     }
 
     fn get_attribute_data(&self, table_index: u8, color_tile_x: u8, color_tile_y: u8) -> u8 {
@@ -168,7 +168,7 @@ impl VideoMemory for VRam {
             .memory
             .get_byte(attrib_table_addr + attribute_index as u16);
         let quadrant: u8 = (color_tile_y % 2) * 2 + (color_tile_x % 2);
-        (attribute_data & ATTRIBUTE_DATA_QUADRANT_MASKS[quadrant as usize] as u8) >> (2 * quadrant)
+        (attribute_data & ATTRIBUTE_DATA_QUADRANT_MASKS[quadrant as usize]) >> (2 * quadrant)
     }
 
     fn get_nametable_tile_index(&self, table_index: u8, tile_x: u8, tile_y: u8) -> u8 {

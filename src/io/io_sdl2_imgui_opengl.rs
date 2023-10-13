@@ -88,7 +88,7 @@ impl IOSdl2ImGuiOpenGl {
         }
         let [video_width, video_height]: [u32; 2] = gui::VideoSizeControl::Double.into();
         let mut window = video_subsys
-            .window("NES-RS", video_width, MENU_BAR_HEIGHT as u32 + video_height)
+            .window("NES-RS", video_width, MENU_BAR_HEIGHT + video_height)
             .position_centered()
             .opengl()
             .build()
@@ -298,7 +298,7 @@ impl IOSdl2ImGuiOpenGl {
                 .borrow_mut()
                 .set_size(
                     std::cmp::max(video_width, MIN_WINDOW_WIDTH),
-                    video_height + MENU_BAR_HEIGHT as u32,
+                    video_height + MENU_BAR_HEIGHT,
                 )
                 .unwrap();
             [video_width as f32, video_height as f32]

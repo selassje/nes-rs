@@ -15,12 +15,7 @@ pub(super) struct OpCode<RAM: Memory, PPU: PpuState, APU: ApuState> {
 
 impl<RAM: Memory, PPU: PpuState, APU: ApuState> Clone for OpCode<RAM, PPU, APU> {
     fn clone(&self) -> Self {
-        Self {
-            instruction: self.instruction,
-            mode: self.mode,
-            base_cycles: self.base_cycles,
-            extra_cycle_on_page_crossing: self.extra_cycle_on_page_crossing,
-        }
+        *self
     }
 }
 impl<RAM: Memory, PPU: PpuState, APU: ApuState> Copy for OpCode<RAM, PPU, APU> {}

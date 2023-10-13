@@ -300,7 +300,7 @@ impl PulseWave {
 
     fn get_sample(&self) -> u8 {
         DUTY_CYCLE_SEQUENCES[self.get_duty_cycle() as usize][self.sequencer_position as usize]
-            * self.get_volume() as u8
+            * self.get_volume()
     }
 
     fn get_volume(&self) -> u8 {

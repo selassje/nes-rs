@@ -75,7 +75,7 @@ impl Emulation {
         let one_second_timer = std::time::Instant::now();
 
         let io_control = io::IOControl {
-            target_fps: common::DEFAULT_FPS as u16,
+            target_fps: common::DEFAULT_FPS,
             current_fps: 0,
             title: initial_title,
         };
@@ -125,7 +125,7 @@ impl emscripten_main_loop::MainLoop for Emulation {
 
 fn read_nes_file(file_name: &str) -> nes_file::NesFile {
     let mut rom = Vec::new();
-    let mut file = File::open(&file_name).unwrap_or_else(|_| {
+    let mut file = File::open(file_name).unwrap_or_else(|_| {
         panic!(
             "Unable to open ROM {} current dir {}",
             file_name,

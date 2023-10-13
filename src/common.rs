@@ -42,7 +42,7 @@ impl<T> Default for NonNullPtr<T> {
 
 impl<T> Clone for NonNullPtr<T> {
     fn clone(&self) -> Self {
-        Self(self.0)
+        *self
     }
 }
 

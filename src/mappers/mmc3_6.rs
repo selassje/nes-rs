@@ -114,7 +114,7 @@ impl MMC3_6 {
 
     fn update_selected_bank(&mut self, selected_bank: usize) {
         if selected_bank < 6 {
-            let mode = self.bank_select.get_chr_inversion_mode() as usize;
+            let mode = self.bank_select.get_chr_inversion_mode();
             let _1kb_bank = (self.bank_data) as usize;
             let _2kb_bank = (self.bank_data & 0b1111_1110) as usize;
             let _2kb_bank = (self.bank_data >> 1) as usize;
@@ -138,7 +138,7 @@ impl MMC3_6 {
                 self.chr_rom_banks[bank_index_1].bank = _1kb_bank;
             }
         } else {
-            let mode = self.bank_select.get_prg_rom_mode() as usize;
+            let mode = self.bank_select.get_prg_rom_mode();
             let bank = (self.bank_data & 0b00111111) as usize;
             if selected_bank == 6 {
                 if mode == 0 {
@@ -213,7 +213,6 @@ impl Mapper for MMC3_6 {
                     self.irq_enabled = !is_even;
                     if !self.irq_enabled {
                         self.irq_triggered = false;
-                    } else {
                     }
                 }
                 _ => {}

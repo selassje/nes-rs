@@ -480,7 +480,7 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
 
         let (color, is_sprite0_hit_detected) = self
             .determine_pixel_color_and_check_for_sprite0_hit(
-                bg_color_index as u8,
+                bg_color_index,
                 sprite_color_index,
                 &sprite,
                 &self.background_palletes[bg_palette_index as usize],
@@ -650,7 +650,7 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
                 data: self
                     .vram
                     .as_ref()
-                    .get_pattern_table_tile_data(table_index as u8, tile_index as u8),
+                    .get_pattern_table_tile_data(table_index, tile_index),
             });
         }
         tiles[tile_index as usize].unwrap()
@@ -675,7 +675,7 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
             bg_color_index = 2 * color_index_hi + color_index_lo;
             bg_palette_index = tile_data.attribute_byte;
         }
-        (bg_color_index as u8, bg_palette_index)
+        (bg_color_index, bg_palette_index)
     }
 
     fn get_sprite_color_index(&mut self, x: u8) -> (u8, Sprite) {
@@ -873,7 +873,7 @@ impl<VRAM: VideoMemory> WritePpuRegisters for Ppu<VRAM> {
 impl<VRAM: VideoMemory> WriteOamDma for Ppu<VRAM> {
     fn write_oam_dma(&mut self, data: [u8; 256]) {
         let write_len = 256 - self.oam_address as usize;
-        self.oam[self.oam_address as usize..].copy_from_slice(&data[..write_len as usize])
+        self.oam[self.oam_address as usize..].copy_from_slice(&data[..write_len])
     }
 }
 
