@@ -1,8 +1,8 @@
 function upload_nes_file_btn_click() {
-    document.getElementById("upload_nes_file").click()
+    document.querySelector("#upload_nes_file").click()
 }
 function upload_save_file_btn_click() {
-    document.getElementById("upload_save_file").click()
+    document.querySelector("#upload_save_file").click()
 }
 
 function upload_file(file, dir) {
@@ -40,10 +40,10 @@ function refreshDownloadList() {
         return files;
     }
     var save_files = getFiles("saves");
-    var list = document.getElementById("download_save_files");
+    var list = document.querySelector("#download_save_files");
     list.style.display = "none";
     if (save_files.length > 0) {
-        var ul = document.getElementById("download_list");
+        var ul = document.querySelector("#download_list");
         ul.innerHTML = "";
         save_files.forEach(element => {
             var entry = document.createElement("li");
@@ -68,7 +68,7 @@ FS.rmdir("tmp");
 FS.mkdir("games");
 FS.mkdir("saves");
 
-document.getElementById("upload_nes_file").addEventListener("change", upload_nes_file, false);
-document.getElementById("upload_save_file").addEventListener("change", upload_save_file, false);
+document.querySelector("#upload_nes_file").addEventListener("change", upload_nes_file, false);
+document.querySelector("#upload_save_file").addEventListener("change", upload_save_file, false);
 
 alignElements();

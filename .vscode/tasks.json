@@ -1,0 +1,119 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+
+  "tasks": [
+    {
+      "label": "build_rel",
+      "type": "shell",
+      "command": "cargo build --release",
+      "problemMatcher": "$rustc",
+      "group": "build"
+    },
+    {
+      "label": "run_rel",
+      "type": "shell",
+      "command": "cargo run --release",
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      },
+      "dependsOn": [
+        "build_rel"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "test",
+      "type": "shell",
+      "command": "cargo test --release",
+      "dependsOn": [
+        "build_rel"
+      ],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "build_dev",
+      "type": "shell",
+      "command": "cargo build",
+      "group": {
+        "kind": "build"
+      }
+    },
+    {
+      "label": "run_dev",
+      "type": "shell",
+      "command": "cargo run",
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      },
+      "dependsOn": [
+        "build_dev"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "build_rel_emscripten",
+      "type": "shell",
+      "command": "cargo build --release --target=wasm32-unknown-emscripten",
+      "group": {
+        "kind": "build"
+      }
+    },
+    {
+      "label": "build_dev_emscripten",
+      "type": "shell",
+      "command": "cargo build --target=wasm32-unknown-emscripten",
+      "group": {
+        "kind": "build"
+      }
+    },
+    {
+      "label": "copy_emscripten_artefacts_release",
+      "hide": true,
+      "type": "shell",
+      "command": "cp ${workspaceFolder}/target/wasm32-unknown-emscripten/release/nes_rs.wasm ${workspaceFolder}/static; cp ${workspaceFolder}/target/wasm32-unknown-emscripten/release/nes-rs.js ${workspaceFolder}/static ",
+      "group": {
+        "kind": "build"
+      }
+    },
+    {
+      "label": "copy_emscripten_artefacts_dev",
+      "hide": true,
+      "type": "shell",
+      "command": "cp ${workspaceFolder}/target/wasm32-unknown-emscripten/debug/nes_rs.wasm ${workspaceFolder}/static; cp ${workspaceFolder}/target/wasm32-unknown-emscripten/debug/nes-rs.js ${workspaceFolder}/static ",
+      "group": {
+        "kind": "build"
+      }
+    },
+    {
+      "label": "deploy",
+      "hide": false,
+      "type": "shell",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "build_rel_emscripten",
+        "copy_emscripten_artefacts_release"
+      ],
+      "group": {
+        "kind": "build"
+      }
+    },
+    {
+      "label": "deploy_dev",
+      "hide": false,
+      "type": "shell",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "build_dev_emscripten",
+        "copy_emscripten_artefacts_dev"
+      ],
+      "group": {
+        "kind": "build"
+      }
+    }
+  ]
+}

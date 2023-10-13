@@ -19,7 +19,7 @@ path = "tests/blargg_ppu_tests.rs"
 [[test]]
 name = "apu_tests"
 path = "tests/apu_tests.rs"
-[[test]]
+  [[test]]
 name = "sprite_0_hit_tests"
 path = "tests/sprite_0_hit_tests.rs"
 [[test]]
@@ -33,7 +33,7 @@ name = "serialization"
 path = "tests/serialization.rs"
 
 [profile.release] 
-debug = false
+debug = true
 lto = true
 opt-level = 3
 panic = "abort"

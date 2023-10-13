@@ -7,6 +7,8 @@ Cargo.lock
 !/tests/*/*.expected.bmp
 *.log
 *.zip
-/.vscode
 *.nesrs
 .cargo-ok
+settings.json
+nes-rs.js
+nes_rs.wasm
