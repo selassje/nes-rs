@@ -39,29 +39,29 @@ opt-level = 3
 panic = "abort"
 
 [target.'cfg(not(target_os = "emscripten"))'.dependencies]
-sdl2 = {version = "0.34", default-features = false, features = ["static-link","use-vcpkg", "image"]}
+sdl2 = {version = "0.36", default-features = false, features = ["static-link","use-vcpkg", "image"]}
 
 [target.'cfg(target_os = "emscripten")'.dependencies]
-sdl2 = {version = "0.34", default-features = false, features = ["image"]}
+sdl2 = {version = "0.36", default-features = false, features = ["image"]}
 instant = {version = "0.1", features = ["wasm-bindgen"]}
 
 [dependencies]
-cfg-if = "0.1"
+cfg-if = "1.0.4"
 enum-tryfrom = "0.2.1"
 enum-tryfrom-derive = "0.2.1"
-imgui = "0.7.0"
-imgui-sys = "0.7.0"
+imgui = "0.11.0"
+imgui-sys = "0.11.0"
 imgui-opengl-renderer = { git = "https://github.com/selassje/rust-imgui-opengl-renderer" }
-imgui-sdl2 = "0.14"
+imgui-sdl2 = "0.15.3"
 imgui-filedialog = { git = "https://github.com/selassje/imgui-filedialog-rs.git"}
-gl = "0.10.0"
+gl = "0.14.0"
 emscripten_main_loop = "0.1"
 serde = { version = "1.0", features = ["derive","rc"] }
 serde_json = "1.0.0"
-serde_arrays = "0.1"
+serde_arrays = "0.2.0"
 serde_stacker = "0.1.4"
 enum_dispatch = "0.3.7"
-yazi = "0.1.4"
+yazi = "0.2.1"
 
 
 [package.metadata.vcpkg]

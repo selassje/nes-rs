@@ -412,7 +412,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
 
         self.gui.build(&mut ui);
 
-        self.renderer.render(ui);
+        self.renderer.render(&mut self.imgui);
         self.update_io_state(&mut io_state);
         self.window.gl_swap_window();
 
