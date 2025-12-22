@@ -89,47 +89,34 @@ impl Default for BankSelect {
         }
     }
 }
+
 #[derive(Serialize, Deserialize)]
 pub(super) struct MapperInternal {
-    #[serde(
-        serialize_with = "serde_arrays::serialize",
-        deserialize_with = "BoxedArrayDeserialize::deserialize"
-    )]
-    prg_ram: Box<[u8; PRG_RAM_DATA_SIZE]>,
-    #[serde(
-        serialize_with = "serde_arrays::serialize",
-        deserialize_with = "BoxedArrayDeserialize::deserialize"
-    )]
-    prg_rom: Box<[u8; PRG_ROM_DATA_SIZE]>,
+    prg_ram: Vec<u8>,
+    prg_rom: Vec<u8>,
     prg_rom_size: usize,
-    #[serde(
-        serialize_with = "serde_arrays::serialize",
-        deserialize_with = "BoxedArrayDeserialize::deserialize"
-    )]
-    chr_rom: Box<[u8; CHR_ROM_DATA_SIZE]>,
+    chr_rom: Vec<u8>,
     chr_rom_size: usize,
-    #[serde(
-        serialize_with = "serde_arrays::serialize",
-        deserialize_with = "BoxedArrayDeserialize::deserialize"
-    )]
-    chr_ram: Box<[u8; CHR_RAM_DATA_SIZE]>,
+    chr_ram: Vec<u8>,
 }
 
 impl MapperInternal {
-    pub fn new(_prg_rom: Vec<u8>, _chr_rom: Vec<u8>) -> Self {
-        let mut prg_rom = Box::new([0; PRG_ROM_DATA_SIZE]);
-        let mut chr_rom = Box::new([0; CHR_ROM_DATA_SIZE]);
-        chr_rom[.._chr_rom.len()].copy_from_slice(_chr_rom.as_slice());
-        prg_rom[.._prg_rom.len()].copy_from_slice(_prg_rom.as_slice());
-        Self {
-            prg_ram: Box::new([0; PRG_RAM_DATA_SIZE]),
-            prg_rom,
-            prg_rom_size: _prg_rom.len(),
-            chr_ram: Box::new([0; CHR_RAM_DATA_SIZE]),
-            chr_rom,
-            chr_rom_size: _chr_rom.len(),
-        }
+  pub fn new(_prg_rom: Vec<u8>, _chr_rom: Vec<u8>) -> Self {
+    let mut prg_rom = vec![0u8; PRG_ROM_DATA_SIZE];
+    let mut chr_rom = vec![0u8; CHR_ROM_DATA_SIZE];
+
+    prg_rom[.._prg_rom.len()].copy_from_slice(&_prg_rom);
+    chr_rom[.._chr_rom.len()].copy_from_slice(&_chr_rom);
+
+    Self {
+        prg_ram: vec![0u8; PRG_RAM_DATA_SIZE],
+        prg_rom,
+        prg_rom_size: _prg_rom.len(),
+        chr_rom,
+        chr_rom_size: _chr_rom.len(),
+        chr_ram: vec![0u8; CHR_RAM_DATA_SIZE],
     }
+}
 
     fn get_address_index(address: u16, bank: usize, bank_size: BankSize) -> usize {
         bank_size as usize * bank + (address as usize % bank_size as usize)
