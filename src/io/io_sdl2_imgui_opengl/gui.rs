@@ -295,7 +295,7 @@ impl Gui {
         self.menu_bar_item_selected[item as usize]
     }
 
-    fn update_menu_item_status(&mut self, ui: &mut imgui::Ui, item: MenuBarItem) {
+    fn update_menu_item_status(&mut self, ui: &imgui::Ui, item: MenuBarItem) {
         self.menu_bar_item_selected[item as usize] = ui.is_item_clicked()
             || (ui.is_item_hovered() && ui.key_pressed_amount(imgui::Key::Enter, 0.0, 0.0) == 1);
     }
@@ -330,148 +330,110 @@ impl Gui {
     fn build_menu_bar(&mut self, ui: &mut imgui::Ui) {
         use MenuBarItem::*;
 
-        // -------------------------
-        // PHASE 1: Render menus & collect clicks
-        // -------------------------
-        let mut clicked_file = Vec::new();
-        let mut clicked_emulation = Vec::new();
-        let mut clicked_video = Vec::new();
-        let mut clicked_audio = Vec::new();
         let mut controllers_setup_needed = false;
 
         if let Some(menu_bar) = ui.begin_main_menu_bar() {
             let _font_token = ui.push_font(self.fonts[GuiFont::MenuBar as usize]);
 
-            // ---- FILE MENU ----
-            if let Some(file_menu) = ui.begin_menu("File") {
-                if ui
-                    .menu_item_config("Load Nes File")
+            if let Some(_) = ui.begin_menu("File") {
+                ui.menu_item_config("Load Nes File")
                     .shortcut("Ctrl+O")
-                    .build()
-                {
-                    clicked_file.push(LoadNesFile);
+                    .build();
+
+                if !self.is_menu_bar_item_selected(LoadNesFile) {
+                    self.update_menu_item_status(ui, LoadNesFile);
                 }
-                if ui.menu_item_config("Save State").shortcut("Ctrl+S").build() {
-                    clicked_file.push(SaveState);
+
+                ui.menu_item_config("Save State").shortcut("Ctrl+S").build();
+                if !self.is_menu_bar_item_selected(SaveState) {
+                    self.update_menu_item_status(ui, SaveState);
                 }
-                if ui.menu_item_config("Load State").shortcut("Ctrl+L").build() {
-                    clicked_file.push(LoadState);
+
+                ui.menu_item_config("Load State").shortcut("Ctrl+L").build();
+                if !self.is_menu_bar_item_selected(LoadState) {
+                    self.update_menu_item_status(ui, LoadState);
                 }
-                if ui.menu_item_config("Quit").shortcut("Alt+F4").build() {
-                    clicked_file.push(Quit);
-                }
-                drop(file_menu);
+
+                ui.menu_item_config("Quit").shortcut("Alt+F5").build();
+                self.update_menu_item_status(ui, Quit);
             }
 
-            // ---- EMULATION MENU ----
-            if let Some(emulation_menu) = ui.begin_menu("Emulation") {
-                if ui
-                    .menu_item_config("Power Cycle")
+            if let Some(_) = ui.begin_menu("Emulation") {
+                ui.menu_item_config("Power Cycle")
                     .shortcut("Ctrl+R")
-                    .build()
-                {
-                    clicked_emulation.push(PowerCycle);
-                }
-                if ui
-                    .menu_item_config("Pause")
+                    .build();
+                self.update_menu_item_status(ui, PowerCycle);
+
+                ui.menu_item_config("Pause")
                     .shortcut("Ctrl+P")
                     .selected(self.pause)
-                    .build()
-                {
-                    clicked_emulation.push(Pause);
-                }
+                    .build();
+                self.update_menu_item_status(ui, Pause);
 
-                if let Some(speed_menu) = ui.begin_menu("Speed") {
+                if let Some(_) = ui.begin_menu("Speed") {
                     let target_fps = self.io_control.target_fps;
                     let is_speed_selected = |fps: u16| fps == target_fps;
 
-                    if ui
-                        .menu_item_config("Normal")
+                    ui.menu_item_config("Normal")
                         .selected(is_speed_selected(common::DEFAULT_FPS))
-                        .build()
-                    {
-                        clicked_emulation.push(SpeedNormal);
-                    }
-                    if ui
-                        .menu_item_config("Double")
+                        .build();
+                    self.update_menu_item_status(ui, SpeedNormal);
+
+                    ui.menu_item_config("Double")
                         .selected(is_speed_selected(common::DOUBLE_FPS))
-                        .build()
-                    {
-                        clicked_emulation.push(SpeedDouble);
-                    }
-                    if ui
-                        .menu_item_config("Half")
+                        .build();
+                    self.update_menu_item_status(ui, SpeedDouble);
+
+                    ui.menu_item_config("Half")
                         .selected(is_speed_selected(common::HALF_FPS))
-                        .build()
-                    {
-                        clicked_emulation.push(SpeedHalf);
-                    }
+                        .build();
+                    self.update_menu_item_status(ui, SpeedHalf);
 
                     ui.separator();
 
-                    if ui.menu_item_config("Increase").shortcut("Ctrl+=").build() {
-                        clicked_emulation.push(SpeedIncrease);
-                    }
-                    if ui.menu_item_config("Decrease").shortcut("Ctrl+-").build() {
-                        clicked_emulation.push(SpeedDecrease);
-                    }
+                    ui.menu_item_config("Increase").shortcut("Ctrl+=").build();
+                    self.update_menu_item_status(ui, SpeedIncrease);
 
-                    drop(speed_menu);
+                    ui.menu_item_config("Decrease").shortcut("Ctrl+-").build();
+                    self.update_menu_item_status(ui, SpeedDecrease);
                 }
-
-                drop(emulation_menu);
             }
 
-            // ---- VIDEO MENU ----
-            if let Some(video_menu) = ui.begin_menu("Video") {
-                if let Some(size_menu) = ui.begin_menu("Size") {
-                    if ui
-                        .menu_item_config("200%")
+            if let Some(_) = ui.begin_menu("Video") {
+                if let Some(_) = ui.begin_menu("Size") {
+                    ui.menu_item_config("200%")
                         .shortcut("F9")
                         .selected(self.video_size_control == VideoSizeControl::Double)
-                        .build()
-                    {
-                        clicked_video.push(VideoSizeDouble);
-                    }
-                    if ui
-                        .menu_item_config("300%")
+                        .build();
+                    self.update_menu_item_status(ui, VideoSizeDouble);
+
+                    ui.menu_item_config("300%")
                         .shortcut("F10")
                         .selected(self.video_size_control == VideoSizeControl::Triple)
-                        .build()
-                    {
-                        clicked_video.push(VideoSizeTriple);
-                    }
-                    if ui
-                        .menu_item_config("400%")
+                        .build();
+                    self.update_menu_item_status(ui, VideoSizeTriple);
+
+                    ui.menu_item_config("400%")
                         .shortcut("F11")
                         .selected(self.video_size_control == VideoSizeControl::Quadrupal)
-                        .build()
-                    {
-                        clicked_video.push(VideoSizeQuadrupal);
-                    }
-                    if ui
-                        .menu_item_config("Full screen")
+                        .build();
+                    self.update_menu_item_status(ui, VideoSizeQuadrupal);
+
+                    ui.menu_item_config("Full screen")
                         .shortcut("F12")
                         .selected(self.video_size_control == VideoSizeControl::FullScreen)
-                        .build()
-                    {
-                        clicked_video.push(VideoSizeFullScreen);
-                    }
-                    drop(size_menu);
+                        .build();
+                    self.update_menu_item_status(ui, VideoSizeFullScreen);
                 }
-                drop(video_menu);
             }
 
-            // ---- AUDIO MENU ----
-            if let Some(audio_menu) = ui.begin_menu("Audio") {
-                if ui
-                    .menu_item_config("Enabled")
+            if let Some(_) = ui.begin_menu("Audio") {
+                ui.menu_item_config("Enabled")
                     .shortcut("Ctrl+A")
                     .selected(self.is_menu_bar_item_selected(AudioEnabled))
-                    .build()
-                {
-                    clicked_audio.push(AudioEnabled);
-                }
+                    .build();
+
+                self.toggle_menu_bar_item_if_clicked(ui, AudioEnabled);
 
                 imgui::ChildWindow::new(ui, "child")
                     .size([190.0, ui.current_font_size() + 3.0])
@@ -485,14 +447,11 @@ impl Gui {
 
                 ui.separator();
 
-                if ui.menu_item_config("Increase").shortcut("=").build() {
-                    clicked_audio.push(VolumeIncrease);
-                }
-                if ui.menu_item_config("Decrease").shortcut("-").build() {
-                    clicked_audio.push(VolumeDecrease);
-                }
+                ui.menu_item_config("Increase").shortcut("=").build();
+                self.update_menu_item_status(ui, VolumeIncrease);
 
-                drop(audio_menu);
+                ui.menu_item_config("Decrease").shortcut("-").build();
+                self.update_menu_item_status(ui, VolumeDecrease);
             }
 
             // ---- CONTROLLERS MENU ----
@@ -512,28 +471,6 @@ impl Gui {
 
             drop(_font_token);
             drop(menu_bar);
-        }
-
-        // -------------------------
-        // PHASE 2: Mutably update state
-        // -------------------------
-        for item in clicked_file {
-            self.update_menu_item_status(ui, item);
-        }
-
-        for item in clicked_emulation {
-            self.update_menu_item_status(ui, item);
-        }
-
-        for item in clicked_video {
-            self.update_menu_item_status(ui, item);
-        }
-
-        for item in clicked_audio {
-            match item {
-                AudioEnabled => self.toggle_menu_bar_item_if_clicked(ui, AudioEnabled),
-                _ => self.update_menu_item_status(ui, item),
-            }
         }
 
         if controllers_setup_needed {
