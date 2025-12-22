@@ -1,5 +1,3 @@
-use std::ops::RangeInclusive;
-
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
     common,
@@ -18,30 +16,7 @@ macro_rules! add_font_from_ttf {
         $imgui.fonts().add_font(&[font_source])
     }};
 }
-macro_rules! with_font {
-    ($font:expr, $ui:ident, $code:block) => {{
-        // Inner scope for RAII guard
-        let result = {
-            let font_token = $ui.push_font($font);
-            let inner_result = { $code }; // execute code while font is active
-            inner_result
-            // font_token dropped here at end of inner scope
-        };
-        result
-    }};
-}
 
-macro_rules! with_token {
-    ($ui:expr, $token_function:ident, ($($arg:expr),*), $code:expr) => {{
-        if let Some(token) = $ui.$token_function($($arg),*) {
-            $code
-            token.end();
-            true
-        } else {
-            false
-        }
-    }};
-}
 macro_rules! with_styles {
     ($ui:expr, ($($style:expr),*), $code:block) => {{
       let _tokens = (
@@ -321,17 +296,11 @@ impl Gui {
         }
     }
 
-    fn add_menu_item(&mut self, ui: &mut imgui::Ui, name: &str, shortcut: &str, item: MenuBarItem) {
-        if imgui::MenuItem::new(name, ui).shortcut(shortcut).build() {
-            self.update_menu_item_status(ui, item);
-        }
-    }
-
     fn build_menu_bar(&mut self, ui: &imgui::Ui) {
         use MenuBarItem::*;
 
-        if let Some(menu_bar) = ui.begin_main_menu_bar() {
-            let _font_token = ui.push_font(self.fonts[GuiFont::MenuBar as usize]);
+        if let Some(_) = ui.begin_main_menu_bar() {
+            let font = ui.push_font(self.fonts[GuiFont::MenuBar as usize]);
 
             if let Some(_) = ui.begin_menu("File") {
                 ui.menu_item_config("Load Nes File")
@@ -461,11 +430,12 @@ impl Gui {
                 }
                 if let Some(_) = ui.begin_menu("Setup") {
                     self.build_controllers_setup_window(ui);
+                    self.controllers_setup = true;
+                } else {
+                    self.controllers_setup = false;
                 }
             }
-
-            drop(_font_token);
-            drop(menu_bar);
+            font.pop();
         }
 
         if !self.controllers_setup {
@@ -622,27 +592,26 @@ impl Gui {
         }
     }
     fn build_controllers_setup_window(&mut self, ui: &imgui::Ui) {
-        with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
-            with_styles!(ui, (imgui::StyleVar::WindowBorderSize(2.0)), {
-                {
-                    if let Some(tab_bar) = imgui::TabBar::new("Players").begin(ui) {
-                        if self.controller_configs[1].pending_key_select.is_none() {
-                            if let Some(player_1_tab) = imgui::TabItem::new("Player 1").begin(ui) {
-                                self.build_controller_setup_for_player(0, ui);
-                                player_1_tab.end();
-                            }
-                        }
-                        if self.controller_configs[0].pending_key_select.is_none() {
-                            if let Some(player_2_tab) = imgui::TabItem::new("Player 2").begin(ui) {
-                                self.build_controller_setup_for_player(1, ui);
-                                player_2_tab.end();
-                            }
-                        }
-                        tab_bar.end();
-                    }
+        let font = ui.push_font(self.fonts[GuiFont::MenuBar as usize]);
+        let style = ui.push_style_var(imgui::StyleVar::WindowBorderSize(2.0));
+
+        if let Some(tab_bar) = imgui::TabBar::new("Players").begin(ui) {
+            if self.controller_configs[1].pending_key_select.is_none() {
+                if let Some(player_1_tab) = imgui::TabItem::new("Player 1").begin(ui) {
+                    self.build_controller_setup_for_player(0, ui);
+                    player_1_tab.end();
                 }
-            });
-        });
+            }
+            if self.controller_configs[0].pending_key_select.is_none() {
+                if let Some(player_2_tab) = imgui::TabItem::new("Player 2").begin(ui) {
+                    self.build_controller_setup_for_player(1, ui);
+                    player_2_tab.end();
+                }
+            }
+            tab_bar.end();
+        }
+        style.pop();
+        font.pop();
     }
 
     pub(super) fn build(&mut self, ui: &mut imgui::Ui) {
