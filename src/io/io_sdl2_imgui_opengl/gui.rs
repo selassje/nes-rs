@@ -27,28 +27,6 @@ macro_rules! with_styles {
         $code
 }};
 }
-macro_rules! create_simple_window {
-    ($ui:expr, $name:expr, $position:expr, $size:expr, $condition_pos:expr, $condition_size:expr) => {{
-        imgui::Window::new($ui, $name)
-            .scrollable(false)
-            .no_decoration()
-            .position($position, $condition_pos)
-            .size($size, $condition_size)
-    }};
-}
-
-macro_rules! create_unmovable_simple_window {
-    ($ui:expr, $name:expr, $position:expr, $size:expr) => {{
-        create_simple_window!(
-            $ui,
-            $name,
-            $position,
-            $size,
-            imgui::Condition::Always,
-            imgui::Condition::Always
-        )
-    }};
-}
 
 enum GuiFont {
     _Default = 0,
@@ -468,20 +446,17 @@ impl Gui {
         let [video_width, _]: [f32; 2] = self.video_size;
         let im_text = ImString::new(&text);
         let text_size = ui.calc_text_size::<&imgui::ImStr>(im_text.as_ref());
-
-        // -------------------------
-        // Build unmovable window
-        // -------------------------
-        create_unmovable_simple_window!(
-            ui,
-            "fps",
-            [video_width - text_size[0], MENU_BAR_HEIGHT as _],
-            text_size
-        )
-        .bg_alpha(0.0)
-        .build(|| {
-            ui.text(text);
-        });
+        ui.window("fps")
+            .position(
+                [video_width - text_size[0], MENU_BAR_HEIGHT as _],
+                imgui::Condition::Always,
+            )
+            .size(text_size, imgui::Condition::Always)
+            .bg_alpha(0.0)
+            .no_decoration()
+            .build(|| {
+                ui.text(text);
+            });
     }
 
     fn build_load_nes_file_explorer(&mut self) {
