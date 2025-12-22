@@ -1,64 +1,4 @@
-use serde::{Deserialize, Deserializer, Serialize};
-
-trait BoxedArrayDeserialize<'de>: Sized {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>;
-}
-
-impl<'de, T, const N: usize> BoxedArrayDeserialize<'de> for Box<[T; N]>
-where
-    T: Default + Copy + Deserialize<'de>,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        use std::marker::PhantomData;
-        struct ArrayVisitor<T, const N: usize> {
-            element: PhantomData<T>,
-        }
-
-        impl<'de, T, const N: usize> serde::de::Visitor<'de> for ArrayVisitor<T, N>
-        where
-            T: Default + Copy + serde::Deserialize<'de>,
-        {
-            type Value = Box<[T; N]>;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                macro_rules! write_len {
-                    ($l:literal) => {
-                        write!(formatter, concat!("an array of length ", $l))
-                    };
-                    ($l:tt) => {
-                        write!(formatter, "an array of length {}", $l)
-                    };
-                }
-
-                write_len!(N)
-            }
-
-            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::SeqAccess<'de>,
-            {
-                let mut arr = Box::new([T::default(); N]);
-                for i in 0..N {
-                    arr[i] = seq
-                        .next_element()?
-                        .ok_or_else(|| serde::de::Error::invalid_length(i, &self))?;
-                }
-                Ok(arr)
-            }
-        }
-
-        let visitor = ArrayVisitor {
-            element: PhantomData,
-        };
-        #[allow(unused_parens)]
-        deserializer.deserialize_tuple(N, visitor)
-    }
-}
+use serde::{Deserialize, Serialize};
 
 const PRG_RAM_DATA_SIZE: usize = 0x20000;
 const PRG_ROM_DATA_SIZE: usize = 0x80000;
@@ -101,22 +41,22 @@ pub(super) struct MapperInternal {
 }
 
 impl MapperInternal {
-  pub fn new(_prg_rom: Vec<u8>, _chr_rom: Vec<u8>) -> Self {
-    let mut prg_rom = vec![0u8; PRG_ROM_DATA_SIZE];
-    let mut chr_rom = vec![0u8; CHR_ROM_DATA_SIZE];
+    pub fn new(_prg_rom: Vec<u8>, _chr_rom: Vec<u8>) -> Self {
+        let mut prg_rom = vec![0u8; PRG_ROM_DATA_SIZE];
+        let mut chr_rom = vec![0u8; CHR_ROM_DATA_SIZE];
 
-    prg_rom[.._prg_rom.len()].copy_from_slice(&_prg_rom);
-    chr_rom[.._chr_rom.len()].copy_from_slice(&_chr_rom);
+        prg_rom[.._prg_rom.len()].copy_from_slice(&_prg_rom);
+        chr_rom[.._chr_rom.len()].copy_from_slice(&_chr_rom);
 
-    Self {
-        prg_ram: vec![0u8; PRG_RAM_DATA_SIZE],
-        prg_rom,
-        prg_rom_size: _prg_rom.len(),
-        chr_rom,
-        chr_rom_size: _chr_rom.len(),
-        chr_ram: vec![0u8; CHR_RAM_DATA_SIZE],
+        Self {
+            prg_ram: vec![0u8; PRG_RAM_DATA_SIZE],
+            prg_rom,
+            prg_rom_size: _prg_rom.len(),
+            chr_rom,
+            chr_rom_size: _chr_rom.len(),
+            chr_ram: vec![0u8; CHR_RAM_DATA_SIZE],
+        }
     }
-}
 
     fn get_address_index(address: u16, bank: usize, bank_size: BankSize) -> usize {
         bank_size as usize * bank + (address as usize % bank_size as usize)

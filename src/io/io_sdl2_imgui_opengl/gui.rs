@@ -50,14 +50,6 @@ macro_rules! create_unmovable_simple_window {
     }};
 }
 
-macro_rules! create_menu_item {
-    ($ui:expr, $name:tt, $shortcut:tt) => {{
-        imgui::MenuItem::new($name, $ui)
-            .selected(false)
-            .enabled(true)
-        //  .shortcut($shortcut)
-    }};
-}
 enum GuiFont {
     _Default = 0,
     FpsCounter,
@@ -451,37 +443,30 @@ impl Gui {
             } else {
                 0.0
             };
-            create_unmovable_simple_window!(
-                ui,
-                "emulation",
-                [0.0, vertical_offset],
-                self.video_size
-            )
-            .bring_to_front_on_focus(false)
-            .build(|| {
-                imgui::Image::new(self.emulation_texture, self.video_size).build(ui);
-            });
+
+            ui.window("emulation")
+                .position([0.0, vertical_offset], imgui::Condition::Always)
+                .no_decoration()
+                .size(self.video_size, imgui::Condition::Always)
+                .scroll_bar(false)
+                .bring_to_front_on_focus(false)
+                .build(|| {
+                    imgui::Image::new(self.emulation_texture, self.video_size).build(ui);
+                });
         });
     }
     fn build_fps_counter(&self, ui: &imgui::Ui) {
         use imgui::ImString;
-
-        // -------------------------
-        // Push font and prepare text
-        // -------------------------
+        let font = ui.push_font(self.fonts[GuiFont::FpsCounter as usize]);
         let text = {
-            // Push font temporarily
-            let _font_token = ui.push_font(self.fonts[GuiFont::FpsCounter as usize]);
             format!(
                 "FPS {}/{}",
                 self.io_control.current_fps, self.io_control.target_fps
             )
-            // _font_token drops here
         };
+        font.pop();
 
         let [video_width, _]: [f32; 2] = self.video_size;
-
-        // Create a long-lived ImString for borrowing
         let im_text = ImString::new(&text);
         let text_size = ui.calc_text_size::<&imgui::ImStr>(im_text.as_ref());
 
