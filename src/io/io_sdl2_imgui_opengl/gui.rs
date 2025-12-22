@@ -393,8 +393,7 @@ impl Gui {
                     .build();
 
                 self.toggle_menu_bar_item_if_clicked(ui, AudioEnabled);
-
-                imgui::ChildWindow::new(ui, "child")
+                ui.child_window("child")
                     .size([190.0, ui.current_font_size() + 3.0])
                     .border(false)
                     .scroll_bar(false)
