@@ -327,10 +327,8 @@ impl Gui {
         }
     }
 
-    fn build_menu_bar(&mut self, ui: &mut imgui::Ui) {
+    fn build_menu_bar(&mut self, ui: &imgui::Ui) {
         use MenuBarItem::*;
-
-        let mut controllers_setup_needed = false;
 
         if let Some(menu_bar) = ui.begin_main_menu_bar() {
             let _font_token = ui.push_font(self.fonts[GuiFont::MenuBar as usize]);
@@ -454,36 +452,29 @@ impl Gui {
                 self.update_menu_item_status(ui, VolumeDecrease);
             }
 
-            // ---- CONTROLLERS MENU ----
-            if let Some(_controllers_menu) = ui.begin_menu("Controllers") {
+            if let Some(_) = ui.begin_menu("Controllers") {
                 unsafe {
                     imgui_sys::igSetNextWindowSize(
                         imgui_sys::ImVec2 { x: 230.0, y: 230.0 },
                         imgui::Condition::Always as i32,
                     );
                 }
-
-                // Mark that controllers setup window should be built after RAII guard
-                controllers_setup_needed = true;
-
-                drop(_controllers_menu);
+                if let Some(_) = ui.begin_menu("Setup") {
+                    self.build_controllers_setup_window(ui);
+                }
             }
 
             drop(_font_token);
             drop(menu_bar);
         }
 
-        if controllers_setup_needed {
-            self.build_controllers_setup_window(ui);
-
-            if !self.controllers_setup {
-                self.controller_configs[0].pending_key_select = None;
-                self.controller_configs[1].pending_key_select = None;
-            }
+        if !self.controllers_setup {
+            self.controller_configs[0].pending_key_select = None;
+            self.controller_configs[1].pending_key_select = None;
         }
     }
 
-    fn build_emulation_window(&self, ui: &mut imgui::Ui) {
+    fn build_emulation_window(&self, ui: &imgui::Ui) {
         with_styles!(ui, (imgui::StyleVar::WindowBorderSize(0.0)), {
             let vertical_offset = if self.build_menu_bar {
                 MENU_BAR_HEIGHT as f32
@@ -502,7 +493,7 @@ impl Gui {
             });
         });
     }
-    fn build_fps_counter(&self, ui: &mut imgui::Ui) {
+    fn build_fps_counter(&self, ui: &imgui::Ui) {
         use imgui::ImString;
 
         // -------------------------
@@ -612,7 +603,7 @@ impl Gui {
                 || self.controller_configs[1].pending_key_select.is_some())
     }
 
-    fn build_controller_setup_for_player(&mut self, player_index: usize, ui: &mut imgui::Ui) {
+    fn build_controller_setup_for_player(&mut self, player_index: usize, ui: &imgui::Ui) {
         let controller_config = &mut self.controller_configs[player_index];
 
         for i in 0..8u8 {
@@ -630,69 +621,48 @@ impl Gui {
             ui.text(text);
         }
     }
-    fn build_controllers_setup_window(&mut self, ui: &mut imgui::Ui) {
-        use imgui::{StyleVar, TabBar, TabItem};
-
-        // Phase 1: Determine which tabs should be drawn (immutable only)
-        let tabs_to_draw: Vec<usize> = {
-            let _style_token = ui.push_style_var(StyleVar::WindowBorderSize(2.0));
-
-            let mut tabs = Vec::new();
-            if let Some(tab_bar) = TabBar::new("Players").begin(ui) {
-                if self.controller_configs[1].pending_key_select.is_none() {
-                    tabs.push(0);
+    fn build_controllers_setup_window(&mut self, ui: &imgui::Ui) {
+        with_font!(self.fonts[GuiFont::MenuBar as usize], ui, {
+            with_styles!(ui, (imgui::StyleVar::WindowBorderSize(2.0)), {
+                {
+                    if let Some(tab_bar) = imgui::TabBar::new("Players").begin(ui) {
+                        if self.controller_configs[1].pending_key_select.is_none() {
+                            if let Some(player_1_tab) = imgui::TabItem::new("Player 1").begin(ui) {
+                                self.build_controller_setup_for_player(0, ui);
+                                player_1_tab.end();
+                            }
+                        }
+                        if self.controller_configs[0].pending_key_select.is_none() {
+                            if let Some(player_2_tab) = imgui::TabItem::new("Player 2").begin(ui) {
+                                self.build_controller_setup_for_player(1, ui);
+                                player_2_tab.end();
+                            }
+                        }
+                        tab_bar.end();
+                    }
                 }
-                if self.controller_configs[0].pending_key_select.is_none() {
-                    tabs.push(1);
-                }
-                tab_bar.end();
-            }
-
-            // _style_token dropped here
-            tabs
-        };
-
-        // Phase 2: Draw tab titles, push font for visuals only
-        let _ = {
-            let _font_token = ui.push_font(self.fonts[GuiFont::MenuBar as usize]);
-            for player_idx in &tabs_to_draw {
-                let _ = TabItem::new(format!("Player {}", player_idx + 1)).begin(ui);
-                // Drop TabItemToken immediately
-            }
-            // _font_token dropped here
-        };
-
-        // Phase 3: Mutably borrow UI for controller setup
-        for player_idx in tabs_to_draw {
-            self.build_controller_setup_for_player(player_idx, ui);
-        }
+            });
+        });
     }
 
     pub(super) fn build(&mut self, ui: &mut imgui::Ui) {
         self.build_menu_bar = !(self.video_size_control == VideoSizeControl::FullScreen);
 
-        // Phase 1: Push styles for the window
-        {
-            let _style_rounding = ui.push_style_var(imgui::StyleVar::WindowRounding(0.0));
-            let _style_border = ui.push_style_var(imgui::StyleVar::WindowBorderSize(0.0));
-            let _style_padding = ui.push_style_var(imgui::StyleVar::WindowPadding([0.0, 0.0]));
+        let style_rounding = ui.push_style_var(imgui::StyleVar::WindowRounding(0.0));
+        let style_border = ui.push_style_var(imgui::StyleVar::WindowBorderSize(0.0));
+        let style_padding = ui.push_style_var(imgui::StyleVar::WindowPadding([0.0, 0.0]));
 
-            // At this point, only immutable borrows are active
-            // We can draw UI that does not require mutable borrows overlapping with styles
-        } // style tokens dropped here
-
-        // Phase 2: Build the menu bar separately (mutable borrow inside)
         if self.build_menu_bar {
             self.build_menu_bar(ui);
         }
-
-        // Phase 3: Build other windows / UI components (mutable borrow safely)
         self.build_emulation_window(ui);
         self.build_fps_counter(ui);
-
-        // Phase 4: Build file explorers (these probably do not need &mut Ui simultaneously)
         self.build_load_nes_file_explorer();
         self.build_save_state_file_explorer();
         self.build_load_state_file_explorer();
+
+        style_padding.pop();
+        style_border.pop();
+        style_rounding.pop();
     }
 }
