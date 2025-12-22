@@ -39,25 +39,3 @@ pub trait WriteOamDma {
 }
 
 pub trait PpuRegisterAccess: WritePpuRegisters + WriteOamDma + ReadPpuRegisters {}
-
-pub struct DummyPpuRegisterAccessImpl {}
-
-impl WritePpuRegisters for DummyPpuRegisterAccessImpl {
-    fn write(&mut self, _register: WriteAccessRegister, _value: u8) {
-        todo!()
-    }
-}
-
-impl WriteOamDma for DummyPpuRegisterAccessImpl {
-    fn write_oam_dma(&mut self, _data: [u8; 256]) {
-        todo!()
-    }
-}
-
-impl ReadPpuRegisters for DummyPpuRegisterAccessImpl {
-    fn read(&mut self, _register: ReadAccessRegister) -> u8 {
-        todo!()
-    }
-}
-
-impl PpuRegisterAccess for DummyPpuRegisterAccessImpl {}

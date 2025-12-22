@@ -9,15 +9,7 @@ pub trait ApuState {
     fn is_irq_pending(&self) -> bool;
 }
 
-pub struct DummyApuStateImpl {}
 
-impl DummyApuStateImpl {}
-
-impl ApuState for DummyApuStateImpl {
-    fn is_irq_pending(&self) -> bool {
-        todo!()
-    }
-}
 
 const LENGTH_COUNTER_LOOKUP_TABLE: [u8; 32] = [
     10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22,

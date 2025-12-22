@@ -11,7 +11,6 @@ trait Register {
     fn is_mode_1_enabled(&self) -> bool;
     fn get_mirroring(&self) -> Mirroring;
     fn get_prg_bank_size(&self) -> BankSize;
-    fn is_menu_selection_mode(&self) -> bool;
 }
 
 impl Register for u16 {
@@ -45,9 +44,6 @@ impl Register for u16 {
         }
     }
 
-    fn is_menu_selection_mode(&self) -> bool {
-        self & 0b0000_0100_0000_0000 != 0
-    }
 }
 
 #[derive(Serialize, Deserialize)]

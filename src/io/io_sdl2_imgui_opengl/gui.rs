@@ -131,14 +131,12 @@ impl Default for VideoSizeControl {
 }
 #[derive(Clone, Copy)]
 pub struct ButtonMapping {
-    pub waiting_for_input: bool,
     pub key: sdl2::keyboard::Scancode,
 }
 
 impl Default for ButtonMapping {
     fn default() -> Self {
         Self {
-            waiting_for_input: false,
             key: sdl2::keyboard::Scancode::A,
         }
     }
@@ -147,14 +145,12 @@ impl Default for ButtonMapping {
 impl ButtonMapping {
     pub fn new(key: sdl2::keyboard::Scancode) -> Self {
         Self {
-            waiting_for_input: false,
             key,
         }
     }
 }
 #[derive(Clone, Copy, Default)]
 pub struct ControllerConfig {
-    pub use_zapper: bool,
     pub mapping: [ButtonMapping; crate::io::Button::Right as usize + 1],
     pub pending_key_select: Option<u8>,
 }
@@ -163,7 +159,6 @@ impl ControllerConfig {
     pub fn new(player: u8) -> Self {
         use sdl2::keyboard::Scancode::*;
         Self {
-            use_zapper: false,
             pending_key_select: None,
             mapping: match player {
                 0 => [

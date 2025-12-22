@@ -326,12 +326,21 @@ impl io::IO for IOSdl2ImGuiOpenGl {
         self.keyboard_shortcuts = Default::default();
         self.cancel = false;
 
-        self.keyboard_state = self
-            .events
-            .keyboard_state()
-            .scancodes()
-            .collect::<HashMap<_, _>>();
         for event in self.events.poll_iter() {
+            match event {
+                sdl2::event::Event::KeyDown {
+                    scancode: Some(sc), ..
+                } => {
+                    self.keyboard_state.insert(sc, true);
+                }
+                sdl2::event::Event::KeyUp {
+                    scancode: Some(sc), ..
+                } => {
+                    self.keyboard_state.insert(sc, false);
+                }
+                _ => {}
+            }
+
             if self.gui.is_key_selection_pending() {
                 self.gui.try_get_key_selection(&event);
             } else {
