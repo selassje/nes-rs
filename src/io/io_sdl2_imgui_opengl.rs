@@ -117,6 +117,7 @@ impl IOSdl2ImGuiOpenGl {
             .io_mut()
             .config_flags
             .set(imgui::ConfigFlags::NAV_ENABLE_KEYBOARD, true);
+        
         let imgui_sdl2 = imgui_sdl2::ImguiSdl2::new(&mut imgui, &window);
 
         let fonts = gui::prepare_fonts(&mut imgui);
