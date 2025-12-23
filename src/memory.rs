@@ -11,7 +11,6 @@ pub trait Memory {
     }
 }
 
-
 #[derive(Serialize, Deserialize)]
 pub struct MemoryImpl<const N: usize> {
     #[serde(with = "serde_arrays")]

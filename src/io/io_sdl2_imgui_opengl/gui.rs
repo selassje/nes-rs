@@ -51,9 +51,10 @@ pub(super) fn prepare_fonts(imgui: &mut imgui::Context) -> GuiFonts {
     fonts
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Default, Clone, Copy, PartialEq)]
 pub enum VideoSizeControl {
     _Normal = 1,
+    #[default]
     Double = 2,
     Triple = 3,
     Quadrupal = 4,
@@ -78,11 +79,6 @@ impl From<VideoSizeControl> for [f32; 2] {
     }
 }
 
-impl Default for VideoSizeControl {
-    fn default() -> Self {
-        Self::Double
-    }
-}
 #[derive(Clone, Copy)]
 pub struct ButtonMapping {
     pub key: sdl2::keyboard::Scancode,
@@ -200,19 +196,19 @@ impl Gui {
             video_size: [FRAME_WIDTH as f32 * 2.0, FRAME_HEIGHT as f32 * 2.0],
             build_menu_bar: Default::default(),
             fd_load_nes_file: create_file_dialog(
-                &nes_file_label.as_ref(),
-                &open_nes_file_label.as_ref(),
-                &open_nes_file_filters_label.as_ref(),
+                nes_file_label.as_ref(),
+                open_nes_file_label.as_ref(),
+                open_nes_file_filters_label.as_ref(),
             ),
             fd_save_state: create_file_dialog(
-                &save_state_label.as_ref(),
-                &save_state_title.as_ref(),
-                &save_state_filters.as_ref(),
+                save_state_label.as_ref(),
+                save_state_title.as_ref(),
+                save_state_filters.as_ref(),
             ),
             fd_load_state: create_file_dialog(
-                &load_state_label.as_ref(),
-                &load_state_title.as_ref(),
-                &load_state_filters.as_ref(),
+                load_state_label.as_ref(),
+                load_state_title.as_ref(),
+                load_state_filters.as_ref(),
             ),
             audio_volume: 100,
             controller_configs: [ControllerConfig::new(0), ControllerConfig::new(1)],
@@ -269,9 +265,11 @@ impl Gui {
     fn build_menu_bar(&mut self, ui: &imgui::Ui) {
         use MenuBarItem::*;
 
+        #[allow(clippy::redundant_pattern_matching)]
         if let Some(_) = ui.begin_main_menu_bar() {
             let font = ui.push_font(self.fonts[GuiFont::MenuBar as usize]);
 
+            #[allow(clippy::redundant_pattern_matching)]
             if let Some(_) = ui.begin_menu("File") {
                 ui.menu_item_config("Load Nes File")
                     .shortcut("Ctrl+O")
@@ -295,6 +293,7 @@ impl Gui {
                 self.update_menu_item_status(ui, Quit);
             }
 
+            #[allow(clippy::redundant_pattern_matching)]
             if let Some(_) = ui.begin_menu("Emulation") {
                 ui.menu_item_config("Power Cycle")
                     .shortcut("Ctrl+R")
@@ -307,6 +306,7 @@ impl Gui {
                     .build();
                 self.update_menu_item_status(ui, Pause);
 
+                #[allow(clippy::redundant_pattern_matching)]
                 if let Some(_) = ui.begin_menu("Speed") {
                     let target_fps = self.io_control.target_fps;
                     let is_speed_selected = |fps: u16| fps == target_fps;
@@ -336,7 +336,9 @@ impl Gui {
                 }
             }
 
+            #[allow(clippy::redundant_pattern_matching)]
             if let Some(_) = ui.begin_menu("Video") {
+                #[allow(clippy::redundant_pattern_matching)]
                 if let Some(_) = ui.begin_menu("Size") {
                     ui.menu_item_config("200%")
                         .shortcut("F9")
@@ -364,6 +366,7 @@ impl Gui {
                 }
             }
 
+            #[allow(clippy::redundant_pattern_matching)]
             if let Some(_) = ui.begin_menu("Audio") {
                 ui.menu_item_config("Enabled")
                     .shortcut("Ctrl+A")
@@ -390,6 +393,7 @@ impl Gui {
                 self.update_menu_item_status(ui, VolumeDecrease);
             }
 
+            #[allow(clippy::redundant_pattern_matching)]
             if let Some(_) = ui.begin_menu("Controllers") {
                 unsafe {
                     imgui_sys::igSetNextWindowSize(
@@ -397,6 +401,7 @@ impl Gui {
                         imgui::Condition::Always as i32,
                     );
                 }
+                #[allow(clippy::redundant_pattern_matching)]
                 if let Some(_) = ui.begin_menu("Setup") {
                     self.build_controllers_setup_window(ui);
                     self.controllers_setup = true;

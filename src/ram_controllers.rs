@@ -22,5 +22,3 @@ pub trait WriteOutputRegisters {
 }
 
 pub trait ControllerRegisterAccess: ReadInputRegisters + WriteOutputRegisters {}
-
-

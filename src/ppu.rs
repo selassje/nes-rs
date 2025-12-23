@@ -604,7 +604,7 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
                 self.scanline = PRE_RENDER_SCANLINE;
             }
             if self.scanline == POST_RENDER_SCANLINE {
-                if self.frame == std::u128::MAX {
+                if self.frame == u128::MAX {
                     self.frame = 0;
                 } else {
                     self.frame += 1;

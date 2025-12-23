@@ -184,7 +184,7 @@ impl Mapper for MMC3_6 {
             self.mapper_internal
                 .store_prg_ram_byte(address, 0, _8KB, byte)
         } else {
-            let is_even = address % 2 == 0;
+            let is_even = address.is_multiple_of(2);
             match address {
                 0x8000..=0x9FFF => {
                     if is_even {

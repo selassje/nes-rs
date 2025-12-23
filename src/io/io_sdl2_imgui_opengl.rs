@@ -117,7 +117,7 @@ impl IOSdl2ImGuiOpenGl {
             .io_mut()
             .config_flags
             .set(imgui::ConfigFlags::NAV_ENABLE_KEYBOARD, true);
-        
+
         let imgui_sdl2 = imgui_sdl2::ImguiSdl2::new(&mut imgui, &window);
 
         let fonts = gui::prepare_fonts(&mut imgui);
@@ -408,10 +408,10 @@ impl io::IO for IOSdl2ImGuiOpenGl {
             &self.events.mouse_state(),
         );
 
-        let mut ui = self.imgui.frame();
-        self.imgui_sdl2.prepare_render(&ui, &self.window);
+        let ui = self.imgui.frame();
+        self.imgui_sdl2.prepare_render(ui, &self.window);
 
-        self.gui.build(&mut ui);
+        self.gui.build(ui);
 
         self.renderer.render(&mut self.imgui);
         self.update_io_state(&mut io_state);

@@ -362,7 +362,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         if instruction.cycle == instruction.total_cycles {
             (ins_fun)(self);
             self.pc = ((self.pc as u32 + instruction.bytes as u32) % u16::MAX as u32) as u16;
-            let cycles_left = std::u128::MAX - self.cycle;
+            let cycles_left = u128::MAX - self.cycle;
             if cycles_left < instruction.total_cycles as u128 {
                 self.cycle = instruction.total_cycles as u128 - cycles_left;
             } else {

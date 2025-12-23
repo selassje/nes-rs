@@ -43,7 +43,6 @@ impl Register for u16 {
             _16KB
         }
     }
-
 }
 
 #[derive(Serialize, Deserialize)]
