@@ -95,7 +95,7 @@ impl IOSdl2ImGuiOpenGl {
             .unwrap();
 
         window.set_icon(
-            sdl2::rwops::RWops::from_bytes(include_bytes!("../../static/favicon.ico"))
+            sdl2::rwops::RWops::from_bytes(include_bytes!("../../static/img/favicon.ico"))
                 .unwrap()
                 .load_png()
                 .unwrap(),
