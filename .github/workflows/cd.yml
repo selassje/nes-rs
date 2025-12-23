@@ -8,7 +8,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  EMSDK_VER: 3.1.43
+  EMSDK_VER: 4.0.22
+  RUST_VER: 1.92.0
 
 jobs:
   build_and_deploy:
@@ -16,6 +17,12 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v2
+    
+    - name: Install Rust
+      shell: bash
+      run: |
+          rustup install $RUST_VER
+          rustup default $RUST_VER
 
     - name: Install Emscripten SDK
       shell: bash
