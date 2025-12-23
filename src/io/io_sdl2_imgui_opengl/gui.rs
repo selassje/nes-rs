@@ -181,10 +181,10 @@ impl Gui {
         let open_nes_file_filters_label = ImString::new(".nes,.NES");
         let save_state_label = ImString::new("save_state");
         let save_state_title = ImString::new("Save Emulation state");
-        let save_state_filters = ImString::new(".nes,.NES");
+        let save_state_filters = ImString::new(".nesrs");
         let load_state_label = ImString::new("load_state");
         let load_state_title = ImString::new("Load Emulation state");
-        let load_state_filters = ImString::new(".nes,.NES");
+        let load_state_filters = ImString::new(".nesrs,.NESRS");
         Self {
             emulation_texture,
             menu_bar_item_selected: Default::default(),

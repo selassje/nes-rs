@@ -1,3 +1,4 @@
+
 [package]
 name = "nes-rs"
 version = "0.1.0"
@@ -36,7 +37,8 @@ path = "tests/serialization.rs"
 debug = true
 lto = true
 opt-level = 3
-panic = "abort"
+panic = "unwind"
+
 
 [target.'cfg(not(target_os = "emscripten"))'.dependencies]
 sdl2 = {version = "0.36", default-features = false, features = ["static-link","use-vcpkg", "image"]}
