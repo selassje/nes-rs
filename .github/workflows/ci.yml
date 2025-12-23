@@ -26,6 +26,7 @@ jobs:
       shell: bash
       run: |
           sudo apt install autoconf autoconf-archive automake libtool
+          sudo apt install libltdl-dev
       if: ${{ matrix.os == 'ubuntu-latest' }}    
     
     - name: Install Rust
