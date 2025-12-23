@@ -65,4 +65,6 @@ jobs:
         cargo clippy --all-targets --all-features -- -D warnings
     
     - name: Check formatting
-      run: cargo fmt -- --check
+      run: |
+        rustup component add rustfmt
+        cargo fmt -- --check
