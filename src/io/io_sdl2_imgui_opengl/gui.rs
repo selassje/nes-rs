@@ -446,7 +446,6 @@ impl Gui {
                 self.io_control.current_fps, self.io_control.target_fps
             )
         };
-        font.pop();
 
         let [video_width, _]: [f32; 2] = self.video_size;
         let im_text = ImString::new(&text);
@@ -462,6 +461,7 @@ impl Gui {
             .build(|| {
                 ui.text(text);
             });
+        font.pop();
     }
 
     fn build_load_nes_file_explorer(&mut self) {
