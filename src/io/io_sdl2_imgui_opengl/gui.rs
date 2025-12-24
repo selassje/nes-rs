@@ -264,11 +264,10 @@ impl Gui {
 
     fn build_menu_bar(&mut self, ui: &imgui::Ui) {
         use MenuBarItem::*;
+        let font = ui.push_font(self.fonts[GuiFont::MenuBar as usize]);
 
         #[allow(clippy::redundant_pattern_matching)]
         if let Some(_) = ui.begin_main_menu_bar() {
-            let font = ui.push_font(self.fonts[GuiFont::MenuBar as usize]);
-
             #[allow(clippy::redundant_pattern_matching)]
             if let Some(_) = ui.begin_menu("File") {
                 ui.menu_item_config("Load Nes File")
@@ -409,8 +408,9 @@ impl Gui {
                     self.controllers_setup = false;
                 }
             }
-            font.pop();
         }
+        
+        font.pop();
 
         if !self.controllers_setup {
             self.controller_configs[0].pending_key_select = None;
