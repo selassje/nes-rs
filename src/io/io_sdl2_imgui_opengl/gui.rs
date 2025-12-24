@@ -409,7 +409,7 @@ impl Gui {
                 }
             }
         }
-        
+
         font.pop();
 
         if !self.controllers_setup {
