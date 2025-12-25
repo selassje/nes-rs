@@ -2,6 +2,7 @@
 **/*.rs.bk
 Cargo.lock
 *.nes
+!/res/nes-rs-demo.nes
 !/tests/*/*
 *.bmp
 !/tests/*/*.expected.bmp

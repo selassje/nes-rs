@@ -67,7 +67,9 @@ impl Emulation {
             let path = &args[1];
             load(&mut nes, path);
             initial_title = Some(path.clone());
-        };
+        } else {
+            load_demo(&mut nes);
+        }
 
         let io_state: io::IOState = Default::default();
         let frame_start = std::time::Instant::now();
@@ -136,6 +138,11 @@ fn read_nes_file(file_name: &str) -> nes_file::NesFile {
     nes_file::NesFile::new(&rom)
 }
 
+fn read_demo() -> nes_file::NesFile {
+    let demo_rom = include_bytes!("../res/nes-rs-demo.nes");
+    nes_file::NesFile::new(demo_rom)
+}
+
 pub fn run(mut emulation: Emulation) {
     while !emulation.io_state.quit {
         emulation.main_loop();
@@ -197,5 +204,10 @@ fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut 
 
 fn load(nes: &mut nes::Nes, path: &str) {
     let nes_file = read_nes_file(path);
+    nes.load(&nes_file);
+}
+
+fn load_demo(nes: &mut nes::Nes) {
+    let nes_file = read_demo();
     nes.load(&nes_file);
 }
