@@ -139,8 +139,19 @@ fn read_nes_file(file_name: &str) -> nes_file::NesFile {
 }
 
 fn read_demo() -> nes_file::NesFile {
-    let demo_rom = include_bytes!("../res/nes-rs-demo.nes");
-    nes_file::NesFile::new(demo_rom)
+    let mut demo_rom = include_bytes!("../res/nes-rs-demo.nes").to_vec();
+    let pattern = b"xxxxxx";
+    const GIT_HASH: &str = git_version::git_version!();
+    let ref replacement = GIT_HASH.as_bytes()[..6];
+    if let Some(pos) = demo_rom
+        .windows(pattern.len())
+        .position(|window| window == pattern)
+    {
+        demo_rom[pos..pos + 6].copy_from_slice(replacement);
+    } else {
+        println!("Pattern not found!");
+    }
+    nes_file::NesFile::new(&demo_rom)
 }
 
 pub fn run(mut emulation: Emulation) {
