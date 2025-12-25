@@ -819,7 +819,9 @@ impl Apu {
 
         self.pulse_1.clock_timer();
         self.pulse_2.clock_timer();
-        self.triangle.clock_timer();
+        if self.is_during_apu_cycle {
+            self.triangle.clock_timer();
+        }
         self.noise.clock_timer();
 
         self.dmc.fetch_next_sample_buffer();
