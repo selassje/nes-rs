@@ -113,7 +113,7 @@ impl NesInternal {
             );
             nes.controllers.set_controller(
                 ControllerId::Controller2,
-                ControllerType::StdNesController,
+                ControllerType::Zapper,
                 io,
             );
             pinned_nes

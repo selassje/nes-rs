@@ -5,9 +5,11 @@ use std::{cell::RefCell, rc::Rc};
 
 mod null_controller;
 mod std_nes_controller;
+mod zapper;
 
 use self::null_controller::NullController;
 use self::std_nes_controller::StdNesController;
+use self::zapper::Zapper;
 
 #[enum_dispatch::enum_dispatch(ControllerEnum)]
 pub trait Controller {
@@ -20,6 +22,7 @@ pub trait Controller {
 pub enum ControllerType {
     NullController,
     StdNesController,
+    Zapper,
 }
 
 #[enum_dispatch::enum_dispatch]
@@ -27,6 +30,7 @@ pub enum ControllerType {
 enum ControllerEnum {
     NullController(self::null_controller::NullController),
     StdNesController(self::std_nes_controller::StdNesController),
+    Zapper(self::zapper::Zapper),
 }
 
 impl ControllerEnum {
@@ -34,6 +38,7 @@ impl ControllerEnum {
         match self {
             ControllerEnum::StdNesController(_) => ControllerType::StdNesController,
             ControllerEnum::NullController(_) => ControllerType::NullController,
+            ControllerEnum::Zapper(_) => ControllerType::Zapper,
         }
     }
 }
@@ -89,6 +94,7 @@ impl Controllers {
                 ControllerEnum::StdNesController(StdNesController::new(id))
             }
             ControllerType::NullController => ControllerEnum::NullController(NullController::new()),
+            ControllerType::Zapper => ControllerEnum::Zapper(Zapper::new(id)),
         }
     }
 
