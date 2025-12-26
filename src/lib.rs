@@ -142,7 +142,7 @@ fn read_demo() -> nes_file::NesFile {
     let mut demo_rom = include_bytes!("../res/nes-rs-demo.nes").to_vec();
     let pattern = b"xxxxxx";
     const GIT_HASH: &str = git_version::git_version!();
-    let ref replacement = GIT_HASH.as_bytes()[..6];
+    let replacement = &GIT_HASH.as_bytes()[..6];
     if let Some(pos) = demo_rom
         .windows(pattern.len())
         .position(|window| window == pattern)

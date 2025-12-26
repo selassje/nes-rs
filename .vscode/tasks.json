@@ -114,6 +114,22 @@
       "group": {
         "kind": "build"
       }
-    }
+    },
+    {
+      "label": "Clippy",
+      "type": "shell",
+      "command": "cargo clippy --all-targets --all-features -- -D warnings",
+      "group": {
+        "kind": "build"
+      }
+    },
+    {
+      "label": "Check formatting",
+      "type": "shell",
+      "command": "cargo fmt -- --check",
+      "group": {
+        "kind": "build"
+      }
+    },
   ]
 }
