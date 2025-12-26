@@ -23,11 +23,11 @@ impl Zapper {
 
 impl super::Controller for Zapper {
     fn read(&self) -> u8 {
-        todo!();
+        0b0001_0000
     }
 
     fn write(&mut self, byte: u8) {
-        todo!();
+        
     }
 
     fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>) {
