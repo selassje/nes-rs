@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::io::{AudioAccess, ControllerAccess, RgbColor, VideoAccess, IO};
+use crate::io::{AudioAccess, ControllerAccess, MouseClick, RgbColor, VideoAccess, IO};
 use crate::{controllers::ControllerId, io::io_internal::IOInternal, io::Button};
 
 use super::{IOControl, IOState};
@@ -53,5 +53,11 @@ impl ControllerAccess for IOTest {
         } else {
             false
         }
+    }
+    fn get_mouse_click(&self) -> Option<MouseClick> {
+        todo!()
+    }
+    fn get_current_frame(&self) -> u128 {
+        todo!()
     }
 }
