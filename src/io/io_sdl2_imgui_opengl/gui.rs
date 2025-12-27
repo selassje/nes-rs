@@ -147,6 +147,7 @@ pub(super) struct Gui {
     pub controller_switch: [Option<controllers::ControllerType>; 2],
     pub pause: bool,
     pub mouse_click: Option<MouseClick>,
+    pub crosshair: bool,
 }
 
 fn create_file_dialog(
@@ -210,6 +211,7 @@ impl Gui {
             controller_switch: [None, None],
             pause: false,
             mouse_click: None,
+            crosshair: false,
         }
     }
 
@@ -429,6 +431,7 @@ impl Gui {
             0.0
         };
 
+        self.crosshair = false;
         ui.window("emulation")
             .position([0.0, vertical_offset], imgui::Condition::Always)
             .no_decoration()
@@ -438,7 +441,10 @@ impl Gui {
             .build(|| {
                 imgui::Image::new(self.emulation_texture, self.video_size).build(ui);
                 self.mouse_click = None;
-                if ui.is_window_hovered() && ui.is_mouse_clicked(imgui::MouseButton::Left) {
+                let zapper_active =
+                    self.io_control.controller_type[1] == controllers::ControllerType::Zapper;
+                if ui.is_window_hovered() && zapper_active {
+                    self.crosshair = true;
                     let io = ui.io();
                     let mouse_pos = io.mouse_pos; // [f32;
                     let window_pos = ui.window_pos();
@@ -447,7 +453,47 @@ impl Gui {
                         (rel_pos[0] / self.video_size[0] * FRAME_WIDTH as f32).floor() as usize;
                     let tex_y =
                         (rel_pos[1] / self.video_size[1] * FRAME_HEIGHT as f32).floor() as usize;
-                    self.mouse_click = Some(MouseClick { x: tex_x, y: tex_y });
+
+                    if ui.is_mouse_clicked(imgui::MouseButton::Left) {
+                        self.mouse_click = Some(MouseClick { x: tex_x, y: tex_y });
+                    }
+
+                    let base_line_len = 3.0;
+                    let base_line_thickness = 1.0;
+                    let base_circle_radius = 5.0;
+                    let base_circle_thickness = 1.5;
+
+                    let factor = self.video_size[0] / FRAME_WIDTH as f32;
+
+                    let line_len = base_line_len * factor;
+                    let line_thickness = base_line_thickness * factor;
+                    let circle_radius = base_circle_radius * factor;
+                    let circle_thickness = base_circle_thickness * factor;
+                    let color = imgui::ImColor32::from_rgba(255, 0, 0, 220);
+                    let draw_list = ui.get_window_draw_list();
+                    draw_list
+                        .add_line(
+                            [mouse_pos[0] - line_len, mouse_pos[1]],
+                            [mouse_pos[0] + line_len, mouse_pos[1]],
+                            color,
+                        )
+                        .thickness(line_thickness)
+                        .build();
+
+                    draw_list
+                        .add_line(
+                            [mouse_pos[0], mouse_pos[1] - line_len],
+                            [mouse_pos[0], mouse_pos[1] + line_len],
+                            color,
+                        )
+                        .thickness(line_thickness)
+                        .build();
+
+                    draw_list
+                        .add_circle([mouse_pos[0], mouse_pos[1]], circle_radius, color)
+                        .thickness(circle_thickness)
+                        .num_segments(12)
+                        .build();
                 }
             });
         style.pop();

@@ -60,13 +60,14 @@ pub struct IOSdl2ImGuiOpenGl {
     is_video_size_change_pending: bool,
     keyboard_shortcuts: keyboard_shortcuts::KeyboardShortcuts,
     frame: u128,
+    sdl2_context: sdl2::Sdl,
 }
 
 impl IOSdl2ImGuiOpenGl {
     pub fn new() -> Self {
-        let sdl_context = sdl2::init().unwrap();
+        let sdl2_context = sdl2::init().unwrap();
         let mut maybe_audio_queue = None;
-        if let Ok(sdl_audio) = sdl_context.audio() {
+        if let Ok(sdl_audio) = sdl2_context.audio() {
             let desired_spec = sdl2::audio::AudioSpecDesired {
                 freq: Some(audio_sample_buffer::SAMPLING_RATE as i32),
                 channels: Some(1),
@@ -77,7 +78,7 @@ impl IOSdl2ImGuiOpenGl {
             maybe_audio_queue = Some(audio_queue);
         }
 
-        let video_subsys = sdl_context.video().unwrap();
+        let video_subsys = sdl2_context.video().unwrap();
         {
             let gl_attr = video_subsys.gl_attr();
             if cfg!(target_arch = "wasm32") {
@@ -120,11 +121,16 @@ impl IOSdl2ImGuiOpenGl {
             .config_flags
             .set(imgui::ConfigFlags::NAV_ENABLE_KEYBOARD, true);
 
+        imgui
+            .io_mut()
+            .config_flags
+            .set(imgui::ConfigFlags::NO_MOUSE_CURSOR_CHANGE, true);
+
         let imgui_sdl2 = imgui_sdl2::ImguiSdl2::new(&mut imgui, &window);
 
         let fonts = gui::prepare_fonts(&mut imgui);
 
-        let events = sdl_context.event_pump().unwrap();
+        let events = sdl2_context.event_pump().unwrap();
         let renderer = imgui_opengl_renderer::Renderer::new(&mut imgui, |s| {
             video_subsys.gl_get_proc_address(s) as _
         });
@@ -157,6 +163,7 @@ impl IOSdl2ImGuiOpenGl {
             cancel: false,
             is_video_size_change_pending: false,
             frame: 0,
+            sdl2_context,
         }
     }
 
@@ -416,7 +423,6 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 self.io_internal.get_pixels_slice().as_ptr() as _,
             );
         };
-
         self.imgui_sdl2.prepare_frame(
             self.imgui.io_mut(),
             &self.window,
@@ -425,6 +431,11 @@ impl io::IO for IOSdl2ImGuiOpenGl {
 
         let ui = self.imgui.frame();
         self.imgui_sdl2.prepare_render(ui, &self.window);
+
+        let mouse = self.sdl2_context.mouse();
+        if mouse.is_cursor_showing() == self.gui.crosshair {
+            mouse.show_cursor(!self.gui.crosshair);
+        }
 
         self.gui.build(ui);
 
