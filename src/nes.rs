@@ -117,6 +117,9 @@ impl NesInternal {
         self.controllers
             .set_controller(id, controller_type, self.controller_access.clone());
     }
+    pub fn get_controller_type(&self, id: ControllerId) -> ControllerType {
+        self.controllers.get_controller_type(id)
+    }
 
     fn serialize(&self) -> Vec<u8> {
         let serialized = serde_json::to_vec(self).unwrap();
@@ -269,4 +272,7 @@ impl Nes {
         self.as_mut().set_controller(id, controller_type);
     }
 
+    pub fn get_controller_type(&mut self, id: ControllerId) -> ControllerType {
+        self.as_mut().get_controller_type(id)
+    }
 }

@@ -81,6 +81,7 @@ pub struct IOControl {
     pub target_fps: u16,
     pub current_fps: u16,
     pub title: Option<String>,
+    pub controller_type: [controllers::ControllerType; 2],
 }
 
 pub trait AudioAccess {

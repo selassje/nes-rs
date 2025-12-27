@@ -111,6 +111,12 @@ impl Controllers {
             controller.set_controller_access(controller_access);
         }
     }
+    pub fn get_controller_type(&self, id: ControllerId) -> ControllerType {
+        match id {
+            ControllerId::Controller1 => self.controller_1.get_type(),
+            ControllerId::Controller2 => self.controller_2.get_type(),
+        }
+    }
 
     fn new_controller(id: ControllerId, controller_type: ControllerType) -> ControllerEnum {
         match controller_type {

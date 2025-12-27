@@ -93,7 +93,6 @@ impl ButtonMapping {
 pub struct ControllerConfig {
     pub mapping: [ButtonMapping; crate::io::Button::Right as usize + 1],
     pub pending_key_select: Option<u8>,
-    pub controller_type: controllers::ControllerType,
 }
 
 impl ControllerConfig {
@@ -124,7 +123,6 @@ impl ControllerConfig {
                 ],
                 _ => panic!("Wrong player!"),
             },
-            controller_type: controllers::ControllerType::StdNesController,
         }
     }
 }
@@ -560,10 +558,11 @@ impl Gui {
 
     fn build_controller_setup_for_player(&mut self, player_index: usize, ui: &imgui::Ui) {
         let controller_config = &mut self.controller_configs[player_index];
+        let controller_type  = self.io_control.controller_type[player_index];
         let items = ["Standard", "Zapper"];
         if player_index == 1 {
             let mut new_selection =
-                controllers::ControllerType::from(controller_config.controller_type) as usize - 1;
+                controllers::ControllerType::from(controller_type) as usize - 1;
             let current_selection = new_selection;
             let text = String::from("Controller:");
             ui.text(text);
@@ -572,11 +571,9 @@ impl Gui {
             if new_selection != current_selection {
                 self.controller_switch[player_index] =
                     Some(controllers::ControllerType::from_index(new_selection + 1).unwrap());
-                controller_config.controller_type =
-                    controllers::ControllerType::from_index(new_selection + 1).unwrap();
             }
         }
-        if controller_config.controller_type == controllers::ControllerType::StdNesController {
+        if controller_type == controllers::ControllerType::StdNesController {
             ui.separator();
             for i in 0..8u8 {
                 let button = crate::io::Button::from(i);

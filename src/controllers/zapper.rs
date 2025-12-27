@@ -60,7 +60,7 @@ impl super::Controller for Zapper {
             .controller_access
             .borrow()
             .get_luminance(*self.x.borrow(), *self.y.borrow());
-        let light_bit = if lum > 0.5 { 0b0000_0000 } else { 0b0000_1000 };
+        let light_bit = if lum > 0.7 { 0b0000_0000 } else { 0b0000_1000 };
         light_bit
             | if *trigger_state {
                 0b0001_0000

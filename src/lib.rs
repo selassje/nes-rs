@@ -60,7 +60,7 @@ impl Emulation {
             io::io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl::new(),
         ));
 
-        let mut nes = nes::Nes::new(io.clone());
+        let mut nes: Nes = nes::Nes::new(io.clone());
         let mut initial_title: Option<String> = None;
         let args: Vec<String> = env::args().collect();
         if args.len() > 1 {
@@ -80,6 +80,7 @@ impl Emulation {
             target_fps: common::DEFAULT_FPS,
             current_fps: 0,
             title: initial_title,
+            controller_type: [controllers::ControllerType::NullController; 2],
         };
         let is_audio_available = io.borrow().is_audio_available();
         Self {
@@ -107,6 +108,11 @@ impl emscripten_main_loop::MainLoop for Emulation {
                 self.fps = 1;
             }
         }
+        self.io_control.controller_type = [
+            self.nes.get_controller_type(controllers::ControllerId::Controller1),
+            self.nes.get_controller_type(controllers::ControllerId::Controller2),
+        ];
+
         self.io_state = self.io.borrow_mut().present_frame(self.io_control.clone());
 
         handle_io_state(&mut self.nes, &self.io_state, &mut self.io_control);
