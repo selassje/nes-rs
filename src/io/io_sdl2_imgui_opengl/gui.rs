@@ -4,6 +4,8 @@ use crate::{
     io::{IOControl, FRAME_HEIGHT, FRAME_WIDTH},
 };
 
+use crate::io::MouseClick;
+
 use imgui::ImString;
 
 macro_rules! add_font_from_ttf {
@@ -153,6 +155,7 @@ pub(super) struct Gui {
     pub controllers_setup: bool,
     pub controller_configs: [ControllerConfig; 2],
     pub pause: bool,
+    pub mouse_click: Option<MouseClick>,
 }
 
 fn create_file_dialog(
@@ -214,6 +217,7 @@ impl Gui {
             controller_configs: [ControllerConfig::new(0), ControllerConfig::new(1)],
             controllers_setup: false,
             pause: false,
+            mouse_click: None,
         }
     }
 
@@ -418,7 +422,7 @@ impl Gui {
         }
     }
 
-    fn build_emulation_window(&self, ui: &imgui::Ui) {
+    fn build_emulation_window(&mut self, ui: &imgui::Ui) {
         with_styles!(ui, (imgui::StyleVar::WindowBorderSize(0.0)), {
             let vertical_offset = if self.build_menu_bar {
                 MENU_BAR_HEIGHT as f32
@@ -434,6 +438,22 @@ impl Gui {
                 .bring_to_front_on_focus(false)
                 .build(|| {
                     imgui::Image::new(self.emulation_texture, self.video_size).build(ui);
+                    self.mouse_click = None;
+                    if ui.is_window_hovered() {
+                        if ui.is_mouse_clicked(imgui::MouseButton::Left) {
+                            let io = ui.io();
+                            let mouse_pos = io.mouse_pos; // [f32;
+                            let window_pos = ui.window_pos();
+                            let rel_pos =
+                                [mouse_pos[0] - window_pos[0], mouse_pos[1] - window_pos[1]];
+                            let tex_x = (rel_pos[0] / self.video_size[0] * FRAME_WIDTH as f32)
+                                .floor() as usize;
+                            let tex_y = (rel_pos[1] / self.video_size[1] * FRAME_HEIGHT as f32)
+                                .floor() as usize;
+                            println!("Clicked at texture pixel: ({}, {})", tex_x, tex_y);
+                            self.mouse_click = Some(MouseClick { x: tex_x, y: tex_y });
+                        }
+                    }
                 });
         });
     }

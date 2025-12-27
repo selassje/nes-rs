@@ -354,7 +354,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 sdl2::event::Event::MouseButtonDown {mouse_btn, x, y ,..} =>{
                   println!("Mouse button up: {:?} at {}, {}", mouse_btn, x, y);
                   if mouse_btn == sdl2::mouse::MouseButton::Left{
-                    self.mouse_click = Some(io::MouseClick {x: x as usize, y: y as usize});
+                 //   self.mouse_click = Some(io::MouseClick {x: x as usize, y: y as usize});
                   }
                 }
                 _ => {}
@@ -468,7 +468,11 @@ impl io::ControllerAccess for IOSdl2ImGuiOpenGl {
     }
 
     fn get_mouse_click(&self) -> Option<io::MouseClick> {
-        self.mouse_click.clone()
+        let  ret = self.gui.mouse_click.clone();
+        unsafe {
+      //      self.gui.mouse_click = None;
+        }
+        ret
     }
     fn get_current_frame(&self) -> u128 {
         self.frame

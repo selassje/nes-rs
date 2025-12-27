@@ -19,6 +19,8 @@ pub struct Zapper {
     #[serde(skip, default = "super::default_controller_access")]
     controller_access: Rc<RefCell<dyn ControllerAccess>>,
     frame_of_last_click: RefCell<u128>,
+    x: RefCell<usize>,
+    y: RefCell<usize>,
 }
 
 impl Zapper {
@@ -28,6 +30,8 @@ impl Zapper {
             controller_access: super::default_controller_access(),
             trigger_state: RefCell::new(TriggerState::Released),
             frame_of_last_click: RefCell::new(0),
+            x: RefCell::new(0),
+            y: RefCell::new(0),
         }
     }
 
@@ -47,11 +51,13 @@ impl super::Controller for Zapper {
         let mut trigger_state = self.trigger_state.borrow_mut();
         if mouse_click.is_some() {
             if *trigger_state == TriggerState::Released {
+                *self.x.borrow_mut() = mouse_click.as_ref().unwrap().x;
+                *self.y.borrow_mut() = mouse_click.as_ref().unwrap().y;
                 *trigger_state = TriggerState::HalfPull;
                 *self.frame_of_last_click.borrow_mut() = current_frame;
                 println!("Shot!");
             }
-        } else if *trigger_state == TriggerState::FullPull {
+        } if *trigger_state == TriggerState::FullPull {
             *trigger_state = TriggerState::Released;
         }
 
@@ -60,11 +66,12 @@ impl super::Controller for Zapper {
         {
             *trigger_state = TriggerState::FullPull;
         }
-
-        let lum = self.controller_access.borrow().get_luminance(100, 100);
-
-        // Simple threshold for Zapper light detection
-        let light_detected = lum > 0.7;
+        let mut light_detected = false;
+        let lum = self
+            .controller_access
+            .borrow()
+            .get_luminance(*self.x.borrow(), *self.y.borrow());
+        light_detected = lum > 0.7;
 
         let mut result = match *trigger_state {
             TriggerState::Released => 0b0000_0000,
