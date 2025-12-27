@@ -166,6 +166,10 @@ impl IOSdl2ImGuiOpenGl {
         io_state.load_nes_file = self.gui.get_rom_path();
         io_state.save_state = self.gui.get_save_state_path();
         io_state.load_state = self.gui.get_load_state_path();
+        io_state.switch_controller_type = [
+            self.gui.get_controller_switch(controllers::ControllerId::Controller1),
+            self.gui.get_controller_switch(controllers::ControllerId::Controller2),
+        ];
 
         io_state.speed = None;
         {

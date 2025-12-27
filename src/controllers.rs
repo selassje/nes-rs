@@ -26,6 +26,18 @@ pub enum ControllerType {
     Zapper,
 }
 
+
+impl ControllerType {
+    pub fn from_index(i: usize) -> Option<Self> {
+        match i {
+            0 => Some(ControllerType::NullController),
+            1 => Some(ControllerType::StdNesController),
+            2 => Some(ControllerType::Zapper),
+            _ => None,
+        }
+    }
+}
+
 #[enum_dispatch::enum_dispatch]
 #[derive(Serialize, Deserialize)]
 enum ControllerEnum {

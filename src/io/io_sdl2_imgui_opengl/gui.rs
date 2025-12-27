@@ -1,6 +1,7 @@
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
-    common, controllers,
+    common,
+    controllers::{self, ControllerId},
     io::{IOControl, FRAME_HEIGHT, FRAME_WIDTH},
 };
 
@@ -145,6 +146,7 @@ pub(super) struct Gui {
     pub audio_volume: u8,
     pub controllers_setup: bool,
     pub controller_configs: [ControllerConfig; 2],
+    pub controller_switch: [Option<controllers::ControllerType>; 2],
     pub pause: bool,
     pub mouse_click: Option<MouseClick>,
 }
@@ -207,9 +209,17 @@ impl Gui {
             audio_volume: 100,
             controller_configs: [ControllerConfig::new(0), ControllerConfig::new(1)],
             controllers_setup: false,
+            controller_switch: [None, None],
             pause: false,
             mouse_click: None,
         }
+    }
+
+    pub fn get_controller_switch(
+        &mut self,
+        player: ControllerId,
+    ) -> Option<controllers::ControllerType> {
+        self.controller_switch[player as usize].take()
     }
 
     pub fn get_rom_path(&mut self) -> Option<String> {
@@ -552,27 +562,36 @@ impl Gui {
         let controller_config = &mut self.controller_configs[player_index];
         let items = ["Standard", "Zapper"];
         if player_index == 1 {
-            let mut current =
+            let mut new_selection =
                 controllers::ControllerType::from(controller_config.controller_type) as usize - 1;
+            let current_selection = new_selection;
             let text = String::from("Controller:");
             ui.text(text);
             ui.same_line();
-            ui.combo_simple_string("Controller", &mut current, &items);
-            ui.separator();
+            ui.combo_simple_string("Controller", &mut new_selection, &items);
+            if new_selection != current_selection {
+                self.controller_switch[player_index] =
+                    Some(controllers::ControllerType::from_index(new_selection + 1).unwrap());
+                controller_config.controller_type =
+                    controllers::ControllerType::from_index(new_selection + 1).unwrap();
+            }
         }
-        for i in 0..8u8 {
-            let button = crate::io::Button::from(i);
-            let caption = imgui::ImString::from(button.to_string());
-            let key = controller_config.mapping[i as usize].key;
-            let mut text = key.to_string();
-            if ui.small_button(&caption) && controller_config.pending_key_select.is_none() {
-                controller_config.pending_key_select = Some(i);
+        if controller_config.controller_type == controllers::ControllerType::StdNesController {
+            ui.separator();
+            for i in 0..8u8 {
+                let button = crate::io::Button::from(i);
+                let caption = imgui::ImString::from(button.to_string());
+                let key = controller_config.mapping[i as usize].key;
+                let mut text = key.to_string();
+                if ui.small_button(&caption) && controller_config.pending_key_select.is_none() {
+                    controller_config.pending_key_select = Some(i);
+                }
+                if Some(i) == controller_config.pending_key_select {
+                    text = String::from("Press Key");
+                }
+                ui.same_line();
+                ui.text(text);
             }
-            if Some(i) == controller_config.pending_key_select {
-                text = String::from("Press Key");
-            }
-            ui.same_line();
-            ui.text(text);
         }
     }
     fn build_controllers_setup_window(&mut self, ui: &imgui::Ui) {
