@@ -438,19 +438,16 @@ impl Gui {
             .build(|| {
                 imgui::Image::new(self.emulation_texture, self.video_size).build(ui);
                 self.mouse_click = None;
-                if ui.is_window_hovered() {
-                    if ui.is_mouse_clicked(imgui::MouseButton::Left) {
-                        let io = ui.io();
-                        let mouse_pos = io.mouse_pos; // [f32;
-                        let window_pos = ui.window_pos();
-                        let rel_pos = [mouse_pos[0] - window_pos[0], mouse_pos[1] - window_pos[1]];
-                        let tex_x =
-                            (rel_pos[0] / self.video_size[0] * FRAME_WIDTH as f32).floor() as usize;
-                        let tex_y = (rel_pos[1] / self.video_size[1] * FRAME_HEIGHT as f32).floor()
-                            as usize;
-                        self.mouse_click = Some(MouseClick { x: tex_x, y: tex_y });
-                        println!("Clicked! {} {}", tex_x, tex_y);
-                    }
+                if ui.is_window_hovered() && ui.is_mouse_clicked(imgui::MouseButton::Left) {
+                    let io = ui.io();
+                    let mouse_pos = io.mouse_pos; // [f32;
+                    let window_pos = ui.window_pos();
+                    let rel_pos = [mouse_pos[0] - window_pos[0], mouse_pos[1] - window_pos[1]];
+                    let tex_x =
+                        (rel_pos[0] / self.video_size[0] * FRAME_WIDTH as f32).floor() as usize;
+                    let tex_y =
+                        (rel_pos[1] / self.video_size[1] * FRAME_HEIGHT as f32).floor() as usize;
+                    self.mouse_click = Some(MouseClick { x: tex_x, y: tex_y });
                 }
             });
         style.pop();
@@ -558,11 +555,10 @@ impl Gui {
 
     fn build_controller_setup_for_player(&mut self, player_index: usize, ui: &imgui::Ui) {
         let controller_config = &mut self.controller_configs[player_index];
-        let controller_type  = self.io_control.controller_type[player_index];
+        let controller_type = self.io_control.controller_type[player_index];
         let items = ["Standard", "Zapper"];
         if player_index == 1 {
-            let mut new_selection =
-                controllers::ControllerType::from(controller_type) as usize - 1;
+            let mut new_selection = controller_type as usize - 1;
             let current_selection = new_selection;
             let text = String::from("Controller:");
             ui.text(text);

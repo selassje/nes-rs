@@ -18,14 +18,13 @@ pub trait Controller {
     fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>);
 }
 
-#[derive(Clone,Copy,PartialEq,Default)]
+#[derive(Clone, Copy, PartialEq, Default)]
 pub enum ControllerType {
     NullController,
     #[default]
     StdNesController,
     Zapper,
 }
-
 
 impl ControllerType {
     pub fn from_index(i: usize) -> Option<Self> {

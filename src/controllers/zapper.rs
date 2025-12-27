@@ -5,7 +5,6 @@ use std::{cell::RefCell, rc::Rc};
 use super::ControllerId;
 use crate::io::ControllerAccess;
 
-
 #[derive(Serialize, Deserialize)]
 pub struct Zapper {
     id: ControllerId,
@@ -43,18 +42,16 @@ impl super::Controller for Zapper {
         let current_frame = self.controller_access.borrow().get_current_frame();
         let mouse_click = self.controller_access.borrow().get_mouse_click();
         let mut trigger_state = self.trigger_pressed.borrow_mut();
-        if mouse_click.is_some() {
+        if let Some(mouse_click) = mouse_click {
             if !*trigger_state {
-                *self.x.borrow_mut() = mouse_click.as_ref().unwrap().x;
-                *self.y.borrow_mut() = mouse_click.as_ref().unwrap().y;
+                *self.x.borrow_mut() = mouse_click.x;
+                *self.y.borrow_mut() = mouse_click.y;
                 *trigger_state = true;
                 *self.frame_of_last_click.borrow_mut() = current_frame;
-                println!("Shot!");
             }
         }
         if self.frames_since_last_click(current_frame) >= 2 && *trigger_state {
             *trigger_state = false;
-            println!("Released!	");
         }
         let lum = self
             .controller_access

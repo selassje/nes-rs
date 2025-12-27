@@ -109,8 +109,10 @@ impl emscripten_main_loop::MainLoop for Emulation {
             }
         }
         self.io_control.controller_type = [
-            self.nes.get_controller_type(controllers::ControllerId::Controller1),
-            self.nes.get_controller_type(controllers::ControllerId::Controller2),
+            self.nes
+                .get_controller_type(controllers::ControllerId::Controller1),
+            self.nes
+                .get_controller_type(controllers::ControllerId::Controller2),
         ];
 
         self.io_state = self.io.borrow_mut().present_frame(self.io_control.clone());
