@@ -5,17 +5,11 @@ use std::{cell::RefCell, rc::Rc};
 use super::ControllerId;
 use crate::io::ControllerAccess;
 
-#[derive(PartialEq, Serialize, Deserialize)]
-enum TriggerState {
-    Released,
-    HalfPull,
-    FullPull,
-}
 
 #[derive(Serialize, Deserialize)]
 pub struct Zapper {
     id: ControllerId,
-    trigger_state: RefCell<TriggerState>,
+    trigger_pressed: RefCell<bool>,
     #[serde(skip, default = "super::default_controller_access")]
     controller_access: Rc<RefCell<dyn ControllerAccess>>,
     frame_of_last_click: RefCell<u128>,
@@ -28,7 +22,7 @@ impl Zapper {
         Self {
             id,
             controller_access: super::default_controller_access(),
-            trigger_state: RefCell::new(TriggerState::Released),
+            trigger_pressed: RefCell::new(false),
             frame_of_last_click: RefCell::new(0),
             x: RefCell::new(0),
             y: RefCell::new(0),
@@ -48,31 +42,31 @@ impl super::Controller for Zapper {
     fn read(&self) -> u8 {
         let current_frame = self.controller_access.borrow().get_current_frame();
         let mouse_click = self.controller_access.borrow().get_mouse_click();
-        let mut trigger_state = self.trigger_state.borrow_mut();
+        let mut trigger_state = self.trigger_pressed.borrow_mut();
         if mouse_click.is_some() {
-            if *trigger_state == TriggerState::Released {
+            if !*trigger_state {
                 *self.x.borrow_mut() = mouse_click.as_ref().unwrap().x;
                 *self.y.borrow_mut() = mouse_click.as_ref().unwrap().y;
-                *trigger_state = TriggerState::HalfPull;
+                *trigger_state = true;
                 *self.frame_of_last_click.borrow_mut() = current_frame;
                 println!("Shot!");
             }
-        } if *trigger_state == TriggerState::FullPull {
-            *trigger_state = TriggerState::Released;
         }
-
-        if self.frames_since_last_click(current_frame) >= 2
-            && *trigger_state == TriggerState::HalfPull
-        {
-            *trigger_state = TriggerState::FullPull;
+        if self.frames_since_last_click(current_frame) >= 2 && *trigger_state {
+            *trigger_state = false;
+            println!("Released!	");
         }
         let lum = self
             .controller_access
             .borrow()
             .get_luminance(*self.x.borrow(), *self.y.borrow());
-        let light_bit = if lum > 0.7 { 0b0000_0000 } else { 0b0000_1000 };
-        light_bit | if *trigger_state == TriggerState::HalfPull { 0b0001_0000 } else { 0b0000_0000 }
-
+        let light_bit = if lum > 0.5 { 0b0000_0000 } else { 0b0000_1000 };
+        light_bit
+            | if *trigger_state {
+                0b0001_0000
+            } else {
+                0b0000_0000
+            }
     }
 
     fn write(&mut self, _byte: u8) {}

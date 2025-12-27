@@ -439,6 +439,7 @@ impl Gui {
                         let tex_y = (rel_pos[1] / self.video_size[1] * FRAME_HEIGHT as f32).floor()
                             as usize;
                         self.mouse_click = Some(MouseClick { x: tex_x, y: tex_y });
+                        println!("Clicked! {} {}", tex_x, tex_y);
                     }
                 }
             });
