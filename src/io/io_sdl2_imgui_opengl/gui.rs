@@ -19,17 +19,6 @@ macro_rules! add_font_from_ttf {
     }};
 }
 
-macro_rules! with_styles {
-    ($ui:expr, ($($style:expr),*), $code:block) => {{
-      let _tokens = (
-        $(
-            $ui.push_style_var($style),
-        )*
-    );
-        $code
-}};
-}
-
 enum GuiFont {
     _Default = 0,
     FpsCounter,
@@ -423,40 +412,39 @@ impl Gui {
     }
 
     fn build_emulation_window(&mut self, ui: &imgui::Ui) {
-        with_styles!(ui, (imgui::StyleVar::WindowBorderSize(0.0)), {
-            let vertical_offset = if self.build_menu_bar {
-                MENU_BAR_HEIGHT as f32
-            } else {
-                0.0
-            };
+        let style = ui.push_style_var(imgui::StyleVar::WindowBorderSize(0.0));
+        let vertical_offset = if self.build_menu_bar {
+            MENU_BAR_HEIGHT as f32
+        } else {
+            0.0
+        };
 
-            ui.window("emulation")
-                .position([0.0, vertical_offset], imgui::Condition::Always)
-                .no_decoration()
-                .size(self.video_size, imgui::Condition::Always)
-                .scroll_bar(false)
-                .bring_to_front_on_focus(false)
-                .build(|| {
-                    imgui::Image::new(self.emulation_texture, self.video_size).build(ui);
-                    self.mouse_click = None;
-                    if ui.is_window_hovered() {
-                        if ui.is_mouse_clicked(imgui::MouseButton::Left) {
-                            let io = ui.io();
-                            let mouse_pos = io.mouse_pos; // [f32;
-                            let window_pos = ui.window_pos();
-                            let rel_pos =
-                                [mouse_pos[0] - window_pos[0], mouse_pos[1] - window_pos[1]];
-                            let tex_x = (rel_pos[0] / self.video_size[0] * FRAME_WIDTH as f32)
-                                .floor() as usize;
-                            let tex_y = (rel_pos[1] / self.video_size[1] * FRAME_HEIGHT as f32)
-                                .floor() as usize;
-                            println!("Clicked at texture pixel: ({}, {})", tex_x, tex_y);
-                            self.mouse_click = Some(MouseClick { x: tex_x, y: tex_y });
-                        }
+        ui.window("emulation")
+            .position([0.0, vertical_offset], imgui::Condition::Always)
+            .no_decoration()
+            .size(self.video_size, imgui::Condition::Always)
+            .scroll_bar(false)
+            .bring_to_front_on_focus(false)
+            .build(|| {
+                imgui::Image::new(self.emulation_texture, self.video_size).build(ui);
+                self.mouse_click = None;
+                if ui.is_window_hovered() {
+                    if ui.is_mouse_clicked(imgui::MouseButton::Left) {
+                        let io = ui.io();
+                        let mouse_pos = io.mouse_pos; // [f32;
+                        let window_pos = ui.window_pos();
+                        let rel_pos = [mouse_pos[0] - window_pos[0], mouse_pos[1] - window_pos[1]];
+                        let tex_x =
+                            (rel_pos[0] / self.video_size[0] * FRAME_WIDTH as f32).floor() as usize;
+                        let tex_y = (rel_pos[1] / self.video_size[1] * FRAME_HEIGHT as f32).floor()
+                            as usize;
+                        self.mouse_click = Some(MouseClick { x: tex_x, y: tex_y });
                     }
-                });
-        });
+                }
+            });
+        style.pop();
     }
+
     fn build_fps_counter(&self, ui: &imgui::Ui) {
         use imgui::ImString;
         let font = ui.push_font(self.fonts[GuiFont::FpsCounter as usize]);
