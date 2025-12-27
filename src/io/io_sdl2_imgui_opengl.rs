@@ -60,7 +60,6 @@ pub struct IOSdl2ImGuiOpenGl {
     is_video_size_change_pending: bool,
     keyboard_shortcuts: keyboard_shortcuts::KeyboardShortcuts,
     frame: u128,
-    mouse_click: Option<io::MouseClick>,
 }
 
 impl IOSdl2ImGuiOpenGl {
@@ -158,7 +157,6 @@ impl IOSdl2ImGuiOpenGl {
             cancel: false,
             is_video_size_change_pending: false,
             frame: 0,
-            mouse_click: None,
         }
     }
 
@@ -321,7 +319,6 @@ impl IOSdl2ImGuiOpenGl {
 
 impl io::IO for IOSdl2ImGuiOpenGl {
     fn present_frame(&mut self, control: io::IOControl) -> io::IOState {
-        self.mouse_click = None;
         if self.frame == u128::MAX {
             self.frame = 0;
         } else {
@@ -350,12 +347,6 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                     scancode: Some(sc), ..
                 } => {
                     self.keyboard_state.insert(sc, false);
-                }
-                sdl2::event::Event::MouseButtonDown {mouse_btn, x, y ,..} =>{
-                  println!("Mouse button up: {:?} at {}, {}", mouse_btn, x, y);
-                  if mouse_btn == sdl2::mouse::MouseButton::Left{
-                 //   self.mouse_click = Some(io::MouseClick {x: x as usize, y: y as usize});
-                  }
                 }
                 _ => {}
             }
@@ -468,11 +459,7 @@ impl io::ControllerAccess for IOSdl2ImGuiOpenGl {
     }
 
     fn get_mouse_click(&self) -> Option<io::MouseClick> {
-        let  ret = self.gui.mouse_click.clone();
-        unsafe {
-      //      self.gui.mouse_click = None;
-        }
-        ret
+      self.gui.mouse_click.clone()
     }
     fn get_current_frame(&self) -> u128 {
         self.frame

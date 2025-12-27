@@ -66,22 +66,13 @@ impl super::Controller for Zapper {
         {
             *trigger_state = TriggerState::FullPull;
         }
-        let mut light_detected = false;
         let lum = self
             .controller_access
             .borrow()
             .get_luminance(*self.x.borrow(), *self.y.borrow());
-        light_detected = lum > 0.7;
+        let light_bit = if lum > 0.7 { 0b0000_0000 } else { 0b0000_1000 };
+        light_bit | if *trigger_state == TriggerState::HalfPull { 0b0001_0000 } else { 0b0000_0000 }
 
-        let mut result = match *trigger_state {
-            TriggerState::Released => 0b0000_0000,
-            TriggerState::HalfPull => 0b0001_0000,
-            TriggerState::FullPull => 0b0000_0000,
-        };
-        if !light_detected {
-            result |= 0b0000_1000;
-        }
-        result
     }
 
     fn write(&mut self, _byte: u8) {}
