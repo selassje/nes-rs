@@ -18,9 +18,10 @@ pub trait Controller {
     fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>);
 }
 
-#[derive(PartialEq)]
+#[derive(Clone,Copy,PartialEq,Default)]
 pub enum ControllerType {
     NullController,
+    #[default]
     StdNesController,
     Zapper,
 }
@@ -54,6 +55,17 @@ pub enum ControllerId {
     Controller1,
     Controller2,
 }
+
+impl ControllerId {
+    pub fn from_index(i: usize) -> Option<Self> {
+        match i {
+            0 => Some(ControllerId::Controller1),
+            1 => Some(ControllerId::Controller2),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Default)]
 pub struct Controllers {
     controller_1: ControllerEnum,

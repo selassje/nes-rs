@@ -106,18 +106,16 @@ impl NesInternal {
             nes.ppu.set_vram(vram);
             nes.ppu.set_mapper(mapper);
 
-            nes.controllers.set_controller(
-                ControllerId::Controller1,
-                ControllerType::StdNesController,
-                io.clone(),
-            );
-            nes.controllers.set_controller(
-                ControllerId::Controller2,
-                ControllerType::Zapper,
-                io,
-            );
+            nes.set_controller(ControllerId::Controller1, ControllerType::StdNesController);
+            nes.set_controller(ControllerId::Controller2, ControllerType::StdNesController);
+
             pinned_nes
         }
+    }
+
+    fn set_controller(&mut self, id: ControllerId, controller_type: ControllerType) {
+        self.controllers
+            .set_controller(id, controller_type, self.controller_access.clone());
     }
 
     fn serialize(&self) -> Vec<u8> {
@@ -266,4 +264,9 @@ impl Nes {
     pub fn run_single_frame(&mut self) {
         self.as_mut().run_single_frame();
     }
+
+    pub fn set_controller(&mut self, id: ControllerId, controller_type: ControllerType) {
+        self.as_mut().set_controller(id, controller_type);
+    }
+
 }

@@ -211,6 +211,14 @@ fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut 
             }
         }
     }
+
+    for (i, controller_type) in io_state.switch_controller_type.iter().enumerate() {
+        if let Some(controller_type) = controller_type {
+            if let Some(id) = controllers::ControllerId::from_index(i) {
+                nes.set_controller(id, *controller_type);
+            }
+        }
+    }
 }
 
 fn load(nes: &mut nes::Nes, path: &str) {

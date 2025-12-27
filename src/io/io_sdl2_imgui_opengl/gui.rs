@@ -1,6 +1,6 @@
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
-    common,
+    common, controllers,
     io::{IOControl, FRAME_HEIGHT, FRAME_WIDTH},
 };
 
@@ -92,6 +92,7 @@ impl ButtonMapping {
 pub struct ControllerConfig {
     pub mapping: [ButtonMapping; crate::io::Button::Right as usize + 1],
     pub pending_key_select: Option<u8>,
+    pub controller_type: controllers::ControllerType,
 }
 
 impl ControllerConfig {
@@ -122,6 +123,7 @@ impl ControllerConfig {
                 ],
                 _ => panic!("Wrong player!"),
             },
+            controller_type: controllers::ControllerType::StdNesController,
         }
     }
 }
@@ -548,7 +550,16 @@ impl Gui {
 
     fn build_controller_setup_for_player(&mut self, player_index: usize, ui: &imgui::Ui) {
         let controller_config = &mut self.controller_configs[player_index];
-
+        let items = ["Standard", "Zapper"];
+        if player_index == 1 {
+            let mut current =
+                controllers::ControllerType::from(controller_config.controller_type) as usize - 1;
+            let text = String::from("Controller:");
+            ui.text(text);
+            ui.same_line();
+            ui.combo_simple_string("Controller", &mut current, &items);
+            ui.separator();
+        }
         for i in 0..8u8 {
             let button = crate::io::Button::from(i);
             let caption = imgui::ImString::from(button.to_string());

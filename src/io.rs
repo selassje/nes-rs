@@ -73,6 +73,7 @@ pub struct IOState {
     pub load_state: Option<String>,
     pub speed: Option<Speed>,
     pub pause: bool,
+    pub switch_controller_type: [Option<controllers::ControllerType>; 2],
 }
 
 #[derive(Clone, Default)]
