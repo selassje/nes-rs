@@ -128,6 +128,7 @@ pub trait ControllerAccess {
     fn is_button_pressed(&self, controller_id: controllers::ControllerId, button: Button) -> bool;
     fn get_mouse_click(&self) -> Option<MouseClick>;
     fn get_current_frame(&self) -> u128;
+    fn get_luminance(&self, x: usize, y: usize) -> f32;
 }
 
 pub struct DummyControllerAccessImplementation {}
@@ -148,6 +149,9 @@ impl ControllerAccess for DummyControllerAccessImplementation {
         todo!()
     }
     fn get_current_frame(&self) -> u128 {
+        todo!()
+    }
+    fn get_luminance(&self, _x: usize, _y: usize) -> f32 {
         todo!()
     }
 }
@@ -197,6 +201,9 @@ impl ControllerAccess for DummyIOImpl {
         todo!()
     }
     fn get_current_frame(&self) -> u128 {
+        todo!()
+    }
+    fn get_luminance(&self, _x: usize, _y: usize) -> f32 {
         todo!()
     }
 }

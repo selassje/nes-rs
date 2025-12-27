@@ -21,6 +21,9 @@ impl IOInternal {
     pub fn get_pixels_slice(&mut self) -> &[u8] {
         self.frame.as_ref()
     }
+    pub fn get_pixels_slice_const(&self) -> &[u8] {
+        self.frame.as_ref()
+    }
 
     pub(super) fn dump_frame(&self, path: &str) {
         let mut bitmap = sdl2::surface::Surface::new(

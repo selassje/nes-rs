@@ -61,11 +61,19 @@ impl super::Controller for Zapper {
             *trigger_state = TriggerState::FullPull;
         }
 
-        let result = match *trigger_state {
-            TriggerState::Released => 0b0000_1000,
+        let lum = self.controller_access.borrow().get_luminance(100, 100);
+
+        // Simple threshold for Zapper light detection
+        let light_detected = lum > 0.7;
+
+        let mut result = match *trigger_state {
+            TriggerState::Released => 0b0000_0000,
             TriggerState::HalfPull => 0b0001_0000,
-            TriggerState::FullPull => 0b0000_1000,
+            TriggerState::FullPull => 0b0000_0000,
         };
+        if !light_detected {
+            result |= 0b0000_1000;
+        }
         result
     }
 

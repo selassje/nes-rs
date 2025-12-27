@@ -8,6 +8,7 @@ use std::{borrow::BorrowMut, collections::HashMap};
 use self::gui::VideoSizeControl;
 
 use super::io_internal;
+use crate::io::FRAME_WIDTH;
 use crate::{controllers, io};
 
 use gl::types::*;
@@ -472,4 +473,14 @@ impl io::ControllerAccess for IOSdl2ImGuiOpenGl {
     fn get_current_frame(&self) -> u128 {
         self.frame
     }
+    fn get_luminance(&self,x: usize, y: usize) -> f32 {
+      let idx = (y * FRAME_WIDTH + x) * 3;
+      let pixels = self.io_internal.get_pixels_slice_const();
+      let r = pixels[idx] as f32 / 255.0;
+      let g = pixels[idx + 1] as f32 / 255.0;
+      let b = pixels[idx + 2] as f32 / 255.0;
+  
+      0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+
 }

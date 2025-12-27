@@ -60,4 +60,7 @@ impl ControllerAccess for IOTest {
     fn get_current_frame(&self) -> u128 {
         todo!()
     }
+    fn get_luminance(&self, x: usize, y: usize) -> f32 {
+        todo!()
+    }
 }
