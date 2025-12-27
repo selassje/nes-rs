@@ -128,6 +128,9 @@ impl emscripten_main_loop::MainLoop for Emulation {
                 }
             }
             self.frame_start = std::time::Instant::now();
+        } else {
+            #[cfg(not(target_os = "emscripten"))]
+            std::thread::sleep(std::time::Duration::from_millis(10));
         }
         emscripten_main_loop::MainLoopEvent::Continue
     }

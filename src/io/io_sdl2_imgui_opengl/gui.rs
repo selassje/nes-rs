@@ -528,7 +528,6 @@ impl Gui {
 
     fn build_load_nes_file_explorer(&mut self) {
         if self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile) {
-            self.pause = false;
             self.toggle_menu_bar_item(MenuBarItem::LoadNesFile);
             self.fd_load_nes_file.open_modal();
         }
@@ -544,7 +543,6 @@ impl Gui {
 
     fn build_save_state_file_explorer(&mut self) {
         if self.is_menu_bar_item_selected(MenuBarItem::SaveState) {
-            self.pause = false;
             self.toggle_menu_bar_item(MenuBarItem::SaveState);
             self.fd_save_state.open_modal();
         }
@@ -560,7 +558,6 @@ impl Gui {
 
     fn build_load_state_file_explorer(&mut self) {
         if self.is_menu_bar_item_selected(MenuBarItem::LoadState) {
-            self.pause = false;
             self.toggle_menu_bar_item(MenuBarItem::LoadState);
             self.fd_load_state.open_modal();
         }
