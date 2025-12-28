@@ -146,7 +146,7 @@ pub(super) struct Gui {
     pub controller_configs: [ControllerConfig; 2],
     pub controller_switch: [Option<controllers::ControllerType>; 2],
     pub pause: bool,
-    pub mouse_click: Option<MouseClick>,
+    pub mouse_click: MouseClick,
     pub crosshair: bool,
 }
 
@@ -210,7 +210,12 @@ impl Gui {
             controllers_setup: false,
             controller_switch: [None, None],
             pause: false,
-            mouse_click: None,
+            mouse_click: MouseClick {
+                left_button: false,
+                right_button: false,
+                x: 0,
+                y: 0,
+            },
             crosshair: false,
         }
     }
@@ -440,7 +445,8 @@ impl Gui {
             .bring_to_front_on_focus(false)
             .build(|| {
                 imgui::Image::new(self.emulation_texture, self.video_size).build(ui);
-                self.mouse_click = None;
+                self.mouse_click.left_button = false;
+                self.mouse_click.right_button = false;
                 let zapper_active =
                     self.io_control.controller_type[1] == controllers::ControllerType::Zapper;
                 if ui.is_window_hovered() && zapper_active {
@@ -455,7 +461,14 @@ impl Gui {
                         (rel_pos[1] / self.video_size[1] * FRAME_HEIGHT as f32).floor() as usize;
 
                     if ui.is_mouse_clicked(imgui::MouseButton::Left) {
-                        self.mouse_click = Some(MouseClick { x: tex_x, y: tex_y });
+                        self.mouse_click.left_button = true;
+                        self.mouse_click.x = tex_x;
+                        self.mouse_click.y = tex_y;
+                    }
+                    if ui.is_mouse_clicked(imgui::MouseButton::Right) {
+                        self.mouse_click.right_button = true;
+                        self.mouse_click.x = tex_x;
+                        self.mouse_click.y = tex_y;
                     }
 
                     let base_line_len = 3.0;

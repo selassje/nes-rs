@@ -122,13 +122,15 @@ impl AudioAccess for DummyAudioAccessImpl {
 
 #[derive(Clone)]
 pub struct MouseClick {
+    pub left_button: bool,
+    pub right_button: bool,
     pub x: usize,
     pub y: usize,
 }
 
 pub trait ControllerAccess {
     fn is_button_pressed(&self, controller_id: controllers::ControllerId, button: Button) -> bool;
-    fn get_mouse_click(&self) -> Option<MouseClick>;
+    fn get_mouse_click(&self) -> MouseClick;
     fn get_current_frame(&self) -> u128;
     fn get_luminance(&self, x: usize, y: usize) -> f32;
 }
@@ -147,7 +149,7 @@ impl ControllerAccess for DummyControllerAccessImplementation {
     ) -> bool {
         todo!()
     }
-    fn get_mouse_click(&self) -> Option<MouseClick> {
+    fn get_mouse_click(&self) -> MouseClick {
         todo!()
     }
     fn get_current_frame(&self) -> u128 {
@@ -199,7 +201,7 @@ impl ControllerAccess for DummyIOImpl {
     ) -> bool {
         todo!()
     }
-    fn get_mouse_click(&self) -> Option<MouseClick> {
+    fn get_mouse_click(&self) -> MouseClick {
         todo!()
     }
     fn get_current_frame(&self) -> u128 {

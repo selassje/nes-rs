@@ -14,6 +14,7 @@ pub struct Zapper {
     frame_of_last_click: RefCell<u128>,
     x: RefCell<usize>,
     y: RefCell<usize>,
+    right_button_pressed: RefCell<bool>,
 }
 
 impl Zapper {
@@ -25,6 +26,7 @@ impl Zapper {
             frame_of_last_click: RefCell::new(0),
             x: RefCell::new(0),
             y: RefCell::new(0),
+            right_button_pressed: RefCell::new(false),
         }
     }
 
@@ -42,13 +44,12 @@ impl super::Controller for Zapper {
         let current_frame = self.controller_access.borrow().get_current_frame();
         let mouse_click = self.controller_access.borrow().get_mouse_click();
         let mut trigger_state = self.trigger_pressed.borrow_mut();
-        if let Some(mouse_click) = mouse_click {
-            if !*trigger_state {
-                *self.x.borrow_mut() = mouse_click.x;
-                *self.y.borrow_mut() = mouse_click.y;
-                *trigger_state = true;
-                *self.frame_of_last_click.borrow_mut() = current_frame;
-            }
+        if (mouse_click.left_button || mouse_click.right_button) && !*trigger_state {
+            *self.x.borrow_mut() = mouse_click.x;
+            *self.y.borrow_mut() = mouse_click.y;
+            *trigger_state = true;
+            *self.frame_of_last_click.borrow_mut() = current_frame;
+            *self.right_button_pressed.borrow_mut() = mouse_click.right_button;
         }
         if self.frames_since_last_click(current_frame) >= 2 && *trigger_state {
             *trigger_state = false;
@@ -58,7 +59,7 @@ impl super::Controller for Zapper {
             .borrow()
             .get_luminance(*self.x.borrow(), *self.y.borrow());
         let mut light_bit = if lum > 0.7 { 0b0000_0000 } else { 0b0000_1000 };
-        if self.frames_since_last_click(current_frame) <= 4 {
+        if self.frames_since_last_click(current_frame) <= 4 || *self.right_button_pressed.borrow() {
             light_bit = 0b0000_1000;
         }
         light_bit
