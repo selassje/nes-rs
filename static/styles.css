@@ -232,6 +232,7 @@ body::after {
   height: 16px;
   background: #000;
   border: 2px solid #555;
+  margin-left: -6px; /* move slightly left */
 }
 
 /* Buttons */
