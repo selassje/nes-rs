@@ -197,3 +197,62 @@ body::after {
 
 /* Zapper */
 .glyph-zapper::before { content: "🔫"; font-size: 10px; }
+
+
+.controller-diagram {
+  margin: 20px 0 30px;
+  text-align: center;
+}
+
+.controller-body {
+  display: inline-flex;
+  align-items: center;
+  gap: 20px;
+  background: #1c1c1c;
+  border: 4px solid #555;
+  padding: 16px 20px;
+}
+
+/* D-Pad */
+.dpad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.dpad-middle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dpad-center {
+  width: 16px;
+  height: 16px;
+  background: #000;
+  border: 2px solid #555;
+}
+
+/* Buttons */
+.buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* Start / Select */
+.center-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Labels */
+.controller-labels {
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  font-size: 8px;
+  color: #aaa;
+}
