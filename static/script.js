@@ -35,7 +35,6 @@ function refreshDownloadList() {
   const listContainer = document.querySelector("#download_save_files");
   const ul = document.querySelector("#download_list");
 
-  // Always reset
   ul.innerHTML = "";
   listContainer.style.display = "none";
 

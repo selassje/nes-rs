@@ -1,24 +1,28 @@
-
 :root {
-  --bg: #0f1220;
-  --panel: #171a2e;
-  --panel-light: #1f2340;
-  --accent: #5ddcff;
-  --text: #e6e8ff;
-  --muted: #a0a4d8;
+  --bg: #0b0b0b;
+  --panel: #1c1c1c;
+  --panel-light: #2a2a2a;
+  --text: #e0e0e0;
+  --accent: #ff2a2a;
+  --border: #555;
 }
 
+/* Global */
 * {
   box-sizing: border-box;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  image-rendering: pixelated;
 }
 
 body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  font-family: "Press Start 2P", monospace;
+  font-size: 10px;
+  line-height: 1.8;
 }
 
+/* Layout */
 .layout {
   display: flex;
   min-height: 100vh;
@@ -28,47 +32,55 @@ body {
 #sidenav {
   width: 260px;
   background: var(--panel);
-  padding: 20px;
-  border-right: 1px solid #222;
+  padding: 16px;
+  border-right: 4px solid var(--border);
 }
 
 #sidenav h2 {
-  margin-top: 0;
   color: var(--accent);
+  text-align: center;
+  margin: 0 0 16px;
+  font-size: 14px;
 }
 
-.side-group {
-  margin-bottom: 20px;
-}
-
+/* NES-style buttons */
 .icon-btn {
+  width: 100%;
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
+  gap: 8px;
   background: var(--panel-light);
   color: var(--text);
-  border: none;
-  padding: 10px 12px;
-  border-radius: 8px;
+  border: 3px solid var(--border);
+  padding: 10px;
+  margin-bottom: 10px;
   cursor: pointer;
-}
-
-.icon-btn img {
-  width: 18px;
-  height: 18px;
+  text-transform: uppercase;
 }
 
 .icon-btn:hover {
-  background: #2a2f55;
+  background: #3a3a3a;
 }
 
+.icon-btn:active {
+  transform: translate(2px, 2px);
+}
+
+.icon-btn img {
+  width: 10px;
+  height: 10px;
+}
+
+/* Hide file inputs */
 input[type="file"] {
   display: none;
 }
 
+/* Save files */
 #download_save_files h3 {
-  margin-bottom: 8px;
+  margin: 12px 0 6px;
+  color: var(--accent);
+  font-size: 10px;
 }
 
 #download_list {
@@ -77,62 +89,76 @@ input[type="file"] {
   margin: 0;
 }
 
-#download_list li a {
-  color: var(--accent);
-  text-decoration: none;
-  font-size: 0.9rem;
+#download_list li {
+  margin-bottom: 6px;
 }
 
-/* Main Content */
+#download_list a {
+  color: #00ff66;
+  text-decoration: none;
+}
+
+/* Main content */
 #main {
   flex: 1;
-  padding: 30px;
-  max-width: 1100px;
+  padding: 20px;
 }
 
+/* Emulator screen */
 canvas {
   display: block;
-  margin-bottom: 30px;
-  border-radius: 10px;
+  margin-bottom: 20px;
   background: black;
-  box-shadow: 0 0 0 3px #000, 0 15px 40px rgba(0,0,0,0.6);
+  border: 6px solid #222;
+  box-shadow:
+    inset 0 0 0 4px #000,
+    0 0 0 4px #555;
 }
 
-/* Cards */
+/* Pixel cards */
 .card {
   background: var(--panel);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 25px;
+  border: 4px solid var(--border);
+  padding: 14px;
+  margin-bottom: 20px;
 }
 
 .card h3 {
-  margin-top: 0;
   color: var(--accent);
+  font-size: 11px;
+  margin-top: 0;
 }
 
-/* Table */
+/* NES-style table */
 table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 10px;
 }
 
-thead {
-  background: var(--panel-light);
-}
-
 th, td {
-  padding: 10px;
-  text-align: left;
+  border: 3px solid var(--border);
+  padding: 6px;
+  font-size: 9px;
 }
 
-tbody tr:nth-child(even) {
-  background: rgba(255,255,255,0.03);
+thead {
+  background: #333;
 }
 
-.hint {
-  color: var(--muted);
-  font-size: 0.9rem;
-  margin-top: 10px;
+/* CRT scanline effect (optional but 🔥) */
+body::after {
+  content: "";
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,0.03),
+      rgba(255,255,255,0.03) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+  mix-blend-mode: overlay;
 }
