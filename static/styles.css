@@ -104,6 +104,21 @@ input[type="file"] {
   padding: 20px;
 }
 
+#main canvas {
+  display: block;
+  /* ensures margin auto works */
+  margin: 0 auto;
+  /* horizontally center */
+  image-rendering: pixelated;
+  width: 512px;
+  /* scaled NES width */
+  height: 480px;
+  /* scaled NES height */
+  border: 6px solid #222;
+  box-shadow: inset 0 0 0 4px #000, 0 0 0 4px #555;
+}
+
+
 /* Emulator screen */
 canvas {
   display: block;
@@ -136,7 +151,8 @@ table {
   margin-top: 10px;
 }
 
-th, td {
+th,
+td {
   border: 3px solid var(--border);
   padding: 6px;
   font-size: 9px;
@@ -153,13 +169,11 @@ body::after {
   position: fixed;
   inset: 0;
   background:
-    repeating-linear-gradient(
-      to bottom,
-      rgba(255,255,255,0.03),
-      rgba(255,255,255,0.03) 1px,
+    repeating-linear-gradient(to bottom,
+      rgba(255, 255, 255, 0.03),
+      rgba(255, 255, 255, 0.03) 1px,
       transparent 1px,
-      transparent 3px
-    );
+      transparent 3px);
   mix-blend-mode: overlay;
 }
 
@@ -178,25 +192,63 @@ body::after {
 }
 
 /* NES buttons */
-.glyph-a { background: #aa0000; border-radius: 50%; }
-.glyph-b { background: #660000; border-radius: 50%; }
-.glyph-start { background: #333; }
-.glyph-select { background: #333; }
+.glyph-a {
+  background: #aa0000;
+  border-radius: 50%;
+}
+
+.glyph-b {
+  background: #660000;
+  border-radius: 50%;
+}
+
+.glyph-start {
+  background: #333;
+}
+
+.glyph-select {
+  background: #333;
+}
 
 /* D-pad */
-.glyph-up::before { content: "▲"; }
-.glyph-down::before { content: "▼"; }
-.glyph-left::before { content: "◄"; }
-.glyph-right::before { content: "►"; }
+.glyph-up::before {
+  content: "▲";
+}
+
+.glyph-down::before {
+  content: "▼";
+}
+
+.glyph-left::before {
+  content: "◄";
+}
+
+.glyph-right::before {
+  content: "►";
+}
 
 /* Text buttons */
-.glyph-a::before { content: "A"; }
-.glyph-b::before { content: "B"; }
-.glyph-start::before { content: "ST"; }
-.glyph-select::before { content: "SE"; }
+.glyph-a::before {
+  content: "A";
+}
+
+.glyph-b::before {
+  content: "B";
+}
+
+.glyph-start::before {
+  content: "ST";
+}
+
+.glyph-select::before {
+  content: "SE";
+}
 
 /* Zapper */
-.glyph-zapper::before { content: "🔫"; font-size: 10px; }
+.glyph-zapper::before {
+  content: "🔫";
+  font-size: 10px;
+}
 
 
 .controller-diagram {
@@ -232,7 +284,8 @@ body::after {
   height: 16px;
   background: #000;
   border: 2px solid #555;
-  margin-left: -6px; /* move slightly left */
+  margin-left: -6px;
+  /* move slightly left */
 }
 
 /* Buttons */
@@ -302,10 +355,13 @@ body::after {
 
 .controller-label-centered {
   display: flex;
-  justify-content: center; /* center horizontally */
-  margin-top: 6px;         /* spacing from button labels */
+  justify-content: center;
+  /* center horizontally */
+  margin-top: 6px;
+  /* spacing from button labels */
   font-size: 8px;
-  color: #ff2a2a;          /* matches your accent */
+  color: #ff2a2a;
+  /* matches your accent */
   font-weight: bold;
   font-family: "Press Start 2P", monospace;
 }
