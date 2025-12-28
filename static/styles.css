@@ -162,3 +162,38 @@ body::after {
     );
   mix-blend-mode: overlay;
 }
+
+.glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  margin-right: 6px;
+  border: 2px solid #555;
+  background: #111;
+  color: #fff;
+  font-size: 8px;
+  line-height: 1;
+}
+
+/* NES buttons */
+.glyph-a { background: #aa0000; border-radius: 50%; }
+.glyph-b { background: #660000; border-radius: 50%; }
+.glyph-start { background: #333; }
+.glyph-select { background: #333; }
+
+/* D-pad */
+.glyph-up::before { content: "▲"; }
+.glyph-down::before { content: "▼"; }
+.glyph-left::before { content: "◄"; }
+.glyph-right::before { content: "►"; }
+
+/* Text buttons */
+.glyph-a::before { content: "A"; }
+.glyph-b::before { content: "B"; }
+.glyph-start::before { content: "ST"; }
+.glyph-select::before { content: "SE"; }
+
+/* Zapper */
+.glyph-zapper::before { content: "🔫"; font-size: 10px; }
