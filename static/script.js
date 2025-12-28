@@ -32,34 +32,43 @@ function alignElements() {
 
 
 function refreshDownloadList() {
-    var getFiles = (dir) => {
-        var files = [];
-        var dirContents = FS.readdir(dir);
-        var files = dirContents
-            .filter((item) => { return FS.isFile(FS.stat(dir + "/" + item).mode) });
-        return files;
-    }
-    var save_files = getFiles("saves");
-    var list = document.querySelector("#download_save_files");
-    list.style.display = "none";
-    if (save_files.length > 0) {
-        var ul = document.querySelector("#download_list");
-        ul.innerHTML = "";
-        save_files.forEach(element => {
-            var entry = document.createElement("li");
-            var link = document.createElement("a");
-            ul.appendChild(entry);
-            link.download = element;
-            var fileContent = FS.readFile("saves/" + element);
-            var mime = "mime/type" || "application/octet-stream";
-            link.href = URL.createObjectURL(new Blob([fileContent], { type: mime }));
-            link.innerText = element;
-            entry.appendChild(link);
-        });
-        list.style.display = "block";
-    }
+  const listContainer = document.querySelector("#download_save_files");
+  const ul = document.querySelector("#download_list");
 
-    alignElements();
+  // Always reset
+  ul.innerHTML = "";
+  listContainer.style.display = "none";
+
+  const getFiles = (dir) => {
+      return FS.readdir(dir)
+          .filter(item => FS.isFile(FS.stat(`${dir}/${item}`).mode));
+  };
+
+  const save_files = getFiles("saves");
+
+  if (save_files.length === 0) {
+      alignElements();
+      return;
+  }
+
+  save_files.forEach(file => {
+      const li = document.createElement("li");
+      const link = document.createElement("a");
+
+      const fileContent = FS.readFile(`saves/${file}`);
+      link.href = URL.createObjectURL(
+          new Blob([fileContent], { type: "application/octet-stream" })
+      );
+
+      link.download = file;
+      link.textContent = file;
+
+      li.appendChild(link);
+      ul.appendChild(li);
+  });
+
+  listContainer.style.display = "block";
+  alignElements();
 }
 
 FS.rmdir("home/web_user");
@@ -72,3 +81,4 @@ document.querySelector("#upload_nes_file").addEventListener("change", upload_nes
 document.querySelector("#upload_save_file").addEventListener("change", upload_save_file, false);
 
 alignElements();
+refreshDownloadList();
