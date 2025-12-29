@@ -321,28 +321,41 @@ impl Gui {
                 if let Some(_) = ui.begin_menu("Speed") {
                     let target_fps = self.io_control.target_fps;
                     let is_speed_selected = |fps: u16| fps == target_fps;
+                    #[cfg(target_os = "emscripten")]
+                    let enabled = false;
+                    #[cfg(not(target_os = "emscripten"))]
+                    let enabled = true;
 
                     ui.menu_item_config("Normal")
+                        .enabled(enabled)
                         .selected(is_speed_selected(common::DEFAULT_FPS))
                         .build();
                     self.update_menu_item_status(ui, SpeedNormal);
 
                     ui.menu_item_config("Double")
+                        .enabled(enabled)
                         .selected(is_speed_selected(common::DOUBLE_FPS))
                         .build();
                     self.update_menu_item_status(ui, SpeedDouble);
 
                     ui.menu_item_config("Half")
+                        .enabled(enabled)
                         .selected(is_speed_selected(common::HALF_FPS))
                         .build();
                     self.update_menu_item_status(ui, SpeedHalf);
 
                     ui.separator();
 
-                    ui.menu_item_config("Increase").shortcut("Ctrl+=").build();
+                    ui.menu_item_config("Increase")
+                        .enabled(enabled)
+                        .shortcut("Ctrl+=")
+                        .build();
                     self.update_menu_item_status(ui, SpeedIncrease);
 
-                    ui.menu_item_config("Decrease").shortcut("Ctrl+-").build();
+                    ui.menu_item_config("Decrease")
+                        .enabled(enabled)
+                        .shortcut("Ctrl+-")
+                        .build();
                     self.update_menu_item_status(ui, SpeedDecrease);
                 }
             }

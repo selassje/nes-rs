@@ -15,7 +15,9 @@ fn shortcut_to_menu_bar_item(key: KeyboardShortcut) -> Option<MenuBarItem> {
         LeftCtrl(Scancode::S) => Some(MenuBarItem::SaveState),
         LeftCtrl(Scancode::L) => Some(MenuBarItem::LoadState),
         LeftCtrl(Scancode::P) => Some(MenuBarItem::Pause),
+        #[cfg(not(target_os = "emscripten"))]
         LeftCtrl(Scancode::Equals) => Some(MenuBarItem::SpeedIncrease),
+        #[cfg(not(target_os = "emscripten"))]
         LeftCtrl(Scancode::Minus) => Some(MenuBarItem::SpeedDecrease),
         LeftCtrl(Scancode::A) => Some(MenuBarItem::AudioEnabled),
         LeftCtrl(Scancode::C) => Some(MenuBarItem::ControllersSetup),
