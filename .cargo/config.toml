@@ -5,7 +5,6 @@ rustflags = [
     "-C", "link-arg=-sSDL2_IMAGE_FORMATS=['png']",
     "-C", "link-arg=-sMIN_WEBGL_VERSION=2",
     "-C", "link-arg=-sMAX_WEBGL_VERSION=2",
-    "-C", "link-arg=-sDISABLE_DEPRECATED_FIND_EVENT_TARGET_BEHAVIOR=0",
     "-C", "link-arg=-sSTACK_SIZE=4194304",
     "-C", "link-arg=-sINITIAL_HEAP=128mb",
 ]

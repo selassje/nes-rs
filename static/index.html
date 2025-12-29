@@ -11,20 +11,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 
   <script>
-    var Module = {};
-    var emulatorCanvas = null;
-    Object.defineProperty(Module, 'canvas', {
-      get: function () {
-        if (emulatorCanvas) {
-          return emulatorCanvas;
-        }
-        var canvas = document.createElement('canvas');
-        var main = document.querySelector('#main');
-        main.insertBefore(canvas, main.firstElementChild);
-        emulatorCanvas = canvas;
-        return canvas;
-      }
-    });
   </script>
 </head>
 
@@ -56,6 +42,12 @@
     </aside>
 
     <main id="main">
+      <canvas id="canvas"></canvas>
+      <script>
+        var Module = {
+          canvas: document.querySelector('#canvas'),
+        };
+      </script>
       <script src="nes-rs.js"></script>
       <script src="script.js"></script>
 
