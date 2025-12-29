@@ -542,6 +542,10 @@ impl Gui {
     fn build_load_nes_file_explorer(&mut self) {
         if self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile) {
             self.toggle_menu_bar_item(MenuBarItem::LoadNesFile);
+            #[cfg(target_os = "emscripten")]
+            self.fd_load_nes_file.open_modal_in_path("/roms");
+
+            #[cfg(not(target_os = "emscripten"))]
             self.fd_load_nes_file.open_modal();
         }
         if self.fd_load_nes_file.display() {
@@ -557,6 +561,10 @@ impl Gui {
     fn build_save_state_file_explorer(&mut self) {
         if self.is_menu_bar_item_selected(MenuBarItem::SaveState) {
             self.toggle_menu_bar_item(MenuBarItem::SaveState);
+            #[cfg(target_os = "emscripten")]
+            self.fd_save_state.open_modal_in_path("/saves");
+
+            #[cfg(not(target_os = "emscripten"))]
             self.fd_save_state.open_modal();
         }
         if self.fd_save_state.display() {
@@ -572,6 +580,11 @@ impl Gui {
     fn build_load_state_file_explorer(&mut self) {
         if self.is_menu_bar_item_selected(MenuBarItem::LoadState) {
             self.toggle_menu_bar_item(MenuBarItem::LoadState);
+
+            #[cfg(target_os = "emscripten")]
+            self.fd_load_state.open_modal_in_path("/saves");
+
+            #[cfg(not(target_os = "emscripten"))]
             self.fd_load_state.open_modal();
         }
         if self.fd_load_state.display() {

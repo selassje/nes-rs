@@ -16,7 +16,7 @@ function upload_file(file, dir) {
 }
 
 function upload_nes_file() {
-    upload_file(this.files[0], "games");
+    upload_file(this.files[0], "roms");
 }
 
 function upload_save_file() {
@@ -73,7 +73,7 @@ function refreshDownloadList() {
 FS.rmdir("home/web_user");
 FS.rmdir("home");
 FS.rmdir("tmp");
-FS.mkdir("games");
+FS.mkdir("roms");
 FS.mkdir("saves");
 
 document.querySelector("#upload_nes_file").addEventListener("change", upload_nes_file, false);
