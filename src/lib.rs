@@ -209,6 +209,7 @@ fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut 
             )
         });
         nes.deserialize(save);
+        io_control.title = Some(load_state_path.clone());
     }
 
     if let Some(ref speed) = io_state.speed {
