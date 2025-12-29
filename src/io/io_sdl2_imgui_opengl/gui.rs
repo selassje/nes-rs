@@ -148,6 +148,7 @@ pub(super) struct Gui {
     pub pause: bool,
     pub mouse_click: MouseClick,
     pub crosshair: bool,
+    pub is_any_file_explorer_open: bool,
 }
 
 fn create_file_dialog(
@@ -217,6 +218,7 @@ impl Gui {
                 y: 0,
             },
             crosshair: false,
+            is_any_file_explorer_open: false,
         }
     }
 
@@ -541,6 +543,7 @@ impl Gui {
 
     fn build_load_nes_file_explorer(&mut self) {
         if self.is_menu_bar_item_selected(MenuBarItem::LoadNesFile) {
+            self.is_any_file_explorer_open = true;
             self.toggle_menu_bar_item(MenuBarItem::LoadNesFile);
             #[cfg(target_os = "emscripten")]
             self.fd_load_nes_file.open_modal_in_path("/roms");
@@ -553,14 +556,15 @@ impl Gui {
                 let file = &self.fd_load_nes_file.selection().unwrap().files()[0];
                 self.nes_file_path = Some(file.to_str().unwrap().to_owned());
             }
-
             self.fd_load_nes_file.close();
+            self.is_any_file_explorer_open = false;
         }
     }
 
     fn build_save_state_file_explorer(&mut self) {
         if self.is_menu_bar_item_selected(MenuBarItem::SaveState) {
             self.toggle_menu_bar_item(MenuBarItem::SaveState);
+            self.is_any_file_explorer_open = true;
             #[cfg(target_os = "emscripten")]
             self.fd_save_state.open_modal_in_path("/saves");
 
@@ -574,12 +578,14 @@ impl Gui {
             }
 
             self.fd_save_state.close();
+            self.is_any_file_explorer_open = false;
         }
     }
 
     fn build_load_state_file_explorer(&mut self) {
         if self.is_menu_bar_item_selected(MenuBarItem::LoadState) {
             self.toggle_menu_bar_item(MenuBarItem::LoadState);
+            self.is_any_file_explorer_open = true;
 
             #[cfg(target_os = "emscripten")]
             self.fd_load_state.open_modal_in_path("/saves");
@@ -593,6 +599,7 @@ impl Gui {
                 self.load_state_path = Some(file.to_str().unwrap().to_owned());
             }
             self.fd_load_state.close();
+            self.is_any_file_explorer_open = false;
         }
     }
 

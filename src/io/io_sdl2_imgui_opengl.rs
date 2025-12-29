@@ -270,8 +270,10 @@ impl IOSdl2ImGuiOpenGl {
         io_state.pause = self.gui.pause;
 
         let mut update_gui_item = |item: MenuBarItem| {
-            self.gui
-                .set_menu_bar_item(item, self.is_menu_bar_item_selected(item));
+            if !self.gui.is_any_file_explorer_open {
+                self.gui
+                    .set_menu_bar_item(item, self.is_menu_bar_item_selected(item));
+            }
         };
 
         update_gui_item(MenuBarItem::LoadNesFile);
