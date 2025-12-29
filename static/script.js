@@ -81,3 +81,9 @@ document.querySelector("#upload_save_file").addEventListener("change", upload_sa
 
 alignElements();
 refreshDownloadList();
+
+document.addEventListener("contextmenu", e => {
+  if (e.target.tagName === "CANVAS") {
+    e.preventDefault();
+  }
+});
