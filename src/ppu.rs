@@ -89,14 +89,14 @@ impl ControlRegister {
 
 #[derive(Serialize)]
 enum MaskRegisterFlag {
-    _GrayScale = 0b00000001,
+    GrayScale = 0b00000001,
     ShowBackgroundInLeftMost8Pixels = 0b00000010,
     ShowSpritesdInLeftMost8Pixels = 0b00000100,
     ShowBackground = 0b00001000,
     ShowSprites = 0b00010000,
-    _EmphasizeRed = 0b00100000,
-    _EmphasizeGreen = 0b01000000,
-    _EmphasizeBlue = 0b10000000,
+    EmphasizeRed = 0b00100000,
+    EmphasizeGreen = 0b01000000,
+    EmphasizeBlue = 0b10000000,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -473,6 +473,39 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
         }
     }
 
+    fn apply_emphasis_and_grayscale(&self, color: (u8, u8, u8)) -> (u8, u8, u8) {
+        let mut final_color = color;
+
+        if self.mask_reg.is_flag_enabled(MaskRegisterFlag::GrayScale) {
+            let gray = (0.299 * final_color.0 as f32
+                + 0.587 * final_color.1 as f32
+                + 0.114 * final_color.2 as f32) as u8;
+            final_color = (gray, gray, gray);
+        }
+
+        let emphasize = |color: &mut u8| *color = (*color as u16 * 135 / 100).min(255) as u8;
+
+        if self
+            .mask_reg
+            .is_flag_enabled(MaskRegisterFlag::EmphasizeRed)
+        {
+            emphasize(&mut final_color.0);
+        }
+        if self
+            .mask_reg
+            .is_flag_enabled(MaskRegisterFlag::EmphasizeGreen)
+        {
+            emphasize(&mut final_color.1);
+        }
+        if self
+            .mask_reg
+            .is_flag_enabled(MaskRegisterFlag::EmphasizeBlue)
+        {
+            emphasize(&mut final_color.2);
+        }
+        final_color
+    }
+
     fn render_pixel(&mut self) {
         let x = self.ppu_cycle - ACTIVE_PIXELS_CYCLE_START;
         let (bg_color_index, bg_palette_index) = self.get_background_color_index(x as usize);
@@ -486,7 +519,7 @@ impl<VRAM: VideoMemory> Ppu<VRAM> {
                 &self.background_palletes[bg_palette_index as usize],
                 &self.sprite_palettes,
             );
-
+        let color = self.apply_emphasis_and_grayscale(color);
         self.video_access
             .borrow_mut()
             .set_pixel(x as usize, self.scanline as usize, color);
