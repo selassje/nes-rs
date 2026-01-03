@@ -160,7 +160,6 @@ impl Cpu {
             mapper: &mut bus.mapper,
             controllers: &mut bus.controllers,
         };
-        self.pc = 0xC000;
         self.pc = bus.ram.get_word(0xFFFC, &mut ram_bus);
         self.sp = 0xFD;
         self.ps = 0x04;

@@ -9,12 +9,9 @@ use crate::io::VideoAccess;
 use crate::io::IO;
 use crate::mappers::*;
 use crate::nes_file::NesFile;
-use crate::vram::VRam;
 use crate::{mappers::Mapper, mappers::MapperNull};
 
 use std::cell::RefCell;
-use std::marker::PhantomPinned;
-use std::pin::Pin;
 use std::rc::Rc;
 use std::time::Duration;
 
@@ -56,24 +53,12 @@ pub struct RamBus<'a> {
     pub controllers: &'a mut Controllers,
 }
 
-impl CpuBus<'_> {
-    pub fn get_ram_bus(&mut self) -> RamBus<'_> {
-        RamBus {
-            apu: self.apu,
-            ppu: self.ppu,
-            mapper: self.mapper,
-            controllers: self.controllers,
-        }
-    }
-}
-
 #[derive(serde::Serialize, serde::Deserialize)]
-pub struct NesInternal {
+pub struct Nes {
     version: String,
     cpu: Cpu,
     ram: Ram,
     ppu: Ppu,
-    vram: VRam,
     apu: Apu,
     controllers: Controllers,
     mapper: MapperEnum,
@@ -83,50 +68,38 @@ pub struct NesInternal {
     audio_access: Rc<RefCell<dyn AudioAccess>>,
     #[serde(skip, default = "default_controller_access")]
     controller_access: Rc<RefCell<dyn ControllerAccess>>,
-    #[serde(skip)]
-    _pin: PhantomPinned,
 }
 
-impl NesInternal {
-    fn new<T>(io: Rc<RefCell<T>>) -> Pin<Box<Self>>
+impl Nes {
+    pub fn new<T>(io: Rc<RefCell<T>>) -> Self
     where
         T: IO + VideoAccess + AudioAccess + ControllerAccess + 'static,
     {
         let controllers = Controllers::new();
         let mapper = MapperEnum::MapperNull(MapperNull::new());
-        let vram = VRam::new();
         let ppu = Ppu::new(io.clone());
         let apu = Apu::new(io.clone());
         let ram = Ram::new();
         let cpu = Cpu::new();
+        let mut nes = Nes {
+            version: SERIALIZATION_VER.to_string(),
+            cpu,
+            ram,
+            ppu,
+            apu,
+            controllers,
+            mapper,
+            video_access: io.clone(),
+            audio_access: io.clone(),
+            controller_access: io.clone(),
+        };
+        nes.set_controller(ControllerId::Controller1, ControllerType::StdNesController);
+        nes.set_controller(ControllerId::Controller2, ControllerType::StdNesController);
 
-        unsafe {
-            let mut pinned_nes = std::pin::Pin::new_unchecked(Box::new(NesInternal {
-                version: SERIALIZATION_VER.to_owned(),
-                cpu,
-                ram,
-                ppu,
-                vram,
-                apu,
-                controllers,
-                mapper,
-                video_access: io.clone(),
-                audio_access: io.clone(),
-                controller_access: io.clone(),
-                _pin: PhantomPinned,
-            }));
-
-            let pin_ref: Pin<&mut Self> = Pin::as_mut(&mut pinned_nes);
-            let nes = Pin::get_unchecked_mut(pin_ref);
-
-            nes.set_controller(ControllerId::Controller1, ControllerType::StdNesController);
-            nes.set_controller(ControllerId::Controller2, ControllerType::StdNesController);
-
-            pinned_nes
-        }
+        nes
     }
 
-    fn set_controller(&mut self, id: ControllerId, controller_type: ControllerType) {
+    pub fn set_controller(&mut self, id: ControllerId, controller_type: ControllerType) {
         self.controllers
             .set_controller(id, controller_type, self.controller_access.clone());
     }
@@ -134,7 +107,7 @@ impl NesInternal {
         self.controllers.get_controller_type(id)
     }
 
-    fn serialize(&self) -> Vec<u8> {
+    pub fn serialize(&self) -> Vec<u8> {
         let serialized = serde_json::to_vec(self).unwrap();
         let compressed = yazi::compress(
             serialized.as_slice(),
@@ -145,7 +118,7 @@ impl NesInternal {
         compressed
     }
 
-    fn deserialize(&mut self, state: Vec<u8>) {
+    pub fn deserialize(&mut self, state: Vec<u8>) {
         let (decompressed, checksum) =
             yazi::decompress(state.as_slice(), yazi::Format::Zlib).unwrap();
 
@@ -157,7 +130,7 @@ impl NesInternal {
         let mut deserializer = serde_json::Deserializer::from_slice(&decompressed);
         let deserializer = serde_stacker::Deserializer::new(&mut deserializer);
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer).unwrap();
-        let new_nes: NesInternal = serde_json::from_value(value).unwrap();
+        let new_nes: Nes = serde_json::from_value(value).unwrap();
         assert!(new_nes.version.eq(SERIALIZATION_VER));
         let video_access = self.video_access.clone();
         let audio_access = self.audio_access.clone();
@@ -177,28 +150,27 @@ impl NesInternal {
         self.controller_access = controller_access;
     }
 
-    fn load(&mut self, nes_file: &NesFile) {
+    pub fn load(&mut self, nes_file: &NesFile) {
         self.mapper = nes_file.create_mapper();
         self.power_cycle();
     }
 
-    fn power_cycle(&mut self) {
-        self.vram.power_cycle();
+    pub fn power_cycle(&mut self) {
         self.ppu.power_cycle();
         self.apu.power_cycle();
         self.ram.power_cycle();
         self.mapper.power_cycle();
-        let mut bus = CpuBus {
+        let mut cpu_bus = CpuBus {
             ram: &mut self.ram,
             ppu: &mut self.ppu,
             apu: &mut self.apu,
             mapper: &mut self.mapper,
             controllers: &mut self.controllers,
         };
-        self.cpu.power_cycle(&mut bus);
+        self.cpu.power_cycle(&mut cpu_bus);
     }
 
-    fn run_for(&mut self, duration: Duration) {
+    pub fn run_for(&mut self, duration: Duration) {
         let mut elapsed_frames = 0;
         while elapsed_frames < duration.as_secs() as u128 * common::DEFAULT_FPS as u128 {
             self.run_single_frame();
@@ -206,7 +178,7 @@ impl NesInternal {
         }
     }
 
-    fn run_single_frame(&mut self) {
+    pub fn run_single_frame(&mut self) {
         use crate::ppu::PpuState;
 
         let current_frame = self.ppu.get_time().frame;
@@ -216,28 +188,28 @@ impl NesInternal {
         }
     }
 
-    fn run_single_cpu_cycle(&mut self) {
-        let mut bus = CpuBus {
+    pub fn run_single_cpu_cycle(&mut self) {
+        let mut cpu_bus = CpuBus {
             ram: &mut self.ram,
             ppu: &mut self.ppu,
             apu: &mut self.apu,
             mapper: &mut self.mapper,
             controllers: &mut self.controllers,
         };
-
-        self.cpu.maybe_fetch_next_instruction(&mut bus);
+        self.cpu.maybe_fetch_next_instruction(&mut cpu_bus);
         let mut ppu_bus = PpuBus {
             mapper: &mut self.mapper,
         };
-        self.ppu.run_single_cpu_cycle(&mut ppu_bus);
 
+        self.ppu.run_single_cpu_cycle(&mut ppu_bus);
         let mut apu_bus = ApuBus {
             ram: &mut self.ram,
             mapper: &mut self.mapper,
         };
-
+        
         self.apu.run_single_cpu_cycle(&mut apu_bus);
-        let mut bus = CpuBus {
+
+        let mut cpu_bus = CpuBus {
             ram: &mut self.ram,
             ppu: &mut self.ppu,
             apu: &mut self.apu,
@@ -245,58 +217,6 @@ impl NesInternal {
             controllers: &mut self.controllers,
         };
 
-        self.cpu.run_single_cycle(&mut bus);
-    }
-}
-
-pub struct Nes {
-    nes: Pin<Box<NesInternal>>,
-}
-
-impl Nes {
-    pub fn new<T>(io: Rc<RefCell<T>>) -> Self
-    where
-        T: IO + VideoAccess + AudioAccess + ControllerAccess + 'static,
-    {
-        Self {
-            nes: NesInternal::new(io),
-        }
-    }
-
-    fn as_mut(&mut self) -> &mut NesInternal {
-        let pin_ref = Pin::as_mut(&mut self.nes);
-        unsafe { Pin::get_unchecked_mut(pin_ref) }
-    }
-
-    pub fn serialize(&self) -> Vec<u8> {
-        self.nes.serialize()
-    }
-
-    pub fn deserialize(&mut self, state: Vec<u8>) {
-        self.as_mut().deserialize(state);
-    }
-
-    pub fn load(&mut self, nes_file: &NesFile) {
-        self.as_mut().load(nes_file);
-    }
-
-    pub fn power_cycle(&mut self) {
-        self.as_mut().power_cycle();
-    }
-
-    pub fn run_for(&mut self, duration: Duration) {
-        self.as_mut().run_for(duration);
-    }
-
-    pub fn run_single_frame(&mut self) {
-        self.as_mut().run_single_frame();
-    }
-
-    pub fn set_controller(&mut self, id: ControllerId, controller_type: ControllerType) {
-        self.as_mut().set_controller(id, controller_type);
-    }
-
-    pub fn get_controller_type(&mut self, id: ControllerId) -> ControllerType {
-        self.as_mut().get_controller_type(id)
+        self.cpu.run_single_cycle(&mut cpu_bus);
     }
 }
