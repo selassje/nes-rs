@@ -86,7 +86,7 @@ enum ProcessorFlag {
     NegativeFlag = 0b10000000,
 }
 
-pub type InstructionFun<M, P, A> = fn(&mut Cpu<M, P, A>,&mut CpuBus);
+pub type InstructionFun<M, P, A> = fn(&mut Cpu<M, P, A>, &mut CpuBus);
 
 #[derive(Copy, Clone, Serialize, Deserialize)]
 struct Instruction {
@@ -595,6 +595,39 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         }
     }
 
+    fn load_from_address2(&self, bus: &mut CpuBus) -> u8 {
+        let mut ram_bus = RamBus {
+            ppu: &mut bus.ppu,
+            apu: &mut bus.apu,
+            mapper: &mut bus.mapper,
+            controllers: &mut bus.controllers,
+        };
+        match &self.address {
+            Address::Implicit => panic!("load_from_address can't be used for implicit mode"),
+            Address::Accumulator => self.a,
+            Address::Immediate(i) => *i,
+            Address::Ram(address) => bus.ram.get_byte(*address, &mut ram_bus),
+            Address::Relative(_) => panic!("load_from_address can't be used for the Relative mode"),
+        }
+    }
+        fn store_to_address2(&mut self, byte: u8, bus: &mut CpuBus) {
+        let mut ram_bus = RamBus {
+            ppu: &mut bus.ppu,
+            apu: &mut bus.apu,
+            mapper: &mut bus.mapper,
+            controllers: &mut bus.controllers,
+        };
+        match &self.address {
+            Address::Implicit => panic!("store_to_address can't be used for implicit mode"),
+            Address::Accumulator => self.a = byte,
+            Address::Immediate(_) => panic!("Not possible to store in Immediate addressing"),
+            Address::Ram(address) => bus.ram.store_byte(*address, byte, &mut ram_bus),
+            Address::Relative(_) => panic!("store_to_address can't be used for the Relative mode"),
+        }
+    }
+
+
+
     fn get_ram_address(&self) -> u16 {
         match &self.address {
             Address::Ram(address) => *address,
@@ -629,17 +662,17 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn adc(&mut self, bus: &mut CpuBus) {
-        let m = self.load_from_address();
+        let m = self.load_from_address2(bus);
         self._adc(m);
     }
 
     fn sbc(&mut self, bus: &mut CpuBus) {
-        let m = self.load_from_address();
+        let m = self.load_from_address2(bus);
         self._adc(!m);
     }
 
     fn asl(&mut self, bus: &mut CpuBus) {
-        let mut m = self.load_from_address();
+        let mut m = self.load_from_address2(bus);
         let old_bit_7 = m & 0x80;
         m <<= 1;
         self.set_or_clear_flag(ProcessorFlag::CarryFlag, old_bit_7 != 0);
@@ -649,28 +682,28 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn and(&mut self, bus: &mut CpuBus) {
-        let m = self.load_from_address();
+        let m = self.load_from_address2(bus);
         self.a &= m;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
     fn ora(&mut self, bus: &mut CpuBus) {
-        let m = self.load_from_address();
+        let m = self.load_from_address2(bus);
         self.a |= m;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
     fn eor(&mut self, bus: &mut CpuBus) {
-        let m = self.load_from_address();
+        let m = self.load_from_address2(bus);
         self.a ^= m;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
     fn ror(&mut self, bus: &mut CpuBus) {
-        let mut m = self.load_from_address();
+        let mut m = self.load_from_address2(bus);
         let old_bit_0 = m & 0x1;
         m = m >> 1 | (self.carry() << 7);
         self.store_to_address(m);
@@ -680,7 +713,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn rol(&mut self, bus: &mut CpuBus) {
-        let mut m = self.load_from_address();
+        let mut m = self.load_from_address2(bus);
         let old_bit_7 = m & 0x80;
         m = m << 1 | self.carry();
         self.store_to_address(m);
@@ -690,7 +723,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn lsr(&mut self, bus: &mut CpuBus) {
-        let mut m = self.load_from_address();
+        let mut m = self.load_from_address2(bus);
         let old_bit_0 = m & 1;
         m >>= 1;
         self.store_to_address(m);
@@ -1128,9 +1161,9 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.adc(bus);
     }
 
-    fn tas(&mut self,bus:&mut CpuBus) {}
+    fn tas(&mut self, bus: &mut CpuBus) {}
 
-    fn xaa(&mut self,bus: &mut CpuBus) {
+    fn xaa(&mut self, bus: &mut CpuBus) {
         self.txa(bus);
         self.and(bus);
     }
