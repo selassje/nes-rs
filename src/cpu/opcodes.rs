@@ -1,33 +1,29 @@
-use crate::apu::ApuState;
-use crate::memory::Memory;
-use crate::ppu::PpuState;
-
 use super::AddressingMode;
 use super::AddressingMode::*;
 use super::Cpu;
 
-pub(super) struct OpCode<RAM: Memory, PPU: PpuState, APU: ApuState> {
-    pub(super) instruction: super::InstructionFun<RAM, PPU, APU>,
+pub(super) struct OpCode {
+    pub(super) instruction: super::InstructionFun,
     pub(super) mode: AddressingMode,
     pub(super) base_cycles: u8,
     pub(super) extra_cycle_on_page_crossing: bool,
 }
 
-impl<RAM: Memory, PPU: PpuState, APU: ApuState> Clone for OpCode<RAM, PPU, APU> {
+impl Clone for OpCode {
     fn clone(&self) -> Self {
         *self
     }
 }
-impl<RAM: Memory, PPU: PpuState, APU: ApuState> Copy for OpCode<RAM, PPU, APU> {}
+impl Copy for OpCode {}
 
 pub(super) const NMI_OPCODE: usize = 0x02;
 pub(super) const IRQ_OPCODE: usize = 0x32;
 
-pub(super) type OpCodes<RAM, PPU, APU> = [Option<OpCode<RAM, PPU, APU>>; 256];
+pub(super) type OpCodes= [Option<OpCode>; 256];
 
 macro_rules! fill_opcodes {
     ($(($op:expr,$ins:ident,$mode:expr,$cycles:expr $(,$extra_cycle_on_page_crossing:expr)?)),*) => {{
-        let mut opcodes: OpCodes<RAM,PPU,APU> = [None.clone(); 256];
+        let mut opcodes: OpCodes = [None.clone(); 256];
         $(
         let _extra_cycle_on_page_crossing = false;
         $( let _extra_cycle_on_page_crossing = $extra_cycle_on_page_crossing;
@@ -38,7 +34,7 @@ macro_rules! fill_opcodes {
         opcodes
     }};
 }
-pub(super) fn get_opcodes<RAM: Memory, PPU: PpuState, APU: ApuState>() -> OpCodes<RAM, PPU, APU> {
+pub(super) fn get_opcodes() -> OpCodes {
     fill_opcodes!(
         (NMI_OPCODE, nmi, Implicit, 7),
         (IRQ_OPCODE, irq, Implicit, 7),

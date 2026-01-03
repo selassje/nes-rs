@@ -19,31 +19,3 @@ pub enum Mirroring {
 pub fn convert_2u8_to_u16(b0: u8, b1: u8) -> u16 {
     (b0 as u16) | ((b1 as u16) << 8)
 }
-
-pub struct NonNullPtr<T: ?Sized>(std::ptr::NonNull<T>);
-impl<T> NonNullPtr<T> {
-    pub fn as_ref<'a>(&self) -> &'a T {
-        unsafe { self.0.as_ref() }
-    }
-    pub fn as_mut<'a>(&mut self) -> &'a mut T {
-        unsafe { self.0.as_mut() }
-    }
-
-    pub fn from(reference: &T) -> Self {
-        Self(std::ptr::NonNull::from(reference))
-    }
-}
-
-impl<T> Default for NonNullPtr<T> {
-    fn default() -> Self {
-        Self(std::ptr::NonNull::dangling())
-    }
-}
-
-impl<T> Clone for NonNullPtr<T> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<T> Copy for NonNullPtr<T> {}

@@ -1,6 +1,5 @@
 use crate::apu::Apu;
 use crate::common;
-use crate::common::NonNullPtr;
 use crate::controllers::ControllerId;
 use crate::controllers::ControllerType;
 use crate::controllers::Controllers;
@@ -33,7 +32,7 @@ fn default_controller_access() -> Rc<RefCell<dyn ControllerAccess>> {
 
 type Ppu = crate::ppu::Ppu;
 pub type Ram = crate::ram::Ram;
-type Cpu = crate::cpu::Cpu<Ram, Ppu, Apu>;
+type Cpu = crate::cpu::Cpu;
 
 pub struct CpuBus<'a> {
     pub ram: &'a mut Ram,
@@ -58,14 +57,14 @@ pub struct RamBus<'a> {
 }
 
 impl CpuBus<'_> {
-  pub fn get_ram_bus(&mut self) -> RamBus<'_> {
-      RamBus {
-          apu: self.apu,
-          ppu: self.ppu,
-          mapper: self.mapper,
-          controllers: self.controllers,
-      }
-  }
+    pub fn get_ram_bus(&mut self) -> RamBus<'_> {
+        RamBus {
+            apu: self.apu,
+            ppu: self.ppu,
+            mapper: self.mapper,
+            controllers: self.controllers,
+        }
+    }
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -117,19 +116,8 @@ impl NesInternal {
                 _pin: PhantomPinned,
             }));
 
-            let ram = NonNullPtr::from(&pinned_nes.ram);
-            let ppu = NonNullPtr::from(&pinned_nes.ppu);
-            let apu = NonNullPtr::from(&pinned_nes.apu);
-            let controllers = NonNullPtr::from(&pinned_nes.controllers);
-            let mapper = NonNullPtr::from(&pinned_nes.mapper);
-
             let pin_ref: Pin<&mut Self> = Pin::as_mut(&mut pinned_nes);
             let nes = Pin::get_unchecked_mut(pin_ref);
-            nes.cpu.set_ram(ram);
-            nes.cpu.set_ppu_state(ppu);
-            nes.cpu.set_apu_state(apu);
-            nes.cpu.set_mapper(mapper);
-            nes.cpu.set_controllers(controllers);
 
             nes.set_controller(ControllerId::Controller1, ControllerType::StdNesController);
             nes.set_controller(ControllerId::Controller2, ControllerType::StdNesController);
@@ -177,19 +165,9 @@ impl NesInternal {
 
         *self = new_nes;
 
-        let mapper = NonNullPtr::from(&self.mapper);
-
-        self.cpu.set_mapper(mapper);
-
         self.ppu.set_video_access(video_access.clone());
 
         self.apu.set_audio_access(audio_access.clone());
-
-        self.cpu.set_ram(NonNullPtr::from(&self.ram));
-        self.cpu.set_ppu_state(NonNullPtr::from(&self.ppu));
-        self.cpu.set_apu_state(NonNullPtr::from(&self.apu));
-        self.cpu
-            .set_controllers(NonNullPtr::from(&self.controllers));
 
         self.controllers
             .set_controller_access(controller_access.clone());
