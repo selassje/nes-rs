@@ -258,30 +258,39 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         }
     }
 
-    fn pop_byte(&mut self) -> u8 {
-        self.sp = ((self.sp as u16 + 1) & 0xFF) as u8;
-        self.ram
-            .as_ref()
-            .get_byte(self.sp as u16 + STACK_PAGE, &mut self.get_rambus())
-    }
+    fn pop_byte(&mut self, bus: &mut CpuBus) -> u8 {
+      let mut ram_bus = RamBus {
+          ppu: &mut bus.ppu,
+          apu: &mut bus.apu,
+          mapper: &mut bus.mapper,
+          controllers: &mut bus.controllers,
+      };
+      self.sp = ((self.sp as u16 + 1) & 0xFF) as u8;
+      bus.ram.get_byte(self.sp as u16 + STACK_PAGE, &mut ram_bus)
+  }
 
-    fn push_byte(&mut self, val: u8) {
-        self.ram
-            .as_mut()
-            .store_byte(self.sp as u16 + STACK_PAGE, val, &mut self.get_rambus());
-        self.sp = ((self.sp as i16 - 1) & 0xFF) as u8;
-    }
+  fn push_byte(&mut self, val: u8, bus: &mut CpuBus) {
+      let mut ram_bus = RamBus {
+          ppu: &mut bus.ppu,
+          apu: &mut bus.apu,
+          mapper: &mut bus.mapper,
+          controllers: &mut bus.controllers,
+      };
+      bus.ram
+          .store_byte(self.sp as u16 + STACK_PAGE, val, &mut ram_bus);
+      self.sp = ((self.sp as i16 - 1) & 0xFF) as u8;
+  }
 
-    fn push_word(&mut self, val: u16) {
-        self.push_byte(((val & 0xFF00) >> 8) as u8);
-        self.push_byte((val & 0x00FF) as u8);
-    }
+  fn push_word(&mut self, val: u16, bus: &mut CpuBus) {
+      self.push_byte(((val & 0xFF00) >> 8) as u8, bus);
+      self.push_byte((val & 0x00FF) as u8, bus);
+  }
 
-    fn pop_word(&mut self) -> u16 {
-        let low_byte = self.pop_byte();
-        let high_byte = self.pop_byte();
-        convert_2u8_to_u16(low_byte, high_byte)
-    }
+  fn pop_word(&mut self, bus: &mut CpuBus) -> u16 {
+      let low_byte = self.pop_byte(bus);
+      let high_byte = self.pop_byte(bus);
+      convert_2u8_to_u16(low_byte, high_byte)
+  }
     pub fn maybe_fetch_next_instruction(&mut self, bus: &mut CpuBus) {
         if self.instruction.is_none() {
             self.fetch_next_instruction(bus);
@@ -734,69 +743,75 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
 
     fn nop(&mut self, bus: &mut CpuBus) {}
 
-    fn update_pc_for_brk_or_irq(&mut self) {
-        let new_pc = if self.is_brk_or_irq_hijacked_by_nmi {
-            self.ram.as_ref().get_word(0xFFFA, &mut self.get_rambus())
-        } else {
-            self.ram.as_ref().get_word(0xFFFE, &mut self.get_rambus())
-        };
-        if new_pc > 0 {
-            self.pc = new_pc - 1;
-        } else {
-            self.pc = u16::MAX;
-        }
-        self.is_brk_or_irq_hijacked_by_nmi = false;
-    }
+    fn update_pc_for_brk_or_irq(&mut self, bus: &mut CpuBus) {
+      let mut ram_bus = RamBus {
+          ppu: &mut bus.ppu,
+          apu: &mut bus.apu,
+          mapper: &mut bus.mapper,
+          controllers: &mut bus.controllers,
+      };
+      let new_pc = if self.is_brk_or_irq_hijacked_by_nmi {
+          bus.ram.get_word(0xFFFA, &mut ram_bus)
+      } else {
+          bus.ram.get_word(0xFFFE, &mut ram_bus)
+      };
+      if new_pc > 0 {
+          self.pc = new_pc - 1;
+      } else {
+          self.pc = u16::MAX;
+      }
+      self.is_brk_or_irq_hijacked_by_nmi = false;
+  }
 
     fn brk(&mut self, bus: &mut CpuBus) {
-        self.push_word(self.pc + 2);
+        self.push_word(self.pc + 2,bus);
         let mut ps = self.ps;
         ps |= ProcessorFlag::BFlagBit4 as u8;
         ps |= ProcessorFlag::BFlagBit5 as u8;
-        self.push_byte(ps);
+        self.push_byte(ps,bus);
         self.set_flag(ProcessorFlag::InterruptDisable);
-        self.update_pc_for_brk_or_irq();
+        self.update_pc_for_brk_or_irq(bus);
     }
 
     fn irq(&mut self, bus: &mut CpuBus) {
-        self.push_word(self.pc);
+        self.push_word(self.pc,bus);
         let mut ps = self.ps;
         ps &= !(ProcessorFlag::BFlagBit4 as u8);
         ps |= ProcessorFlag::BFlagBit5 as u8;
-        self.push_byte(ps);
+        self.push_byte(ps,bus);
         self.set_flag(ProcessorFlag::InterruptDisable);
-        self.update_pc_for_brk_or_irq();
+        self.update_pc_for_brk_or_irq(bus);
     }
 
     fn nmi(&mut self, bus: &mut CpuBus) {
-        self.push_word(self.pc);
+        self.push_word(self.pc,bus);
         let mut ps = self.ps;
         ps &= !(ProcessorFlag::BFlagBit4 as u8);
         ps |= ProcessorFlag::BFlagBit5 as u8;
-        self.push_byte(ps);
+        self.push_byte(ps,bus);
         self.set_flag(ProcessorFlag::InterruptDisable);
         self.pc = self.ram.as_ref().get_word(0xFFFA, &mut self.get_rambus()) - 1;
     }
 
     fn jsr(&mut self, bus: &mut CpuBus) {
-        self.push_word(self.pc + 2);
+        self.push_word(self.pc + 2,bus);
         self.pc = self.get_ram_address() - 3;
     }
 
     fn rts(&mut self, bus: &mut CpuBus) {
-        self.pc = self.pop_word();
+        self.pc = self.pop_word(bus);
     }
 
     fn rti_restore_ps(&mut self, bus: &mut CpuBus) {
         let b_flag_mask = ProcessorFlag::BFlagBit4 as u8 | ProcessorFlag::BFlagBit5 as u8;
         let b_flag_bits = self.ps & b_flag_mask;
-        self.ps = self.pop_byte();
+        self.ps = self.pop_byte(bus);
         self.ps &= !b_flag_mask;
         self.ps |= b_flag_bits;
     }
 
     fn rti(&mut self, bus: &mut CpuBus) {
-        let popped = self.pop_word();
+        let popped = self.pop_word(bus);
         if popped == 0 {
             println!("what?");
         }
@@ -1026,18 +1041,18 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn pha(&mut self, bus: &mut CpuBus) {
-        self.push_byte(self.a);
+        self.push_byte(self.a,bus);
     }
 
     fn php(&mut self, bus: &mut CpuBus) {
         let mut ps = self.ps;
         ps |= ProcessorFlag::BFlagBit4 as u8;
         ps |= ProcessorFlag::BFlagBit5 as u8;
-        self.push_byte(ps);
+        self.push_byte(ps,bus);
     }
 
     fn pla(&mut self, bus: &mut CpuBus) {
-        self.a = self.pop_byte();
+        self.a = self.pop_byte(bus);
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
@@ -1045,7 +1060,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     fn plp(&mut self, bus: &mut CpuBus) {
         let b_flag_mask = ProcessorFlag::BFlagBit4 as u8 | ProcessorFlag::BFlagBit5 as u8;
         let b_flag_bits = self.ps & b_flag_mask;
-        self.ps = self.pop_byte();
+        self.ps = self.pop_byte(bus);
         self.ps &= !b_flag_mask;
         self.ps |= b_flag_bits;
     }
