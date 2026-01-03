@@ -279,18 +279,18 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn check_for_interrupts(&mut self) {
-        if self.ppu_state.as_mut().check_for_nmi_pending() {
-            self.ppu_state.as_mut().clear_nmi_pending();
+        if self.get_rambus().ppu.check_for_nmi_pending() {
+            self.get_rambus().ppu.clear_nmi_pending();
             self.interrupt = Some(NMI_OPCODE as u8);
         } else if !self.get_flag(ProcessorFlag::InterruptDisable)
-            && (self.mapper.as_mut().is_irq_pending() || self.apu_state.as_ref().is_irq_pending())
+            && (self.get_rambus().mapper.is_irq_pending() || self.apu_state.as_ref().is_irq_pending())
         {
             self.interrupt = Some(IRQ_OPCODE as u8)
         }
     }
 
     fn fetch_next_instruction(&mut self) {
-        let ppu_time = self.ppu_state.as_mut().get_time();
+        let ppu_time = self.get_rambus().ppu.get_time();
         let op = if let Some(op) = self.interrupt.take() {
             op
         } else {
@@ -391,9 +391,9 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
             }
             self.instruction = None;
         } else if is_brk_or_irq_executing {
-            if self.ppu_state.as_mut().check_for_nmi_pending() && instruction.cycle <= 4 {
+            if self.get_rambus().ppu.check_for_nmi_pending() && instruction.cycle <= 4 {
                 self.is_brk_or_irq_hijacked_by_nmi = true;
-                self.ppu_state.as_mut().clear_nmi_pending()
+                self.get_rambus().ppu.clear_nmi_pending()
             }
         } else if is_branching_executing {
             if instruction.cycle == 1 || (instruction.cycle == 3 && instruction.total_cycles == 4) {
