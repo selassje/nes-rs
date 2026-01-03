@@ -86,7 +86,7 @@ enum ProcessorFlag {
     NegativeFlag = 0b10000000,
 }
 
-pub type InstructionFun<M, P, A> = fn(&mut Cpu<M, P, A>);
+pub type InstructionFun<M, P, A> = fn(&mut Cpu<M, P, A>,&mut CpuBus);
 
 #[derive(Copy, Clone, Serialize, Deserialize)]
 struct Instruction {
@@ -398,7 +398,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         let is_nmi_executing = ins_fun as usize == Self::nmi as usize;
         let is_branching_executing = self.is_current_instruction_branching();
         if instruction.cycle == instruction.total_cycles {
-            (ins_fun)(self);
+            (ins_fun)(self, bus);
             self.pc = ((self.pc as u32 + instruction.bytes as u32) % u16::MAX as u32) as u16;
             let cycles_left = u128::MAX - self.cycle;
             if cycles_left < instruction.total_cycles as u128 {
@@ -628,17 +628,17 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.set_or_clear_flag(ProcessorFlag::CarryFlag, result & 0xFF00 != 0);
     }
 
-    fn adc(&mut self) {
+    fn adc(&mut self, bus: &mut CpuBus) {
         let m = self.load_from_address();
         self._adc(m);
     }
 
-    fn sbc(&mut self) {
+    fn sbc(&mut self, bus: &mut CpuBus) {
         let m = self.load_from_address();
         self._adc(!m);
     }
 
-    fn asl(&mut self) {
+    fn asl(&mut self, bus: &mut CpuBus) {
         let mut m = self.load_from_address();
         let old_bit_7 = m & 0x80;
         m <<= 1;
@@ -648,28 +648,28 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.store_to_address(m);
     }
 
-    fn and(&mut self) {
+    fn and(&mut self, bus: &mut CpuBus) {
         let m = self.load_from_address();
         self.a &= m;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
-    fn ora(&mut self) {
+    fn ora(&mut self, bus: &mut CpuBus) {
         let m = self.load_from_address();
         self.a |= m;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
-    fn eor(&mut self) {
+    fn eor(&mut self, bus: &mut CpuBus) {
         let m = self.load_from_address();
         self.a ^= m;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
-    fn ror(&mut self) {
+    fn ror(&mut self, bus: &mut CpuBus) {
         let mut m = self.load_from_address();
         let old_bit_0 = m & 0x1;
         m = m >> 1 | (self.carry() << 7);
@@ -679,7 +679,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
     }
 
-    fn rol(&mut self) {
+    fn rol(&mut self, bus: &mut CpuBus) {
         let mut m = self.load_from_address();
         let old_bit_7 = m & 0x80;
         m = m << 1 | self.carry();
@@ -689,7 +689,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
     }
 
-    fn lsr(&mut self) {
+    fn lsr(&mut self, bus: &mut CpuBus) {
         let mut m = self.load_from_address();
         let old_bit_0 = m & 1;
         m >>= 1;
@@ -699,7 +699,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
     }
 
-    fn nop(&mut self) {}
+    fn nop(&mut self, bus: &mut CpuBus) {}
 
     fn update_pc_for_brk_or_irq(&mut self) {
         let new_pc = if self.is_brk_or_irq_hijacked_by_nmi {
@@ -715,7 +715,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.is_brk_or_irq_hijacked_by_nmi = false;
     }
 
-    fn brk(&mut self) {
+    fn brk(&mut self, bus: &mut CpuBus) {
         self.push_word(self.pc + 2);
         let mut ps = self.ps;
         ps |= ProcessorFlag::BFlagBit4 as u8;
@@ -725,7 +725,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.update_pc_for_brk_or_irq();
     }
 
-    fn irq(&mut self) {
+    fn irq(&mut self, bus: &mut CpuBus) {
         self.push_word(self.pc);
         let mut ps = self.ps;
         ps &= !(ProcessorFlag::BFlagBit4 as u8);
@@ -735,7 +735,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.update_pc_for_brk_or_irq();
     }
 
-    fn nmi(&mut self) {
+    fn nmi(&mut self, bus: &mut CpuBus) {
         self.push_word(self.pc);
         let mut ps = self.ps;
         ps &= !(ProcessorFlag::BFlagBit4 as u8);
@@ -745,12 +745,12 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.pc = self.ram.as_ref().get_word(0xFFFA, &mut self.get_rambus()) - 1;
     }
 
-    fn jsr(&mut self) {
+    fn jsr(&mut self, bus: &mut CpuBus) {
         self.push_word(self.pc + 2);
         self.pc = self.get_ram_address() - 3;
     }
 
-    fn rts(&mut self) {
+    fn rts(&mut self, bus: &mut CpuBus) {
         self.pc = self.pop_word();
     }
 
@@ -762,7 +762,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.ps |= b_flag_bits;
     }
 
-    fn rti(&mut self) {
+    fn rti(&mut self, bus: &mut CpuBus) {
         let popped = self.pop_word();
         if popped == 0 {
             println!("what?");
@@ -771,85 +771,85 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.pc = popped - 1;
     }
 
-    fn jmp(&mut self) {
+    fn jmp(&mut self, bus: &mut CpuBus) {
         self.pc = self.get_ram_address() - 3;
     }
 
-    fn sei(&mut self) {
+    fn sei(&mut self, bus: &mut CpuBus) {
         self.set_flag(ProcessorFlag::InterruptDisable);
     }
 
-    fn cld(&mut self) {
+    fn cld(&mut self, bus: &mut CpuBus) {
         self.clear_flag(ProcessorFlag::DecimalMode);
     }
 
-    fn cli(&mut self) {
+    fn cli(&mut self, bus: &mut CpuBus) {
         self.clear_flag(ProcessorFlag::InterruptDisable);
     }
 
-    fn clv(&mut self) {
+    fn clv(&mut self, bus: &mut CpuBus) {
         self.clear_flag(ProcessorFlag::OverflowFlag);
     }
 
-    fn lda(&mut self) {
+    fn lda(&mut self, bus: &mut CpuBus) {
         self.a = self.load_from_address();
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
-    fn ldx(&mut self) {
+    fn ldx(&mut self, bus: &mut CpuBus) {
         self.x = self.load_from_address();
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.x == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
     }
 
-    fn ldy(&mut self) {
+    fn ldy(&mut self, bus: &mut CpuBus) {
         self.y = self.load_from_address();
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.y == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.y & 0x80 != 0);
     }
 
-    fn sta(&mut self) {
+    fn sta(&mut self, bus: &mut CpuBus) {
         self.store_to_address(self.a);
     }
 
-    fn sty(&mut self) {
+    fn sty(&mut self, bus: &mut CpuBus) {
         self.store_to_address(self.y);
     }
 
-    fn stx(&mut self) {
+    fn stx(&mut self, bus: &mut CpuBus) {
         self.store_to_address(self.x);
     }
 
-    fn txs(&mut self) {
+    fn txs(&mut self, bus: &mut CpuBus) {
         self.sp = self.x;
     }
 
-    fn tsx(&mut self) {
+    fn tsx(&mut self, bus: &mut CpuBus) {
         self.x = self.sp;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.x == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
     }
 
-    fn txa(&mut self) {
+    fn txa(&mut self, bus: &mut CpuBus) {
         self.a = self.x;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
-    fn tax(&mut self) {
+    fn tax(&mut self, bus: &mut CpuBus) {
         self.x = self.a;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.x == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
     }
 
-    fn tya(&mut self) {
+    fn tya(&mut self, bus: &mut CpuBus) {
         self.a = self.y;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
-    fn tay(&mut self) {
+    fn tay(&mut self, bus: &mut CpuBus) {
         self.y = self.a;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.y == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.y & 0x80 != 0);
@@ -869,7 +869,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.get_flag(ProcessorFlag::ZeroFlag)
     }
 
-    fn beq(&mut self) {
+    fn beq(&mut self, bus: &mut CpuBus) {
         self.branch_if(self.check_condition_for_beq());
     }
 
@@ -877,7 +877,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         !self.check_condition_for_beq()
     }
 
-    fn bne(&mut self) {
+    fn bne(&mut self, bus: &mut CpuBus) {
         self.branch_if(self.check_condition_for_bne());
     }
 
@@ -885,7 +885,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.get_flag(ProcessorFlag::NegativeFlag)
     }
 
-    fn bmi(&mut self) {
+    fn bmi(&mut self, bus: &mut CpuBus) {
         self.branch_if(self.check_condition_for_bmi());
     }
 
@@ -893,7 +893,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         !self.check_condition_for_bmi()
     }
 
-    fn bpl(&mut self) {
+    fn bpl(&mut self, bus: &mut CpuBus) {
         self.branch_if(self.check_condition_for_bpl());
     }
 
@@ -901,7 +901,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.get_flag(ProcessorFlag::OverflowFlag)
     }
 
-    fn bvs(&mut self) {
+    fn bvs(&mut self, bus: &mut CpuBus) {
         self.branch_if(self.check_condition_for_bvs());
     }
 
@@ -909,7 +909,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         !self.check_condition_for_bvs()
     }
 
-    fn bvc(&mut self) {
+    fn bvc(&mut self, bus: &mut CpuBus) {
         self.branch_if(self.check_condition_for_bvc());
     }
 
@@ -917,7 +917,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.get_flag(ProcessorFlag::CarryFlag)
     }
 
-    fn bcs(&mut self) {
+    fn bcs(&mut self, bus: &mut CpuBus) {
         self.branch_if(self.check_condition_for_bcs());
     }
 
@@ -925,18 +925,18 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         !self.check_condition_for_bcs()
     }
 
-    fn bcc(&mut self) {
+    fn bcc(&mut self, bus: &mut CpuBus) {
         self.branch_if(self.check_condition_for_bcc());
     }
 
-    fn bit(&mut self) {
+    fn bit(&mut self, bus: &mut CpuBus) {
         let m = self.load_from_address();
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a & m == 0);
         self.set_or_clear_flag(ProcessorFlag::OverflowFlag, m & (1 << 6) != 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & (1 << 7) != 0);
     }
 
-    fn cmp(&mut self) {
+    fn cmp(&mut self, bus: &mut CpuBus) {
         let m = self.load_from_address();
         let result = (self.a as i16 - m as i16) as u8;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == m);
@@ -944,7 +944,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);
     }
 
-    fn cpx(&mut self) {
+    fn cpx(&mut self, bus: &mut CpuBus) {
         let m = self.load_from_address();
         let result = (self.x as i16 - m as i16) as u8;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.x == m);
@@ -952,7 +952,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);
     }
 
-    fn cpy(&mut self) {
+    fn cpy(&mut self, bus: &mut CpuBus) {
         let m = self.load_from_address();
         let result = (self.y as i16 - m as i16) as u8;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.y == m);
@@ -960,7 +960,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);
     }
 
-    fn dey(&mut self) {
+    fn dey(&mut self, bus: &mut CpuBus) {
         if self.y == 0 {
             self.y = 0xFF;
         } else {
@@ -970,7 +970,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.y & 0x80 != 0);
     }
 
-    fn dec(&mut self) {
+    fn dec(&mut self, bus: &mut CpuBus) {
         let mut m = self.load_from_address();
         if m == 0 {
             m = 0xFF;
@@ -982,7 +982,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.store_to_address(m);
     }
 
-    fn dex(&mut self) {
+    fn dex(&mut self, bus: &mut CpuBus) {
         if self.x == 0 {
             self.x = 0xFF;
         } else {
@@ -992,24 +992,24 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
     }
 
-    fn pha(&mut self) {
+    fn pha(&mut self, bus: &mut CpuBus) {
         self.push_byte(self.a);
     }
 
-    fn php(&mut self) {
+    fn php(&mut self, bus: &mut CpuBus) {
         let mut ps = self.ps;
         ps |= ProcessorFlag::BFlagBit4 as u8;
         ps |= ProcessorFlag::BFlagBit5 as u8;
         self.push_byte(ps);
     }
 
-    fn pla(&mut self) {
+    fn pla(&mut self, bus: &mut CpuBus) {
         self.a = self.pop_byte();
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
-    fn plp(&mut self) {
+    fn plp(&mut self, bus: &mut CpuBus) {
         let b_flag_mask = ProcessorFlag::BFlagBit4 as u8 | ProcessorFlag::BFlagBit5 as u8;
         let b_flag_bits = self.ps & b_flag_mask;
         self.ps = self.pop_byte();
@@ -1017,7 +1017,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.ps |= b_flag_bits;
     }
 
-    fn inc(&mut self) {
+    fn inc(&mut self, bus: &mut CpuBus) {
         let mut m = self.load_from_address();
         let result = m as u16 + 1;
         m = (result & 0xFF) as u8;
@@ -1026,33 +1026,33 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.store_to_address(m);
     }
 
-    fn inx(&mut self) {
+    fn inx(&mut self, bus: &mut CpuBus) {
         let result = self.x as u16 + 1;
         self.x = (result & 0xFF) as u8;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.x == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
     }
 
-    fn iny(&mut self) {
+    fn iny(&mut self, bus: &mut CpuBus) {
         let result = self.y as u16 + 1;
         self.y = (result & 0xFF) as u8;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.y == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.y & 0x80 != 0);
     }
 
-    fn clc(&mut self) {
+    fn clc(&mut self, bus: &mut CpuBus) {
         self.clear_flag(ProcessorFlag::CarryFlag);
     }
 
-    fn sec(&mut self) {
+    fn sec(&mut self, bus: &mut CpuBus) {
         self.set_flag(ProcessorFlag::CarryFlag);
     }
 
-    fn sed(&mut self) {
+    fn sed(&mut self, bus: &mut CpuBus) {
         self.set_flag(ProcessorFlag::DecimalMode);
     }
 
-    fn lax(&mut self) {
+    fn lax(&mut self, bus: &mut CpuBus) {
         let m = self.load_from_address();
         self.a = m;
         self.x = m;
@@ -1060,80 +1060,80 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
     }
 
-    fn aax(&mut self) {
+    fn aax(&mut self, bus: &mut CpuBus) {
         let result = self.a & self.x;
         self.store_to_address(result);
     }
 
-    fn alr(&mut self) {
-        self.and();
+    fn alr(&mut self, bus: &mut CpuBus) {
+        self.and(bus);
         self.address = Address::Accumulator;
-        self.lsr();
+        self.lsr(bus);
     }
 
-    fn anc(&mut self) {
-        self.and();
+    fn anc(&mut self, bus: &mut CpuBus) {
+        self.and(bus);
         self.set_or_clear_flag(
             ProcessorFlag::CarryFlag,
             self.get_flag(ProcessorFlag::NegativeFlag),
         );
     }
 
-    fn arr(&mut self) {
-        self.and();
+    fn arr(&mut self, bus: &mut CpuBus) {
+        self.and(bus);
         self.address = Address::Accumulator;
-        self.ror();
+        self.ror(bus);
     }
 
-    fn axa(&mut self) {
-        self.and();
-        self.lsr();
+    fn axa(&mut self, bus: &mut CpuBus) {
+        self.and(bus);
+        self.lsr(bus);
     }
 
-    fn dcp(&mut self) {
-        self.dec();
-        self.cmp();
+    fn dcp(&mut self, bus: &mut CpuBus) {
+        self.dec(bus);
+        self.cmp(bus);
     }
 
-    fn isc(&mut self) {
-        self.inc();
-        self.sbc();
+    fn isc(&mut self, bus: &mut CpuBus) {
+        self.inc(bus);
+        self.sbc(bus);
     }
 
-    fn las(&mut self) {}
+    fn las(&mut self, bus: &mut CpuBus) {}
 
-    fn oal(&mut self) {}
+    fn oal(&mut self, bus: &mut CpuBus) {}
 
-    fn sax(&mut self) {}
+    fn sax(&mut self, bus: &mut CpuBus) {}
 
-    fn slo(&mut self) {
-        self.asl();
-        self.ora();
+    fn slo(&mut self, bus: &mut CpuBus) {
+        self.asl(bus);
+        self.ora(bus);
     }
 
-    fn rla(&mut self) {
-        self.rol();
-        self.and();
+    fn rla(&mut self, bus: &mut CpuBus) {
+        self.rol(bus);
+        self.and(bus);
     }
 
-    fn say(&mut self) {}
+    fn say(&mut self, bus: &mut CpuBus) {}
 
-    fn sre(&mut self) {
-        self.lsr();
-        self.eor();
+    fn sre(&mut self, bus: &mut CpuBus) {
+        self.lsr(bus);
+        self.eor(bus);
     }
 
-    fn rra(&mut self) {
-        self.ror();
-        self.adc();
+    fn rra(&mut self, bus: &mut CpuBus) {
+        self.ror(bus);
+        self.adc(bus);
     }
 
-    fn tas(&mut self) {}
+    fn tas(&mut self,bus:&mut CpuBus) {}
 
-    fn xaa(&mut self) {
-        self.txa();
-        self.and();
+    fn xaa(&mut self,bus: &mut CpuBus) {
+        self.txa(bus);
+        self.and(bus);
     }
 
-    fn xas(&mut self) {}
+    fn xas(&mut self, bus: &mut CpuBus) {}
 }
