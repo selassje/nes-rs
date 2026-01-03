@@ -38,6 +38,16 @@ type Cpu = crate::cpu::Cpu<Ram, Ppu, Apu>;
 pub struct PpuBus<'a> {
     pub mapper: &'a mut MapperEnum,
 }
+pub struct ApuBus<'a> {
+    pub ram: &'a mut Ram,
+    pub mapper: &'a mut MapperEnum,
+}
+pub struct RamBus<'a> {
+    pub apu: &'a mut Apu,
+    pub ppu: &'a mut Ppu,
+    pub mapper: &'a mut MapperEnum,
+    pub controllers: &'a mut Controllers,
+}
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesInternal {
@@ -104,7 +114,6 @@ impl NesInternal {
             nes.ram.set_ppu_access(ppu);
             nes.ram.set_apu_access(apu);
             nes.ram.set_mapper(mapper);
-            nes.apu.set_dmc_memory(ram);
 
             nes.set_controller(ControllerId::Controller1, ControllerType::StdNesController);
             nes.set_controller(ControllerId::Controller2, ControllerType::StdNesController);
@@ -161,8 +170,6 @@ impl NesInternal {
 
         self.apu.set_audio_access(audio_access.clone());
 
-        self.apu.set_dmc_memory(NonNullPtr::from(&self.ram));
-
         self.ram.set_apu_access(NonNullPtr::from(&self.apu));
         self.ram.set_ppu_access(NonNullPtr::from(&self.ppu));
         self.ram
@@ -214,11 +221,16 @@ impl NesInternal {
     fn run_single_cpu_cycle(&mut self) {
         self.cpu.maybe_fetch_next_instruction();
         let mut ppu_bus = PpuBus {
-          mapper: &mut self.mapper,
-      };
+            mapper: &mut self.mapper,
+        };
         self.ppu.run_single_cpu_cycle(&mut ppu_bus);
 
-        self.apu.run_single_cpu_cycle();
+        let mut apu_bus = ApuBus {
+            ram: &mut self.ram,
+            mapper: &mut self.mapper,
+        };
+
+        self.apu.run_single_cpu_cycle(&mut apu_bus);
 
         self.cpu.run_single_cycle();
     }

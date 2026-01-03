@@ -1,7 +1,8 @@
 use self::StatusRegisterFlag::*;
-use crate::common::NonNullPtr;
 use crate::io::AudioSampleFormat;
 use crate::{io::AudioAccess, memory::DmcMemory, ram_apu::*};
+use crate::nes::{ApuBus};
+use crate::nes::Ram;
 
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, default::Default, rc::Rc};
@@ -532,7 +533,7 @@ impl LengthCounterChannel for Noise {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-struct Dmc<D: DmcMemory> {
+struct Dmc {
     data: [u8; 4],
     timer_tick: u16,
     sample_buffer: Option<u8>,
@@ -544,11 +545,9 @@ struct Dmc<D: DmcMemory> {
     output_value: u8,
     start_pending: bool,
     interrupt: bool,
-    #[serde(skip)]
-    dmc_memory: NonNullPtr<D>,
 }
 
-impl<D: DmcMemory> Dmc<D> {
+impl Dmc {
     fn new() -> Self {
         Dmc {
             data: [0; 4],
@@ -560,7 +559,6 @@ impl<D: DmcMemory> Dmc<D> {
             sample_buffer: None,
             shift_register: 0,
             output_value: 0,
-            dmc_memory: Default::default(),
             start_pending: false,
             interrupt: false,
         }
@@ -579,11 +577,9 @@ impl<D: DmcMemory> Dmc<D> {
         self.interrupt = false;
     }
 
-    fn start_sample(&mut self) {
+    fn start_sample(&mut self, ram: &mut Ram) {
         self.bytes_remaining = self.next_bytes_remaining;
-        self.dmc_memory
-            .as_mut()
-            .set_sample_address(self.get_sample_address());
+        ram.set_sample_address(self.get_sample_address());
     }
 
     fn is_irq_enabled(&self) -> bool {
@@ -637,22 +633,22 @@ impl<D: DmcMemory> Dmc<D> {
         }
     }
 
-    fn fetch_next_sample_buffer(&mut self) {
+    fn fetch_next_sample_buffer(&mut self, bus: &mut ApuBus) {
         if self.sample_buffer.is_none() {
             if self.bytes_remaining > 0 {
-                self.sample_buffer = Some(self.dmc_memory.as_mut().get_next_sample_byte());
+                self.sample_buffer = Some(bus.ram.get_next_sample_byte(bus.mapper));
                 self.bytes_remaining -= 1;
                 if self.bytes_remaining == 0 {
                     if self.is_loop_enabled() {
                         self.next_bytes_remaining = self.get_sample_length();
-                        self.start_sample();
+                        self.start_sample(bus.ram);
                     } else if self.is_irq_enabled() {
                         self.interrupt = true;
                     }
                 }
             } else if self.start_pending {
-                self.start_sample();
-                self.fetch_next_sample_buffer();
+                self.start_sample(bus.ram);
+                self.fetch_next_sample_buffer(bus);
                 self.start_pending = false;
             }
         }
@@ -675,8 +671,7 @@ pub struct Apu {
     pulse_2: PulseWave,
     triangle: TriangleWave,
     noise: Noise,
-    #[serde(skip)]
-    dmc: Dmc<crate::nes::Ram>,
+    dmc: Dmc,
     cpu_cycle: u16,
     is_during_apu_cycle: bool,
     frame_interrupt: bool,
@@ -742,10 +737,6 @@ impl Apu {
         self.irq_flag_setting_in_progress = false;
     }
 
-    pub fn set_dmc_memory(&mut self, dmc_memory: NonNullPtr<crate::nes::Ram>) {
-        self.dmc.dmc_memory = dmc_memory;
-    }
-
     pub fn set_audio_access(&mut self, audio_access: Rc<RefCell<dyn AudioAccess>>) {
         self.audio_access = audio_access;
     }
@@ -798,7 +789,7 @@ impl Apu {
         self.noise.clock_envelope();
     }
 
-    pub fn run_single_cpu_cycle(&mut self) {
+    pub fn run_single_cpu_cycle(&mut self,bus: &mut ApuBus) {
         if let Some(pending_reset_cycle) = self.pending_reset_cycle {
             if pending_reset_cycle == self.cpu_cycle {
                 self.cpu_cycle = 0;
@@ -824,7 +815,7 @@ impl Apu {
         }
         self.noise.clock_timer();
 
-        self.dmc.fetch_next_sample_buffer();
+        self.dmc.fetch_next_sample_buffer(bus);
         self.dmc.clock_timer();
 
         if self.frame_counter.get_sequencer_mode() == 0
@@ -1023,10 +1014,10 @@ impl ReadAccessRegisters for Apu {
     }
 }
 
-impl ApuRegisterAccess for Apu {}
-
 impl ApuState for Apu {
     fn is_irq_pending(&self) -> bool {
         self.frame_interrupt || self.dmc.interrupt
     }
 }
+
+impl ApuRegisterAccess for Apu {}

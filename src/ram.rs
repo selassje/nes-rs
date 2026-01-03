@@ -211,13 +211,15 @@ impl<P: PpuRegisterAccess, A: ApuRegisterAccess, C: ControllerRegisterAccess> Dm
         self.dmc_sample_address = 0xC000 + (address as usize * 64);
     }
 
-    fn get_next_sample_byte(&mut self) -> u8 {
-        let byte = self.get_byte(self.dmc_sample_address as u16);
-        self.dmc_sample_address = if self.dmc_sample_address == 0xFFFF {
-            0x8000
-        } else {
-            self.dmc_sample_address + 1
-        };
-        byte
-    }
+    fn get_next_sample_byte(&mut self, mapper: &mut MapperEnum) -> u8 {
+      let addr = self.get_real_address(self.dmc_sample_address as u16);
+      assert!(CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)));
+      let byte =  mapper.get_prg_byte(addr);
+      self.dmc_sample_address = if self.dmc_sample_address == 0xFFFF {
+          0x8000
+      } else {
+          self.dmc_sample_address + 1
+      };
+      byte
+  }
 }

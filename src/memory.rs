@@ -66,5 +66,5 @@ pub trait VideoMemory {
 
 pub trait DmcMemory {
     fn set_sample_address(&mut self, address: u8);
-    fn get_next_sample_byte(&mut self) -> u8;
+    fn get_next_sample_byte(&mut self,mapper: &mut MapperEnum) -> u8;
 }
