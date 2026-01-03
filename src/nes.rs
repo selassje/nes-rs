@@ -35,6 +35,14 @@ type Ppu = crate::ppu::Ppu;
 pub type Ram = crate::ram::Ram;
 type Cpu = crate::cpu::Cpu<Ram, Ppu, Apu>;
 
+pub struct CpuBus<'a> {
+    pub ram: &'a mut Ram,
+    pub ppu: &'a mut Ppu,
+    pub apu: &'a mut Apu,
+    pub mapper: &'a mut MapperEnum,
+    pub controllers: &'a mut Controllers,
+}
+
 pub struct PpuBus<'a> {
     pub mapper: &'a mut MapperEnum,
 }
@@ -169,7 +177,8 @@ impl NesInternal {
         self.cpu.set_ram(NonNullPtr::from(&self.ram));
         self.cpu.set_ppu_state(NonNullPtr::from(&self.ppu));
         self.cpu.set_apu_state(NonNullPtr::from(&self.apu));
-        self.cpu.set_controllers(NonNullPtr::from(&self.controllers));
+        self.cpu
+            .set_controllers(NonNullPtr::from(&self.controllers));
 
         self.controllers
             .set_controller_access(controller_access.clone());
@@ -190,7 +199,14 @@ impl NesInternal {
         self.apu.power_cycle();
         self.ram.power_cycle();
         self.mapper.power_cycle();
-        self.cpu.power_cycle();
+        let mut bus = CpuBus {
+            ram: &mut self.ram,
+            ppu: &mut self.ppu,
+            apu: &mut self.apu,
+            mapper: &mut self.mapper,
+            controllers: &mut self.controllers,
+        };
+        self.cpu.power_cycle(&mut bus);
     }
 
     fn run_for(&mut self, duration: Duration) {
@@ -212,7 +228,15 @@ impl NesInternal {
     }
 
     fn run_single_cpu_cycle(&mut self) {
-        self.cpu.maybe_fetch_next_instruction();
+        let mut bus = CpuBus {
+            ram: &mut self.ram,
+            ppu: &mut self.ppu,
+            apu: &mut self.apu,
+            mapper: &mut self.mapper,
+            controllers: &mut self.controllers,
+        };
+
+        self.cpu.maybe_fetch_next_instruction(&mut bus);
         let mut ppu_bus = PpuBus {
             mapper: &mut self.mapper,
         };
@@ -224,8 +248,15 @@ impl NesInternal {
         };
 
         self.apu.run_single_cpu_cycle(&mut apu_bus);
+        let mut bus = CpuBus {
+            ram: &mut self.ram,
+            ppu: &mut self.ppu,
+            apu: &mut self.apu,
+            mapper: &mut self.mapper,
+            controllers: &mut self.controllers,
+        };
 
-        self.cpu.run_single_cycle();
+        self.cpu.run_single_cycle(&mut bus);
     }
 }
 

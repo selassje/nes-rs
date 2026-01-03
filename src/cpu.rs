@@ -10,6 +10,7 @@ use crate::{mappers::Mapper, ram_ppu::DmaWriteAccessRegister::OamDma};
 use opcodes::{get_opcodes, OpCodes, NMI_OPCODE};
 use serde::{Deserialize, Serialize};
 use crate::nes::RamBus;
+use crate::nes::CpuBus;
 
 use std::fmt::{Display, Formatter, Result};
 
@@ -205,7 +206,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.apu_state = apu_state;
     }
 
-    pub fn power_cycle(&mut self) {
+    pub fn power_cycle(&mut self, bus: &mut CpuBus) {
         self.pc = 0xC000;
         self.pc = self.ram.as_ref().get_word(0xFFFC,&mut self.get_rambus());
         self.sp = 0xFD;
@@ -272,7 +273,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         let high_byte = self.pop_byte();
         convert_2u8_to_u16(low_byte, high_byte)
     }
-    pub fn maybe_fetch_next_instruction(&mut self) {
+    pub fn maybe_fetch_next_instruction(&mut self,  _bus: &mut CpuBus) {
         if self.instruction.is_none() {
             self.fetch_next_instruction();
         }
@@ -370,7 +371,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         }
     }
 
-    pub fn run_single_cycle(&mut self) {
+    pub fn run_single_cycle(&mut self, bus: &mut CpuBus) {
         self.instruction.as_mut().unwrap().cycle += 1;
         let instruction = self.instruction.unwrap();
         let ins_fun = self.opcodes[instruction.opcode as usize]
