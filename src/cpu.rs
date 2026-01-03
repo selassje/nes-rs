@@ -1,13 +1,15 @@
 mod opcodes;
 
 use self::{opcodes::IRQ_OPCODE, AddressingMode::*};
-use crate::apu::ApuState;
+use crate::apu::{Apu, ApuState};
+use crate::controllers::Controllers;
 use crate::mappers::MapperEnum;
-use crate::ppu::PpuState;
+use crate::ppu::{Ppu, PpuState};
 use crate::{common::*, memory::Memory};
 use crate::{mappers::Mapper, ram_ppu::DmaWriteAccessRegister::OamDma};
 use opcodes::{get_opcodes, OpCodes, NMI_OPCODE};
 use serde::{Deserialize, Serialize};
+use crate::nes::RamBus;
 
 use std::fmt::{Display, Formatter, Result};
 
@@ -111,6 +113,9 @@ pub struct Cpu<M: Memory, P: PpuState, A: ApuState> {
     apu_state: NonNullPtr<A>,
     #[serde(skip)]
     mapper: NonNullPtr<MapperEnum>,
+    #[serde(skip)]
+    controllers: NonNullPtr<Controllers>,
+
     code_segment: (u16, u16),
     #[serde(skip, default = "get_opcodes")]
     opcodes: OpCodes<M, P, A>,
@@ -134,6 +139,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Default for Cpu<M, P, A> {
             ppu_state: Default::default(),
             apu_state: Default::default(),
             mapper: Default::default(),
+            controllers: Default::default(),
             code_segment: (0, 0),
             interrupt: None,
             address: Address::Implicit,
@@ -159,6 +165,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
             ppu_state: Default::default(),
             apu_state: Default::default(),
             mapper: Default::default(),
+            controllers: Default::default(),
             code_segment: (0, 0),
             interrupt: None,
             address: Address::Implicit,
@@ -166,6 +173,20 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
             is_brk_or_irq_hijacked_by_nmi: false,
             oam_dma_in_progress: None,
         }
+    }
+    pub fn get_rambus(&mut self) -> RamBus<'_> {
+      unsafe {
+          RamBus {
+              apu: &mut *(self.apu_state.as_mut() as *mut A as *mut Apu),
+              ppu: &mut *(self.ppu_state.as_mut() as *mut P as *mut Ppu),
+              mapper: &mut *(self.mapper.as_mut() as *mut MapperEnum),
+              controllers: &mut *(self.controllers.as_mut() as *mut Controllers),
+          }
+      }
+  }
+
+    pub fn set_controllers(&mut self, controllers: NonNullPtr<Controllers>) {
+        self.controllers = controllers;
     }
 
     pub fn set_mapper(&mut self, mapper: NonNullPtr<MapperEnum>) {
@@ -186,7 +207,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
 
     pub fn power_cycle(&mut self) {
         self.pc = 0xC000;
-        self.pc = self.ram.as_ref().get_word(0xFFFC);
+        self.pc = self.ram.as_ref().get_word(0xFFFC,&mut self.get_rambus());
         self.sp = 0xFD;
         self.ps = 0x04;
         self.a = 0;
@@ -231,13 +252,13 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
 
     fn pop_byte(&mut self) -> u8 {
         self.sp = ((self.sp as u16 + 1) & 0xFF) as u8;
-        self.ram.as_ref().get_byte(self.sp as u16 + STACK_PAGE)
+        self.ram.as_ref().get_byte(self.sp as u16 + STACK_PAGE,&mut self.get_rambus())
     }
 
     fn push_byte(&mut self, val: u8) {
         self.ram
             .as_mut()
-            .store_byte(self.sp as u16 + STACK_PAGE, val);
+            .store_byte(self.sp as u16 + STACK_PAGE, val, &mut self.get_rambus());
         self.sp = ((self.sp as i16 - 1) & 0xFF) as u8;
     }
 
@@ -273,7 +294,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         let op = if let Some(op) = self.interrupt.take() {
             op
         } else {
-            self.ram.as_ref().get_byte(self.pc)
+            self.ram.as_ref().get_byte(self.pc,&mut self.get_rambus())
         };
 
         let (_, code_segment_end) = self.code_segment;
@@ -282,10 +303,10 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
             let mut operand_2 = 0;
 
             if self.pc < code_segment_end {
-                operand_1 = self.ram.as_ref().get_byte(self.pc + 1);
+                operand_1 = self.ram.as_ref().get_byte(self.pc + 1, &mut self.get_rambus());
             }
             if self.pc + 1 < code_segment_end {
-                operand_2 = self.ram.as_ref().get_byte(self.pc + 2);
+                operand_2 = self.ram.as_ref().get_byte(self.pc + 2, &mut self.get_rambus());
             }
 
             let (address, extra_cycles_from_page_crossing) = self
@@ -460,7 +481,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn get_address_and_extra_cycle_from_page_crossing(
-        &self,
+        &mut self,
         operand_1: u8,
         operand_2: u8,
         mode: AddressingMode,
@@ -474,6 +495,8 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         let zero_page_x_hi = (b0_u16 + x_u16 + 1) & 0xFF;
         let zero_page_y = (b0_u16 + y_u16) & 0xFF;
         let mut extra_cycle = 0;
+
+       // let mut ram_bus = self.get_rambus();
 
         let address = match mode {
             AddressingMode::Implicit => Address::Implicit,
@@ -500,15 +523,15 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
             }
             AddressingMode::IndexedIndirectX => {
                 let indexed_indirect = convert_2u8_to_u16(
-                    self.ram.as_ref().get_byte(zero_page_x),
-                    self.ram.as_ref().get_byte(zero_page_x_hi),
+                    self.ram.as_ref().get_byte(zero_page_x, &mut self.get_rambus()),
+                    self.ram.as_ref().get_byte(zero_page_x_hi, &mut self.get_rambus()),
                 );
                 Address::Ram(indexed_indirect)
             }
             AddressingMode::IndirectIndexedY => {
                 let indirect = convert_2u8_to_u16(
-                    self.ram.as_ref().get_byte(b0_u16),
-                    self.ram.as_ref().get_byte((b0_u16 + 1) & 0xFF),
+                    self.ram.as_ref().get_byte(b0_u16, &mut self.get_rambus()),
+                    self.ram.as_ref().get_byte((b0_u16 + 1) & 0xFF, &mut self.get_rambus()),
                 );
                 let indirect_indexed = (indirect as u32 + y_u16 as u32) as u16;
                 if extra_cycle_on_page_crossing && Self::is_page_crossed(indirect_indexed, indirect)
@@ -524,13 +547,13 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
             AddressingMode::Indirect => {
                 let indirect = if b0_u16 == 0xFF {
                     convert_2u8_to_u16(
-                        self.ram.as_ref().get_byte(b0_u16 + (b1_u16 << 8)),
-                        self.ram.as_ref().get_byte(b1_u16 << 8),
+                        self.ram.as_ref().get_byte(b0_u16 + (b1_u16 << 8), &mut self.get_rambus()),
+                        self.ram.as_ref().get_byte(b1_u16 << 8, &mut self.get_rambus()),
                     )
                 } else {
                     convert_2u8_to_u16(
-                        self.ram.as_ref().get_byte(b0_u16 + (b1_u16 << 8)),
-                        self.ram.as_ref().get_byte(b0_u16 + (b1_u16 << 8) + 1),
+                        self.ram.as_ref().get_byte(b0_u16 + (b1_u16 << 8), &mut self.get_rambus()),
+                        self.ram.as_ref().get_byte(b0_u16 + (b1_u16 << 8) + 1, &mut self.get_rambus()),
                     )
                 };
                 Address::Ram(indirect)
@@ -539,12 +562,12 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         (address, extra_cycle)
     }
 
-    fn load_from_address(&self) -> u8 {
+    fn load_from_address(&mut self) -> u8 {
         match &self.address {
             Address::Implicit => panic!("load_from_address can't be used for implicit mode"),
             Address::Accumulator => self.a,
             Address::Immediate(i) => *i,
-            Address::Ram(address) => self.ram.as_ref().get_byte(*address),
+            Address::Ram(address) => self.ram.as_ref().get_byte(*address, &mut self.get_rambus()),
             Address::Relative(_) => panic!("load_from_address can't be used for the Relative mode"),
         }
     }
@@ -561,7 +584,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
             Address::Implicit => panic!("store_to_address can't be used for implicit mode"),
             Address::Accumulator => self.a = byte,
             Address::Immediate(_) => panic!("Not possible to store in Immediate addressing"),
-            Address::Ram(address) => self.ram.as_mut().store_byte(*address, byte),
+            Address::Ram(address) => self.ram.as_mut().store_byte(*address, byte, &mut self.get_rambus()),
             Address::Relative(_) => panic!("store_to_address can't be used for the Relative mode"),
         }
     }
@@ -652,10 +675,10 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     fn nop(&mut self) {}
 
     fn update_pc_for_brk_or_irq(&mut self) {
-        let new_pc = if self.is_brk_or_irq_hijacked_by_nmi {
-            self.ram.as_ref().get_word(0xFFFA)
+      let new_pc = if self.is_brk_or_irq_hijacked_by_nmi {
+            self.ram.as_ref().get_word(0xFFFA, &mut self.get_rambus())
         } else {
-            self.ram.as_ref().get_word(0xFFFE)
+            self.ram.as_ref().get_word(0xFFFE,&mut self.get_rambus())
         };
         if new_pc > 0 {
             self.pc = new_pc - 1;
@@ -692,7 +715,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         ps |= ProcessorFlag::BFlagBit5 as u8;
         self.push_byte(ps);
         self.set_flag(ProcessorFlag::InterruptDisable);
-        self.pc = self.ram.as_ref().get_word(0xFFFA) - 1;
+        self.pc = self.ram.as_ref().get_word(0xFFFA,&mut self.get_rambus()) - 1;
     }
 
     fn jsr(&mut self) {

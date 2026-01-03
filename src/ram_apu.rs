@@ -41,4 +41,3 @@ pub trait ReadAccessRegisters {
     fn read(&mut self, register: ReadAccessRegister) -> u8;
 }
 
-pub trait ApuRegisterAccess: WriteAcessRegisters + ReadAccessRegisters {}

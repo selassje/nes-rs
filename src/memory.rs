@@ -1,14 +1,15 @@
 use crate::common;
 use crate::mappers::MapperEnum;
+use crate::nes::RamBus;
 
 use serde::{Deserialize, Serialize};
 pub trait Memory {
-    fn get_byte(&self, addr: u16) -> u8;
+    fn get_byte(&self, addr: u16, bus: &mut RamBus) -> u8;
 
-    fn store_byte(&mut self, addr: u16, byte: u8);
+    fn store_byte(&mut self, addr: u16, byte: u8, bus: &mut RamBus);
 
-    fn get_word(&self, addr: u16) -> u16 {
-        common::convert_2u8_to_u16(self.get_byte(addr), self.get_byte(addr + 1))
+    fn get_word(&self, addr: u16, bus: &mut RamBus) -> u16 {
+        common::convert_2u8_to_u16(self.get_byte(addr,bus), self.get_byte(addr + 1,bus))
     }
 }
 

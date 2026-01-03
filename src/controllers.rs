@@ -151,4 +151,3 @@ impl WriteOutputRegisters for Controllers {
     }
 }
 
-impl ControllerRegisterAccess for Controllers {}

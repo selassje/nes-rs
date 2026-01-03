@@ -899,7 +899,6 @@ impl WriteOamDma for Ppu {
     }
 }
 
-impl PpuRegisterAccess for Ppu {}
 
 impl ReadPpuRegisters for Ppu {
     fn read(&mut self, register: ReadAccessRegister, mapper: &mut MapperEnum) -> u8 {

@@ -1020,4 +1020,3 @@ impl ApuState for Apu {
     }
 }
 
-impl ApuRegisterAccess for Apu {}
