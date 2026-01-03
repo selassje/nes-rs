@@ -784,14 +784,20 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn nmi(&mut self, bus: &mut CpuBus) {
-        self.push_word(self.pc,bus);
-        let mut ps = self.ps;
-        ps &= !(ProcessorFlag::BFlagBit4 as u8);
-        ps |= ProcessorFlag::BFlagBit5 as u8;
-        self.push_byte(ps,bus);
-        self.set_flag(ProcessorFlag::InterruptDisable);
-        self.pc = self.ram.as_ref().get_word(0xFFFA, &mut self.get_rambus()) - 1;
-    }
+      self.push_word(self.pc, bus);
+      let mut ps = self.ps;
+      ps &= !(ProcessorFlag::BFlagBit4 as u8);
+      ps |= ProcessorFlag::BFlagBit5 as u8;
+      self.push_byte(ps, bus);
+      self.set_flag(ProcessorFlag::InterruptDisable);
+      let mut ram_bus = RamBus {
+          ppu: &mut bus.ppu,
+          apu: &mut bus.apu,
+          mapper: &mut bus.mapper,
+          controllers: &mut bus.controllers,
+      };
+      self.pc = bus.ram.get_word(0xFFFA, &mut ram_bus) - 1;
+  }
 
     fn jsr(&mut self, bus: &mut CpuBus) {
         self.push_word(self.pc + 2,bus);
@@ -978,7 +984,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn bit(&mut self, bus: &mut CpuBus) {
-        let m = self.load_from_address();
+        let m = self.load_from_address2(bus);
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a & m == 0);
         self.set_or_clear_flag(ProcessorFlag::OverflowFlag, m & (1 << 6) != 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & (1 << 7) != 0);
@@ -993,7 +999,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn cpx(&mut self, bus: &mut CpuBus) {
-        let m = self.load_from_address();
+        let m = self.load_from_address2(bus);
         let result = (self.x as i16 - m as i16) as u8;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.x == m);
         self.set_or_clear_flag(ProcessorFlag::CarryFlag, self.x >= m);
@@ -1001,7 +1007,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn cpy(&mut self, bus: &mut CpuBus) {
-        let m = self.load_from_address();
+        let m = self.load_from_address2(bus);
         let result = (self.y as i16 - m as i16) as u8;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.y == m);
         self.set_or_clear_flag(ProcessorFlag::CarryFlag, self.y >= m);
@@ -1019,7 +1025,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn dec(&mut self, bus: &mut CpuBus) {
-        let mut m = self.load_from_address();
+        let mut m = self.load_from_address2(bus);
         if m == 0 {
             m = 0xFF;
         } else {
