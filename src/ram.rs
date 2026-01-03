@@ -132,7 +132,7 @@ impl<P: PpuRegisterAccess, A: ApuRegisterAccess, C: ControllerRegisterAccess> Me
     fn get_byte(&self, address_org: u16) -> u8 {
         let addr = self.get_real_address(address_org);
         if let Ok(reg) = ReadAccessRegister::try_from(addr) {
-            let mut ppu_register_value = self.ppu_access.borrow_mut().as_mut().read(reg);
+            let mut ppu_register_value = self.ppu_access.borrow_mut().as_mut().read(reg, self.mapper.borrow_mut().as_mut());
             if reg == ReadAccessRegister::PpuStatus {
                 const LOW_5_BITS: u8 = 0b00011111;
                 ppu_register_value &= !LOW_5_BITS;
@@ -170,7 +170,7 @@ impl<P: PpuRegisterAccess, A: ApuRegisterAccess, C: ControllerRegisterAccess> Me
     fn store_byte(&mut self, address: u16, byte: u8) {
         let addr = self.get_real_address(address);
         if let Ok(reg) = WriteAccessRegister::try_from(addr) {
-            self.ppu_access.borrow_mut().as_mut().write(reg, byte);
+            self.ppu_access.borrow_mut().as_mut().write(reg, byte, self.mapper.borrow_mut().as_mut());
             *self.ppu_register_latch.borrow_mut() = byte;
         } else if DmaWriteAccessRegister::try_from(addr).is_ok() {
             let mut dma_data = [0; 256];

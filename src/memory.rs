@@ -1,4 +1,5 @@
 use crate::common;
+use crate::mappers::MapperEnum;
 
 use serde::{Deserialize, Serialize};
 pub trait Memory {
@@ -41,22 +42,26 @@ impl<const N: usize> Default for MemoryImpl<N> {
     }
 }
 
-pub trait VideoMemory: Memory {
-    fn get_nametable_tile_index(&self, table_index: u8, tile_x: u8, tile_y: u8) -> u8;
+pub trait VideoMemory {
+  fn get_byte(&self, addr: u16, mapper: &mut MapperEnum) -> u8;
 
-    fn get_pattern_table_tile_data(&self, table_index: u8, tile_index: u8) -> [u8; 16];
+  fn store_byte(&mut self, addr: u16, byte: u8, mapper: &mut MapperEnum);
 
-    fn get_universal_background_color(&self) -> u8;
+  fn get_nametable_tile_index(&self, table_index: u8, tile_x: u8, tile_y: u8,mapper: &mut MapperEnum) -> u8;
 
-    fn get_background_palette(&self, palette_index: u8) -> [u8; 3];
+  fn get_pattern_table_tile_data(&self, table_index: u8, tile_index: u8,mapper: &mut MapperEnum) -> [u8; 16];
 
-    fn get_attribute_data(&self, table_index: u8, color_tile_x: u8, color_tile_y: u8) -> u8;
+  fn get_universal_background_color(&self,mapper: &mut MapperEnum) -> u8;
 
-    fn get_low_pattern_data(&self, table_index: u8, tile_index: u8, y: u8) -> u8;
+  fn get_background_palette(&self, palette_index: u8, mapper: &mut MapperEnum) -> [u8; 3];
 
-    fn get_high_pattern_data(&self, table_index: u8, tile_index: u8, y: u8) -> u8;
+  fn get_attribute_data(&self, table_index: u8, color_tile_x: u8, color_tile_y: u8, mapper: &mut MapperEnum) -> u8;
 
-    fn get_sprite_palette(&self, palette_index: u8) -> [u8; 3];
+  fn get_low_pattern_data(&self, table_index: u8, tile_index: u8, y: u8, mapper: &mut MapperEnum) -> u8;
+
+  fn get_high_pattern_data(&self, table_index: u8, tile_index: u8, y: u8, mapper: &mut MapperEnum) -> u8;
+
+  fn get_sprite_palette(&self, palette_index: u8,mapper: &mut MapperEnum) -> [u8; 3];
 }
 
 pub trait DmcMemory {

@@ -31,9 +31,13 @@ fn default_controller_access() -> Rc<RefCell<dyn ControllerAccess>> {
     Rc::new(RefCell::new(crate::io::DummyIOImpl::new()))
 }
 
-type Ppu = crate::ppu::Ppu<VRam>;
+type Ppu = crate::ppu::Ppu;
 pub type Ram = crate::ram::Ram<Ppu, Apu, Controllers>;
 type Cpu = crate::cpu::Cpu<Ram, Ppu, Apu>;
+
+pub struct PpuBus<'a> {
+    pub mapper: &'a mut MapperEnum,
+}
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesInternal {
@@ -87,7 +91,6 @@ impl NesInternal {
             let ram = NonNullPtr::from(&pinned_nes.ram);
             let ppu = NonNullPtr::from(&pinned_nes.ppu);
             let apu = NonNullPtr::from(&pinned_nes.apu);
-            let vram = NonNullPtr::from(&pinned_nes.vram);
             let controllers = NonNullPtr::from(&pinned_nes.controllers);
             let mapper = NonNullPtr::from(&pinned_nes.mapper);
 
@@ -101,10 +104,7 @@ impl NesInternal {
             nes.ram.set_ppu_access(ppu);
             nes.ram.set_apu_access(apu);
             nes.ram.set_mapper(mapper);
-            nes.vram.set_mapper(mapper);
             nes.apu.set_dmc_memory(ram);
-            nes.ppu.set_vram(vram);
-            nes.ppu.set_mapper(mapper);
 
             nes.set_controller(ControllerId::Controller1, ControllerType::StdNesController);
             nes.set_controller(ControllerId::Controller2, ControllerType::StdNesController);
@@ -154,12 +154,9 @@ impl NesInternal {
 
         let mapper = NonNullPtr::from(&self.mapper);
 
-        self.vram.set_mapper(mapper);
-        self.ppu.set_mapper(mapper);
         self.ram.set_mapper(mapper);
         self.cpu.set_mapper(mapper);
 
-        self.ppu.set_vram(NonNullPtr::from(&self.vram));
         self.ppu.set_video_access(video_access.clone());
 
         self.apu.set_audio_access(audio_access.clone());
@@ -216,8 +213,10 @@ impl NesInternal {
 
     fn run_single_cpu_cycle(&mut self) {
         self.cpu.maybe_fetch_next_instruction();
-
-        self.ppu.run_single_cpu_cycle();
+        let mut ppu_bus = PpuBus {
+          mapper: &mut self.mapper,
+      };
+        self.ppu.run_single_cpu_cycle(&mut ppu_bus);
 
         self.apu.run_single_cpu_cycle();
 

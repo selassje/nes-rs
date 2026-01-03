@@ -1,4 +1,5 @@
 use std::convert::TryFrom;
+use crate::mappers::MapperEnum;
 
 #[derive(Copy, Clone, Debug, TryFromPrimitive)]
 #[TryFromPrimitiveType = "u16"]
@@ -27,11 +28,11 @@ pub enum ReadAccessRegister {
 }
 
 pub trait WritePpuRegisters {
-    fn write(&mut self, register: WriteAccessRegister, value: u8);
+    fn write(&mut self, register: WriteAccessRegister, value: u8, mapper: &mut MapperEnum);
 }
 
 pub trait ReadPpuRegisters {
-    fn read(&mut self, register: ReadAccessRegister) -> u8;
+    fn read(&mut self, register: ReadAccessRegister, mapper: &mut MapperEnum) -> u8;
 }
 
 pub trait WriteOamDma {
