@@ -208,7 +208,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
 
     pub fn power_cycle(&mut self, bus: &mut CpuBus) {
         self.pc = 0xC000;
-        self.pc = self.ram.as_ref().get_word(0xFFFC,&mut self.get_rambus());
+        self.pc = bus.ram.get_word(0xFFFC, &mut self.get_rambus());
         self.sp = 0xFD;
         self.ps = 0x04;
         self.a = 0;
@@ -273,9 +273,9 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         let high_byte = self.pop_byte();
         convert_2u8_to_u16(low_byte, high_byte)
     }
-    pub fn maybe_fetch_next_instruction(&mut self,  _bus: &mut CpuBus) {
+    pub fn maybe_fetch_next_instruction(&mut self,  bus: &mut CpuBus) {
         if self.instruction.is_none() {
-            self.fetch_next_instruction();
+            self.fetch_next_instruction(bus);
         }
     }
 
@@ -290,86 +290,93 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         }
     }
 
-    fn fetch_next_instruction(&mut self) {
-        let ppu_time = self.get_rambus().ppu.get_time();
-        let op = if let Some(op) = self.interrupt.take() {
-            op
-        } else {
-            self.ram.as_ref().get_byte(self.pc,&mut self.get_rambus())
-        };
+    fn fetch_next_instruction(&mut self, bus: &mut CpuBus) {
+      let ppu_time = bus.ppu.get_time();
+      let mut ram_bus = RamBus {
+          ppu: &mut bus.ppu,
+          apu: &mut bus.apu,
+          mapper: &mut bus.mapper,
+          controllers: &mut bus.controllers,
+      };
+      let op = if let Some(op) = self.interrupt.take() {
+          op
+      } else {
+          bus.ram.get_byte(self.pc, &mut ram_bus)
+      };
 
-        let (_, code_segment_end) = self.code_segment;
-        if let Some(opcode) = self.opcodes[op as usize] {
-            let mut operand_1 = 0;
-            let mut operand_2 = 0;
+      let (_, code_segment_end) = self.code_segment;
+      if let Some(opcode) = self.opcodes[op as usize] {
+          let mut operand_1 = 0;
+          let mut operand_2 = 0;
 
-            if self.pc < code_segment_end {
-                operand_1 = self.ram.as_ref().get_byte(self.pc + 1, &mut self.get_rambus());
-            }
-            if self.pc + 1 < code_segment_end {
-                operand_2 = self.ram.as_ref().get_byte(self.pc + 2, &mut self.get_rambus());
-            }
+          if self.pc < code_segment_end {
+              operand_1 = bus.ram.get_byte(self.pc + 1, &mut ram_bus);
+          }
+          if self.pc + 1 < code_segment_end {
+              operand_2 = bus.ram.get_byte(self.pc + 2, &mut ram_bus);
+          }
 
-            let (address, extra_cycles_from_page_crossing) = self
-                .get_address_and_extra_cycle_from_page_crossing(
-                    operand_1,
-                    operand_2,
-                    opcode.mode,
-                    opcode.extra_cycle_on_page_crossing,
-                );
-            self.address = address;
+          let (address, extra_cycles_from_page_crossing) = self
+              .get_address_and_extra_cycle_from_page_crossing(
+                  operand_1,
+                  operand_2,
+                  opcode.mode,
+                  opcode.extra_cycle_on_page_crossing,
+                  bus,
+              );
+          self.address = address;
 
-            let extra_cycles_from_branching =
-                self.get_extra_cycles_from_branching(opcode.instruction as usize);
+          let extra_cycles_from_branching =
+              self.get_extra_cycles_from_branching(opcode.instruction as usize);
 
-            let extra_cycles_from_oam_dma = self.get_extra_cycles_from_oam_dma();
-            if extra_cycles_from_oam_dma != 0 {
-                self.oam_dma_in_progress = Some(
-                    opcode.base_cycles as u16
-                        + extra_cycles_from_page_crossing
-                        + extra_cycles_from_branching,
-                )
-            } else {
-                self.oam_dma_in_progress = None;
-            }
+          let extra_cycles_from_oam_dma = self.get_extra_cycles_from_oam_dma();
+          if extra_cycles_from_oam_dma != 0 {
+              self.oam_dma_in_progress = Some(
+                  opcode.base_cycles as u16
+                      + extra_cycles_from_page_crossing
+                      + extra_cycles_from_branching,
+              )
+          } else {
+              self.oam_dma_in_progress = None;
+          }
 
-            let total_cycles = opcode.base_cycles as u16
-                + extra_cycles_from_page_crossing
-                + extra_cycles_from_branching
-                + extra_cycles_from_oam_dma;
+          let total_cycles = opcode.base_cycles as u16
+              + extra_cycles_from_page_crossing
+              + extra_cycles_from_branching
+              + extra_cycles_from_oam_dma;
 
-            self.instruction = Some(Instruction {
-                opcode: op,
-                total_cycles,
-                cycle: 0,
-                bytes: opcode.mode.get_bytes(),
-            });
+          self.instruction = Some(Instruction {
+              opcode: op,
+              total_cycles,
+              cycle: 0,
+              bytes: opcode.mode.get_bytes(),
+          });
 
-            if false {
-                println!(
-                    "{:04X} {:02X} {:02X} {:02X} \t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CYC:{:<3} SL:{:<3} FC:{} CPU Cycle:{}",
-                    self.pc,
-                    op,
-                    operand_1,
-                    operand_2,
-                    self.a,
-                    self.x,
-                    self.y,
-                    self.ps,
-                    self.sp,
-                    ppu_time.cycle,
-                    ppu_time.scanline,
-                    ppu_time.frame,
-                    self.cycle,
-                );
-            }
-            if opcode.instruction as usize == Self::rti as usize {
-                self.rti_restore_ps();
-            }
-        } else {
-            panic!("Unknown instruction {:#04x} at {:#X} ", op, self.pc);
-        }
-    }
+          if false {
+              println!(
+                  "{:04X} {:02X} {:02X} {:02X} \t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CYC:{:<3} SL:{:<3} FC:{} CPU Cycle:{}",
+                  self.pc,
+                  op,
+                  operand_1,
+                  operand_2,
+                  self.a,
+                  self.x,
+                  self.y,
+                  self.ps,
+                  self.sp,
+                  ppu_time.cycle,
+                  ppu_time.scanline,
+                  ppu_time.frame,
+                  self.cycle,
+              );
+          }
+          if opcode.instruction as usize == Self::rti as usize {
+              self.rti_restore_ps(bus);
+          }
+      } else {
+          panic!("Unknown instruction {:#04x} at {:#X} ", op, self.pc);
+      }
+  }
 
     pub fn run_single_cycle(&mut self, bus: &mut CpuBus) {
         self.instruction.as_mut().unwrap().cycle += 1;
@@ -482,86 +489,92 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn get_address_and_extra_cycle_from_page_crossing(
-        &mut self,
-        operand_1: u8,
-        operand_2: u8,
-        mode: AddressingMode,
-        extra_cycle_on_page_crossing: bool,
-    ) -> (Address, u16) {
-        let b0_u16 = operand_1 as u16;
-        let b1_u16 = operand_2 as u16;
-        let x_u16 = self.x as u16;
-        let y_u16 = self.y as u16;
-        let zero_page_x = (b0_u16 + x_u16) & 0xFF;
-        let zero_page_x_hi = (b0_u16 + x_u16 + 1) & 0xFF;
-        let zero_page_y = (b0_u16 + y_u16) & 0xFF;
-        let mut extra_cycle = 0;
+      &self,
+      operand_1: u8,
+      operand_2: u8,
+      mode: AddressingMode,
+      extra_cycle_on_page_crossing: bool,
+      bus: &mut CpuBus,
+  ) -> (Address, u16) {
+      let mut ram_bus = RamBus {
+          ppu: &mut bus.ppu,
+          apu: &mut bus.apu,
+          mapper: &mut bus.mapper,
+          controllers: &mut bus.controllers,
+      };
 
-       // let mut ram_bus = self.get_rambus();
+      let b0_u16 = operand_1 as u16;
+      let b1_u16 = operand_2 as u16;
+      let x_u16 = self.x as u16;
+      let y_u16 = self.y as u16;
+      let zero_page_x = (b0_u16 + x_u16) & 0xFF;
+      let zero_page_x_hi = (b0_u16 + x_u16 + 1) & 0xFF;
+      let zero_page_y = (b0_u16 + y_u16) & 0xFF;
+      let mut extra_cycle = 0;
 
-        let address = match mode {
-            AddressingMode::Implicit => Address::Implicit,
-            AddressingMode::Accumulator => Address::Accumulator,
-            AddressingMode::Immediate => Address::Immediate(operand_1),
-            AddressingMode::ZeroPage => Address::Ram(b0_u16),
-            AddressingMode::ZeroPageX => Address::Ram(zero_page_x),
-            AddressingMode::ZeroPageY => Address::Ram(zero_page_y),
-            AddressingMode::Absolute => Address::Ram(convert_2u8_to_u16(operand_1, operand_2)),
+      let address = match mode {
+          AddressingMode::Implicit => Address::Implicit,
+          AddressingMode::Accumulator => Address::Accumulator,
+          AddressingMode::Immediate => Address::Immediate(operand_1),
+          AddressingMode::ZeroPage => Address::Ram(b0_u16),
+          AddressingMode::ZeroPageX => Address::Ram(zero_page_x),
+          AddressingMode::ZeroPageY => Address::Ram(zero_page_y),
+          AddressingMode::Absolute => Address::Ram(convert_2u8_to_u16(operand_1, operand_2)),
 
-            AddressingMode::AbsoluteX => {
-                if extra_cycle_on_page_crossing && b0_u16 + x_u16 > 0xFF {
-                    extra_cycle = 1
-                }
-                let address = b0_u16 as u32 + x_u16 as u32 + (b1_u16 << 8) as u32;
-                Address::Ram(address as u16)
-            }
-            AddressingMode::AbsoluteY => {
-                if extra_cycle_on_page_crossing && b0_u16 + y_u16 > 0xFF {
-                    extra_cycle = 1
-                }
-                let address = b0_u16 as u32 + y_u16 as u32 + (b1_u16 << 8) as u32;
-                Address::Ram(address as u16)
-            }
-            AddressingMode::IndexedIndirectX => {
-                let indexed_indirect = convert_2u8_to_u16(
-                    self.ram.as_ref().get_byte(zero_page_x, &mut self.get_rambus()),
-                    self.ram.as_ref().get_byte(zero_page_x_hi, &mut self.get_rambus()),
-                );
-                Address::Ram(indexed_indirect)
-            }
-            AddressingMode::IndirectIndexedY => {
-                let indirect = convert_2u8_to_u16(
-                    self.ram.as_ref().get_byte(b0_u16, &mut self.get_rambus()),
-                    self.ram.as_ref().get_byte((b0_u16 + 1) & 0xFF, &mut self.get_rambus()),
-                );
-                let indirect_indexed = (indirect as u32 + y_u16 as u32) as u16;
-                if extra_cycle_on_page_crossing && Self::is_page_crossed(indirect_indexed, indirect)
-                {
-                    extra_cycle = 1;
-                }
-                Address::Ram(indirect_indexed)
-            }
-            AddressingMode::Relative => {
-                let new_pc = (self.pc as i16 + (operand_1 as i8 as i16)) as u16;
-                Address::Relative(new_pc)
-            }
-            AddressingMode::Indirect => {
-                let indirect = if b0_u16 == 0xFF {
-                    convert_2u8_to_u16(
-                        self.ram.as_ref().get_byte(b0_u16 + (b1_u16 << 8), &mut self.get_rambus()),
-                        self.ram.as_ref().get_byte(b1_u16 << 8, &mut self.get_rambus()),
-                    )
-                } else {
-                    convert_2u8_to_u16(
-                        self.ram.as_ref().get_byte(b0_u16 + (b1_u16 << 8), &mut self.get_rambus()),
-                        self.ram.as_ref().get_byte(b0_u16 + (b1_u16 << 8) + 1, &mut self.get_rambus()),
-                    )
-                };
-                Address::Ram(indirect)
-            }
-        };
-        (address, extra_cycle)
-    }
+          AddressingMode::AbsoluteX => {
+              if extra_cycle_on_page_crossing && b0_u16 + x_u16 > 0xFF {
+                  extra_cycle = 1
+              }
+              let address = b0_u16 as u32 + x_u16 as u32 + (b1_u16 << 8) as u32;
+              Address::Ram(address as u16)
+          }
+          AddressingMode::AbsoluteY => {
+              if extra_cycle_on_page_crossing && b0_u16 + y_u16 > 0xFF {
+                  extra_cycle = 1
+              }
+              let address = b0_u16 as u32 + y_u16 as u32 + (b1_u16 << 8) as u32;
+              Address::Ram(address as u16)
+          }
+          AddressingMode::IndexedIndirectX => {
+              let indexed_indirect = convert_2u8_to_u16(
+                  bus.ram.get_byte(zero_page_x, &mut ram_bus),
+                  bus.ram.get_byte(zero_page_x_hi, &mut ram_bus),
+              );
+              Address::Ram(indexed_indirect)
+          }
+          AddressingMode::IndirectIndexedY => {
+              let indirect = convert_2u8_to_u16(
+                  bus.ram.get_byte(b0_u16, &mut ram_bus),
+                  bus.ram.get_byte((b0_u16 + 1) & 0xFF, &mut ram_bus),
+              );
+              let indirect_indexed = (indirect as u32 + y_u16 as u32) as u16;
+              if extra_cycle_on_page_crossing && Self::is_page_crossed(indirect_indexed, indirect)
+              {
+                  extra_cycle = 1;
+              }
+              Address::Ram(indirect_indexed)
+          }
+          AddressingMode::Relative => {
+              let new_pc = (self.pc as i16 + (operand_1 as i8 as i16)) as u16;
+              Address::Relative(new_pc)
+          }
+          AddressingMode::Indirect => {
+              let indirect = if b0_u16 == 0xFF {
+                  convert_2u8_to_u16(
+                      bus.ram.get_byte(b0_u16 + (b1_u16 << 8), &mut ram_bus),
+                      bus.ram.get_byte(b1_u16 << 8, &mut ram_bus),
+                  )
+              } else {
+                  convert_2u8_to_u16(
+                      bus.ram.get_byte(b0_u16 + (b1_u16 << 8), &mut ram_bus),
+                      bus.ram.get_byte(b0_u16 + (b1_u16 << 8) + 1, &mut ram_bus),
+                  )
+              };
+              Address::Ram(indirect)
+          }
+      };
+      (address, extra_cycle)
+  }
 
     fn load_from_address(&mut self) -> u8 {
         match &self.address {
@@ -728,7 +741,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.pc = self.pop_word();
     }
 
-    fn rti_restore_ps(&mut self) {
+    fn rti_restore_ps(&mut self, bus: &mut CpuBus) {
         let b_flag_mask = ProcessorFlag::BFlagBit4 as u8 | ProcessorFlag::BFlagBit5 as u8;
         let b_flag_bits = self.ps & b_flag_mask;
         self.ps = self.pop_byte();

@@ -57,6 +57,17 @@ pub struct RamBus<'a> {
     pub controllers: &'a mut Controllers,
 }
 
+impl CpuBus<'_> {
+  pub fn get_ram_bus(&mut self) -> RamBus<'_> {
+      RamBus {
+          apu: self.apu,
+          ppu: self.ppu,
+          mapper: self.mapper,
+          controllers: self.controllers,
+      }
+  }
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct NesInternal {
     version: String,
