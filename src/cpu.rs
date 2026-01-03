@@ -279,16 +279,16 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         }
     }
 
-    fn check_for_interrupts(&mut self) {
-        if self.get_rambus().ppu.check_for_nmi_pending() {
-            self.get_rambus().ppu.clear_nmi_pending();
-            self.interrupt = Some(NMI_OPCODE as u8);
-        } else if !self.get_flag(ProcessorFlag::InterruptDisable)
-            && (self.get_rambus().mapper.is_irq_pending() || self.apu_state.as_ref().is_irq_pending())
-        {
-            self.interrupt = Some(IRQ_OPCODE as u8)
-        }
-    }
+    fn check_for_interrupts(&mut self, bus: &mut CpuBus) {
+      if bus.ppu.check_for_nmi_pending() {
+          bus.ppu.clear_nmi_pending();
+          self.interrupt = Some(NMI_OPCODE as u8);
+      } else if !self.get_flag(ProcessorFlag::InterruptDisable)
+          && (bus.mapper.is_irq_pending() || bus.apu.is_irq_pending())
+      {
+          self.interrupt = Some(IRQ_OPCODE as u8)
+      }
+  }
 
     fn fetch_next_instruction(&mut self, bus: &mut CpuBus) {
       let ppu_time = bus.ppu.get_time();
@@ -378,44 +378,44 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
       }
   }
 
-    pub fn run_single_cycle(&mut self, bus: &mut CpuBus) {
-        self.instruction.as_mut().unwrap().cycle += 1;
-        let instruction = self.instruction.unwrap();
-        let ins_fun = self.opcodes[instruction.opcode as usize]
-            .unwrap()
-            .instruction;
-        let is_brk_or_irq_executing =
-            ins_fun as usize == Self::brk as usize || ins_fun as usize == Self::irq as usize;
-        let is_nmi_executing = ins_fun as usize == Self::nmi as usize;
-        let is_branching_executing = self.is_current_instruction_branching();
-        if instruction.cycle == instruction.total_cycles {
-            (ins_fun)(self);
-            self.pc = ((self.pc as u32 + instruction.bytes as u32) % u16::MAX as u32) as u16;
-            let cycles_left = u128::MAX - self.cycle;
-            if cycles_left < instruction.total_cycles as u128 {
-                self.cycle = instruction.total_cycles as u128 - cycles_left;
-            } else {
-                self.cycle += instruction.total_cycles as u128;
-            }
-            self.instruction = None;
-        } else if is_brk_or_irq_executing {
-            if self.get_rambus().ppu.check_for_nmi_pending() && instruction.cycle <= 4 {
-                self.is_brk_or_irq_hijacked_by_nmi = true;
-                self.get_rambus().ppu.clear_nmi_pending()
-            }
-        } else if is_branching_executing {
-            if instruction.cycle == 1 || (instruction.cycle == 3 && instruction.total_cycles == 4) {
-                self.check_for_interrupts();
-            }
-        } else if !is_nmi_executing
-            && ((self.oam_dma_in_progress.is_some()
-                && instruction.cycle == self.oam_dma_in_progress.unwrap() - 1)
-                || (self.oam_dma_in_progress.is_none()
-                    && instruction.cycle == instruction.total_cycles - 1))
-        {
-            self.check_for_interrupts()
+  pub fn run_single_cycle(&mut self, bus: &mut CpuBus) {
+    self.instruction.as_mut().unwrap().cycle += 1;
+    let instruction = self.instruction.unwrap();
+    let ins_fun = self.opcodes[instruction.opcode as usize]
+        .unwrap()
+        .instruction;
+    let is_brk_or_irq_executing =
+        ins_fun as usize == Self::brk as usize || ins_fun as usize == Self::irq as usize;
+    let is_nmi_executing = ins_fun as usize == Self::nmi as usize;
+    let is_branching_executing = self.is_current_instruction_branching();
+    if instruction.cycle == instruction.total_cycles {
+        (ins_fun)(self);
+        self.pc = ((self.pc as u32 + instruction.bytes as u32) % u16::MAX as u32) as u16;
+        let cycles_left = u128::MAX - self.cycle;
+        if cycles_left < instruction.total_cycles as u128 {
+            self.cycle = instruction.total_cycles as u128 - cycles_left;
+        } else {
+            self.cycle += instruction.total_cycles as u128;
         }
+        self.instruction = None;
+    } else if is_brk_or_irq_executing {
+        if bus.ppu.check_for_nmi_pending() && instruction.cycle <= 4 {
+            self.is_brk_or_irq_hijacked_by_nmi = true;
+            bus.ppu.clear_nmi_pending()
+        }
+    } else if is_branching_executing {
+        if instruction.cycle == 1 || (instruction.cycle == 3 && instruction.total_cycles == 4) {
+            self.check_for_interrupts(bus);
+        }
+    } else if !is_nmi_executing
+        && ((self.oam_dma_in_progress.is_some()
+            && instruction.cycle == self.oam_dma_in_progress.unwrap() - 1)
+            || (self.oam_dma_in_progress.is_none()
+                && instruction.cycle == instruction.total_cycles - 1))
+    {
+        self.check_for_interrupts(bus)
     }
+}
 
     fn get_extra_cycles_from_oam_dma(&mut self) -> u16 {
         let mut extra_cycles = 0;
