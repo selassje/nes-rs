@@ -687,7 +687,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         self.set_or_clear_flag(ProcessorFlag::CarryFlag, old_bit_7 != 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
-        self.store_to_address(m);
+        self.store_to_address2(m,bus);
     }
 
     fn and(&mut self, bus: &mut CpuBus) {
@@ -715,7 +715,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         let mut m = self.load_from_address2(bus);
         let old_bit_0 = m & 0x1;
         m = m >> 1 | (self.carry() << 7);
-        self.store_to_address(m);
+        self.store_to_address2(m,bus);
         self.set_or_clear_flag(ProcessorFlag::CarryFlag, old_bit_0 == 1);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
@@ -725,7 +725,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         let mut m = self.load_from_address2(bus);
         let old_bit_7 = m & 0x80;
         m = m << 1 | self.carry();
-        self.store_to_address(m);
+        self.store_to_address2(m,bus);
         self.set_or_clear_flag(ProcessorFlag::CarryFlag, old_bit_7 != 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
@@ -735,7 +735,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         let mut m = self.load_from_address2(bus);
         let old_bit_0 = m & 1;
         m >>= 1;
-        self.store_to_address(m);
+        self.store_to_address2(m,bus);
         self.set_or_clear_flag(ProcessorFlag::CarryFlag, old_bit_0 == 1);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
@@ -846,33 +846,33 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn lda(&mut self, bus: &mut CpuBus) {
-        self.a = self.load_from_address();
+        self.a = self.load_from_address2(bus);
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
     }
 
     fn ldx(&mut self, bus: &mut CpuBus) {
-        self.x = self.load_from_address();
+        self.x = self.load_from_address2(bus);
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.x == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.x & 0x80 != 0);
     }
 
     fn ldy(&mut self, bus: &mut CpuBus) {
-        self.y = self.load_from_address();
+        self.y = self.load_from_address2(bus);
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.y == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.y & 0x80 != 0);
     }
 
     fn sta(&mut self, bus: &mut CpuBus) {
-        self.store_to_address(self.a);
+        self.store_to_address2(self.a, bus);
     }
 
     fn sty(&mut self, bus: &mut CpuBus) {
-        self.store_to_address(self.y);
+        self.store_to_address2(self.y,bus);
     }
 
     fn stx(&mut self, bus: &mut CpuBus) {
-        self.store_to_address(self.x);
+        self.store_to_address2(self.x,bus);
     }
 
     fn txs(&mut self, bus: &mut CpuBus) {
@@ -991,7 +991,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn cmp(&mut self, bus: &mut CpuBus) {
-        let m = self.load_from_address();
+        let m = self.load_from_address2(bus);
         let result = (self.a as i16 - m as i16) as u8;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == m);
         self.set_or_clear_flag(ProcessorFlag::CarryFlag, self.a >= m);
@@ -1033,7 +1033,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
         }
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
-        self.store_to_address(m);
+        self.store_to_address2(m,bus);
     }
 
     fn dex(&mut self, bus: &mut CpuBus) {
@@ -1072,12 +1072,12 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn inc(&mut self, bus: &mut CpuBus) {
-        let mut m = self.load_from_address();
+        let mut m = self.load_from_address2(bus);
         let result = m as u16 + 1;
         m = (result & 0xFF) as u8;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
-        self.store_to_address(m);
+        self.store_to_address2(m,bus);
     }
 
     fn inx(&mut self, bus: &mut CpuBus) {
@@ -1107,7 +1107,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
     }
 
     fn lax(&mut self, bus: &mut CpuBus) {
-        let m = self.load_from_address();
+        let m = self.load_from_address2(bus);
         self.a = m;
         self.x = m;
         self.set_or_clear_flag(ProcessorFlag::ZeroFlag, m == 0);
@@ -1116,7 +1116,7 @@ impl<M: Memory, P: PpuState, A: ApuState> Cpu<M, P, A> {
 
     fn aax(&mut self, bus: &mut CpuBus) {
         let result = self.a & self.x;
-        self.store_to_address(result);
+        self.store_to_address2(result,bus);
     }
 
     fn alr(&mut self, bus: &mut CpuBus) {
