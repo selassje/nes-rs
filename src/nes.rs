@@ -1,6 +1,6 @@
 use crate::apu::Apu;
 use crate::common;
-use crate::common::CPU_CYCLES_PER_FRAME;
+use crate::common::*;
 use crate::controllers::ControllerId;
 use crate::controllers::ControllerType;
 use crate::controllers::Controllers;
@@ -69,21 +69,21 @@ pub struct RamBus<'a> {
     pub controllers: &'a mut Controllers,
 }
 
+const FRAME_SIZE: usize = FRAME_HEIGHT * FRAME_WIDTH * PIXEL_SIZE;
 
 pub struct EmulationFrame {
-    pub video: [(u8,u8,u8); common::FRAME_WIDTH as usize * common::FRAME_HEIGHT as usize],
-    pub audio: [f32; CPU_CYCLES_PER_FRAME as usize],
+    pub video: Box<[u8; FRAME_SIZE]>,
+    //    pub audio: [f32; CPU_CYCLES_PER_FRAME as usize],
 }
 
 impl Default for EmulationFrame {
     fn default() -> Self {
         Self {
-            video: [(0,0,0); common::FRAME_WIDTH as usize * common::FRAME_HEIGHT as usize],
-            audio: [0.0; CPU_CYCLES_PER_FRAME as usize],
+            video: Box::new([0; FRAME_SIZE]),
+            //   audio: [0.0; CPU_CYCLES_PER_FRAME as usize],
         }
     }
 }
-
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Nes {
@@ -94,7 +94,7 @@ pub struct Nes {
     apu: Apu,
     controllers: Controllers,
     mapper: MapperEnum,
-    #[serde(skip,default)]
+    #[serde(skip, default)]
     emulation_frame: EmulationFrame,
     #[serde(skip, default = "default_video_access")]
     video_access: Rc<RefCell<dyn VideoAccess>>,
@@ -155,7 +155,7 @@ impl Nes {
 
     pub fn get_emulation_frame(&self) -> &EmulationFrame {
         &self.emulation_frame
-    }    
+    }
 
     pub fn deserialize(&mut self, state: Vec<u8>) {
         let (decompressed, checksum) =

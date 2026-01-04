@@ -18,7 +18,7 @@ mod cpu;
 mod io;
 mod mappers;
 mod memory;
-mod nes;
+pub mod nes;
 mod nes_file;
 mod ppu;
 mod ram;
@@ -115,7 +115,10 @@ impl emscripten_main_loop::MainLoop for Emulation {
                 .get_controller_type(controllers::ControllerId::Controller2),
         ];
 
-        self.io_state = self.io.borrow_mut().present_frame(self.io_control.clone());
+        self.io_state = self
+            .io
+            .borrow_mut()
+            .present_frame(self.io_control.clone(), self.nes.get_emulation_frame());
 
         handle_io_state(&mut self.nes, &self.io_state, &mut self.io_control);
 

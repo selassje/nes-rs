@@ -8,7 +8,9 @@ use std::{borrow::BorrowMut, collections::HashMap};
 use self::gui::VideoSizeControl;
 
 use super::io_internal;
-use crate::io::FRAME_WIDTH;
+use crate::common::FRAME_WIDTH;
+use crate::common::FRAME_HEIGHT;
+use crate::nes::EmulationFrame;
 use crate::{controllers, io};
 
 use gl::types::*;
@@ -140,7 +142,7 @@ impl IOSdl2ImGuiOpenGl {
         unsafe {
             gl::GenTextures(1, &mut emulation_texture);
             gl::BindTexture(gl::TEXTURE_2D, emulation_texture);
-            gl::PixelStorei(gl::UNPACK_ROW_LENGTH, io::FRAME_WIDTH as _);
+            gl::PixelStorei(gl::UNPACK_ROW_LENGTH, FRAME_WIDTH as _);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
         }
@@ -333,7 +335,7 @@ impl IOSdl2ImGuiOpenGl {
 }
 
 impl io::IO for IOSdl2ImGuiOpenGl {
-    fn present_frame(&mut self, control: io::IOControl) -> io::IOState {
+    fn present_frame(&mut self, control: io::IOControl, emulation_frame : &EmulationFrame) -> io::IOState {
         if self.frame == u128::MAX {
             self.frame = 0;
         } else {
@@ -417,12 +419,12 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 gl::TEXTURE_2D,
                 0,
                 gl::RGB8 as _,
-                io::FRAME_WIDTH as _,
-                io::FRAME_HEIGHT as _,
+                FRAME_WIDTH as _,
+                FRAME_HEIGHT as _,
                 0,
                 gl::RGB,
                 gl::UNSIGNED_BYTE,
-                self.io_internal.get_pixels_slice().as_ptr() as _,
+                emulation_frame.video.as_ref().as_ptr() as _,
             );
         };
         self.imgui_sdl2.prepare_frame(

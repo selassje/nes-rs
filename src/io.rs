@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use crate::controllers;
+use crate::nes::EmulationFrame;
 
 mod io_internal;
 pub mod io_sdl2_imgui_opengl;
@@ -8,7 +9,6 @@ pub mod io_test;
 
 pub type AudioSampleFormat = f32;
 pub type RgbColor = (u8, u8, u8);
-const PIXEL_SIZE: usize = std::mem::size_of::<RgbColor>();
 
 #[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
 pub enum Button {
@@ -159,7 +159,7 @@ impl ControllerAccess for DummyControllerAccessImplementation {
 }
 
 pub trait IO: VideoAccess + AudioAccess + ControllerAccess {
-    fn present_frame(&mut self, control: IOControl) -> IOState;
+    fn present_frame(&mut self, control: IOControl, emulation_frame: &EmulationFrame) -> IOState;
     fn is_audio_available(&self) -> bool;
 }
 
@@ -172,7 +172,7 @@ impl DummyIOImpl {
 }
 
 impl IO for DummyIOImpl {
-    fn present_frame(&mut self, _control: IOControl) -> IOState {
+    fn present_frame(&mut self, _control: IOControl, _emulation_frame: &EmulationFrame) -> IOState {
         todo!()
     }
 

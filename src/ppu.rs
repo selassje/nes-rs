@@ -1,12 +1,10 @@
+use crate::colors::{ColorMapper, DefaultColorMapper, RgbColor};
 use crate::nes::PpuBus;
 use crate::vram::VRam;
-use crate::{
-    colors::{ColorMapper, DefaultColorMapper, RgbColor},
-};
 use crate::{io::VideoAccess, memory::VideoMemory};
 use crate::{mappers::Mapper, mappers::MapperEnum, ram_ppu::*};
 
-use crate::common::{FRAME_WIDTH};
+use crate::common::{FRAME_HEIGHT, FRAME_WIDTH, PIXEL_SIZE};
 
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, default::Default, fmt::Display, rc::Rc};
@@ -521,7 +519,11 @@ impl Ppu {
             .borrow_mut()
             .set_pixel(x as usize, self.scanline as usize, color);
 
-        bus.emulation_frame.video[self.scanline as usize * FRAME_WIDTH + x as usize] = color;
+        let index = self.scanline as usize * PIXEL_SIZE as usize * FRAME_WIDTH as usize
+            + x as usize * PIXEL_SIZE as usize;
+        bus.emulation_frame.video[index] = color.0;
+        bus.emulation_frame.video[index + 1] = color.1;
+        bus.emulation_frame.video[index + 2] = color.2;
 
         if !self.status_reg.get_flag(StatusRegisterFlag::Sprite0Hit)
             && x < 255

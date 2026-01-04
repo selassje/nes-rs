@@ -3,7 +3,9 @@ use sdl2::{
     rect::Rect,
 };
 
-use super::{RgbColor, VideoAccess, FRAME_HEIGHT, FRAME_WIDTH, PIXEL_SIZE};
+use crate::common::{FRAME_HEIGHT, FRAME_WIDTH,PIXEL_SIZE};
+
+use super::{RgbColor, VideoAccess};
 
 const FRAME_SIZE: usize = FRAME_HEIGHT * FRAME_WIDTH * PIXEL_SIZE;
 type Frame = [u8; FRAME_SIZE];

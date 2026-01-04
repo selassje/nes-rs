@@ -27,7 +27,7 @@ impl IOTest {
 }
 
 impl IO for IOTest {
-    fn present_frame(&mut self, _: IOControl) -> IOState {
+    fn present_frame(&mut self, _: IOControl, _: &crate::nes::EmulationFrame) -> IOState {
         Default::default()
     }
 
