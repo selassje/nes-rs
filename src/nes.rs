@@ -88,6 +88,12 @@ impl Default for EmulationFrame {
     }
 }
 
+impl EmulationFrame {
+    pub fn get_audio_samples(&self) -> &[f32] {
+        &self.audio[..self.audio_size]
+    }
+}
+
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Nes {
     version: String,
@@ -110,7 +116,7 @@ pub struct Nes {
 impl Nes {
     pub fn new<T>(io: Rc<RefCell<T>>) -> Self
     where
-        T: IO  + 'static,
+        T: IO + 'static,
     {
         let controllers = Controllers::new();
         let mapper = MapperEnum::MapperNull(MapperNull::new());
