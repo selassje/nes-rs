@@ -154,12 +154,14 @@ impl Tile {
 #[derive(Serialize, Deserialize)]
 struct PatternTable {
     #[serde(with = "serde_arrays")]
-    tiles: [Option<Tile>; 256],
+    tiles: [Tile; 256],
 }
 
 impl Default for PatternTable {
     fn default() -> Self {
-        PatternTable { tiles: [None; 256] }
+        PatternTable {
+            tiles: [Tile::default(); 256],
+        }
     }
 }
 
@@ -669,17 +671,15 @@ impl Ppu {
         (final_color, sprite0_hit)
     }
 
-    fn get_pattern_tile(&self, table_index: u8, tile_index: u8, bus: &mut PpuBus) -> Tile {
+    fn get_pattern_tile(&self, table_index: u8, tile_index: u8, bus: &PpuBus) -> Tile {
         let pattern_table = &self.pattern_tables[table_index as usize];
         let tiles = &mut pattern_table.borrow_mut().tiles;
-        if true {
-            tiles[tile_index as usize] = Some(Tile {
-                data: self
-                    .vram
-                    .get_pattern_table_tile_data(table_index, tile_index, bus.mapper),
-            });
-        }
-        tiles[tile_index as usize].unwrap()
+        tiles[tile_index as usize] = Tile {
+            data: self
+                .vram
+                .get_pattern_table_tile_data(table_index, tile_index, bus.mapper),
+        };
+        tiles[tile_index as usize]
     }
     fn get_background_color_index(&mut self, x: usize) -> (u8, u8) {
         let mut bg_color_index = 0;
