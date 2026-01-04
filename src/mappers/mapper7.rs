@@ -21,7 +21,7 @@ impl Mapper7 {
 }
 
 impl Mapper for Mapper7 {
-    fn get_chr_byte(&mut self, address: u16) -> u8 {
+    fn get_chr_byte(&self, address: u16) -> u8 {
         self.mapper_internal.get_chr_byte(address, 0, _8KB)
     }
 
@@ -33,7 +33,7 @@ impl Mapper for Mapper7 {
         }
     }
 
-    fn get_prg_byte(&mut self, address: u16) -> u8 {
+    fn get_prg_byte(&self, address: u16) -> u8 {
         if address >= 0x8000 {
             let bank = self.register & 7;
             self.mapper_internal.get_prg_rom_byte(address, bank, _32KB)

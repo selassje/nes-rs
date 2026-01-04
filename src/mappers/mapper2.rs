@@ -24,14 +24,14 @@ impl Mapper2 {
 }
 
 impl Mapper for Mapper2 {
-    fn get_chr_byte(&mut self, address: u16) -> u8 {
+    fn get_chr_byte(&self, address: u16) -> u8 {
         self.mapper_internal.get_chr_byte(address, 0, _8KB)
     }
 
     fn get_mirroring(&self) -> Mirroring {
         self.mirroring
     }
-    fn get_prg_byte(&mut self, address: u16) -> u8 {
+    fn get_prg_byte(&self, address: u16) -> u8 {
         let bank = if address < 0xC000 {
             self.switchable_bank_0
         } else {

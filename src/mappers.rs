@@ -25,10 +25,10 @@ pub use self::mapper_null::MapperNull;
 
 #[enum_dispatch::enum_dispatch(MapperEnum)]
 pub trait Mapper {
-    fn get_chr_byte(&mut self, address: u16) -> u8;
+    fn get_chr_byte(&self, address: u16) -> u8;
     fn store_chr_byte(&mut self, address: u16, byte: u8);
 
-    fn get_prg_byte(&mut self, address: u16) -> u8;
+    fn get_prg_byte(&self, address: u16) -> u8;
     fn store_prg_byte(&mut self, address: u16, byte: u8);
 
     fn get_mirroring(&self) -> Mirroring;

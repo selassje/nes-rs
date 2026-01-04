@@ -97,7 +97,7 @@ impl VRam {
         }
     }
 
-    fn get_byte_internal(&self, address: u16, mapper: &mut MapperEnum) -> u8 {
+    fn get_byte_internal(&self, address: u16, mapper: &MapperEnum) -> u8 {
         if address < NAMETABLES_START {
             mapper.get_chr_byte(address)
         } else {
@@ -106,7 +106,7 @@ impl VRam {
         }
     }
 
-    fn get_palette(&self, start_address: u16, mapper: &mut MapperEnum) -> [u8; 3] {
+    fn get_palette(&self, start_address: u16, mapper: &MapperEnum) -> [u8; 3] {
         [
             self.get_byte_internal(start_address, mapper),
             self.get_byte_internal(start_address + 1, mapper),
@@ -116,7 +116,7 @@ impl VRam {
 }
 
 impl VideoMemory for VRam {
-    fn get_byte(&self, addr: u16, mapper: &mut MapperEnum) -> u8 {
+    fn get_byte(&self, addr: u16, mapper: &MapperEnum) -> u8 {
         let addr = addr & 0x3FFF;
         let byte = self.get_byte_internal(addr, mapper);
         if PALETTES_RANGE.contains(&addr) {
@@ -144,7 +144,7 @@ impl VideoMemory for VRam {
         table_index: u8,
         tile_x: u8,
         tile_y: u8,
-        mapper: &mut MapperEnum,
+        mapper: &MapperEnum,
     ) -> u8 {
         let name_table_addr = NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE;
         let tile_index = 32 * tile_y as u16 + tile_x as u16;
@@ -155,7 +155,7 @@ impl VideoMemory for VRam {
         &self,
         table_index: u8,
         tile_index: u8,
-        mapper: &mut MapperEnum,
+        mapper: &MapperEnum,
     ) -> [u8; 16] {
         let mut tile_data = [0; 16];
         let pattern_table_addr = table_index as u16 * PATTERN_TABLE_SIZE;
@@ -168,11 +168,11 @@ impl VideoMemory for VRam {
         tile_data
     }
 
-    fn get_universal_background_color(&self, mapper: &mut MapperEnum) -> u8 {
+    fn get_universal_background_color(&self, mapper: &MapperEnum) -> u8 {
         self.get_byte_internal(PALETTES_START, mapper)
     }
 
-    fn get_background_palette(&self, palette_index: u8, mapper: &mut MapperEnum) -> [u8; 3] {
+    fn get_background_palette(&self, palette_index: u8, mapper: &MapperEnum) -> [u8; 3] {
         self.get_palette(0x3F01 + 4 * palette_index as u16, mapper)
     }
 
@@ -181,7 +181,7 @@ impl VideoMemory for VRam {
         table_index: u8,
         color_tile_x: u8,
         color_tile_y: u8,
-        mapper: &mut MapperEnum,
+        mapper: &MapperEnum,
     ) -> u8 {
         let attrib_table_addr = self.get_target_address(
             NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE + 960,
@@ -200,7 +200,7 @@ impl VideoMemory for VRam {
         table_index: u8,
         tile_index: u8,
         y: u8,
-        mapper: &mut MapperEnum,
+        mapper: &MapperEnum,
     ) -> u8 {
         let pattern_table_addr = table_index as u16 * PATTERN_TABLE_SIZE;
         self.get_byte_internal(
@@ -214,7 +214,7 @@ impl VideoMemory for VRam {
         table_index: u8,
         tile_index: u8,
         y: u8,
-        mapper: &mut MapperEnum,
+        mapper: &MapperEnum,
     ) -> u8 {
         let pattern_table_addr = table_index as u16 * PATTERN_TABLE_SIZE;
         self.get_byte_internal(
@@ -223,7 +223,7 @@ impl VideoMemory for VRam {
         )
     }
 
-    fn get_sprite_palette(&self, palette_index: u8, mapper: &mut MapperEnum) -> [u8; 3] {
+    fn get_sprite_palette(&self, palette_index: u8, mapper: &MapperEnum) -> [u8; 3] {
         self.get_palette(0x3F11 + 4 * palette_index as u16, mapper)
     }
 }
