@@ -1067,9 +1067,23 @@ impl Cpu {
         self.sbc(bus);
     }
 
-    fn las(&mut self, _bus: &mut CpuBus) {}
+    fn las(&mut self, bus: &mut CpuBus) {
+        let m = self.load_from_address(bus);
+        let result = m & self.x & self.sp;
+        self.a = result;
+        self.x = result;
+        self.sp = result;
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, result == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);
+    }
 
-    fn oal(&mut self, _bus: &mut CpuBus) {}
+    fn oal(&mut self, bus: &mut CpuBus) {
+        let m = self.load_from_address(bus);
+        self.a &= m;
+        self.sp = self.a;
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, self.a == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, self.a & 0x80 != 0);
+    }
 
     fn sbx(&mut self, bus: &mut CpuBus) {
         let m = self.load_from_address(bus);
@@ -1111,12 +1125,23 @@ impl Cpu {
         self.adc(bus);
     }
 
-    fn tas(&mut self, _bus: &mut CpuBus) {}
+    fn tas(&mut self, bus: &mut CpuBus) {
+        let m = self.load_from_address(bus) as u16;
+        let result = self.a & self.x;
+        self.sp = result;
+        let addr = m & 0xFF00 | (self.sp as u16);
+        bus.store_byte(addr, result);
+    }
 
     fn xaa(&mut self, bus: &mut CpuBus) {
         self.txa(bus);
         self.and(bus);
     }
 
-    fn xas(&mut self, _bus: &mut CpuBus) {}
+    fn xas(&mut self, bus: &mut CpuBus) {
+        let m = self.load_from_address(bus) as u16;
+        let result = self.a & self.x;
+        let addr = m & 0xFF00 | (self.sp as u16);
+        bus.store_byte(addr, result);
+    }
 }
