@@ -92,6 +92,35 @@ struct Instruction {
     cycle: u16,
     bytes: u8,
 }
+macro_rules! ram_bus {
+    ($cpu_bus:expr) => {{
+        RamBus {
+            ppu: &mut $cpu_bus.ppu,
+            apu: &mut $cpu_bus.apu,
+            mapper: &mut $cpu_bus.mapper,
+            controllers: &mut $cpu_bus.controllers,
+        }
+    }};
+}
+impl CpuBus<'_> {
+    fn get_byte(&mut self, address: u16) -> u8 {
+        let mut ram_bus = ram_bus!(self);
+        self.ram.get_byte(address, &mut ram_bus)
+    }
+
+    fn get_word(&mut self, address: u16) -> u16 {
+        let mut ram_bus = ram_bus!(self);
+        crate::common::convert_2u8_to_u16(
+            self.ram.get_byte(address, &mut ram_bus),
+            self.ram.get_byte(address + 1, &mut ram_bus),
+        )
+    }
+
+    fn store_byte(&mut self, address: u16, byte: u8) {
+        let mut ram_bus = ram_bus!(self);
+        self.ram.store_byte(address, byte, &mut ram_bus);
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct Cpu {
@@ -154,13 +183,7 @@ impl Cpu {
     }
 
     pub fn power_cycle(&mut self, bus: &mut CpuBus) {
-        let mut ram_bus = RamBus {
-            ppu: &mut bus.ppu,
-            apu: &mut bus.apu,
-            mapper: &mut bus.mapper,
-            controllers: &mut bus.controllers,
-        };
-        self.pc = bus.ram.get_word(0xFFFC, &mut ram_bus);
+        self.pc = bus.get_word(0xFFFC);
         self.sp = 0xFD;
         self.ps = 0x04;
         self.a = 0;
@@ -204,14 +227,8 @@ impl Cpu {
     }
 
     fn pop_byte(&mut self, bus: &mut CpuBus) -> u8 {
-        let mut ram_bus = RamBus {
-            ppu: &mut bus.ppu,
-            apu: &mut bus.apu,
-            mapper: &mut bus.mapper,
-            controllers: &mut bus.controllers,
-        };
         self.sp = ((self.sp as u16 + 1) & 0xFF) as u8;
-        bus.ram.get_byte(self.sp as u16 + STACK_PAGE, &mut ram_bus)
+        bus.get_byte(self.sp as u16 + STACK_PAGE)
     }
 
     fn push_byte(&mut self, val: u8, bus: &mut CpuBus) {
@@ -540,32 +557,20 @@ impl Cpu {
     }
 
     fn load_from_address(&self, bus: &mut CpuBus) -> u8 {
-        let mut ram_bus = RamBus {
-            ppu: &mut bus.ppu,
-            apu: &mut bus.apu,
-            mapper: &mut bus.mapper,
-            controllers: &mut bus.controllers,
-        };
         match &self.address {
             Address::Implicit => panic!("load_from_address can't be used for implicit mode"),
             Address::Accumulator => self.a,
             Address::Immediate(i) => *i,
-            Address::Ram(address) => bus.ram.get_byte(*address, &mut ram_bus),
+            Address::Ram(address) => bus.get_byte(*address),
             Address::Relative(_) => panic!("load_from_address can't be used for the Relative mode"),
         }
     }
     fn store_to_address(&mut self, byte: u8, bus: &mut CpuBus) {
-        let mut ram_bus = RamBus {
-            ppu: &mut bus.ppu,
-            apu: &mut bus.apu,
-            mapper: &mut bus.mapper,
-            controllers: &mut bus.controllers,
-        };
         match &self.address {
             Address::Implicit => panic!("store_to_address can't be used for implicit mode"),
             Address::Accumulator => self.a = byte,
             Address::Immediate(_) => panic!("Not possible to store in Immediate addressing"),
-            Address::Ram(address) => bus.ram.store_byte(*address, byte, &mut ram_bus),
+            Address::Ram(address) => bus.store_byte(*address, byte),
             Address::Relative(_) => panic!("store_to_address can't be used for the Relative mode"),
         }
     }
@@ -663,16 +668,10 @@ impl Cpu {
     fn nop(&mut self, _bus: &mut CpuBus) {}
 
     fn update_pc_for_brk_or_irq(&mut self, bus: &mut CpuBus) {
-        let mut ram_bus = RamBus {
-            ppu: &mut bus.ppu,
-            apu: &mut bus.apu,
-            mapper: &mut bus.mapper,
-            controllers: &mut bus.controllers,
-        };
         let new_pc = if self.is_brk_or_irq_hijacked_by_nmi {
-            bus.ram.get_word(0xFFFA, &mut ram_bus)
+            bus.get_word(0xFFFA)
         } else {
-            bus.ram.get_word(0xFFFE, &mut ram_bus)
+            bus.get_word(0xFFFE)
         };
         if new_pc > 0 {
             self.pc = new_pc - 1;
