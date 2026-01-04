@@ -69,12 +69,13 @@ pub struct RamBus<'a> {
     pub controllers: &'a mut Controllers,
 }
 
-const VIDEO_FRAME_SIZE: usize = FRAME_HEIGHT * FRAME_WIDTH * PIXEL_SIZE;
-const AUDIO_FRAME_SIZE: usize = CPU_CYCLES_PER_FRAME;
+pub const VIDEO_FRAME_SIZE: usize = FRAME_HEIGHT * FRAME_WIDTH * PIXEL_SIZE;
+pub const AUDIO_FRAME_SIZE: usize = 2048;
 
 pub struct EmulationFrame {
     pub video: Box<[u8; VIDEO_FRAME_SIZE]>,
     pub audio: Box<[f32; AUDIO_FRAME_SIZE]>,
+    pub audio_size: usize,
 }
 
 impl Default for EmulationFrame {
@@ -82,6 +83,7 @@ impl Default for EmulationFrame {
         Self {
             video: Box::new([0; VIDEO_FRAME_SIZE]),
             audio: Box::new([0.0; AUDIO_FRAME_SIZE]),
+            audio_size: 0,
         }
     }
 }
@@ -220,9 +222,10 @@ impl Nes {
         while self.ppu.get_time().frame == current_frame {
             self.run_single_cpu_cycle();
         }
+        self.apu.reset_audio_buffer();
     }
 
-    pub fn run_single_cpu_cycle(&mut self) {
+    fn run_single_cpu_cycle(&mut self) {
         let mut cpu_bus = cpu_bus!(self);
         self.cpu.maybe_fetch_next_instruction(&mut cpu_bus);
         let mut ppu_bus = PpuBus {

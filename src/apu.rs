@@ -1,6 +1,7 @@
 use crate::common::CPU_CYCLES_PER_FRAME;
 use crate::io::AudioSampleFormat;
 use crate::nes::ApuBus;
+use crate::nes::EmulationFrame;
 use crate::nes::Ram;
 use crate::{io::AudioAccess, memory::DmcMemory, ram_apu::*};
 use StatusRegisterFlag::*;
@@ -665,14 +666,13 @@ fn default_audio_access() -> Rc<RefCell<dyn AudioAccess>> {
 
 const SAMPLING_RATE: usize = 44100;
 const CPU_CLOCK_NTSC: f64 = 1_789_773.0;
-const BUFFER_SIZE: usize = 2048;
+use crate::nes::AUDIO_FRAME_SIZE;
+
 struct AudioBuffer {
-  phase: f64,
-  cycles_per_sample: f64,
-  acc: f64,
-  acc_count: f64,
-  buffer: [f32; BUFFER_SIZE],
-  size: usize,
+    phase: f64,
+    cycles_per_sample: f64,
+    acc: f64,
+    acc_count: f64,
 }
 
 impl AudioBuffer {
@@ -680,30 +680,36 @@ impl AudioBuffer {
         Self {
             phase: 0.0,
             cycles_per_sample: CPU_CLOCK_NTSC as f64 / SAMPLING_RATE as f64,
-            buffer: [0.0; BUFFER_SIZE],
-            size: 0,
             acc: 0.0,
             acc_count: 0.0,
         }
     }
-    pub fn add_sample(&mut self, sample: f32) {
-      self.phase += 1.0;
-      self.acc += sample as f64;
-      self.acc_count += 1.0;
-  
-      if self.phase >= self.cycles_per_sample {
-          self.phase -= self.cycles_per_sample;
-  
-          if self.size < BUFFER_SIZE {
-              let averaged = self.acc / self.acc_count;
-              self.buffer[self.size] = averaged as f32;
-              self.size += 1;
-          }
-  
-          self.acc = 0.0;
-          self.acc_count = 0.0;
-      }
-  }
+    pub fn add_sample(&mut self, sample: f32, emulation_frame: &mut EmulationFrame) {
+        self.phase += 1.0;
+        self.acc += sample as f64;
+        self.acc_count += 1.0;
+
+        if self.phase >= self.cycles_per_sample {
+            self.phase -= self.cycles_per_sample;
+            if emulation_frame.audio_size < AUDIO_FRAME_SIZE {
+                let averaged = self.acc / self.acc_count;
+                emulation_frame.audio[emulation_frame.audio_size] = averaged as f32;
+                emulation_frame.audio_size += 1;
+            }
+            self.acc = 0.0;
+            self.acc_count = 0.0;
+        }
+    }
+    fn reset(&mut self) {
+        self.phase = 0.0;
+        self.acc = 0.0;
+        self.acc_count = 0.0;
+    }
+}
+impl Default for AudioBuffer {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -723,7 +729,8 @@ pub struct Apu {
     frame: u128,
     pending_reset_cycle: Option<u16>,
     irq_flag_setting_in_progress: bool,
-    sample_index: usize,
+    #[serde(skip, default)]
+    audio_buffer: AudioBuffer,
 }
 
 impl Default for Apu {
@@ -743,7 +750,7 @@ impl Default for Apu {
             frame: 1,
             pending_reset_cycle: None,
             irq_flag_setting_in_progress: false,
-            sample_index: 0,
+            audio_buffer: AudioBuffer::new(),
         }
     }
 }
@@ -765,7 +772,7 @@ impl Apu {
             frame: 1,
             pending_reset_cycle: None,
             irq_flag_setting_in_progress: false,
-            sample_index: 0,
+            audio_buffer: AudioBuffer::new(),
         }
     }
 
@@ -783,7 +790,10 @@ impl Apu {
         self.frame = 1;
         self.pending_reset_cycle = None;
         self.irq_flag_setting_in_progress = false;
-        self.sample_index = 0;
+    }
+
+    pub fn reset_audio_buffer(&mut self) {
+        self.audio_buffer.reset();
     }
 
     pub fn set_audio_access(&mut self, audio_access: Rc<RefCell<dyn AudioAccess>>) {
@@ -901,8 +911,7 @@ impl Apu {
             self.noise.get_sample(),
             self.dmc.get_sample(),
         );
-        bus.emulation_frame.audio[self.sample_index] = sample;
-        self.sample_index = (self.sample_index + 1) % CPU_CYCLES_PER_FRAME;
+        self.audio_buffer.add_sample(sample, bus.emulation_frame);
         self.audio_access.borrow_mut().add_sample(sample);
     }
 
