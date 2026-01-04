@@ -386,6 +386,10 @@ impl io::IO for IOSdl2ImGuiOpenGl {
             };
         }
 
+        for sample in emulation_frame.audio.iter() {
+           // self.sample_buffer.add(*sample);
+        }
+
         if let Some(ref audio_queue) = self.maybe_audio_queue {
             if self.gui.pause {
                 audio_queue.pause();

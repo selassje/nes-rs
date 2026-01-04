@@ -1,3 +1,4 @@
+use crate::common::CPU_CYCLES_PER_FRAME;
 use crate::io::AudioSampleFormat;
 use crate::nes::ApuBus;
 use crate::nes::Ram;
@@ -678,6 +679,7 @@ pub struct Apu {
     frame: u128,
     pending_reset_cycle: Option<u16>,
     irq_flag_setting_in_progress: bool,
+    sample_index : usize,
 }
 
 impl Default for Apu {
@@ -697,6 +699,7 @@ impl Default for Apu {
             frame: 1,
             pending_reset_cycle: None,
             irq_flag_setting_in_progress: false,
+            sample_index : 0,
         }
     }
 }
@@ -718,6 +721,7 @@ impl Apu {
             frame: 1,
             pending_reset_cycle: None,
             irq_flag_setting_in_progress: false,
+            sample_index : 0,
         }
     }
 
@@ -735,6 +739,7 @@ impl Apu {
         self.frame = 1;
         self.pending_reset_cycle = None;
         self.irq_flag_setting_in_progress = false;
+        self.sample_index = 0;
     }
 
     pub fn set_audio_access(&mut self, audio_access: Rc<RefCell<dyn AudioAccess>>) {
@@ -852,7 +857,8 @@ impl Apu {
             self.noise.get_sample(),
             self.dmc.get_sample(),
         );
-
+        bus.emulation_frame.audio[self.sample_index] = sample;
+        self.sample_index = (self.sample_index + 1) % CPU_CYCLES_PER_FRAME;
         self.audio_access.borrow_mut().add_sample(sample);
     }
 
