@@ -40,4 +40,3 @@ pub enum ReadAccessRegister {
 pub trait ReadAccessRegisters {
     fn read(&mut self, register: ReadAccessRegister) -> u8;
 }
-

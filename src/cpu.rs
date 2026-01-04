@@ -95,10 +95,10 @@ struct Instruction {
 macro_rules! ram_bus {
     ($cpu_bus:expr) => {{
         RamBus {
-            ppu: &mut $cpu_bus.ppu,
-            apu: &mut $cpu_bus.apu,
-            mapper: &mut $cpu_bus.mapper,
-            controllers: &mut $cpu_bus.controllers,
+            ppu: $cpu_bus.ppu,
+            apu: $cpu_bus.apu,
+            mapper: $cpu_bus.mapper,
+            controllers: $cpu_bus.controllers,
         }
     }};
 }
@@ -232,12 +232,7 @@ impl Cpu {
     }
 
     fn push_byte(&mut self, val: u8, bus: &mut CpuBus) {
-        let mut ram_bus = RamBus {
-            ppu: &mut bus.ppu,
-            apu: &mut bus.apu,
-            mapper: &mut bus.mapper,
-            controllers: &mut bus.controllers,
-        };
+        let mut ram_bus = ram_bus!(bus);
         bus.ram
             .store_byte(self.sp as u16 + STACK_PAGE, val, &mut ram_bus);
         self.sp = ((self.sp as i16 - 1) & 0xFF) as u8;
@@ -272,12 +267,7 @@ impl Cpu {
 
     fn fetch_next_instruction(&mut self, bus: &mut CpuBus) {
         let ppu_time = bus.ppu.get_time();
-        let mut ram_bus = RamBus {
-            ppu: &mut bus.ppu,
-            apu: &mut bus.apu,
-            mapper: &mut bus.mapper,
-            controllers: &mut bus.controllers,
-        };
+        let mut ram_bus = ram_bus!(bus);
         let op = if let Some(op) = self.interrupt.take() {
             op
         } else {
@@ -476,13 +466,7 @@ impl Cpu {
         extra_cycle_on_page_crossing: bool,
         bus: &mut CpuBus,
     ) -> (Address, u16) {
-        let mut ram_bus = RamBus {
-            ppu: &mut bus.ppu,
-            apu: &mut bus.apu,
-            mapper: &mut bus.mapper,
-            controllers: &mut bus.controllers,
-        };
-
+        let mut ram_bus = ram_bus!(bus);
         let b0_u16 = operand_1 as u16;
         let b1_u16 = operand_2 as u16;
         let x_u16 = self.x as u16;
@@ -708,13 +692,7 @@ impl Cpu {
         ps |= ProcessorFlag::BFlagBit5 as u8;
         self.push_byte(ps, bus);
         self.set_flag(ProcessorFlag::InterruptDisable);
-        let mut ram_bus = RamBus {
-            ppu: &mut bus.ppu,
-            apu: &mut bus.apu,
-            mapper: &mut bus.mapper,
-            controllers: &mut bus.controllers,
-        };
-        self.pc = bus.ram.get_word(0xFFFA, &mut ram_bus) - 1;
+        self.pc = bus.get_word(0xFFFA) - 1;
     }
 
     fn jsr(&mut self, bus: &mut CpuBus) {

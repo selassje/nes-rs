@@ -1,8 +1,8 @@
-use StatusRegisterFlag::*;
 use crate::io::AudioSampleFormat;
-use crate::{io::AudioAccess, memory::DmcMemory, ram_apu::*};
-use crate::nes::{ApuBus};
+use crate::nes::ApuBus;
 use crate::nes::Ram;
+use crate::{io::AudioAccess, memory::DmcMemory, ram_apu::*};
+use StatusRegisterFlag::*;
 
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, default::Default, rc::Rc};
@@ -789,7 +789,7 @@ impl Apu {
         self.noise.clock_envelope();
     }
 
-    pub fn run_single_cpu_cycle(&mut self,bus: &mut ApuBus) {
+    pub fn run_single_cpu_cycle(&mut self, bus: &mut ApuBus) {
         if let Some(pending_reset_cycle) = self.pending_reset_cycle {
             if pending_reset_cycle == self.cpu_cycle {
                 self.cpu_cycle = 0;
@@ -1019,4 +1019,3 @@ impl ApuState for Apu {
         self.frame_interrupt || self.dmc.interrupt
     }
 }
-

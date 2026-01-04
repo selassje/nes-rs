@@ -150,4 +150,3 @@ impl WriteOutputRegisters for Controllers {
         self.controller_2.write(value);
     }
 }
-

@@ -1,3 +1,4 @@
+use crate::nes::PpuBus;
 use crate::vram::VRam;
 use crate::{
     colors::{ColorMapper, DefaultColorMapper, RgbColor},
@@ -5,7 +6,6 @@ use crate::{
 };
 use crate::{io::VideoAccess, memory::VideoMemory};
 use crate::{mappers::Mapper, mappers::MapperEnum, ram_ppu::*};
-use crate::nes::PpuBus;
 
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, default::Default, fmt::Display, rc::Rc};
@@ -437,19 +437,22 @@ impl Ppu {
             FETCH_NAMETABLE_DATA_CYCLE_OFFSET => {
                 self.tile_data[2].index =
                     self.vram
-                        .get_nametable_tile_index(nametable_index, tile_x, tile_y,bus.mapper)
+                        .get_nametable_tile_index(nametable_index, tile_x, tile_y, bus.mapper)
             }
             FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET => {
-                self.tile_data[2].attribute_byte =
-                    self.vram
-                        .get_attribute_data(nametable_index, tile_x / 2, tile_y / 2,bus.mapper);
+                self.tile_data[2].attribute_byte = self.vram.get_attribute_data(
+                    nametable_index,
+                    tile_x / 2,
+                    tile_y / 2,
+                    bus.mapper,
+                );
             }
             FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET => {
                 self.tile_data[2].low_bg_pattern_byte = self.vram.get_low_pattern_data(
                     pattern_table_index,
                     self.tile_data[2].index,
                     fine_y as u8,
-                    bus.mapper
+                    bus.mapper,
                 );
             }
             FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET => {
@@ -457,7 +460,7 @@ impl Ppu {
                     pattern_table_index,
                     self.tile_data[2].index,
                     fine_y as u8,
-                    bus.mapper
+                    bus.mapper,
                 )
             }
             _ => {}
@@ -497,7 +500,7 @@ impl Ppu {
         final_color
     }
 
-    fn render_pixel(&mut self, bus : &mut PpuBus) {
+    fn render_pixel(&mut self, bus: &mut PpuBus) {
         let x = self.ppu_cycle - ACTIVE_PIXELS_CYCLE_START;
         let (bg_color_index, bg_palette_index) = self.get_background_color_index(x as usize);
         let (sprite_color_index, sprite) = self.get_sprite_color_index(x as u8, bus);
@@ -528,13 +531,13 @@ impl Ppu {
         }
     }
 
-    pub fn run_single_cpu_cycle(&mut self, mut bus: &mut PpuBus) {
+    pub fn run_single_cpu_cycle(&mut self, bus: &mut PpuBus) {
         for _ in 0..3 {
-            self.run_single_ppu_cycle(&mut bus);
+            self.run_single_ppu_cycle(bus);
         }
     }
 
-    fn run_single_ppu_cycle(&mut self,bus : &mut PpuBus ) {
+    fn run_single_ppu_cycle(&mut self, bus: &mut PpuBus) {
         if self.ppu_cycle == ACTIVE_PIXELS_CYCLE_END + 1 && self.is_rendering_in_progress() {
             self.vram_address.inc_y();
             bus.mapper.ppu_a12_rising_edge_triggered();
@@ -666,14 +669,14 @@ impl Ppu {
         (final_color, sprite0_hit)
     }
 
-    fn get_pattern_tile(&self, table_index: u8, tile_index: u8, bus : &mut PpuBus) -> Tile {
+    fn get_pattern_tile(&self, table_index: u8, tile_index: u8, bus: &mut PpuBus) -> Tile {
         let pattern_table = &self.pattern_tables[table_index as usize];
         let tiles = &mut pattern_table.borrow_mut().tiles;
         if true {
             tiles[tile_index as usize] = Some(Tile {
                 data: self
                     .vram
-                    .get_pattern_table_tile_data(table_index, tile_index,bus.mapper),
+                    .get_pattern_table_tile_data(table_index, tile_index, bus.mapper),
             });
         }
         tiles[tile_index as usize].unwrap()
@@ -701,7 +704,7 @@ impl Ppu {
         (bg_color_index, bg_palette_index)
     }
 
-    fn get_sprite_color_index(&mut self, x: u8, bus : &mut PpuBus) -> (u8, Sprite) {
+    fn get_sprite_color_index(&mut self, x: u8, bus: &mut PpuBus) -> (u8, Sprite) {
         if self.mask_reg.is_flag_enabled(MaskRegisterFlag::ShowSprites)
             && (self
                 .mask_reg
@@ -768,9 +771,9 @@ impl Ppu {
         let raw_universal_bckg_color = self.vram.get_universal_background_color(bus.mapper);
         for (i, p) in palletes.iter_mut().enumerate() {
             let raw_colors = if for_background {
-                self.vram.get_background_palette(i as u8,bus.mapper)
+                self.vram.get_background_palette(i as u8, bus.mapper)
             } else {
-                self.vram.get_sprite_palette(i as u8,bus.mapper)
+                self.vram.get_sprite_palette(i as u8, bus.mapper)
             };
             *p = [
                 self.color_mapper
@@ -783,11 +786,15 @@ impl Ppu {
         palletes
     }
 
-    fn check_for_a12_rising_toggle(&mut self, old_vram_address: VRAMAddress, mapper: &mut MapperEnum) {
+    fn check_for_a12_rising_toggle(
+        &mut self,
+        old_vram_address: VRAMAddress,
+        mapper: &mut MapperEnum,
+    ) {
         let old_bit12 = old_vram_address.get(BIT_12);
         let new_bit12 = self.vram_address.get(BIT_12);
         if old_bit12 != new_bit12 && new_bit12 != 0 {
-           mapper.ppu_a12_rising_edge_triggered();
+            mapper.ppu_a12_rising_edge_triggered();
         }
     }
     fn is_rendering_in_progress(&self) -> bool {
@@ -863,7 +870,7 @@ impl WritePpuRegisters for Ppu {
                     self.t_vram_address.set(LOW_BYTE, value as u16);
                     let old_vram_address = self.vram_address;
                     self.vram_address.address = self.t_vram_address.address;
-                    self.check_for_a12_rising_toggle(old_vram_address,mapper);
+                    self.check_for_a12_rising_toggle(old_vram_address, mapper);
                 } else {
                     self.t_vram_address
                         .set(BITS_8_13, (value & 0b00111111) as u16);
@@ -874,10 +881,10 @@ impl WritePpuRegisters for Ppu {
             WriteAccessRegister::PpuData => {
                 if !self.is_rendering_in_progress() {
                     self.vram
-                        .store_byte(self.vram_address.address, value,mapper);
+                        .store_byte(self.vram_address.address, value, mapper);
                     let old_vram_address = self.vram_address;
                     self.vram_address.address += self.control_reg.get_vram_increment();
-                    self.check_for_a12_rising_toggle(old_vram_address,mapper);
+                    self.check_for_a12_rising_toggle(old_vram_address, mapper);
                 } else {
                     // panic!("PPU Write during rendering!")
                 }
@@ -898,7 +905,6 @@ impl WriteOamDma for Ppu {
         self.oam[self.oam_address as usize..].copy_from_slice(&data[..write_len])
     }
 }
-
 
 impl ReadPpuRegisters for Ppu {
     fn read(&mut self, register: ReadAccessRegister, mapper: &mut MapperEnum) -> u8 {
@@ -921,10 +927,10 @@ impl ReadPpuRegisters for Ppu {
                 current_status
             }
             ReadAccessRegister::PpuData => {
-                let val = self.vram.get_byte(self.vram_address.address,mapper);
+                let val = self.vram.get_byte(self.vram_address.address, mapper);
                 let old_vram_address = self.vram_address;
                 self.vram_address.address += self.control_reg.get_vram_increment();
-                self.check_for_a12_rising_toggle(old_vram_address,mapper);
+                self.check_for_a12_rising_toggle(old_vram_address, mapper);
                 val
             }
             ReadAccessRegister::OamData => self.oam[self.oam_address as usize],

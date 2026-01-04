@@ -11,7 +11,6 @@ use std::cell::RefCell;
 use std::convert::TryFrom;
 use std::ops::Range;
 
-
 const INTERNAL_START: u16 = 0x0000;
 const INTERNAL_END: u16 = 0x2000;
 const INTERNAL_MIRROR_SIZE: u16 = 0x0800;
@@ -41,7 +40,7 @@ const CARTRIDGE_SPACE_RANGE: Range<u32> = Range {
 };
 
 type RegisterLatch = RefCell<u8>;
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct Ram {
     memory: MemoryImpl<0x0808>,
     dmc_sample_address: usize,
@@ -49,19 +48,6 @@ pub struct Ram {
     apu_register_latch: RegisterLatch,
     controller_register_latch: RegisterLatch,
     oam_dma_register_latch: RegisterLatch,
-}
-
-impl Default for Ram {
-    fn default() -> Self {
-        Self {
-            memory: Default::default(),
-            dmc_sample_address: Default::default(),
-            ppu_register_latch: Default::default(),
-            apu_register_latch: Default::default(),
-            controller_register_latch: Default::default(),
-            oam_dma_register_latch: Default::default(),
-        }
-    }
 }
 
 impl Ram {
@@ -99,7 +85,7 @@ impl Memory for Ram {
     fn get_byte(&self, address_org: u16, bus: &mut RamBus) -> u8 {
         let addr = self.get_real_address(address_org);
         if let Ok(reg) = ReadAccessRegister::try_from(addr) {
-            let mut ppu_register_value = bus.ppu.read(reg,bus.mapper);
+            let mut ppu_register_value = bus.ppu.read(reg, bus.mapper);
             if reg == ReadAccessRegister::PpuStatus {
                 const LOW_5_BITS: u8 = 0b00011111;
                 ppu_register_value &= !LOW_5_BITS;
@@ -111,8 +97,7 @@ impl Memory for Ram {
             *self.apu_register_latch.borrow_mut() = bus.apu.read(reg);
             *self.apu_register_latch.borrow()
         } else if let Ok(input_port) = InputRegister::try_from(addr) {
-            *self.controller_register_latch.borrow_mut() =
-                bus.controllers.read(input_port);
+            *self.controller_register_latch.borrow_mut() = bus.controllers.read(input_port);
             *self.controller_register_latch.borrow()
         } else if WriteAccessRegister::try_from(addr).is_ok() {
             *self.ppu_register_latch.borrow_mut()
@@ -137,7 +122,7 @@ impl Memory for Ram {
     fn store_byte(&mut self, address: u16, byte: u8, bus: &mut RamBus) {
         let addr = self.get_real_address(address);
         if let Ok(reg) = WriteAccessRegister::try_from(addr) {
-            bus.ppu.write(reg, byte,bus.mapper);
+            bus.ppu.write(reg, byte, bus.mapper);
             *self.ppu_register_latch.borrow_mut() = byte;
         } else if DmaWriteAccessRegister::try_from(addr).is_ok() {
             let mut dma_data = [0; 256];
@@ -145,8 +130,7 @@ impl Memory for Ram {
                 let page_adress = (byte as u16) << 8;
                 *e = self.get_byte(page_adress + i as u16, bus);
             }
-            bus.ppu
-                .write_oam_dma(dma_data);
+            bus.ppu.write_oam_dma(dma_data);
             *self.oam_dma_register_latch.borrow_mut() = byte;
         } else if let Ok(output_port) = OutputRegister::try_from(addr) {
             bus.controllers.write(output_port, byte);
@@ -169,9 +153,7 @@ impl Memory for Ram {
     }
 }
 
-impl DmcMemory
-    for Ram
-{
+impl DmcMemory for Ram {
     fn set_sample_address(&mut self, address: u8) {
         self.dmc_sample_address = 0xC000 + (address as usize * 64);
     }
@@ -179,7 +161,7 @@ impl DmcMemory
     fn get_next_sample_byte(&mut self, mapper: &mut MapperEnum) -> u8 {
         let addr = self.get_real_address(self.dmc_sample_address as u16);
         assert!(CARTRIDGE_SPACE_RANGE.contains(&(addr as u32)));
-        let byte =  mapper.get_prg_byte(addr);
+        let byte = mapper.get_prg_byte(addr);
         self.dmc_sample_address = if self.dmc_sample_address == 0xFFFF {
             0x8000
         } else {

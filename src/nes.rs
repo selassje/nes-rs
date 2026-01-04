@@ -7,10 +7,10 @@ use crate::io::AudioAccess;
 use crate::io::ControllerAccess;
 use crate::io::VideoAccess;
 use crate::io::IO;
-use crate::nes_file::NesFile;
 use crate::mappers::Mapper;
 use crate::mappers::MapperEnum;
 use crate::mappers::MapperNull;
+use crate::nes_file::NesFile;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -51,7 +51,6 @@ macro_rules! cpu_bus {
         }
     }};
 }
-
 
 pub struct PpuBus<'a> {
     pub mapper: &'a mut MapperEnum,
@@ -203,7 +202,7 @@ impl Nes {
     }
 
     pub fn run_single_cpu_cycle(&mut self) {
-        let mut cpu_bus =  cpu_bus!(self);
+        let mut cpu_bus = cpu_bus!(self);
         self.cpu.maybe_fetch_next_instruction(&mut cpu_bus);
         let mut ppu_bus = PpuBus {
             mapper: &mut self.mapper,
@@ -214,7 +213,7 @@ impl Nes {
             mapper: &mut self.mapper,
         };
         self.apu.run_single_cpu_cycle(&mut apu_bus);
-        let mut cpu_bus =  cpu_bus!(self);
+        let mut cpu_bus = cpu_bus!(self);
         self.cpu.run_single_cycle(&mut cpu_bus);
     }
 }

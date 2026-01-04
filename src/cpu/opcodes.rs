@@ -19,7 +19,7 @@ impl Copy for OpCode {}
 pub(super) const NMI_OPCODE: usize = 0x02;
 pub(super) const IRQ_OPCODE: usize = 0x32;
 
-pub(super) type OpCodes= [Option<OpCode>; 256];
+pub(super) type OpCodes = [Option<OpCode>; 256];
 
 macro_rules! fill_opcodes {
     ($(($op:expr,$ins:ident,$mode:expr,$cycles:expr $(,$extra_cycle_on_page_crossing:expr)?)),*) => {{

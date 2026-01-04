@@ -1,5 +1,5 @@
-use std::convert::TryFrom;
 use crate::mappers::MapperEnum;
+use std::convert::TryFrom;
 
 #[derive(Copy, Clone, Debug, TryFromPrimitive)]
 #[TryFromPrimitiveType = "u16"]
@@ -38,4 +38,3 @@ pub trait ReadPpuRegisters {
 pub trait WriteOamDma {
     fn write_oam_dma(&mut self, data: [u8; 256]);
 }
-
