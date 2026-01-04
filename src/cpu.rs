@@ -1032,11 +1032,6 @@ impl Cpu {
         self.set_or_clear_flag(ProcessorFlag::NegativeFlag, m & 0x80 != 0);
     }
 
-    fn aax(&mut self, bus: &mut CpuBus) {
-        let result = self.a & self.x;
-        self.store_to_address(result, bus);
-    }
-
     fn alr(&mut self, bus: &mut CpuBus) {
         self.and(bus);
         self.address = Address::Accumulator;
@@ -1076,7 +1071,20 @@ impl Cpu {
 
     fn oal(&mut self, _bus: &mut CpuBus) {}
 
-    fn sax(&mut self, _bus: &mut CpuBus) {}
+    fn sbx(&mut self, bus: &mut CpuBus) {
+        let m = self.load_from_address(bus);
+        let ax = self.a & self.x;
+        let result = ax.wrapping_sub(m);
+        self.set_or_clear_flag(ProcessorFlag::CarryFlag, ax >= m);
+        self.set_or_clear_flag(ProcessorFlag::ZeroFlag, result == 0);
+        self.set_or_clear_flag(ProcessorFlag::NegativeFlag, result & 0x80 != 0);
+        self.x = result;
+    }
+
+    fn sax(&mut self, bus: &mut CpuBus) {
+        let result = self.a & self.x;
+        self.store_to_address(result, bus);
+    }
 
     fn slo(&mut self, bus: &mut CpuBus) {
         self.asl(bus);
@@ -1088,7 +1096,10 @@ impl Cpu {
         self.and(bus);
     }
 
-    fn say(&mut self, _bus: &mut CpuBus) {}
+    fn say(&mut self, bus: &mut CpuBus) {
+        let result = self.a & self.y;
+        self.store_to_address(result, bus);
+    }
 
     fn sre(&mut self, bus: &mut CpuBus) {
         self.lsr(bus);
