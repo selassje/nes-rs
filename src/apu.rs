@@ -1,4 +1,4 @@
-use self::StatusRegisterFlag::*;
+use StatusRegisterFlag::*;
 use crate::io::AudioSampleFormat;
 use crate::{io::AudioAccess, memory::DmcMemory, ram_apu::*};
 use crate::nes::{ApuBus};

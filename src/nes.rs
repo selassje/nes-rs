@@ -8,6 +8,7 @@ use crate::io::ControllerAccess;
 use crate::io::VideoAccess;
 use crate::io::IO;
 use crate::nes_file::NesFile;
+use crate::mappers::Mapper;
 use crate::mappers::MapperEnum;
 use crate::mappers::MapperNull;
 
