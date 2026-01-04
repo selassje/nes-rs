@@ -1,8 +1,8 @@
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
-    common,
+    common::{self, FRAME_HEIGHT, FRAME_WIDTH},
     controllers::{self, ControllerId},
-    io::{IOControl, FRAME_HEIGHT, FRAME_WIDTH},
+    io::{IOControl},
 };
 
 use crate::io::MouseClick;
@@ -471,9 +471,9 @@ impl Gui {
                     let window_pos = ui.window_pos();
                     let rel_pos = [mouse_pos[0] - window_pos[0], mouse_pos[1] - window_pos[1]];
                     let tex_x =
-                        (rel_pos[0] / self.video_size[0] * FRAME_WIDTH as f32).floor() as usize;
+                        (rel_pos[0] / self.video_size[0] * common::FRAME_WIDTH as f32).floor() as usize;
                     let tex_y =
-                        (rel_pos[1] / self.video_size[1] * FRAME_HEIGHT as f32).floor() as usize;
+                        (rel_pos[1] / self.video_size[1] * common::FRAME_HEIGHT as f32).floor() as usize;
 
                     if ui.is_mouse_clicked(imgui::MouseButton::Left) {
                         self.mouse_click.left_button = true;

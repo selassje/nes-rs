@@ -1,5 +1,6 @@
 use crate::apu::Apu;
 use crate::common;
+use crate::common::CPU_CYCLES_PER_FRAME;
 use crate::controllers::ControllerId;
 use crate::controllers::ControllerType;
 use crate::controllers::Controllers;
@@ -54,10 +55,12 @@ macro_rules! cpu_bus {
 
 pub struct PpuBus<'a> {
     pub mapper: &'a mut MapperEnum,
+    pub emulation_frame: &'a mut EmulationFrame,
 }
 pub struct ApuBus<'a> {
     pub ram: &'a mut Ram,
     pub mapper: &'a mut MapperEnum,
+    pub emulation_frame: &'a mut EmulationFrame,
 }
 pub struct RamBus<'a> {
     pub apu: &'a mut Apu,
@@ -65,6 +68,22 @@ pub struct RamBus<'a> {
     pub mapper: &'a mut MapperEnum,
     pub controllers: &'a mut Controllers,
 }
+
+
+pub struct EmulationFrame {
+    pub video: [(u8,u8,u8); common::FRAME_WIDTH as usize * common::FRAME_HEIGHT as usize],
+    pub audio: [f32; CPU_CYCLES_PER_FRAME as usize],
+}
+
+impl Default for EmulationFrame {
+    fn default() -> Self {
+        Self {
+            video: [(0,0,0); common::FRAME_WIDTH as usize * common::FRAME_HEIGHT as usize],
+            audio: [0.0; CPU_CYCLES_PER_FRAME as usize],
+        }
+    }
+}
+
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Nes {
@@ -75,6 +94,8 @@ pub struct Nes {
     apu: Apu,
     controllers: Controllers,
     mapper: MapperEnum,
+    #[serde(skip,default)]
+    emulation_frame: EmulationFrame,
     #[serde(skip, default = "default_video_access")]
     video_access: Rc<RefCell<dyn VideoAccess>>,
     #[serde(skip, default = "default_audio_access")]
@@ -105,6 +126,7 @@ impl Nes {
             video_access: io.clone(),
             audio_access: io.clone(),
             controller_access: io.clone(),
+            emulation_frame: EmulationFrame::default(),
         };
         nes.set_controller(ControllerId::Controller1, ControllerType::StdNesController);
         nes.set_controller(ControllerId::Controller2, ControllerType::StdNesController);
@@ -130,6 +152,10 @@ impl Nes {
         .unwrap();
         compressed
     }
+
+    pub fn get_emulation_frame(&self) -> &EmulationFrame {
+        &self.emulation_frame
+    }    
 
     pub fn deserialize(&mut self, state: Vec<u8>) {
         let (decompressed, checksum) =
@@ -200,11 +226,13 @@ impl Nes {
         self.cpu.maybe_fetch_next_instruction(&mut cpu_bus);
         let mut ppu_bus = PpuBus {
             mapper: &mut self.mapper,
+            emulation_frame: &mut self.emulation_frame,
         };
         self.ppu.run_single_cpu_cycle(&mut ppu_bus);
         let mut apu_bus = ApuBus {
             ram: &mut self.ram,
             mapper: &mut self.mapper,
+            emulation_frame: &mut self.emulation_frame,
         };
         self.apu.run_single_cpu_cycle(&mut apu_bus);
         let mut cpu_bus = cpu_bus!(self);
