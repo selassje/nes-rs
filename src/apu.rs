@@ -662,6 +662,41 @@ impl Dmc {
 fn default_audio_access() -> Rc<RefCell<dyn AudioAccess>> {
     Rc::new(RefCell::new(crate::io::DummyAudioAccessImpl::new()))
 }
+
+const SAMPLING_RATE: usize = 44100;
+const CPU_CLOCK_NTSC: f64 = 1_789_773.0;
+const BUFFER_SIZE: usize = 2048;
+struct AudioBuffer {
+    phase: f64,
+    cycles_per_sample: f64,
+    buffer: [f32; BUFFER_SIZE],
+    size: usize,
+    volume: f32,
+}
+
+impl AudioBuffer {
+    pub fn new() -> Self {
+        Self {
+            phase: 0.0,
+            cycles_per_sample: CPU_CLOCK_NTSC as f64 / SAMPLING_RATE as f64,
+            buffer: [0.0; BUFFER_SIZE],
+            size: 0,
+            volume: 1.0,
+        }
+    }
+    pub fn add_sample(&mut self, sample: f32) {
+        self.phase += 1.0;
+        if self.phase >= self.cycles_per_sample {
+            self.phase -= self.cycles_per_sample;
+
+            if self.size < BUFFER_SIZE {
+                self.buffer[self.size] = sample * self.volume;
+                self.size += 1;
+            }
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Apu {
     #[serde(skip, default = "default_audio_access")]
@@ -679,7 +714,7 @@ pub struct Apu {
     frame: u128,
     pending_reset_cycle: Option<u16>,
     irq_flag_setting_in_progress: bool,
-    sample_index : usize,
+    sample_index: usize,
 }
 
 impl Default for Apu {
@@ -699,7 +734,7 @@ impl Default for Apu {
             frame: 1,
             pending_reset_cycle: None,
             irq_flag_setting_in_progress: false,
-            sample_index : 0,
+            sample_index: 0,
         }
     }
 }
@@ -721,7 +756,7 @@ impl Apu {
             frame: 1,
             pending_reset_cycle: None,
             irq_flag_setting_in_progress: false,
-            sample_index : 0,
+            sample_index: 0,
         }
     }
 

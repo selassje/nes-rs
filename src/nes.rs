@@ -108,7 +108,7 @@ pub struct Nes {
 impl Nes {
     pub fn new<T>(io: Rc<RefCell<T>>) -> Self
     where
-        T: IO + VideoAccess + AudioAccess + ControllerAccess + 'static,
+        T: IO  + 'static,
     {
         let controllers = Controllers::new();
         let mapper = MapperEnum::MapperNull(MapperNull::new());
