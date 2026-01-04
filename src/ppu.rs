@@ -515,10 +515,6 @@ impl Ppu {
                 &self.sprite_palettes,
             );
         let color = self.apply_emphasis_and_grayscale(color);
-        self.video_access
-            .borrow_mut()
-            .set_pixel(x as usize, self.scanline as usize, color);
-
         let index = self.scanline as usize * PIXEL_SIZE as usize * FRAME_WIDTH as usize
             + x as usize * PIXEL_SIZE as usize;
         bus.emulation_frame.video[index] = color.0;

@@ -69,18 +69,19 @@ pub struct RamBus<'a> {
     pub controllers: &'a mut Controllers,
 }
 
-const FRAME_SIZE: usize = FRAME_HEIGHT * FRAME_WIDTH * PIXEL_SIZE;
+const VIDEO_FRAME_SIZE: usize = FRAME_HEIGHT * FRAME_WIDTH * PIXEL_SIZE;
+const AUDIO_FRAME_SIZE: usize = CPU_CYCLES_PER_FRAME;
 
 pub struct EmulationFrame {
-    pub video: Box<[u8; FRAME_SIZE]>,
-    //    pub audio: [f32; CPU_CYCLES_PER_FRAME as usize],
+    pub video: Box<[u8; VIDEO_FRAME_SIZE]>,
+    pub audio: Box<[f32; AUDIO_FRAME_SIZE]>,
 }
 
 impl Default for EmulationFrame {
     fn default() -> Self {
         Self {
-            video: Box::new([0; FRAME_SIZE]),
-            //   audio: [0.0; CPU_CYCLES_PER_FRAME as usize],
+            video: Box::new([0; VIDEO_FRAME_SIZE]),
+            audio: Box::new([0.0; AUDIO_FRAME_SIZE]),
         }
     }
 }
