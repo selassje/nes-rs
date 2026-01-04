@@ -667,11 +667,12 @@ const SAMPLING_RATE: usize = 44100;
 const CPU_CLOCK_NTSC: f64 = 1_789_773.0;
 const BUFFER_SIZE: usize = 2048;
 struct AudioBuffer {
-    phase: f64,
-    cycles_per_sample: f64,
-    buffer: [f32; BUFFER_SIZE],
-    size: usize,
-    volume: f32,
+  phase: f64,
+  cycles_per_sample: f64,
+  acc: f64,
+  acc_count: f64,
+  buffer: [f32; BUFFER_SIZE],
+  size: usize,
 }
 
 impl AudioBuffer {
@@ -681,20 +682,28 @@ impl AudioBuffer {
             cycles_per_sample: CPU_CLOCK_NTSC as f64 / SAMPLING_RATE as f64,
             buffer: [0.0; BUFFER_SIZE],
             size: 0,
-            volume: 1.0,
+            acc: 0.0,
+            acc_count: 0.0,
         }
     }
     pub fn add_sample(&mut self, sample: f32) {
-        self.phase += 1.0;
-        if self.phase >= self.cycles_per_sample {
-            self.phase -= self.cycles_per_sample;
-
-            if self.size < BUFFER_SIZE {
-                self.buffer[self.size] = sample * self.volume;
-                self.size += 1;
-            }
-        }
-    }
+      self.phase += 1.0;
+      self.acc += sample as f64;
+      self.acc_count += 1.0;
+  
+      if self.phase >= self.cycles_per_sample {
+          self.phase -= self.cycles_per_sample;
+  
+          if self.size < BUFFER_SIZE {
+              let averaged = self.acc / self.acc_count;
+              self.buffer[self.size] = averaged as f32;
+              self.size += 1;
+          }
+  
+          self.acc = 0.0;
+          self.acc_count = 0.0;
+      }
+  }
 }
 
 #[derive(Serialize, Deserialize)]
