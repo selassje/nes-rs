@@ -232,9 +232,7 @@ impl Cpu {
     }
 
     fn push_byte(&mut self, val: u8, bus: &mut CpuBus) {
-        let mut ram_bus = ram_bus!(bus);
-        bus.ram
-            .store_byte(self.sp as u16 + STACK_PAGE, val, &mut ram_bus);
+        bus.store_byte(self.sp as u16 + STACK_PAGE, val);
         self.sp = ((self.sp as i16 - 1) & 0xFF) as u8;
     }
 
@@ -267,11 +265,10 @@ impl Cpu {
 
     fn fetch_next_instruction(&mut self, bus: &mut CpuBus) {
         let ppu_time = bus.ppu.get_time();
-        let mut ram_bus = ram_bus!(bus);
         let op = if let Some(op) = self.interrupt.take() {
             op
         } else {
-            bus.ram.get_byte(self.pc, &mut ram_bus)
+            bus.get_byte(self.pc)
         };
 
         let (_, code_segment_end) = self.code_segment;
@@ -280,10 +277,10 @@ impl Cpu {
             let mut operand_2 = 0;
 
             if self.pc < code_segment_end {
-                operand_1 = bus.ram.get_byte(self.pc + 1, &mut ram_bus);
+                operand_1 = bus.get_byte(self.pc + 1);
             }
             if self.pc + 1 < code_segment_end {
-                operand_2 = bus.ram.get_byte(self.pc + 2, &mut ram_bus);
+                operand_2 = bus.get_byte(self.pc + 2);
             }
 
             let (address, extra_cycles_from_page_crossing) = self
@@ -466,7 +463,6 @@ impl Cpu {
         extra_cycle_on_page_crossing: bool,
         bus: &mut CpuBus,
     ) -> (Address, u16) {
-        let mut ram_bus = ram_bus!(bus);
         let b0_u16 = operand_1 as u16;
         let b1_u16 = operand_2 as u16;
         let x_u16 = self.x as u16;
@@ -500,17 +496,13 @@ impl Cpu {
                 Address::Ram(address as u16)
             }
             AddressingMode::IndexedIndirectX => {
-                let indexed_indirect = convert_2u8_to_u16(
-                    bus.ram.get_byte(zero_page_x, &mut ram_bus),
-                    bus.ram.get_byte(zero_page_x_hi, &mut ram_bus),
-                );
+                let indexed_indirect =
+                    convert_2u8_to_u16(bus.get_byte(zero_page_x), bus.get_byte(zero_page_x_hi));
                 Address::Ram(indexed_indirect)
             }
             AddressingMode::IndirectIndexedY => {
-                let indirect = convert_2u8_to_u16(
-                    bus.ram.get_byte(b0_u16, &mut ram_bus),
-                    bus.ram.get_byte((b0_u16 + 1) & 0xFF, &mut ram_bus),
-                );
+                let indirect =
+                    convert_2u8_to_u16(bus.get_byte(b0_u16), bus.get_byte((b0_u16 + 1) & 0xFF));
                 let indirect_indexed = (indirect as u32 + y_u16 as u32) as u16;
                 if extra_cycle_on_page_crossing && Self::is_page_crossed(indirect_indexed, indirect)
                 {
@@ -525,13 +517,13 @@ impl Cpu {
             AddressingMode::Indirect => {
                 let indirect = if b0_u16 == 0xFF {
                     convert_2u8_to_u16(
-                        bus.ram.get_byte(b0_u16 + (b1_u16 << 8), &mut ram_bus),
-                        bus.ram.get_byte(b1_u16 << 8, &mut ram_bus),
+                        bus.get_byte(b0_u16 + (b1_u16 << 8)),
+                        bus.get_byte(b1_u16 << 8),
                     )
                 } else {
                     convert_2u8_to_u16(
-                        bus.ram.get_byte(b0_u16 + (b1_u16 << 8), &mut ram_bus),
-                        bus.ram.get_byte(b0_u16 + (b1_u16 << 8) + 1, &mut ram_bus),
+                        bus.get_byte(b0_u16 + (b1_u16 << 8)),
+                        bus.get_byte(b0_u16 + (b1_u16 << 8) + 1),
                     )
                 };
                 Address::Ram(indirect)

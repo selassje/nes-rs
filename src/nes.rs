@@ -173,13 +173,7 @@ impl Nes {
         self.apu.power_cycle();
         self.ram.power_cycle();
         self.mapper.power_cycle();
-        let mut cpu_bus = CpuBus {
-            ram: &mut self.ram,
-            ppu: &mut self.ppu,
-            apu: &mut self.apu,
-            mapper: &mut self.mapper,
-            controllers: &mut self.controllers,
-        };
+        let mut cpu_bus = cpu_bus!(self);
         self.cpu.power_cycle(&mut cpu_bus);
     }
 
