@@ -57,11 +57,6 @@ pub struct PpuBus<'a> {
     pub mapper: &'a mut MapperEnum,
     pub emulation_frame: &'a mut EmulationFrame,
 }
-pub struct ApuBus<'a> {
-    pub ram: &'a mut Ram,
-    pub mapper: &'a mut MapperEnum,
-    pub emulation_frame: &'a mut EmulationFrame,
-}
 pub struct RamBus<'a> {
     pub apu: &'a mut Apu,
     pub ppu: &'a mut Ppu,
@@ -95,7 +90,7 @@ impl EmulationFrame {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-struct ConfigImpl {
+pub(crate) struct ConfigImpl {
   pub audio_volume : f32,
   pub target_fps : u16, 
 }
@@ -128,6 +123,12 @@ impl Config<'_> {
     }
   }
 
+pub struct ApuBus<'a> {
+    pub ram: &'a mut Ram,
+    pub mapper: &'a mut MapperEnum,
+    pub emulation_frame: &'a mut EmulationFrame,
+    pub config: &'a ConfigImpl,
+}
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Nes {
     version: String,
@@ -284,6 +285,7 @@ impl Nes {
             ram: &mut self.ram,
             mapper: &mut self.mapper,
             emulation_frame: &mut self.emulation_frame,
+            config: &self.config,
         };
         self.apu.run_single_cpu_cycle(&mut apu_bus);
         let mut cpu_bus = cpu_bus!(self);

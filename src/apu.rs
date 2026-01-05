@@ -1,6 +1,7 @@
 use crate::common::CPU_CYCLES_PER_FRAME;
 use crate::io::AudioSampleFormat;
 use crate::nes::ApuBus;
+use crate::nes::ConfigImpl;
 use crate::nes::EmulationFrame;
 use crate::nes::Ram;
 use crate::{io::AudioAccess, memory::DmcMemory, ram_apu::*};
@@ -666,7 +667,7 @@ fn default_audio_access() -> Rc<RefCell<dyn AudioAccess>> {
 
 const SAMPLING_RATE: usize = 44100;
 const CPU_CLOCK_NTSC: f64 = 1_789_773.0;
-const CYCLES_PER_SAMPLE: f64 =  (CPU_CLOCK_NTSC as f64 / SAMPLING_RATE as f64) * 0.98;
+const CYCLES_PER_SAMPLE: f64 = (CPU_CLOCK_NTSC as f64 / SAMPLING_RATE as f64) * 0.98;
 use crate::nes::AUDIO_FRAME_SIZE;
 
 struct AudioBuffer {
@@ -683,9 +684,14 @@ impl AudioBuffer {
             acc_count: 0.0,
         }
     }
-    pub fn add_sample(&mut self, sample: f32, emulation_frame: &mut EmulationFrame) {
+    pub fn add_sample(
+        &mut self,
+        sample: f32,
+        emulation_frame: &mut EmulationFrame,
+        config: &ConfigImpl,
+    ) {
         self.phase += 1.0;
-        self.acc += sample as f64;
+        self.acc += sample as f64 * config.audio_volume as f64;
         self.acc_count += 1.0;
         if self.phase >= CYCLES_PER_SAMPLE {
             self.phase -= CYCLES_PER_SAMPLE;
@@ -909,7 +915,8 @@ impl Apu {
             self.noise.get_sample(),
             self.dmc.get_sample(),
         );
-        self.audio_buffer.add_sample(sample, bus.emulation_frame);
+        self.audio_buffer
+            .add_sample(sample, bus.emulation_frame, bus.config);
         self.audio_access.borrow_mut().add_sample(sample);
     }
 
