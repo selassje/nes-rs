@@ -691,10 +691,11 @@ impl AudioBuffer {
         config: &ConfigImpl,
     ) {
         self.phase += 1.0;
+        let cycels_per_sample = (config.target_fps as f64 * CPU_CYCLES_PER_FRAME as f64) / SAMPLING_RATE as f64;
         self.acc += sample as f64 * config.audio_volume as f64;
         self.acc_count += 1.0;
-        if self.phase >= CYCLES_PER_SAMPLE {
-            self.phase -= CYCLES_PER_SAMPLE;
+        if self.phase >= cycels_per_sample {
+            self.phase -= cycels_per_sample;
             if emulation_frame.audio_size < AUDIO_FRAME_SIZE {
                 let averaged = self.acc / self.acc_count;
                 emulation_frame.audio[emulation_frame.audio_size] = averaged as f32;

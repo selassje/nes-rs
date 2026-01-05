@@ -396,22 +396,21 @@ impl io::IO for IOSdl2ImGuiOpenGl {
             } else {
                 audio_queue.resume();
 
-                let mut audio_saturation_threshold = self.sample_buffer.get_byte_size() as u32 * 10;
-                audio_saturation_threshold = emulation_frame.audio_size as u32 * 10 * 4;
-                println!(
-                    "Audio len {} org {}",
-                    emulation_frame.audio_size,
-                    self.sample_buffer.get_byte_size() / 4
-                );
+                let audio_frames_reserve: u32 = 10;
+                let audio_saturation_threshold = emulation_frame.audio_size as u32
+                    * std::mem::size_of::<f32>() as u32
+                    * audio_frames_reserve;
+                //let audio_saturation_threshold = self.sample_buffer.get_byte_size() as u32 * 10;
+                //  println!(
+                //     "Audio len {} org {}",
+                //     emulation_frame.audio_size,
+                //    self.sample_buffer.get_byte_size() / 4
+                // );
                 #[cfg(not(target_os = "emscripten"))]
                 {
-                    //  while audio_queue.size() > audio_saturation_threshold {}
-                    //let _ = audio_queue.queue_audio(emulation_frame.get_audio_samples());
-                    let min_queue = 735 * 3 * 4;
-
-                    if audio_queue.size() < min_queue {
-                      let _ = audio_queue.queue_audio(self.sample_buffer.get_samples());
-                    }
+                    while audio_queue.size() > audio_saturation_threshold {}
+                    let _ = audio_queue.queue_audio(emulation_frame.get_audio_samples());
+                    //let _ = audio_queue.queue_audio(self.sample_buffer.get_samples());
                 }
                 #[cfg(target_os = "emscripten")]
                 if audio_queue.size() < audio_saturation_threshold {
@@ -426,7 +425,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 } else {
                     0.0
                 };
-                
+
                 self.sample_buffer.reset(control.target_fps, volume);
                 io_state.audio_volume = volume;
             }

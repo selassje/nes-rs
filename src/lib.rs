@@ -124,8 +124,8 @@ impl emscripten_main_loop::MainLoop for Emulation {
 
         if !self.io_state.pause {
             let elapsed_time_since_frame_start = self.frame_start.elapsed();
-          //  if !self.is_audio_available && elapsed_time_since_frame_start < FRAME_DURATION {
-            if elapsed_time_since_frame_start < FRAME_DURATION {
+            if !self.is_audio_available && elapsed_time_since_frame_start < FRAME_DURATION {
+          //  if elapsed_time_since_frame_start < FRAME_DURATION {
                 #[cfg(not(target_os = "emscripten"))]
                 std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);
             }
