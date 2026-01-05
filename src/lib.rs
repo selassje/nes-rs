@@ -123,12 +123,11 @@ impl emscripten_main_loop::MainLoop for Emulation {
         handle_io_state(&mut self.nes, &self.io_state, &mut self.io_control);
 
         if !self.io_state.pause {
-            {
-                let elapsed_time_since_frame_start = self.frame_start.elapsed();
-                if !self.is_audio_available && elapsed_time_since_frame_start < FRAME_DURATION {
-                    #[cfg(not(target_os = "emscripten"))]
-                    std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);
-                }
+            let elapsed_time_since_frame_start = self.frame_start.elapsed();
+          //  if !self.is_audio_available && elapsed_time_since_frame_start < FRAME_DURATION {
+            if elapsed_time_since_frame_start < FRAME_DURATION {
+                #[cfg(not(target_os = "emscripten"))]
+                std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);
             }
             self.frame_start = std::time::Instant::now();
         } else {
@@ -223,8 +222,9 @@ fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut 
             io::Speed::Increase => io_control.target_fps += 5,
             io::Speed::Decrease => {
                 io_control.target_fps = std::cmp::max(0, io_control.target_fps as i32 - 5) as u16
-            }
+            } 
         }
+        nes.config().set_target_fps(io_control.target_fps);
     }
 
     for (i, controller_type) in io_state.switch_controller_type.iter().enumerate() {
@@ -234,6 +234,7 @@ fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut 
             }
         }
     }
+    nes.config().set_audio_volume(io_state.audio_volume);
 }
 
 fn load(nes: &mut nes::Nes, path: &str) {

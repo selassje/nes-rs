@@ -3,7 +3,8 @@ use crate::io;
 
 pub(super) const SAMPLING_RATE: usize = 44100;
 const INITIAL_SAMPLE_BUCKET_SIZE: f32 =
-    (common::DEFAULT_FPS as f32 * common::CPU_CYCLES_PER_FRAME as f32) / SAMPLING_RATE as f32;
+    (1 as f32 * common::CPU_CYCLES_PER_FRAME as f32) / SAMPLING_RATE as f32;
+//pub(super) const BUFFER_SIZE: usize = 65536;
 pub(super) const BUFFER_SIZE: usize = 2048;
 pub(super) struct AudioSampleBuffer {
     size: usize,

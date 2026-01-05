@@ -666,11 +666,11 @@ fn default_audio_access() -> Rc<RefCell<dyn AudioAccess>> {
 
 const SAMPLING_RATE: usize = 44100;
 const CPU_CLOCK_NTSC: f64 = 1_789_773.0;
+const CYCLES_PER_SAMPLE: f64 =  (CPU_CLOCK_NTSC as f64 / SAMPLING_RATE as f64) * 0.98;
 use crate::nes::AUDIO_FRAME_SIZE;
 
 struct AudioBuffer {
     phase: f64,
-    cycles_per_sample: f64,
     acc: f64,
     acc_count: f64,
 }
@@ -679,7 +679,6 @@ impl AudioBuffer {
     pub fn new() -> Self {
         Self {
             phase: 0.0,
-            cycles_per_sample: CPU_CLOCK_NTSC as f64 / SAMPLING_RATE as f64,
             acc: 0.0,
             acc_count: 0.0,
         }
@@ -688,9 +687,8 @@ impl AudioBuffer {
         self.phase += 1.0;
         self.acc += sample as f64;
         self.acc_count += 1.0;
-
-        if self.phase >= self.cycles_per_sample {
-            self.phase -= self.cycles_per_sample;
+        if self.phase >= CYCLES_PER_SAMPLE {
+            self.phase -= CYCLES_PER_SAMPLE;
             if emulation_frame.audio_size < AUDIO_FRAME_SIZE {
                 let averaged = self.acc / self.acc_count;
                 emulation_frame.audio[emulation_frame.audio_size] = averaged as f32;

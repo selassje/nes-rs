@@ -8,8 +8,8 @@ use std::{borrow::BorrowMut, collections::HashMap};
 use self::gui::VideoSizeControl;
 
 use super::io_internal;
-use crate::common::FRAME_WIDTH;
 use crate::common::FRAME_HEIGHT;
+use crate::common::FRAME_WIDTH;
 use crate::nes::EmulationFrame;
 use crate::{controllers, io};
 
@@ -335,7 +335,11 @@ impl IOSdl2ImGuiOpenGl {
 }
 
 impl io::IO for IOSdl2ImGuiOpenGl {
-    fn present_frame(&mut self, control: io::IOControl, emulation_frame : &EmulationFrame) -> io::IOState {
+    fn present_frame(
+        &mut self,
+        control: io::IOControl,
+        emulation_frame: &EmulationFrame,
+    ) -> io::IOState {
         if self.frame == u128::MAX {
             self.frame = 0;
         } else {
@@ -386,20 +390,28 @@ impl io::IO for IOSdl2ImGuiOpenGl {
             };
         }
 
-
         if let Some(ref audio_queue) = self.maybe_audio_queue {
             if self.gui.pause {
                 audio_queue.pause();
             } else {
                 audio_queue.resume();
-              
+
                 let mut audio_saturation_threshold = self.sample_buffer.get_byte_size() as u32 * 10;
-                audio_saturation_threshold = emulation_frame.audio_size as u32 * 10;
+                audio_saturation_threshold = emulation_frame.audio_size as u32 * 10 * 4;
+                println!(
+                    "Audio len {} org {}",
+                    emulation_frame.audio_size,
+                    self.sample_buffer.get_byte_size() / 4
+                );
                 #[cfg(not(target_os = "emscripten"))]
                 {
-                    while audio_queue.size() > audio_saturation_threshold {}
-                    //let _ = audio_queue.queue_audio(self.sample_buffer.get_samples());
-                    let _ = audio_queue.queue_audio(emulation_frame.get_audio_samples());
+                    //  while audio_queue.size() > audio_saturation_threshold {}
+                    //let _ = audio_queue.queue_audio(emulation_frame.get_audio_samples());
+                    let min_queue = 735 * 3 * 4;
+
+                    if audio_queue.size() < min_queue {
+                      let _ = audio_queue.queue_audio(self.sample_buffer.get_samples());
+                    }
                 }
                 #[cfg(target_os = "emscripten")]
                 if audio_queue.size() < audio_saturation_threshold {
@@ -414,8 +426,9 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 } else {
                     0.0
                 };
-
+                
                 self.sample_buffer.reset(control.target_fps, volume);
+                io_state.audio_volume = volume;
             }
         }
         unsafe {

@@ -95,6 +95,40 @@ impl EmulationFrame {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
+struct ConfigImpl {
+  pub audio_volume : f32,
+  pub target_fps : u16, 
+}
+
+impl Default for ConfigImpl {
+    fn default() -> Self {
+        ConfigImpl {
+            audio_volume: 1.0,
+            target_fps: common::DEFAULT_FPS,
+        }
+    }
+}
+
+pub struct Config<'a> {
+    config: &'a mut ConfigImpl,
+}
+
+impl Config<'_> {
+    pub fn set_audio_volume(&mut self, volume: f32) {
+        self.config.audio_volume = volume;
+    }
+    pub fn get_audio_volume(&self) -> f32 {
+        self.config.audio_volume
+    }
+    pub fn set_target_fps(&mut self, fps: u16) {
+        self.config.target_fps = fps;
+    }
+    pub fn get_target_fps(&self) -> u16 {
+        self.config.target_fps
+    }
+  }
+
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Nes {
     version: String,
     cpu: Cpu,
@@ -103,6 +137,7 @@ pub struct Nes {
     apu: Apu,
     controllers: Controllers,
     mapper: MapperEnum,
+    config: ConfigImpl,
     #[serde(skip, default)]
     emulation_frame: EmulationFrame,
     #[serde(skip, default = "default_video_access")]
@@ -132,6 +167,7 @@ impl Nes {
             apu,
             controllers,
             mapper,
+            config: ConfigImpl::default(),
             video_access: io.clone(),
             audio_access: io.clone(),
             controller_access: io.clone(),
@@ -164,6 +200,12 @@ impl Nes {
 
     pub fn get_emulation_frame(&self) -> &EmulationFrame {
         &self.emulation_frame
+    }
+
+    pub fn config(&mut self) -> Config {
+        Config {
+            config: &mut self.config,
+        }
     }
 
     pub fn deserialize(&mut self, state: Vec<u8>) {
@@ -222,9 +264,8 @@ impl Nes {
 
     pub fn run_single_frame(&mut self) {
         use crate::ppu::PpuState;
-
+        self.emulation_frame.audio_size = 0;
         let current_frame = self.ppu.get_time().frame;
-
         while self.ppu.get_time().frame == current_frame {
             self.run_single_cpu_cycle();
         }

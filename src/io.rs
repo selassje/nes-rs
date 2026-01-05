@@ -72,6 +72,7 @@ pub struct IOState {
     pub speed: Option<Speed>,
     pub pause: bool,
     pub switch_controller_type: [Option<controllers::ControllerType>; 2],
+    pub audio_volume: f32,
 }
 
 #[derive(Clone, Default)]
