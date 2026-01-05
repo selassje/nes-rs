@@ -106,6 +106,7 @@ impl Default for ConfigImpl {
 
 pub struct Config<'a> {
     config: &'a mut ConfigImpl,
+    controllers: &'a mut Controllers,
 }
 
 impl Config<'_> {
@@ -121,7 +122,14 @@ impl Config<'_> {
     pub fn get_target_fps(&self) -> u16 {
         self.config.target_fps
     }
+    pub fn set_controller(&mut self, id: ControllerId, controller_type: ControllerType) {
+        self.controllers
+            .set_controller(id, controller_type, Rc::new(RefCell::new(crate::io::DummyIOImpl::new())));
+    }
+
   }
+
+type ControllerAccessRef = Rc<RefCell<dyn ControllerAccess>>;
 
 pub struct ApuBus<'a> {
     pub ram: &'a mut Ram,
@@ -206,6 +214,7 @@ impl Nes {
     pub fn config(&mut self) -> Config {
         Config {
             config: &mut self.config,
+            controllers: &mut self.controllers
         }
     }
 
