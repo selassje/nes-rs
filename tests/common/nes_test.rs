@@ -1,11 +1,9 @@
 use nes_rs::{ControllerId, Nes, StdNesControllerButton, FRAME_HEIGHT, FRAME_WIDTH, PIXEL_SIZE};
 
 use fs::File;
-use sdl2::{
-    pixels::{self, PixelFormatEnum},
-    rect::Rect,
+use std::{
+    cell::RefCell, fs, io::Read, io::Write, path::Path, path::PathBuf, rc::Rc, time::Duration,
 };
-use std::{cell::RefCell, fs, io::Read, path::Path, path::PathBuf, rc::Rc, time::Duration};
 type TestFn = dyn Fn(&mut NesTest);
 
 fn get_bytes_from_file(file_name: &str) -> Vec<u8> {
@@ -19,7 +17,7 @@ fn get_bytes_from_file(file_name: &str) -> Vec<u8> {
     });
     file.read_to_end(&mut rom).expect("Unable to read ROM");
     rom
-  }
+}
 
 pub struct NesTest {
     nes: Nes,
@@ -140,20 +138,30 @@ impl NesTest {
 
     fn dump_frame(&self) {
         let frame = &self.nes.get_emulation_frame().video;
-        let mut bitmap = sdl2::surface::Surface::new(
-            FRAME_WIDTH as u32,
-            FRAME_HEIGHT as u32,
-            PixelFormatEnum::RGB24,
-        )
-        .unwrap();
-        for x in 0..FRAME_WIDTH {
-            for y in 0..FRAME_HEIGHT {
-                let index = y * PIXEL_SIZE * FRAME_WIDTH + x * PIXEL_SIZE;
-                let pixel_color =
-                    pixels::Color::RGB(frame[index], frame[index + 1], frame[index + 2]);
-                let _ = bitmap.fill_rect(Rect::new(x as i32, y as i32, 1, 1), pixel_color);
+        let row_size = (PIXEL_SIZE * FRAME_WIDTH + 3) & !3;
+        let pixel_data_size = row_size * FRAME_HEIGHT;
+        let file_size = 54 + pixel_data_size;
+        let mut file = File::create(&self.output_frame_path).unwrap();
+        let mut header = [0u8; 54];
+        header[0] = b'B';
+        header[1] = b'M';
+        header[2..6].copy_from_slice(&(file_size as u32).to_le_bytes());
+        header[10..14].copy_from_slice(&54u32.to_le_bytes());
+        header[14..18].copy_from_slice(&40u32.to_le_bytes());
+        header[18..22].copy_from_slice(&(FRAME_WIDTH as u32).to_le_bytes());
+        header[22..26].copy_from_slice(&(FRAME_HEIGHT as u32).to_le_bytes());
+        header[26..28].copy_from_slice(&1u16.to_le_bytes()); 
+        header[28..30].copy_from_slice(&(PIXEL_SIZE as u16 * 8).to_le_bytes());
+        file.write_all(&header).unwrap();
+        for y in (0..FRAME_HEIGHT).rev() {
+            let mut row = vec![0u8; row_size];
+            for x in 0..FRAME_WIDTH {
+                let index = y * FRAME_WIDTH * PIXEL_SIZE + x * PIXEL_SIZE;
+                row[x * PIXEL_SIZE] = frame[index + 2]; // B
+                row[x * PIXEL_SIZE + 1] = frame[index + 1]; // G
+                row[x * PIXEL_SIZE + 2] = frame[index]; // R
             }
+            file.write_all(&row).unwrap();
         }
-        let _ = bitmap.save_bmp(&self.output_frame_path);
     }
 }
