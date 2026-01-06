@@ -8,8 +8,8 @@ use self::gui::VideoSizeControl;
 
 use crate::common::FRAME_HEIGHT;
 use crate::common::FRAME_WIDTH;
-use crate::nes::{self, EmulationFrame};
 use crate::io;
+use crate::nes::{self, EmulationFrame};
 
 use nes::ControllerId;
 
@@ -172,10 +172,8 @@ impl IOSdl2ImGuiOpenGl {
         io_state.save_state = self.gui.get_save_state_path();
         io_state.load_state = self.gui.get_load_state_path();
         io_state.switch_controller_type = [
-            self.gui
-                .get_controller_switch(ControllerId::Controller1),
-            self.gui
-                .get_controller_switch(ControllerId::Controller2),
+            self.gui.get_controller_switch(ControllerId::Controller1),
+            self.gui.get_controller_switch(ControllerId::Controller2),
         ];
 
         io_state.speed = None;
@@ -468,8 +466,16 @@ impl io::ControllerAccess for IOSdl2ImGuiOpenGl {
         let key_state = self.keyboard_state.get(&sdl2_scancode);
         *key_state.unwrap_or(&false)
     }
-
-    fn get_mouse_click(&self) -> io::MouseClick {
-        self.gui.mouse_click.clone()
+    fn is_zapper_trigger_pressed(&self) -> Option<nes::ZapperTarget> {
+        if self.gui.mouse_click.left_button {
+            Some(nes::ZapperTarget::OnScreen(
+                self.gui.mouse_click.x as u8,
+                self.gui.mouse_click.y as u8,
+            ))
+        } else if self.gui.mouse_click.right_button {
+            Some(nes::ZapperTarget::OffScreen)
+        } else {
+            None
+        }
     }
 }

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::io::{ControllerAccess, IO};
-use crate::{nes::ControllerId, nes::StdNesControllerButton,nes::MouseClick};
+use crate::{nes::ControllerId, nes::StdNesControllerButton};
 
 use super::{IOControl, IOState};
 
@@ -38,7 +38,7 @@ impl ControllerAccess for IOTest {
             false
         }
     }
-    fn get_mouse_click(&self) -> MouseClick {
-        todo!()
+    fn is_zapper_trigger_pressed(&self) -> Option<crate::nes::ZapperTarget> {
+        None
     }
 }

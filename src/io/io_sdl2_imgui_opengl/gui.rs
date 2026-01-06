@@ -5,7 +5,7 @@ use crate::{
     io::{IOControl},
 };
 
-use crate::nes::MouseClick;
+use crate::io::MouseClick;
 
 use imgui::ImString;
 

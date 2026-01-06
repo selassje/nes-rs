@@ -4,13 +4,19 @@ use crate::nes::ControllerAccess;
 use crate::nes::ControllerId;
 use crate::nes::ControllerType;
 use crate::nes::EmulationFrame;
-use crate::nes::MouseClick;
 use crate::nes::StdNesControllerButton;
 
 pub mod io_sdl2_imgui_opengl;
 pub mod io_test;
 
 pub type AudioSampleFormat = f32;
+#[derive(Clone)]
+pub struct MouseClick {
+    pub left_button: bool,
+    pub right_button: bool,
+    pub x: usize,
+    pub y: usize,
+}
 
 impl From<u8> for StdNesControllerButton {
     fn from(value: u8) -> Self {
@@ -87,13 +93,8 @@ impl ControllerAccess for DummyControllerAccessImplementation {
     ) -> bool {
         false
     }
-    fn get_mouse_click(&self) -> MouseClick {
-        MouseClick {
-            left_button: false,
-            right_button: false,
-            x: 0,
-            y: 0,
-        }
+    fn is_zapper_trigger_pressed(&self) -> Option<crate::nes::ZapperTarget> {
+        None
     }
 }
 

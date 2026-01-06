@@ -43,17 +43,15 @@ pub enum StdNesControllerButton {
     Right,
 }
 
-#[derive(Clone)]
-pub struct MouseClick {
-    pub left_button: bool,
-    pub right_button: bool,
-    pub x: usize,
-    pub y: usize,
+pub enum ZapperTarget {
+    OffScreen,
+    OnScreen(u8,u8),
 }
+
 
 pub trait ControllerAccess {
     fn is_button_pressed(&self, controller_id: crate::nes::ControllerId, button: StdNesControllerButton) -> bool;
-    fn get_mouse_click(&self) -> MouseClick;
+    fn is_zapper_trigger_pressed(&self) ->  Option<ZapperTarget>;
 }
 pub struct CpuBus<'a> {
     pub ram: &'a mut Ram,
