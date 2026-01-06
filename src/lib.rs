@@ -210,7 +210,7 @@ impl Nes {
         }
     }
 
-    pub fn serialize(&self) -> Vec<u8> {
+    pub fn save_state(&self) -> Vec<u8> {
         let serialized = serde_json::to_vec(self).unwrap();
         let compressed = yazi::compress(
             serialized.as_slice(),
@@ -232,7 +232,7 @@ impl Nes {
         }
     }
 
-    pub fn deserialize(&mut self, state: Vec<u8>) {
+    pub fn load_state(&mut self, state: Vec<u8>) {
         let (decompressed, checksum) =
             yazi::decompress(state.as_slice(), yazi::Format::Zlib).unwrap();
 

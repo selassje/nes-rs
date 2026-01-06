@@ -110,7 +110,6 @@ impl emscripten_main_loop::MainLoop for Emulation {
         if !self.io_state.pause {
             let elapsed_time_since_frame_start = self.frame_start.elapsed();
             if !self.is_audio_available && elapsed_time_since_frame_start < FRAME_DURATION {
-                //  if elapsed_time_since_frame_start < FRAME_DURATION {
                 #[cfg(not(target_os = "emscripten"))]
                 std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);
             }
@@ -169,7 +168,7 @@ fn handle_io_state(nes: &mut Nes, io_state: &io::IOState, io_control: &mut io::I
     }
 
     if let Some(ref save_state_path) = io_state.save_state {
-        let serialized = nes.serialize();
+        let serialized = nes.save_state();
         let file_name = save_state_path.as_str();
         let mut file = File::create(file_name).unwrap_or_else(|_| {
             panic!(
@@ -195,7 +194,7 @@ fn handle_io_state(nes: &mut Nes, io_state: &io::IOState, io_control: &mut io::I
                 std::env::current_dir().unwrap().display()
             )
         });
-        nes.deserialize(save);
+        nes.load_state(save);
         io_control.title = Some(load_state_path.clone());
     }
 

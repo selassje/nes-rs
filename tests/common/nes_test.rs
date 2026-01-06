@@ -95,14 +95,14 @@ impl NesTest {
 
     #[allow(dead_code)]
     pub fn serialize_and_reset(&mut self) -> Vec<u8> {
-        let serialized = self.nes.serialize();
+        let serialized = self.nes.save_state();
         self.nes.power_cycle();
         serialized
     }
 
     #[allow(dead_code)]
     pub fn deserialize(&mut self, state: Vec<u8>) {
-        self.nes.deserialize(state);
+        self.nes.load_state(state);
     }
 
     #[allow(dead_code)]
