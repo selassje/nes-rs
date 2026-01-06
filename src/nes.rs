@@ -111,14 +111,14 @@ impl EmulationFrame {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-pub(crate) struct ConfigImpl {
+pub(crate) struct AudioConfig {
     pub audio_volume: f32,
     pub target_fps: u16,
 }
 
-impl Default for ConfigImpl {
+impl Default for AudioConfig {
     fn default() -> Self {
-        ConfigImpl {
+        AudioConfig {
             audio_volume: 1.0,
             target_fps: common::DEFAULT_FPS,
         }
@@ -126,7 +126,7 @@ impl Default for ConfigImpl {
 }
 
 pub struct Config<'a> {
-    config: &'a mut ConfigImpl,
+    config: &'a mut AudioConfig,
     controllers: &'a mut Controllers,
 }
 
@@ -160,7 +160,7 @@ pub struct ApuBus<'a> {
     pub ram: &'a mut Ram,
     pub mapper: &'a mut MapperEnum,
     pub emulation_frame: &'a mut EmulationFrame,
-    pub(crate) config: &'a ConfigImpl,
+    pub(crate) config: &'a AudioConfig,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Nes {
@@ -171,7 +171,7 @@ pub struct Nes {
     apu: Apu,
     controllers: Controllers,
     mapper: MapperEnum,
-    config: ConfigImpl,
+    config: AudioConfig,
     #[serde(skip, default)]
     emulation_frame: EmulationFrame,
 }
@@ -186,7 +186,7 @@ impl Nes {
             apu: Apu::new(),
             controllers: Controllers::new(),
             mapper: MapperEnum::MapperNull(MapperNull::new()),
-            config: ConfigImpl::default(),
+            config: AudioConfig::default(),
             emulation_frame: EmulationFrame::default(),
         }
     }
@@ -206,7 +206,7 @@ impl Nes {
         &self.emulation_frame
     }
 
-    pub fn config(&mut self) -> Config {
+    pub fn config(&mut self) -> Config<'_> {
         Config {
             config: &mut self.config,
             controllers: &mut self.controllers,

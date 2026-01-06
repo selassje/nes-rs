@@ -1,7 +1,7 @@
 use crate::common::CPU_CYCLES_PER_FRAME;
 use crate::io::AudioSampleFormat;
 use crate::nes::ApuBus;
-use crate::nes::ConfigImpl;
+use crate::nes::AudioConfig;
 use crate::nes::EmulationFrame;
 use crate::nes::Ram;
 use crate::{memory::DmcMemory, ram_apu::*};
@@ -684,7 +684,7 @@ impl AudioBuffer {
         &mut self,
         sample: f32,
         emulation_frame: &mut EmulationFrame,
-        config: &ConfigImpl,
+        config: &AudioConfig,
     ) {
         self.phase += 1.0;
         let cycels_per_sample = (config.target_fps as f64 * CPU_CYCLES_PER_FRAME as f64) / SAMPLING_RATE as f64;

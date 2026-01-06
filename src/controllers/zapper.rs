@@ -49,7 +49,7 @@ impl super::Controller for Zapper {
     fn read(&self) -> u8 {
         let zapper_trigger = self.controller_access.borrow().is_zapper_trigger_pressed();
         let mut trigger_state = self.trigger_pressed.borrow_mut();
-        if (zapper_trigger.is_some() && !*trigger_state) {
+        if zapper_trigger.is_some() && !*trigger_state {
            if let  Some(ZapperTarget::OnScreen(x,y)) = zapper_trigger {
             *self.x.borrow_mut() = x as usize;
             *self.y.borrow_mut() = y as usize;
