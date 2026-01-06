@@ -1,7 +1,8 @@
-use crate::{nes::ControllerAccess, ram_controllers::*};
+use crate::{ControllerAccess, ram_controllers::*};
 
-use crate::nes::ControllerId;
-use crate::nes::ControllerType;
+use crate::ControllerId;
+use crate::ControllerType;
+use crate::StdNesControllerButton;
 use serde::Deserialize;
 use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
@@ -10,9 +11,28 @@ mod null_controller;
 mod std_nes_controller;
 mod zapper;
 
-use self::null_controller::NullController;
 use self::std_nes_controller::StdNesController;
 use self::zapper::Zapper;
+use self::null_controller::NullController;
+
+pub struct NullControllerAccess {}
+impl NullControllerAccess {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+impl ControllerAccess for NullControllerAccess {
+    fn is_button_pressed(
+        &self,
+        _controller_id: ControllerId,
+        _button: StdNesControllerButton,
+    ) -> bool {
+        false
+    }
+    fn is_zapper_trigger_pressed(&self) -> Option<crate::ZapperTarget> {
+        None
+    }
+}
 
 #[enum_dispatch::enum_dispatch(ControllerEnum)]
 pub trait Controller {
@@ -53,7 +73,7 @@ impl ControllerEnum {
 
 impl Default for ControllerEnum {
     fn default() -> Self {
-        Self::NullController(NullController::new())
+        Self::NullController(null_controller::NullController::new())
     }
 }
 
@@ -68,7 +88,7 @@ impl ControllerId {
 }
 fn default_controller_access() -> Rc<RefCell<dyn ControllerAccess>> {
     Rc::new(RefCell::new(
-        crate::io::DummyControllerAccessImplementation::new(),
+        NullControllerAccess::new(),
     ))
 }
 
@@ -115,7 +135,7 @@ impl Controllers {
         self.controller_2.power_cycle();
     }
 
-    pub fn update_zappers(&mut self, emulation_frame: &crate::nes::EmulationFrame, frame: u128) {
+    pub fn update_zappers(&mut self, emulation_frame: &crate::EmulationFrame, frame: u128) {
         for controller in [&mut self.controller_1, &mut self.controller_2] {
             if let ControllerEnum::Zapper(zapper) = controller {
                 zapper.update(emulation_frame, frame);

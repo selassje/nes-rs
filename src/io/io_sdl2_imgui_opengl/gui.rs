@@ -1,11 +1,14 @@
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
-    common::{self, FRAME_HEIGHT, FRAME_WIDTH},
-    nes::{ControllerId,ControllerType},
+    ControllerId,ControllerType,
     io::{IOControl},
+    FRAME_WIDTH, FRAME_HEIGHT,DEFAULT_FPS
 };
 
+
 use crate::io::MouseClick;
+use super::DOUBLE_FPS;
+use super::HALF_FPS;
 
 use imgui::ImString;
 
@@ -328,19 +331,19 @@ impl Gui {
 
                     ui.menu_item_config("Normal")
                         .enabled(enabled)
-                        .selected(is_speed_selected(common::DEFAULT_FPS))
+                        .selected(is_speed_selected(DEFAULT_FPS))
                         .build();
                     self.update_menu_item_status(ui, SpeedNormal);
 
                     ui.menu_item_config("Double")
                         .enabled(enabled)
-                        .selected(is_speed_selected(common::DOUBLE_FPS))
+                        .selected(is_speed_selected(DOUBLE_FPS))
                         .build();
                     self.update_menu_item_status(ui, SpeedDouble);
 
                     ui.menu_item_config("Half")
                         .enabled(enabled)
-                        .selected(is_speed_selected(common::HALF_FPS))
+                        .selected(is_speed_selected(HALF_FPS))
                         .build();
                     self.update_menu_item_status(ui, SpeedHalf);
 
@@ -471,9 +474,9 @@ impl Gui {
                     let window_pos = ui.window_pos();
                     let rel_pos = [mouse_pos[0] - window_pos[0], mouse_pos[1] - window_pos[1]];
                     let tex_x =
-                        (rel_pos[0] / self.video_size[0] * common::FRAME_WIDTH as f32).floor() as usize;
+                        (rel_pos[0] / self.video_size[0] * crate::FRAME_WIDTH as f32).floor() as usize;
                     let tex_y =
-                        (rel_pos[1] / self.video_size[1] * common::FRAME_HEIGHT as f32).floor() as usize;
+                        (rel_pos[1] / self.video_size[1] * crate::FRAME_HEIGHT as f32).floor() as usize;
 
                     if ui.is_mouse_clicked(imgui::MouseButton::Left) {
                         self.mouse_click.left_button = true;

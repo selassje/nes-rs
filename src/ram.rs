@@ -1,5 +1,5 @@
 use crate::mappers::MapperEnum;
-use crate::nes::RamBus;
+use crate::RamBus;
 use crate::ram_apu;
 use crate::ram_apu::ReadAccessRegisters;
 use crate::ram_apu::WriteAcessRegisters;

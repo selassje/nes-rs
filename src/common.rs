@@ -3,15 +3,9 @@ pub const CHR_ROM_UNIT_SIZE: usize = 0x2000;
 pub const PRG_RAM_UNIT_SIZE: usize = 0x2000;
 
 pub const CPU_CYCLES_PER_FRAME: usize = 29780;
-pub const FRAME_WIDTH: usize = 256;
-pub const FRAME_HEIGHT: usize = 240;
-
-pub const PIXEL_SIZE: usize = 3;
 
 
-pub const DEFAULT_FPS: u16 = 60;
-pub const DOUBLE_FPS: u16 = 120;
-pub const HALF_FPS: u16 = 30;
+
 
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Mirroring {

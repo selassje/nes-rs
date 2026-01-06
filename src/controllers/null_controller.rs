@@ -2,7 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
 
-use crate::nes::ControllerAccess;
+use crate::ControllerAccess;
 
 #[derive(Serialize, Deserialize)]
 pub struct NullController {}

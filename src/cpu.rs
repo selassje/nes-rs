@@ -2,8 +2,8 @@ mod opcodes;
 
 use self::{opcodes::IRQ_OPCODE, AddressingMode::*};
 use crate::apu::ApuState;
-use crate::nes::CpuBus;
-use crate::nes::RamBus;
+use crate::CpuBus;
+use crate::RamBus;
 use crate::ppu::PpuState;
 use crate::{common::*, memory::Memory};
 use crate::{mappers::Mapper, ram_ppu::DmaWriteAccessRegister::OamDma};

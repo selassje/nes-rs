@@ -6,18 +6,19 @@ use std::{borrow::BorrowMut, collections::HashMap};
 
 use self::gui::VideoSizeControl;
 
-use crate::common::FRAME_HEIGHT;
-use crate::common::FRAME_WIDTH;
 use crate::io;
-use crate::nes::{self, EmulationFrame};
 
-use nes::ControllerId;
+use crate::ControllerId;
+use crate::EmulationFrame;
 
 use gl::types::*;
 use sdl2::image::ImageRWops;
 
 const MENU_BAR_HEIGHT: u32 = 18;
 const MIN_WINDOW_WIDTH: u32 = 360;
+use crate::DEFAULT_FPS;
+pub const DOUBLE_FPS: u16 = 120;
+pub const HALF_FPS: u16 = 30;
 
 type Size = [f32; 2];
 
@@ -69,7 +70,7 @@ impl IOSdl2ImGuiOpenGl {
         let mut maybe_audio_queue = None;
         if let Ok(sdl_audio) = sdl2_context.audio() {
             let desired_spec = sdl2::audio::AudioSpecDesired {
-                freq: Some(nes::SAMPLING_RATE as i32),
+                freq: Some(crate::SAMPLING_RATE as i32),
                 channels: Some(1),
                 samples: None,
             };
@@ -140,7 +141,7 @@ impl IOSdl2ImGuiOpenGl {
         unsafe {
             gl::GenTextures(1, &mut emulation_texture);
             gl::BindTexture(gl::TEXTURE_2D, emulation_texture);
-            gl::PixelStorei(gl::UNPACK_ROW_LENGTH, FRAME_WIDTH as _);
+            gl::PixelStorei(gl::UNPACK_ROW_LENGTH, nes_rs::FRAME_WIDTH as _);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
         }
@@ -419,8 +420,8 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 gl::TEXTURE_2D,
                 0,
                 gl::RGB8 as _,
-                FRAME_WIDTH as _,
-                FRAME_HEIGHT as _,
+                nes_rs::FRAME_WIDTH as _,
+                nes_rs::FRAME_HEIGHT as _,
                 0,
                 gl::RGB,
                 gl::UNSIGNED_BYTE,
@@ -466,14 +467,14 @@ impl io::ControllerAccess for IOSdl2ImGuiOpenGl {
         let key_state = self.keyboard_state.get(&sdl2_scancode);
         *key_state.unwrap_or(&false)
     }
-    fn is_zapper_trigger_pressed(&self) -> Option<nes::ZapperTarget> {
+    fn is_zapper_trigger_pressed(&self) -> Option<crate::ZapperTarget> {
         if self.gui.mouse_click.left_button {
-            Some(nes::ZapperTarget::OnScreen(
+            Some(crate::ZapperTarget::OnScreen(
                 self.gui.mouse_click.x as u8,
                 self.gui.mouse_click.y as u8,
             ))
         } else if self.gui.mouse_click.right_button {
-            Some(nes::ZapperTarget::OffScreen)
+            Some(crate::ZapperTarget::OffScreen)
         } else {
             None
         }

@@ -3,9 +3,9 @@ use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
 
 use super::ControllerId;
-use crate::nes::ControllerAccess;
-use crate::nes::EmulationFrame;
-use crate::nes::ZapperTarget;
+use crate::ControllerAccess;
+use crate::EmulationFrame;
+use crate::ZapperTarget;
 
 #[derive(Serialize, Deserialize)]
 pub struct Zapper {
@@ -99,7 +99,7 @@ impl Zapper {
         self.current_frame = frame;
         let x = *self.x.borrow();
         let y = *self.y.borrow();
-        let idx = (y * crate::common::FRAME_WIDTH + x) * 3;
+        let idx = (y * crate::FRAME_WIDTH + x) * 3;
         let pixels = emulation_frame.video.as_ref();
         let r = pixels[idx] as f32 / 255.0;
         let g = pixels[idx + 1] as f32 / 255.0;

@@ -1,10 +1,10 @@
 use serde::Deserialize;
 use serde::Serialize;
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc,fmt::Display};
 
 use super::ControllerId;
-use crate::nes::StdNesControllerButton;
-use crate::nes::ControllerAccess;
+use crate::StdNesControllerButton;
+use crate::ControllerAccess;
 
 #[derive(Serialize, Deserialize)]
 pub struct StdNesController {
@@ -32,6 +32,36 @@ impl StdNesController {
     }
 }
 
+impl From<u8> for StdNesControllerButton {
+    fn from(value: u8) -> Self {
+        use StdNesControllerButton::*;
+        match value {
+            0 => A,
+            1 => B,
+            2 => Select,
+            3 => Start,
+            4 => Up,
+            5 => Down,
+            6 => Left,
+            7 => Right,
+            _ => panic!("Can't cast {} to Button", value),
+        }
+    }
+}
+impl Display for StdNesControllerButton {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            StdNesControllerButton::A => "A",
+            StdNesControllerButton::B => "B",
+            StdNesControllerButton::Select => "Select",
+            StdNesControllerButton::Start => "Start",
+            StdNesControllerButton::Up => "Up",
+            StdNesControllerButton::Down => "Down",
+            StdNesControllerButton::Left => "Left",
+            StdNesControllerButton::Right => "Right",
+        })
+    }
+}
 impl super::Controller for StdNesController {
     fn read(&self) -> u8 {
         0x40 | if *self.button.borrow() < 8 {

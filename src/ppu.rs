@@ -1,10 +1,10 @@
 use crate::colors::{ColorMapper, DefaultColorMapper, RgbColor};
-use crate::nes::PpuBus;
+use crate::PpuBus;
 use crate::vram::VRam;
 use crate::memory::VideoMemory;
 use crate::{mappers::Mapper, mappers::MapperEnum, ram_ppu::*};
 
-use crate::common::{FRAME_WIDTH, PIXEL_SIZE};
+use crate::{FRAME_WIDTH, PIXEL_SIZE};
 
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, default::Default, fmt::Display};

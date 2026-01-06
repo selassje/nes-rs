@@ -1,4 +1,7 @@
 use std::convert::TryFrom;
+
+use enum_tryfrom_derive::TryFromPrimitive;
+
 #[derive(Copy, Clone, Debug, TryFromPrimitive)]
 #[TryFromPrimitiveType = "u16"]
 pub enum WriteAccessRegister {

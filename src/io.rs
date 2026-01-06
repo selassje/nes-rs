@@ -1,10 +1,9 @@
 use std::fmt::Display;
 
-use crate::nes::ControllerAccess;
-use crate::nes::ControllerId;
-use crate::nes::ControllerType;
-use crate::nes::EmulationFrame;
-use crate::nes::StdNesControllerButton;
+use crate::ControllerAccess;
+use crate::ControllerType;
+use crate::EmulationFrame;
+use crate::StdNesControllerButton;
 
 pub mod io_sdl2_imgui_opengl;
 pub mod io_test;
@@ -18,37 +17,7 @@ pub struct MouseClick {
     pub y: usize,
 }
 
-impl From<u8> for StdNesControllerButton {
-    fn from(value: u8) -> Self {
-        use StdNesControllerButton::*;
-        match value {
-            0 => A,
-            1 => B,
-            2 => Select,
-            3 => Start,
-            4 => Up,
-            5 => Down,
-            6 => Left,
-            7 => Right,
-            _ => panic!("Can't cast {} to Button", value),
-        }
-    }
-}
 
-impl Display for StdNesControllerButton {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            StdNesControllerButton::A => "A",
-            StdNesControllerButton::B => "B",
-            StdNesControllerButton::Select => "Select",
-            StdNesControllerButton::Start => "Start",
-            StdNesControllerButton::Up => "Up",
-            StdNesControllerButton::Down => "Down",
-            StdNesControllerButton::Left => "Left",
-            StdNesControllerButton::Right => "Right",
-        })
-    }
-}
 #[derive(Clone)]
 pub enum Speed {
     Half,
@@ -79,24 +48,6 @@ pub struct IOControl {
     pub controller_type: [ControllerType; 2],
 }
 
-pub struct DummyControllerAccessImplementation {}
-impl DummyControllerAccessImplementation {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-impl ControllerAccess for DummyControllerAccessImplementation {
-    fn is_button_pressed(
-        &self,
-        _controller_id: ControllerId,
-        _button: StdNesControllerButton,
-    ) -> bool {
-        false
-    }
-    fn is_zapper_trigger_pressed(&self) -> Option<crate::nes::ZapperTarget> {
-        None
-    }
-}
 
 pub trait IO: ControllerAccess {
     fn present_frame(&mut self, control: IOControl, emulation_frame: &EmulationFrame) -> IOState;

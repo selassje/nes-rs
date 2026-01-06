@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::io::{ControllerAccess, IO};
-use crate::{nes::ControllerId, nes::StdNesControllerButton};
+use crate::{ControllerId, StdNesControllerButton};
 
 use super::{IOControl, IOState};
 
@@ -21,7 +21,7 @@ impl IOTest {
 }
 
 impl IO for IOTest {
-    fn present_frame(&mut self, _: IOControl, _: &crate::nes::EmulationFrame) -> IOState {
+    fn present_frame(&mut self, _: IOControl, _: &crate::EmulationFrame) -> IOState {
         Default::default()
     }
 
@@ -38,7 +38,7 @@ impl ControllerAccess for IOTest {
             false
         }
     }
-    fn is_zapper_trigger_pressed(&self) -> Option<crate::nes::ZapperTarget> {
+    fn is_zapper_trigger_pressed(&self) -> Option<crate::ZapperTarget> {
         None
     }
 }

@@ -1,9 +1,8 @@
 use crate::common::CPU_CYCLES_PER_FRAME;
-use crate::io::AudioSampleFormat;
-use crate::nes::ApuBus;
-use crate::nes::AudioConfig;
-use crate::nes::EmulationFrame;
-use crate::nes::Ram;
+use crate::ApuBus;
+use crate::AudioConfig;
+use crate::EmulationFrame;
+use crate::Ram;
 use crate::{memory::DmcMemory, ram_apu::*};
 use StatusRegisterFlag::*;
 
@@ -662,8 +661,8 @@ impl Dmc {
 }
 
 
-use crate::nes::AUDIO_FRAME_SIZE;
-use crate::nes::SAMPLING_RATE;
+use crate::AUDIO_FRAME_SIZE;
+use crate::SAMPLING_RATE;
 
 #[derive(Serialize, Deserialize)]
 struct AudioBuffer {
@@ -913,7 +912,7 @@ impl Apu {
         triangle: u8,
         noise: u8,
         dmc: u8,
-    ) -> AudioSampleFormat {
+    ) -> f32 {
         let mut n = pulse_1 + pulse_2;
         let puls_out = if n != 0 {
             95.52 / ((8128.0 / (n as f32)) + 100.0)
@@ -926,7 +925,7 @@ impl Apu {
         } else {
             0.0
         };
-        (puls_out + tnd_out) as AudioSampleFormat
+        (puls_out + tnd_out) as f32
     }
 
     fn is_half_frame_reached(&self) -> bool {

@@ -1,25 +1,11 @@
-use std::{
-    cell::RefCell,
-    env,
-    fs::File,
-    io::{Read, Write},
-    rc::Rc,
-};
-
-use emscripten_main_loop::MainLoop;
-use io::{io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl, IOControl, IOState, IO};
-use nes::Nes;
-
 mod apu;
 mod colors;
 mod common;
 mod controllers;
 mod cpu;
-mod io;
 mod mappers;
 mod memory;
-pub mod nes;
-mod nes_file;
+pub mod nes_file;
 mod ppu;
 mod ram;
 mod ram_apu;
@@ -27,226 +13,293 @@ mod ram_controllers;
 mod ram_ppu;
 mod vram;
 
-pub mod nes_test;
 
-extern crate enum_tryfrom;
+use crate::apu::Apu;
+use crate::controllers::Controllers;
+use crate::mappers::Mapper;
+use crate::mappers::MapperEnum;
+use crate::mappers::MapperNull;
+use crate::nes_file::NesFile;
 
-#[macro_use]
-extern crate enum_tryfrom_derive;
-extern crate cfg_if;
+use std::cell::RefCell;
+use std::rc::Rc;
+use std::time::Duration;
 
-const FRAME_DURATION: std::time::Duration = std::time::Duration::from_nanos(
-    (std::time::Duration::from_secs(1).as_nanos() / (common::DEFAULT_FPS) as u128) as u64,
-);
+const SERIALIZATION_VER: &str = "1";
 
-#[cfg(target_os = "emscripten")]
-extern "C" {
-    fn emscripten_run_script(s: *const std::os::raw::c_char);
+type Ppu = crate::ppu::Ppu;
+pub type Ram = crate::ram::Ram;
+type Cpu = crate::cpu::Cpu;
+
+#[derive(Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ControllerId {
+    Controller1,
+    Controller2,
 }
-pub struct Emulation {
-    nes: Nes,
-    io: Rc<RefCell<IOSdl2ImGuiOpenGl>>,
-    io_control: IOControl,
-    io_state: IOState,
-    fps: u16,
-    one_second_timer: std::time::Instant,
-    frame_start: std::time::Instant,
-    is_audio_available: bool,
+
+#[derive(Clone, Copy, PartialEq, Default)]
+pub enum ControllerType {
+    NullController,
+    #[default]
+    StdNesController,
+    Zapper,
 }
-#[allow(clippy::new_without_default)]
-impl Emulation {
-    pub fn new() -> Self {
-        let io = Rc::new(RefCell::new(
-            io::io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl::new(),
-        ));
 
-        let mut nes: Nes = nes::Nes::new();
-        nes.config().set_controller_access(io.clone());
+#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
+pub enum StdNesControllerButton {
+    A,
+    B,
+    Select,
+    Start,
+    Up,
+    Down,
+    Left,
+    Right,
+}
 
-        let mut initial_title: Option<String> = None;
-        let args: Vec<String> = env::args().collect();
-        if args.len() > 1 {
-            let path = &args[1];
-            load(&mut nes, path);
-            initial_title = Some(path.clone());
-        } else {
-            load_demo(&mut nes);
+pub enum ZapperTarget {
+    OffScreen,
+    OnScreen(u8,u8),
+}
+
+
+pub trait ControllerAccess {
+    fn is_button_pressed(&self, controller_id: ControllerId, button: StdNesControllerButton) -> bool;
+    fn is_zapper_trigger_pressed(&self) ->  Option<ZapperTarget>;
+}
+pub struct CpuBus<'a> {
+    pub ram: &'a mut Ram,
+    pub ppu: &'a mut Ppu,
+    pub apu: &'a mut Apu,
+    pub mapper: &'a mut MapperEnum,
+    pub controllers: &'a mut Controllers,
+}
+
+macro_rules! cpu_bus {
+    ($nes:expr) => {{
+        CpuBus {
+            ram: &mut $nes.ram,
+            ppu: &mut $nes.ppu,
+            apu: &mut $nes.apu,
+            mapper: &mut $nes.mapper,
+            controllers: &mut $nes.controllers,
         }
+    }};
+}
 
-        let io_state: io::IOState = Default::default();
-        let frame_start = std::time::Instant::now();
-        let fps = 0;
-        let one_second_timer = std::time::Instant::now();
+pub struct PpuBus<'a> {
+    pub mapper: &'a mut MapperEnum,
+    pub emulation_frame: &'a mut EmulationFrame,
+}
+pub struct RamBus<'a> {
+    pub apu: &'a mut Apu,
+    pub ppu: &'a mut Ppu,
+    pub mapper: &'a mut MapperEnum,
+    pub controllers: &'a mut Controllers,
+}
+pub const DEFAULT_FPS: u16 = 60;
+pub const PIXEL_SIZE: usize = 3;
+pub const FRAME_WIDTH: usize = 256;
+pub const FRAME_HEIGHT: usize = 240;
+pub const VIDEO_FRAME_SIZE: usize = FRAME_HEIGHT * FRAME_WIDTH * PIXEL_SIZE;
+pub const AUDIO_FRAME_SIZE: usize = 2048;
+pub const SAMPLING_RATE: usize = 44100;
 
-        let io_control = io::IOControl {
-            target_fps: common::DEFAULT_FPS,
-            current_fps: 0,
-            title: initial_title,
-            controller_type: [nes::ControllerType::NullController; 2],
-        };
-        let is_audio_available = io.borrow().is_audio_available();
+pub struct EmulationFrame {
+    pub video: Box<[u8; VIDEO_FRAME_SIZE]>,
+    pub audio: Box<[f32; AUDIO_FRAME_SIZE]>,
+    pub audio_size: usize,
+}
+
+impl Default for EmulationFrame {
+    fn default() -> Self {
         Self {
-            nes,
-            io,
-            io_control,
-            io_state,
-            fps,
-            one_second_timer,
-            frame_start,
-            is_audio_available,
+            video: Box::new([0; VIDEO_FRAME_SIZE]),
+            audio: Box::new([0.0; AUDIO_FRAME_SIZE]),
+            audio_size: 0,
         }
     }
 }
 
-impl emscripten_main_loop::MainLoop for Emulation {
-    fn main_loop(&mut self) -> emscripten_main_loop::MainLoopEvent {
-        if !self.io_state.pause {
-            self.nes.run_single_frame();
-            if self.one_second_timer.elapsed() < std::time::Duration::from_secs(1) {
-                self.fps += 1;
-            } else {
-                self.one_second_timer = std::time::Instant::now();
-                self.io_control.current_fps = self.fps;
-                self.fps = 1;
-            }
-        }
-        self.io_control.controller_type = [
-            self.nes
-                .config()
-                .get_controller_type(nes::ControllerId::Controller1),
-            self.nes
-                .config()
-                .get_controller_type(nes::ControllerId::Controller2),
-        ];
-
-        self.io_state = self
-            .io
-            .borrow_mut()
-            .present_frame(self.io_control.clone(), self.nes.get_emulation_frame());
-
-        handle_io_state(&mut self.nes, &self.io_state, &mut self.io_control);
-
-        if !self.io_state.pause {
-            let elapsed_time_since_frame_start = self.frame_start.elapsed();
-            if !self.is_audio_available && elapsed_time_since_frame_start < FRAME_DURATION {
-                //  if elapsed_time_since_frame_start < FRAME_DURATION {
-                #[cfg(not(target_os = "emscripten"))]
-                std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);
-            }
-            self.frame_start = std::time::Instant::now();
-        } else {
-            #[cfg(not(target_os = "emscripten"))]
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
-        emscripten_main_loop::MainLoopEvent::Continue
+impl EmulationFrame {
+    pub fn get_audio_samples(&self) -> &[f32] {
+        &self.audio[..self.audio_size]
     }
 }
 
-fn read_nes_file(file_name: &str) -> nes_file::NesFile {
-    let mut rom = Vec::new();
-    let mut file = File::open(file_name).unwrap_or_else(|_| {
-        panic!(
-            "Unable to open ROM {} current dir {}",
-            file_name,
-            std::env::current_dir().unwrap().display()
+#[derive(serde::Serialize, serde::Deserialize)]
+pub(crate) struct AudioConfig {
+    pub audio_volume: f32,
+    pub target_fps: u16,
+}
+
+impl Default for AudioConfig {
+    fn default() -> Self {
+        AudioConfig {
+            audio_volume: 1.0,
+            target_fps: DEFAULT_FPS,
+        }
+    }
+}
+
+pub struct Config<'a> {
+    config: &'a mut AudioConfig,
+    controllers: &'a mut Controllers,
+}
+
+impl Config<'_> {
+    pub fn set_audio_volume(&mut self, volume: f32) {
+        self.config.audio_volume = volume;
+    }
+    pub fn get_audio_volume(&self) -> f32 {
+        self.config.audio_volume
+    }
+    pub fn set_target_fps(&mut self, fps: u16) {
+        self.config.target_fps = fps;
+    }
+    pub fn get_target_fps(&self) -> u16 {
+        self.config.target_fps
+    }
+    pub fn set_controller(&mut self, id: ControllerId, controller_type: ControllerType) {
+        self.controllers.set_controller(id, controller_type);
+    }
+
+    pub fn get_controller_type(&self, id: ControllerId) -> ControllerType {
+        self.controllers.get_controller_type(id)
+    }
+
+    pub fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>) {
+        self.controllers.set_controller_access(controller_access);
+    }
+}
+
+pub struct ApuBus<'a> {
+    pub ram: &'a mut Ram,
+    pub mapper: &'a mut MapperEnum,
+    pub emulation_frame: &'a mut EmulationFrame,
+    pub(crate) config: &'a AudioConfig,
+}
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct Nes {
+    version: String,
+    cpu: Cpu,
+    ram: Ram,
+    ppu: Ppu,
+    apu: Apu,
+    controllers: Controllers,
+    mapper: MapperEnum,
+    config: AudioConfig,
+    #[serde(skip, default)]
+    emulation_frame: EmulationFrame,
+}
+
+impl Nes {
+    pub fn new() -> Self {
+        Nes {
+            version: SERIALIZATION_VER.to_string(),
+            cpu: Cpu::new(),
+            ram: Ram::new(),
+            ppu: Ppu::new(),
+            apu: Apu::new(),
+            controllers: Controllers::new(),
+            mapper: MapperEnum::MapperNull(MapperNull::new()),
+            config: AudioConfig::default(),
+            emulation_frame: EmulationFrame::default(),
+        }
+    }
+
+    pub fn serialize(&self) -> Vec<u8> {
+        let serialized = serde_json::to_vec(self).unwrap();
+        let compressed = yazi::compress(
+            serialized.as_slice(),
+            yazi::Format::Zlib,
+            yazi::CompressionLevel::Default,
         )
-    });
-    file.read_to_end(&mut rom).expect("Unable to read ROM");
-    nes_file::NesFile::new(&rom)
-}
-
-fn read_demo() -> nes_file::NesFile {
-    let mut demo_rom = include_bytes!("../res/nes-rs-demo.nes").to_vec();
-    let pattern = b"xxxxxx";
-    const GIT_HASH: &str = git_version::git_version!();
-    let replacement = &GIT_HASH.as_bytes()[..6];
-    if let Some(pos) = demo_rom
-        .windows(pattern.len())
-        .position(|window| window == pattern)
-    {
-        demo_rom[pos..pos + 6].copy_from_slice(replacement);
-    } else {
-        println!("Pattern not found!");
-    }
-    nes_file::NesFile::new(&demo_rom)
-}
-
-pub fn run(mut emulation: Emulation) {
-    while !emulation.io_state.quit {
-        emulation.main_loop();
-    }
-}
-
-fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut io::IOControl) {
-    if io_state.power_cycle {
-        nes.power_cycle();
+        .unwrap();
+        compressed
     }
 
-    if let Some(ref nes_file_path) = io_state.load_nes_file {
-        load(nes, nes_file_path.as_str());
-        io_control.title = Some(nes_file_path.clone());
+    pub fn get_emulation_frame(&self) -> &EmulationFrame {
+        &self.emulation_frame
     }
 
-    if let Some(ref save_state_path) = io_state.save_state {
-        let serialized = nes.serialize();
-        let file_name = save_state_path.as_str();
-        let mut file = File::create(file_name).unwrap_or_else(|_| {
-            panic!(
-                "Unable to create save file {} current dir {}",
-                file_name,
-                std::env::current_dir().unwrap().display()
-            )
-        });
-        file.write_all(serialized.as_slice()).unwrap();
-        #[cfg(target_os = "emscripten")]
-        unsafe {
-            let script = std::ffi::CString::new("refreshDownloadList();").unwrap();
-            emscripten_run_script(script.as_ptr());
+    pub fn config(&mut self) -> Config<'_> {
+        Config {
+            config: &mut self.config,
+            controllers: &mut self.controllers,
+        }
+    }
+
+    pub fn deserialize(&mut self, state: Vec<u8>) {
+        let (decompressed, checksum) =
+            yazi::decompress(state.as_slice(), yazi::Format::Zlib).unwrap();
+
+        assert_eq!(
+            yazi::Adler32::from_buf(&decompressed).finish(),
+            checksum.unwrap()
+        );
+
+        let mut deserializer = serde_json::Deserializer::from_slice(&decompressed);
+        let deserializer = serde_stacker::Deserializer::new(&mut deserializer);
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer).unwrap();
+        let new_nes: Nes = serde_json::from_value(value).unwrap();
+        assert!(new_nes.version.eq(SERIALIZATION_VER));
+        let controller_access = self.controllers.get_controller_access();
+        *self = new_nes;
+        self.controllers.set_controller_access(controller_access);
+    }
+
+    pub fn load(&mut self, nes_file: &NesFile) {
+        self.mapper = nes_file.create_mapper();
+        self.power_cycle();
+    }
+
+    pub fn power_cycle(&mut self) {
+        self.ppu.power_cycle();
+        self.apu.power_cycle();
+        self.ram.power_cycle();
+        self.mapper.power_cycle();
+        let mut cpu_bus = cpu_bus!(self);
+        self.cpu.power_cycle(&mut cpu_bus);
+        self.controllers.power_cycle();
+    }
+
+    pub fn run_for(&mut self, duration: Duration) {
+        let mut elapsed_frames = 0;
+        while elapsed_frames < duration.as_secs() as u128 * DEFAULT_FPS as u128 {
+            self.run_single_frame();
+            elapsed_frames += 1;
+        }
+    }
+
+    pub fn run_single_frame(&mut self) {
+        use crate::ppu::PpuState;
+        self.emulation_frame.audio_size = 0;
+        let current_frame = self.ppu.get_time().frame;
+        while self.ppu.get_time().frame == current_frame {
+            self.run_single_cpu_cycle();
+        }
+        self.controllers
+            .update_zappers(&self.emulation_frame,self.ppu.get_time().frame);
+        self.apu.reset_audio_buffer();
+    }
+
+    fn run_single_cpu_cycle(&mut self) {
+        let mut cpu_bus = cpu_bus!(self);
+        self.cpu.maybe_fetch_next_instruction(&mut cpu_bus);
+        let mut ppu_bus = PpuBus {
+            mapper: &mut self.mapper,
+            emulation_frame: &mut self.emulation_frame,
         };
+        self.ppu.run_single_cpu_cycle(&mut ppu_bus);
+        let mut apu_bus = ApuBus {
+            ram: &mut self.ram,
+            mapper: &mut self.mapper,
+            emulation_frame: &mut self.emulation_frame,
+            config: &self.config,
+        };
+        self.apu.run_single_cpu_cycle(&mut apu_bus);
+        let mut cpu_bus = cpu_bus!(self);
+        self.cpu.run_single_cycle(&mut cpu_bus);
     }
-
-    if let Some(ref load_state_path) = io_state.load_state {
-        let file_name = load_state_path.as_str();
-        let save = std::fs::read(file_name).unwrap_or_else(|_| {
-            panic!(
-                "Unable to open save file {} current dir {}",
-                file_name,
-                std::env::current_dir().unwrap().display()
-            )
-        });
-        nes.deserialize(save);
-        io_control.title = Some(load_state_path.clone());
-    }
-
-    if let Some(ref speed) = io_state.speed {
-        match speed {
-            io::Speed::Half => io_control.target_fps = common::HALF_FPS,
-            io::Speed::Normal => io_control.target_fps = common::DEFAULT_FPS,
-            io::Speed::Double => io_control.target_fps = common::DOUBLE_FPS,
-            io::Speed::Increase => io_control.target_fps += 5,
-            io::Speed::Decrease => {
-                io_control.target_fps = std::cmp::max(0, io_control.target_fps as i32 - 5) as u16
-            }
-        }
-        nes.config().set_target_fps(io_control.target_fps);
-    }
-
-    for (i, controller_type) in io_state.switch_controller_type.iter().enumerate() {
-        if let Some(controller_type) = controller_type {
-            if let Some(id) = nes::ControllerId::from_index(i) {
-                nes.config().set_controller(id, *controller_type);
-            }
-        }
-    }
-    nes.config().set_audio_volume(io_state.audio_volume);
-}
-
-fn load(nes: &mut nes::Nes, path: &str) {
-    let nes_file = read_nes_file(path);
-    nes.load(&nes_file);
-}
-
-fn load_demo(nes: &mut nes::Nes) {
-    let nes_file = read_demo();
-    nes.load(&nes_file);
 }
