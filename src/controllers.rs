@@ -1,7 +1,7 @@
 use crate::{nes::ControllerAccess, ram_controllers::*};
 
-use crate::nes::ControllerType;
 use crate::nes::ControllerId;
+use crate::nes::ControllerType;
 use serde::Deserialize;
 use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
@@ -19,8 +19,8 @@ pub trait Controller {
     fn read(&self) -> u8;
     fn write(&mut self, byte: u8);
     fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>);
+    fn power_cycle(&mut self);
 }
-
 
 impl ControllerType {
     pub fn from_index(i: usize) -> Option<Self> {
@@ -56,7 +56,6 @@ impl Default for ControllerEnum {
         Self::NullController(NullController::new())
     }
 }
-
 
 impl ControllerId {
     pub fn from_index(i: usize) -> Option<Self> {
@@ -111,11 +110,15 @@ impl Controllers {
             controller.set_controller_access(self.controller_access.clone());
         }
     }
+    pub fn power_cycle(&mut self) {
+        self.controller_1.power_cycle();
+        self.controller_2.power_cycle();
+    }
 
-    pub fn update_luminance_for_zappers(&mut self, emulation_frame: &crate::nes::EmulationFrame) {
+    pub fn update_zappers(&mut self, emulation_frame: &crate::nes::EmulationFrame, frame: u128) {
         for controller in [&mut self.controller_1, &mut self.controller_2] {
             if let ControllerEnum::Zapper(zapper) = controller {
-                zapper.update_luminance(emulation_frame);
+                zapper.update(emulation_frame, frame);
             }
         }
     }

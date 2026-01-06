@@ -1,7 +1,6 @@
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
     common::{self, FRAME_HEIGHT, FRAME_WIDTH},
-    controllers::{self},
     nes::{ControllerId,ControllerType},
     io::{IOControl},
 };

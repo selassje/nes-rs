@@ -1,18 +1,16 @@
 use std::fmt::Display;
 
-use crate::nes::EmulationFrame;
 use crate::nes::ControllerAccess;
-use crate::nes::StdNesControllerButton;
-use crate::nes::MouseClick;
-use crate::nes::ControllerType;
 use crate::nes::ControllerId;
+use crate::nes::ControllerType;
+use crate::nes::EmulationFrame;
+use crate::nes::MouseClick;
+use crate::nes::StdNesControllerButton;
 
 pub mod io_sdl2_imgui_opengl;
 pub mod io_test;
 
 pub type AudioSampleFormat = f32;
-pub type RgbColor = (u8, u8, u8);
-
 
 impl From<u8> for StdNesControllerButton {
     fn from(value: u8) -> Self {
@@ -75,8 +73,6 @@ pub struct IOControl {
     pub controller_type: [ControllerType; 2],
 }
 
-
-
 pub struct DummyControllerAccessImplementation {}
 impl DummyControllerAccessImplementation {
     pub fn new() -> Self {
@@ -89,13 +85,18 @@ impl ControllerAccess for DummyControllerAccessImplementation {
         _controller_id: ControllerId,
         _button: StdNesControllerButton,
     ) -> bool {
-        todo!()
+        false
     }
     fn get_mouse_click(&self) -> MouseClick {
-        todo!()
+        MouseClick {
+            left_button: false,
+            right_button: false,
+            x: 0,
+            y: 0,
+        }
     }
     fn get_current_frame(&self) -> u128 {
-        todo!()
+        0
     }
 }
 

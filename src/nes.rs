@@ -163,7 +163,7 @@ pub struct ApuBus<'a> {
     pub ram: &'a mut Ram,
     pub mapper: &'a mut MapperEnum,
     pub emulation_frame: &'a mut EmulationFrame,
-    pub config: &'a ConfigImpl,
+    pub(crate) config: &'a ConfigImpl,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Nes {
@@ -247,6 +247,7 @@ impl Nes {
         self.mapper.power_cycle();
         let mut cpu_bus = cpu_bus!(self);
         self.cpu.power_cycle(&mut cpu_bus);
+        self.controllers.power_cycle();
     }
 
     pub fn run_for(&mut self, duration: Duration) {
@@ -265,7 +266,7 @@ impl Nes {
             self.run_single_cpu_cycle();
         }
         self.controllers
-            .update_luminance_for_zappers(&self.emulation_frame);
+            .update_zappers(&self.emulation_frame,self.ppu.get_time().frame);
         self.apu.reset_audio_buffer();
     }
 

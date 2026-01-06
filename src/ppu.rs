@@ -7,7 +7,7 @@ use crate::{mappers::Mapper, mappers::MapperEnum, ram_ppu::*};
 use crate::common::{FRAME_WIDTH, PIXEL_SIZE};
 
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, default::Default, fmt::Display, rc::Rc};
+use std::{cell::RefCell, default::Default, fmt::Display};
 pub struct PpuTime {
     pub scanline: i16,
     pub cycle: u16,

@@ -15,6 +15,12 @@ pub struct StdNesController {
     strobe: bool,
 }
 
+impl Default for StdNesController {
+    fn default() -> Self {
+        Self::new(ControllerId::Controller1)
+    }
+}
+
 impl StdNesController {
     pub fn new(id: ControllerId) -> Self {
         Self {
@@ -70,5 +76,10 @@ impl super::Controller for StdNesController {
 
     fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>) {
         self.controller_access = controller_access;
+    }
+
+    fn power_cycle(&mut self) {
+        self.strobe = true;
+        *self.button.borrow_mut() = Default::default()
     }
 }
