@@ -1,7 +1,11 @@
+use crate::common::{FRAME_HEIGHT, FRAME_WIDTH, PIXEL_SIZE};
 use crate::{controllers::ControllerId, io::io_test, nes::Nes, read_nes_file};
 use fs::File;
+use sdl2::{
+    pixels::{self, PixelFormatEnum},
+    rect::Rect,
+};
 use std::{cell::RefCell, fs, io::Read, path::Path, path::PathBuf, rc::Rc, time::Duration};
-
 type TestFn = dyn Fn(&mut NesTest);
 
 pub struct NesTest {
@@ -27,6 +31,7 @@ impl NesTest {
         let io_test = Rc::new(RefCell::new(io_test::IOTest::new(rom_path)));
         let nes_file = read_nes_file(rom_path);
         let mut nes = Nes::new(io_test.clone());
+        nes.config().set_controller_access(io_test.clone());
         let mut dir = PathBuf::from(rom_path);
         let mut test_name = dir.file_name().unwrap().to_str().unwrap().to_owned();
         if let Some(suffix) = suffix {
@@ -117,6 +122,24 @@ impl NesTest {
     }
 
     fn dump_frame(&self) {
-        self.io_test.borrow().dump_frame(&self.output_frame_path)
+        let frame = &self.nes.get_emulation_frame().video;
+        let mut bitmap = sdl2::surface::Surface::new(
+            FRAME_WIDTH as u32,
+            FRAME_HEIGHT as u32,
+            PixelFormatEnum::RGB24,
+        )
+        .unwrap();
+        for x in 0..FRAME_WIDTH {
+            for y in 0..FRAME_HEIGHT {
+                let index = y * PIXEL_SIZE * FRAME_WIDTH + x * PIXEL_SIZE;
+                let pixel_color = pixels::Color::RGB(
+                    frame[index],
+                    frame[index + 1],
+                    frame[index + 2],
+                );
+                let _ = bitmap.fill_rect(Rect::new(x as i32, y as i32, 1, 1), pixel_color);
+            }
+        }
+        let _ = bitmap.save_bmp(&self.output_frame_path);
     }
 }
