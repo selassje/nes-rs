@@ -61,6 +61,17 @@ impl Emulation {
         ));
 
         let mut nes: Nes = nes::Nes::new(io.clone());
+
+        nes.config().set_controller_access(io.clone());
+        nes.config().set_controller(
+            controllers::ControllerId::Controller1,
+            controllers::ControllerType::StdNesController,
+        );
+        nes.config().set_controller(
+            controllers::ControllerId::Controller2,
+            controllers::ControllerType::StdNesController,
+        );
+
         let mut initial_title: Option<String> = None;
         let args: Vec<String> = env::args().collect();
         if args.len() > 1 {

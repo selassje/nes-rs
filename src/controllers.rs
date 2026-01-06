@@ -76,17 +76,28 @@ impl ControllerId {
         }
     }
 }
-
-#[derive(Serialize, Deserialize, Default)]
-pub struct Controllers {
-    controller_1: ControllerEnum,
-    controller_2: ControllerEnum,
-}
-
 fn default_controller_access() -> Rc<RefCell<dyn ControllerAccess>> {
     Rc::new(RefCell::new(
         crate::io::DummyControllerAccessImplementation::new(),
     ))
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Controllers {
+    controller_1: ControllerEnum,
+    controller_2: ControllerEnum,
+    #[serde(skip, default = "default_controller_access")]
+    controller_access: Rc<RefCell<dyn ControllerAccess>>,
+}
+
+impl Default for Controllers {
+    fn default() -> Self {
+        Self {
+            controller_1: ControllerEnum::NullController(NullController::new()),
+            controller_2: ControllerEnum::NullController(NullController::new()),
+            controller_access: default_controller_access(),
+        }
+    }
 }
 
 impl Controllers {
@@ -94,12 +105,7 @@ impl Controllers {
         Default::default()
     }
 
-    pub fn set_controller(
-        &mut self,
-        id: ControllerId,
-        controller_type: ControllerType,
-        controller_access: Rc<RefCell<dyn ControllerAccess>>,
-    ) {
+    pub fn set_controller(&mut self, id: ControllerId, controller_type: ControllerType) {
         let controller = match id {
             ControllerId::Controller1 => &mut self.controller_1,
             ControllerId::Controller2 => &mut self.controller_2,
@@ -107,9 +113,20 @@ impl Controllers {
 
         if controller.get_type() != controller_type {
             *controller = Self::new_controller(id, controller_type);
-            controller.set_controller_access(controller_access);
+            controller.set_controller_access(self.controller_access.clone());
         }
     }
+
+    pub fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>) {
+        self.controller_access = controller_access.clone();
+        self.controller_1
+            .set_controller_access(controller_access.clone());
+        self.controller_2.set_controller_access(controller_access);
+    }
+    pub fn get_controller_access(&self) -> Rc<RefCell<dyn ControllerAccess>> {
+        self.controller_access.clone()
+    }
+
     pub fn get_controller_type(&self, id: ControllerId) -> ControllerType {
         match id {
             ControllerId::Controller1 => self.controller_1.get_type(),
@@ -127,11 +144,6 @@ impl Controllers {
         }
     }
 
-    pub fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>) {
-        self.controller_1
-            .set_controller_access(controller_access.clone());
-        self.controller_2.set_controller_access(controller_access);
-    }
 }
 
 impl ReadInputRegisters for Controllers {

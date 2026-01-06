@@ -124,12 +124,15 @@ impl Config<'_> {
     }
     pub fn set_controller(&mut self, id: ControllerId, controller_type: ControllerType) {
         self.controllers
-            .set_controller(id, controller_type, Rc::new(RefCell::new(crate::io::DummyIOImpl::new())));
+            .set_controller(id, controller_type);
+    }
+
+    pub fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>) {
+        self.controllers.set_controller_access(controller_access);
     }
 
   }
 
-type ControllerAccessRef = Rc<RefCell<dyn ControllerAccess>>;
 
 pub struct ApuBus<'a> {
     pub ram: &'a mut Ram,
@@ -153,8 +156,6 @@ pub struct Nes {
     video_access: Rc<RefCell<dyn VideoAccess>>,
     #[serde(skip, default = "default_audio_access")]
     audio_access: Rc<RefCell<dyn AudioAccess>>,
-    #[serde(skip, default = "default_controller_access")]
-    controller_access: Rc<RefCell<dyn ControllerAccess>>,
 }
 
 impl Nes {
@@ -168,7 +169,7 @@ impl Nes {
         let apu = Apu::new(io.clone());
         let ram = Ram::new();
         let cpu = Cpu::new();
-        let mut nes = Nes {
+         Nes {
             version: SERIALIZATION_VER.to_string(),
             cpu,
             ram,
@@ -179,18 +180,13 @@ impl Nes {
             config: ConfigImpl::default(),
             video_access: io.clone(),
             audio_access: io.clone(),
-            controller_access: io.clone(),
             emulation_frame: EmulationFrame::default(),
-        };
-        nes.set_controller(ControllerId::Controller1, ControllerType::StdNesController);
-        nes.set_controller(ControllerId::Controller2, ControllerType::StdNesController);
-
-        nes
+        }
     }
 
     pub fn set_controller(&mut self, id: ControllerId, controller_type: ControllerType) {
         self.controllers
-            .set_controller(id, controller_type, self.controller_access.clone());
+            .set_controller(id, controller_type);
     }
     pub fn get_controller_type(&self, id: ControllerId) -> ControllerType {
         self.controllers.get_controller_type(id)
@@ -234,7 +230,7 @@ impl Nes {
         assert!(new_nes.version.eq(SERIALIZATION_VER));
         let video_access = self.video_access.clone();
         let audio_access = self.audio_access.clone();
-        let controller_access = self.controller_access.clone();
+        let controller_access = self.controllers.get_controller_access();
 
         *self = new_nes;
 
@@ -247,7 +243,7 @@ impl Nes {
 
         self.video_access = video_access;
         self.audio_access = audio_access;
-        self.controller_access = controller_access;
+        self.controllers.set_controller_access(controller_access);
     }
 
     pub fn load(&mut self, nes_file: &NesFile) {
