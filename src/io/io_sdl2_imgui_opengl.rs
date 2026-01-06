@@ -401,7 +401,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 }
                 #[cfg(target_os = "emscripten")]
                 if audio_queue.size() < audio_saturation_threshold {
-                    let _ = audio_queue.queue_audio(self.sample_buffer.get_samples());
+                    let _ = audio_queue.queue_audio(emulation_frame.get_audio_samples());
                 }
                 let volume = if self
                     .gui
