@@ -95,9 +95,6 @@ impl ControllerAccess for DummyControllerAccessImplementation {
             y: 0,
         }
     }
-    fn get_current_frame(&self) -> u128 {
-        0
-    }
 }
 
 pub trait IO: ControllerAccess {

@@ -54,7 +54,6 @@ pub struct MouseClick {
 pub trait ControllerAccess {
     fn is_button_pressed(&self, controller_id: crate::nes::ControllerId, button: StdNesControllerButton) -> bool;
     fn get_mouse_click(&self) -> MouseClick;
-    fn get_current_frame(&self) -> u128;
 }
 pub struct CpuBus<'a> {
     pub ram: &'a mut Ram,

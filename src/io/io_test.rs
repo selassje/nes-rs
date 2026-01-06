@@ -41,7 +41,4 @@ impl ControllerAccess for IOTest {
     fn get_mouse_click(&self) -> MouseClick {
         todo!()
     }
-    fn get_current_frame(&self) -> u128 {
-        todo!()
-    }
 }

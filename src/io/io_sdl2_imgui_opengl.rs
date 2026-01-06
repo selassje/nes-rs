@@ -472,7 +472,4 @@ impl io::ControllerAccess for IOSdl2ImGuiOpenGl {
     fn get_mouse_click(&self) -> io::MouseClick {
         self.gui.mouse_click.clone()
     }
-    fn get_current_frame(&self) -> u128 {
-        self.frame
-    }
 }
