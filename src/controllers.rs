@@ -93,8 +93,8 @@ pub struct Controllers {
 impl Default for Controllers {
     fn default() -> Self {
         Self {
-            controller_1: ControllerEnum::NullController(NullController::new()),
-            controller_2: ControllerEnum::NullController(NullController::new()),
+            controller_1: ControllerEnum::StdNesController(StdNesController::new(ControllerId::Controller1)),
+            controller_2: ControllerEnum::StdNesController(StdNesController::new(ControllerId::Controller2)),
             controller_access: default_controller_access(),
         }
     }

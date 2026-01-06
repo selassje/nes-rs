@@ -61,16 +61,7 @@ impl Emulation {
         ));
 
         let mut nes: Nes = nes::Nes::new(io.clone());
-
         nes.config().set_controller_access(io.clone());
-        nes.config().set_controller(
-            controllers::ControllerId::Controller1,
-            controllers::ControllerType::StdNesController,
-        );
-        nes.config().set_controller(
-            controllers::ControllerId::Controller2,
-            controllers::ControllerType::StdNesController,
-        );
 
         let mut initial_title: Option<String> = None;
         let args: Vec<String> = env::args().collect();
@@ -121,8 +112,10 @@ impl emscripten_main_loop::MainLoop for Emulation {
         }
         self.io_control.controller_type = [
             self.nes
+                .config()
                 .get_controller_type(controllers::ControllerId::Controller1),
             self.nes
+                .config()
                 .get_controller_type(controllers::ControllerId::Controller2),
         ];
 
@@ -136,7 +129,7 @@ impl emscripten_main_loop::MainLoop for Emulation {
         if !self.io_state.pause {
             let elapsed_time_since_frame_start = self.frame_start.elapsed();
             if !self.is_audio_available && elapsed_time_since_frame_start < FRAME_DURATION {
-          //  if elapsed_time_since_frame_start < FRAME_DURATION {
+                //  if elapsed_time_since_frame_start < FRAME_DURATION {
                 #[cfg(not(target_os = "emscripten"))]
                 std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);
             }
@@ -233,7 +226,7 @@ fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut 
             io::Speed::Increase => io_control.target_fps += 5,
             io::Speed::Decrease => {
                 io_control.target_fps = std::cmp::max(0, io_control.target_fps as i32 - 5) as u16
-            } 
+            }
         }
         nes.config().set_target_fps(io_control.target_fps);
     }
@@ -241,7 +234,7 @@ fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut 
     for (i, controller_type) in io_state.switch_controller_type.iter().enumerate() {
         if let Some(controller_type) = controller_type {
             if let Some(id) = controllers::ControllerId::from_index(i) {
-                nes.set_controller(id, *controller_type);
+                nes.config().set_controller(id, *controller_type);
             }
         }
     }

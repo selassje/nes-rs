@@ -91,8 +91,8 @@ impl EmulationFrame {
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub(crate) struct ConfigImpl {
-  pub audio_volume : f32,
-  pub target_fps : u16, 
+    pub audio_volume: f32,
+    pub target_fps: u16,
 }
 
 impl Default for ConfigImpl {
@@ -123,16 +123,17 @@ impl Config<'_> {
         self.config.target_fps
     }
     pub fn set_controller(&mut self, id: ControllerId, controller_type: ControllerType) {
-        self.controllers
-            .set_controller(id, controller_type);
+        self.controllers.set_controller(id, controller_type);
+    }
+
+    pub fn get_controller_type(&self, id: ControllerId) -> ControllerType {
+        self.controllers.get_controller_type(id)
     }
 
     pub fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>) {
         self.controllers.set_controller_access(controller_access);
     }
-
-  }
-
+}
 
 pub struct ApuBus<'a> {
     pub ram: &'a mut Ram,
@@ -169,7 +170,7 @@ impl Nes {
         let apu = Apu::new(io.clone());
         let ram = Ram::new();
         let cpu = Cpu::new();
-         Nes {
+        Nes {
             version: SERIALIZATION_VER.to_string(),
             cpu,
             ram,
@@ -182,14 +183,6 @@ impl Nes {
             audio_access: io.clone(),
             emulation_frame: EmulationFrame::default(),
         }
-    }
-
-    pub fn set_controller(&mut self, id: ControllerId, controller_type: ControllerType) {
-        self.controllers
-            .set_controller(id, controller_type);
-    }
-    pub fn get_controller_type(&self, id: ControllerId) -> ControllerType {
-        self.controllers.get_controller_type(id)
     }
 
     pub fn serialize(&self) -> Vec<u8> {
@@ -210,7 +203,7 @@ impl Nes {
     pub fn config(&mut self) -> Config {
         Config {
             config: &mut self.config,
-            controllers: &mut self.controllers
+            controllers: &mut self.controllers,
         }
     }
 
