@@ -30,7 +30,7 @@ impl NesTest {
     ) -> Self {
         let io_test = Rc::new(RefCell::new(io_test::IOTest::new(rom_path)));
         let nes_file = read_nes_file(rom_path);
-        let mut nes = Nes::new(io_test.clone());
+        let mut nes = Nes::new();
         nes.config().set_controller_access(io_test.clone());
         let mut dir = PathBuf::from(rom_path);
         let mut test_name = dir.file_name().unwrap().to_str().unwrap().to_owned();

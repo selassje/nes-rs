@@ -60,7 +60,7 @@ impl Emulation {
             io::io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl::new(),
         ));
 
-        let mut nes: Nes = nes::Nes::new(io.clone());
+        let mut nes: Nes = nes::Nes::new();
         nes.config().set_controller_access(io.clone());
 
         let mut initial_title: Option<String> = None;

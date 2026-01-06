@@ -19,16 +19,6 @@ use std::time::Duration;
 
 const SERIALIZATION_VER: &str = "1";
 
-fn default_video_access() -> Rc<RefCell<dyn VideoAccess>> {
-    Rc::new(RefCell::new(crate::io::DummyIOImpl::new()))
-}
-fn default_audio_access() -> Rc<RefCell<dyn AudioAccess>> {
-    Rc::new(RefCell::new(crate::io::DummyIOImpl::new()))
-}
-fn default_controller_access() -> Rc<RefCell<dyn ControllerAccess>> {
-    Rc::new(RefCell::new(crate::io::DummyIOImpl::new()))
-}
-
 type Ppu = crate::ppu::Ppu;
 pub type Ram = crate::ram::Ram;
 type Cpu = crate::cpu::Cpu;
@@ -153,34 +143,19 @@ pub struct Nes {
     config: ConfigImpl,
     #[serde(skip, default)]
     emulation_frame: EmulationFrame,
-    #[serde(skip, default = "default_video_access")]
-    video_access: Rc<RefCell<dyn VideoAccess>>,
-    #[serde(skip, default = "default_audio_access")]
-    audio_access: Rc<RefCell<dyn AudioAccess>>,
 }
 
 impl Nes {
-    pub fn new<T>(io: Rc<RefCell<T>>) -> Self
-    where
-        T: IO + 'static,
-    {
-        let controllers = Controllers::new();
-        let mapper = MapperEnum::MapperNull(MapperNull::new());
-        let ppu = Ppu::new(io.clone());
-        let apu = Apu::new(io.clone());
-        let ram = Ram::new();
-        let cpu = Cpu::new();
+    pub fn new() -> Self {
         Nes {
             version: SERIALIZATION_VER.to_string(),
-            cpu,
-            ram,
-            ppu,
-            apu,
-            controllers,
-            mapper,
+            cpu: Cpu::new(),
+            ram: Ram::new(),
+            ppu: Ppu::new(),
+            apu: Apu::new(),
+            controllers: Controllers::new(),
+            mapper: MapperEnum::MapperNull(MapperNull::new()),
             config: ConfigImpl::default(),
-            video_access: io.clone(),
-            audio_access: io.clone(),
             emulation_frame: EmulationFrame::default(),
         }
     }
@@ -221,21 +196,8 @@ impl Nes {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer).unwrap();
         let new_nes: Nes = serde_json::from_value(value).unwrap();
         assert!(new_nes.version.eq(SERIALIZATION_VER));
-        let video_access = self.video_access.clone();
-        let audio_access = self.audio_access.clone();
         let controller_access = self.controllers.get_controller_access();
-
         *self = new_nes;
-
-        self.ppu.set_video_access(video_access.clone());
-
-        self.apu.set_audio_access(audio_access.clone());
-
-        self.controllers
-            .set_controller_access(controller_access.clone());
-
-        self.video_access = video_access;
-        self.audio_access = audio_access;
         self.controllers.set_controller_access(controller_access);
     }
 

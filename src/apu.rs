@@ -666,10 +666,9 @@ fn default_audio_access() -> Rc<RefCell<dyn AudioAccess>> {
 }
 
 const SAMPLING_RATE: usize = 44100;
-const CPU_CLOCK_NTSC: f64 = 1_789_773.0;
-const CYCLES_PER_SAMPLE: f64 = (CPU_CLOCK_NTSC as f64 / SAMPLING_RATE as f64) * 0.98;
 use crate::nes::AUDIO_FRAME_SIZE;
 
+#[derive(Serialize, Deserialize)]
 struct AudioBuffer {
     phase: f64,
     acc: f64,
@@ -719,8 +718,6 @@ impl Default for AudioBuffer {
 
 #[derive(Serialize, Deserialize)]
 pub struct Apu {
-    #[serde(skip, default = "default_audio_access")]
-    audio_access: Rc<RefCell<dyn AudioAccess>>,
     frame_counter: FrameCounter,
     status: StatusRegister,
     pulse_1: PulseWave,
@@ -734,7 +731,6 @@ pub struct Apu {
     frame: u128,
     pending_reset_cycle: Option<u16>,
     irq_flag_setting_in_progress: bool,
-    #[serde(skip, default)]
     audio_buffer: AudioBuffer,
 }
 
@@ -751,7 +747,6 @@ impl Default for Apu {
             cpu_cycle: 8,
             is_during_apu_cycle: false,
             frame_interrupt: false,
-            audio_access: default_audio_access(),
             frame: 1,
             pending_reset_cycle: None,
             irq_flag_setting_in_progress: false,
@@ -761,7 +756,7 @@ impl Default for Apu {
 }
 
 impl Apu {
-    pub fn new(audio_access: Rc<RefCell<dyn AudioAccess>>) -> Self {
+    pub fn new() -> Self {
         Self {
             frame_counter: FrameCounter { data: 0 },
             status: StatusRegister { data: 0 },
@@ -773,7 +768,6 @@ impl Apu {
             cpu_cycle: 8,
             is_during_apu_cycle: false,
             frame_interrupt: false,
-            audio_access,
             frame: 1,
             pending_reset_cycle: None,
             irq_flag_setting_in_progress: false,
@@ -799,10 +793,6 @@ impl Apu {
 
     pub fn reset_audio_buffer(&mut self) {
         self.audio_buffer.reset();
-    }
-
-    pub fn set_audio_access(&mut self, audio_access: Rc<RefCell<dyn AudioAccess>>) {
-        self.audio_access = audio_access;
     }
 
     fn get_length_counter_channel(
@@ -918,7 +908,6 @@ impl Apu {
         );
         self.audio_buffer
             .add_sample(sample, bus.emulation_frame, bus.config);
-        self.audio_access.borrow_mut().add_sample(sample);
     }
 
     fn get_mixer_output(

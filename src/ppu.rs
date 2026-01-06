@@ -4,7 +4,7 @@ use crate::vram::VRam;
 use crate::{io::VideoAccess, memory::VideoMemory};
 use crate::{mappers::Mapper, mappers::MapperEnum, ram_ppu::*};
 
-use crate::common::{FRAME_HEIGHT, FRAME_WIDTH, PIXEL_SIZE};
+use crate::common::{FRAME_WIDTH, PIXEL_SIZE};
 
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, default::Default, fmt::Display, rc::Rc};
@@ -313,8 +313,6 @@ fn default_color_mapper() -> Box<dyn ColorMapper> {
 }
 #[derive(Serialize, Deserialize)]
 pub struct Ppu {
-    #[serde(skip, default = "default_video_access")]
-    video_access: Rc<RefCell<dyn VideoAccess>>,
     vram: VRam,
     control_reg: ControlRegister,
     mask_reg: MaskRegister,
@@ -361,7 +359,6 @@ impl Default for Ppu {
             write_toggle: false,
             nmi_pending: false,
             vbl_flag_supressed: false,
-            video_access: default_video_access(),
             sprite_palettes: Default::default(),
             background_palletes: Default::default(),
             tile_data: [Default::default(); 3],
@@ -370,7 +367,7 @@ impl Default for Ppu {
 }
 
 impl Ppu {
-    pub fn new(video_access: Rc<RefCell<dyn VideoAccess>>) -> Self {
+    pub fn new() -> Self {
         Self {
             vram: VRam::new(),
             control_reg: ControlRegister { value: 0 },
@@ -390,15 +387,10 @@ impl Ppu {
             write_toggle: false,
             nmi_pending: false,
             vbl_flag_supressed: false,
-            video_access,
             sprite_palettes: Default::default(),
             background_palletes: Default::default(),
             tile_data: [Default::default(); 3],
         }
-    }
-
-    pub fn set_video_access(&mut self, video_access: Rc<RefCell<dyn VideoAccess>>) {
-        self.video_access = video_access;
     }
 
     pub fn power_cycle(&mut self) {
