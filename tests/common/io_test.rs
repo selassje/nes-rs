@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
-use nes_rs::{ControllerId, StdNesControllerButton,ControllerAccess};
-
+use nes_rs::{ControllerAccess, ControllerId, StdNesControllerButton};
 
 pub struct IOTest {
     controller_buttons_state: [HashMap<StdNesControllerButton, bool>; 2],
@@ -13,13 +12,22 @@ impl IOTest {
             controller_buttons_state: [HashMap::new(), HashMap::new()],
         }
     }
-    pub fn set_button_state(&mut self, button: StdNesControllerButton, controller_id: ControllerId, state: bool) {
+    pub fn set_button_state(
+        &mut self,
+        button: StdNesControllerButton,
+        controller_id: ControllerId,
+        state: bool,
+    ) {
         self.controller_buttons_state[controller_id as usize].insert(button, state);
     }
 }
 
 impl ControllerAccess for IOTest {
-    fn is_button_pressed(&self, controller_id: ControllerId, button: StdNesControllerButton) -> bool {
+    fn is_button_pressed(
+        &self,
+        controller_id: ControllerId,
+        button: StdNesControllerButton,
+    ) -> bool {
         if let Some(pressed) = self.controller_buttons_state[controller_id as usize].get(&button) {
             *pressed
         } else {

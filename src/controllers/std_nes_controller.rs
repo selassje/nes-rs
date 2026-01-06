@@ -1,10 +1,10 @@
 use serde::Deserialize;
 use serde::Serialize;
-use std::{cell::RefCell, rc::Rc,fmt::Display};
+use std::{cell::RefCell, fmt::Display, rc::Rc};
 
 use super::ControllerId;
-use crate::StdNesControllerButton;
 use crate::ControllerAccess;
+use crate::StdNesControllerButton;
 
 #[derive(Serialize, Deserialize)]
 pub struct StdNesController {

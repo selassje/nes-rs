@@ -1,5 +1,5 @@
-use std::convert::TryFrom;
 use enum_tryfrom_derive::TryFromPrimitive;
+use std::convert::TryFrom;
 
 #[derive(Copy, Clone, Debug, TryFromPrimitive)]
 #[TryFromPrimitiveType = "u16"]

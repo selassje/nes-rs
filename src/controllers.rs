@@ -1,4 +1,4 @@
-use crate::{ControllerAccess, ram_controllers::*};
+use crate::{ram_controllers::*, ControllerAccess};
 
 use crate::ControllerId;
 use crate::ControllerType;
@@ -11,9 +11,9 @@ mod null_controller;
 mod std_nes_controller;
 mod zapper;
 
+use self::null_controller::NullController;
 use self::std_nes_controller::StdNesController;
 use self::zapper::Zapper;
-use self::null_controller::NullController;
 
 pub struct NullControllerAccess {}
 impl NullControllerAccess {
@@ -87,9 +87,7 @@ impl ControllerId {
     }
 }
 fn default_controller_access() -> Rc<RefCell<dyn ControllerAccess>> {
-    Rc::new(RefCell::new(
-        NullControllerAccess::new(),
-    ))
+    Rc::new(RefCell::new(NullControllerAccess::new()))
 }
 
 #[derive(Serialize, Deserialize)]

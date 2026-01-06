@@ -1,13 +1,9 @@
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
-use crate::{
-    ControllerId,ControllerType,
-    io::{IOControl},
-    FRAME_WIDTH, FRAME_HEIGHT,DEFAULT_FPS
-};
+use crate::{io::IOControl, ControllerId, ControllerType, DEFAULT_FPS, FRAME_HEIGHT, FRAME_WIDTH};
 
-use crate::io::MouseClick;
 use super::DOUBLE_FPS;
 use super::HALF_FPS;
+use crate::io::MouseClick;
 
 use imgui::ImString;
 
@@ -224,10 +220,7 @@ impl Gui {
         }
     }
 
-    pub fn get_controller_switch(
-        &mut self,
-        player: ControllerId,
-    ) -> Option<ControllerType> {
+    pub fn get_controller_switch(&mut self, player: ControllerId) -> Option<ControllerType> {
         self.controller_switch[player as usize].take()
     }
 
@@ -464,18 +457,17 @@ impl Gui {
                 imgui::Image::new(self.emulation_texture, self.video_size).build(ui);
                 self.mouse_click.left_button = false;
                 self.mouse_click.right_button = false;
-                let zapper_active =
-                    self.io_control.controller_type[1] == ControllerType::Zapper;
+                let zapper_active = self.io_control.controller_type[1] == ControllerType::Zapper;
                 if ui.is_window_hovered() && zapper_active {
                     self.crosshair = true;
                     let io = ui.io();
                     let mouse_pos = io.mouse_pos; // [f32;
                     let window_pos = ui.window_pos();
                     let rel_pos = [mouse_pos[0] - window_pos[0], mouse_pos[1] - window_pos[1]];
-                    let tex_x =
-                        (rel_pos[0] / self.video_size[0] * nes_rs::FRAME_WIDTH as f32).floor() as usize;
-                    let tex_y =
-                        (rel_pos[1] / self.video_size[1] * crate::FRAME_HEIGHT as f32).floor() as usize;
+                    let tex_x = (rel_pos[0] / self.video_size[0] * nes_rs::FRAME_WIDTH as f32)
+                        .floor() as usize;
+                    let tex_y = (rel_pos[1] / self.video_size[1] * crate::FRAME_HEIGHT as f32)
+                        .floor() as usize;
 
                     if ui.is_mouse_clicked(imgui::MouseButton::Left) {
                         self.mouse_click.left_button = true;

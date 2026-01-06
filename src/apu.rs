@@ -660,7 +660,6 @@ impl Dmc {
     }
 }
 
-
 use crate::AUDIO_FRAME_SIZE;
 use crate::SAMPLING_RATE;
 
@@ -686,7 +685,8 @@ impl AudioBuffer {
         config: &AudioConfig,
     ) {
         self.phase += 1.0;
-        let cycels_per_sample = (config.target_fps as f64 * CPU_CYCLES_PER_FRAME as f64) / SAMPLING_RATE as f64;
+        let cycels_per_sample =
+            (config.target_fps as f64 * CPU_CYCLES_PER_FRAME as f64) / SAMPLING_RATE as f64;
         self.acc += sample as f64 * config.audio_volume as f64;
         self.acc_count += 1.0;
         if self.phase >= cycels_per_sample {
@@ -906,13 +906,7 @@ impl Apu {
             .add_sample(sample, bus.emulation_frame, bus.config);
     }
 
-    fn get_mixer_output(
-        pulse_1: u8,
-        pulse_2: u8,
-        triangle: u8,
-        noise: u8,
-        dmc: u8,
-    ) -> f32 {
+    fn get_mixer_output(pulse_1: u8, pulse_2: u8, triangle: u8, noise: u8, dmc: u8) -> f32 {
         let mut n = pulse_1 + pulse_2;
         let puls_out = if n != 0 {
             95.52 / ((8128.0 / (n as f32)) + 100.0)

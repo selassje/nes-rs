@@ -1,7 +1,7 @@
 use crate::colors::{ColorMapper, DefaultColorMapper, RgbColor};
-use crate::PpuBus;
-use crate::vram::VRam;
 use crate::memory::VideoMemory;
+use crate::vram::VRam;
+use crate::PpuBus;
 use crate::{mappers::Mapper, mappers::MapperEnum, ram_ppu::*};
 
 use crate::{FRAME_WIDTH, PIXEL_SIZE};
@@ -504,8 +504,7 @@ impl Ppu {
                 &self.sprite_palettes,
             );
         let color = self.apply_emphasis_and_grayscale(color);
-        let index = self.scanline as usize * PIXEL_SIZE * FRAME_WIDTH
-            + x as usize * PIXEL_SIZE;
+        let index = self.scanline as usize * PIXEL_SIZE * FRAME_WIDTH + x as usize * PIXEL_SIZE;
         bus.emulation_frame.video[index] = color.0;
         bus.emulation_frame.video[index + 1] = color.1;
         bus.emulation_frame.video[index + 2] = color.2;

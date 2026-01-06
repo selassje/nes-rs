@@ -1,4 +1,3 @@
-
 use std::{
     cell::RefCell,
     env,
@@ -10,9 +9,9 @@ use std::{
 mod io;
 
 use emscripten_main_loop::MainLoop;
-use io::{io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl, IOControl, IOState, IO};
 use io::io_sdl2_imgui_opengl::DOUBLE_FPS;
 use io::io_sdl2_imgui_opengl::HALF_FPS;
+use io::{io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl, IOControl, IOState, IO};
 use nes_rs::*;
 
 extern crate enum_tryfrom;

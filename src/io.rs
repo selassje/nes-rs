@@ -1,4 +1,3 @@
-
 use crate::ControllerAccess;
 use crate::ControllerType;
 use crate::EmulationFrame;
@@ -14,7 +13,6 @@ pub struct MouseClick {
     pub x: usize,
     pub y: usize,
 }
-
 
 #[derive(Clone)]
 pub enum Speed {
@@ -45,7 +43,6 @@ pub struct IOControl {
     pub title: Option<String>,
     pub controller_type: [ControllerType; 2],
 }
-
 
 pub trait IO: ControllerAccess {
     fn present_frame(&mut self, control: IOControl, emulation_frame: &EmulationFrame) -> IOState;

@@ -50,22 +50,27 @@ impl super::Controller for Zapper {
         let zapper_trigger = self.controller_access.borrow().is_zapper_trigger_pressed();
         let mut trigger_state = self.trigger_pressed.borrow_mut();
         if zapper_trigger.is_some() && !*trigger_state {
-           if let  Some(ZapperTarget::OnScreen(x,y)) = zapper_trigger {
-            *self.x.borrow_mut() = x as usize;
-            *self.y.borrow_mut() = y as usize;
-            *self.offscreen_targeted.borrow_mut() = false;
-           }
-           else {
-            *self.offscreen_targeted.borrow_mut() = true;
-           }
+            if let Some(ZapperTarget::OnScreen(x, y)) = zapper_trigger {
+                *self.x.borrow_mut() = x as usize;
+                *self.y.borrow_mut() = y as usize;
+                *self.offscreen_targeted.borrow_mut() = false;
+            } else {
+                *self.offscreen_targeted.borrow_mut() = true;
+            }
             *trigger_state = true;
             *self.frame_of_last_trigger.borrow_mut() = self.current_frame;
         }
         if self.frames_since_last_trigger(self.current_frame) >= 2 && *trigger_state {
             *trigger_state = false;
         }
-        let mut light_bit = if self.luminance > 0.7 { 0b0000_0000 } else { 0b0000_1000 };
-        if self.frames_since_last_trigger(self.current_frame) <= 4 || *self.offscreen_targeted.borrow() {
+        let mut light_bit = if self.luminance > 0.7 {
+            0b0000_0000
+        } else {
+            0b0000_1000
+        };
+        if self.frames_since_last_trigger(self.current_frame) <= 4
+            || *self.offscreen_targeted.borrow()
+        {
             light_bit = 0b0000_1000;
         }
         light_bit
@@ -91,7 +96,6 @@ impl super::Controller for Zapper {
         *self.offscreen_targeted.borrow_mut() = false;
         self.luminance = 0.0;
     }
-
 }
 
 impl Zapper {

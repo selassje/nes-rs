@@ -8,9 +8,6 @@ use sdl2::{
 use std::{cell::RefCell, fs, io::Read, path::Path, path::PathBuf, rc::Rc, time::Duration};
 type TestFn = dyn Fn(&mut NesTest);
 
-#[path = "io_test.rs"]
-mod io_test;
-
 fn read_nes_file(file_name: &str) -> nes_rs::nes_file::NesFile {
     let mut rom = Vec::new();
     let mut file = File::open(file_name).unwrap_or_else(|_| {
@@ -26,7 +23,7 @@ fn read_nes_file(file_name: &str) -> nes_rs::nes_file::NesFile {
 
 pub struct NesTest {
     nes: Nes,
-    io_test: Rc<RefCell<io_test::IOTest>>,
+    io_test: Rc<RefCell<super::io_test::IOTest>>,
     output_frame_path: String,
     expected_frame_path: String,
     test_fn: Rc<TestFn>,
@@ -44,7 +41,7 @@ impl NesTest {
         suffix: Option<&str>,
         test_fn: impl Fn(&mut NesTest) + 'static,
     ) -> Self {
-        let io_test = Rc::new(RefCell::new(io_test::IOTest::new(rom_path)));
+        let io_test = Rc::new(RefCell::new(super::io_test::IOTest::new(rom_path)));
         let nes_file = read_nes_file(rom_path);
         let mut nes = Nes::new();
         nes.config().set_controller_access(io_test.clone());

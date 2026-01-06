@@ -1,4 +1,3 @@
-#[path = "common.rs"]
 mod common;
 use std::time::Duration;
 

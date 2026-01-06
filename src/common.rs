@@ -4,9 +4,6 @@ pub const PRG_RAM_UNIT_SIZE: usize = 0x2000;
 
 pub const CPU_CYCLES_PER_FRAME: usize = 29780;
 
-
-
-
 #[derive(Copy, Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum Mirroring {
     Vertical,
