@@ -150,7 +150,7 @@ impl NesTest {
         header[14..18].copy_from_slice(&40u32.to_le_bytes());
         header[18..22].copy_from_slice(&(FRAME_WIDTH as u32).to_le_bytes());
         header[22..26].copy_from_slice(&(FRAME_HEIGHT as u32).to_le_bytes());
-        header[26..28].copy_from_slice(&1u16.to_le_bytes()); 
+        header[26..28].copy_from_slice(&1u16.to_le_bytes());
         header[28..30].copy_from_slice(&(PIXEL_SIZE as u16 * 8).to_le_bytes());
         file.write_all(&header).unwrap();
         for y in (0..FRAME_HEIGHT).rev() {
