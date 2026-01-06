@@ -8,7 +8,7 @@ use sdl2::{
 use std::{cell::RefCell, fs, io::Read, path::Path, path::PathBuf, rc::Rc, time::Duration};
 type TestFn = dyn Fn(&mut NesTest);
 
-fn read_nes_file(file_name: &str) -> nes_rs::nes_file::NesFile {
+fn get_bytes_from_file(file_name: &str) -> Vec<u8> {
     let mut rom = Vec::new();
     let mut file = File::open(file_name).unwrap_or_else(|_| {
         panic!(
@@ -18,8 +18,8 @@ fn read_nes_file(file_name: &str) -> nes_rs::nes_file::NesFile {
         )
     });
     file.read_to_end(&mut rom).expect("Unable to read ROM");
-    nes_rs::nes_file::NesFile::new(&rom)
-}
+    rom
+  }
 
 pub struct NesTest {
     nes: Nes,
@@ -42,7 +42,7 @@ impl NesTest {
         test_fn: impl Fn(&mut NesTest) + 'static,
     ) -> Self {
         let io_test = Rc::new(RefCell::new(super::io_test::IOTest::new(rom_path)));
-        let nes_file = read_nes_file(rom_path);
+        let rom = get_bytes_from_file(rom_path);
         let mut nes = Nes::new();
         nes.config().set_controller_access(io_test.clone());
         let mut dir = PathBuf::from(rom_path);
@@ -55,7 +55,7 @@ impl NesTest {
         dir.pop();
         let output_frame_path = Self::create_frame_path(&dir, &test_name, "");
         let expected_frame_path = Self::create_frame_path(&dir, &test_name, ".expected");
-        nes.load(&nes_file);
+        nes.load_rom(&rom);
 
         NesTest {
             io_test,

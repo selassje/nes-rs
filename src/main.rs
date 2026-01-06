@@ -123,7 +123,7 @@ impl emscripten_main_loop::MainLoop for Emulation {
     }
 }
 
-fn read_nes_file(file_name: &str) -> nes_file::NesFile {
+fn get_bytes_from_file(file_name: &str) -> Vec<u8> {
     let mut rom = Vec::new();
     let mut file = File::open(file_name).unwrap_or_else(|_| {
         panic!(
@@ -133,10 +133,10 @@ fn read_nes_file(file_name: &str) -> nes_file::NesFile {
         )
     });
     file.read_to_end(&mut rom).expect("Unable to read ROM");
-    crate::nes_file::NesFile::new(&rom)
+    rom
 }
 
-fn read_demo() -> nes_file::NesFile {
+fn read_demo() -> Vec<u8> {
     let mut demo_rom = include_bytes!("../res/nes-rs-demo.nes").to_vec();
     let pattern = b"xxxxxx";
     const GIT_HASH: &str = git_version::git_version!();
@@ -149,7 +149,7 @@ fn read_demo() -> nes_file::NesFile {
     } else {
         println!("Pattern not found!");
     }
-    nes_file::NesFile::new(&demo_rom)
+    demo_rom
 }
 
 pub fn run(mut emulation: Emulation) {
@@ -223,13 +223,13 @@ fn handle_io_state(nes: &mut Nes, io_state: &io::IOState, io_control: &mut io::I
 }
 
 fn load(nes: &mut Nes, path: &str) {
-    let nes_file = read_nes_file(path);
-    nes.load(&nes_file);
+    let rom = get_bytes_from_file(path);
+    nes.load_rom(&rom);
 }
 
 fn load_demo(nes: &mut Nes) {
-    let nes_file = read_demo();
-    nes.load(&nes_file);
+    let demo_rom = read_demo();
+    nes.load_rom(&demo_rom);
 }
 
 fn main() {

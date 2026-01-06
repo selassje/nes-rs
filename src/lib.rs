@@ -5,7 +5,7 @@ mod controllers;
 mod cpu;
 mod mappers;
 mod memory;
-pub mod nes_file;
+mod nes_file;
 mod ppu;
 mod ram;
 mod ram_apu;
@@ -251,7 +251,8 @@ impl Nes {
         self.controllers.set_controller_access(controller_access);
     }
 
-    pub fn load(&mut self, nes_file: &NesFile) {
+    pub fn load_rom(&mut self, rom: &[u8]) {
+        let nes_file = NesFile::new(rom);
         self.mapper = nes_file.create_mapper();
         self.power_cycle();
     }
