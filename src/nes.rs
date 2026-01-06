@@ -268,6 +268,8 @@ impl Nes {
         while self.ppu.get_time().frame == current_frame {
             self.run_single_cpu_cycle();
         }
+        self.controllers
+            .update_luminance_for_zappers(&self.emulation_frame);
         self.apu.reset_audio_buffer();
     }
 

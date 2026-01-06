@@ -93,8 +93,12 @@ pub struct Controllers {
 impl Default for Controllers {
     fn default() -> Self {
         Self {
-            controller_1: ControllerEnum::StdNesController(StdNesController::new(ControllerId::Controller1)),
-            controller_2: ControllerEnum::StdNesController(StdNesController::new(ControllerId::Controller2)),
+            controller_1: ControllerEnum::StdNesController(StdNesController::new(
+                ControllerId::Controller1,
+            )),
+            controller_2: ControllerEnum::StdNesController(StdNesController::new(
+                ControllerId::Controller2,
+            )),
             controller_access: default_controller_access(),
         }
     }
@@ -114,6 +118,14 @@ impl Controllers {
         if controller.get_type() != controller_type {
             *controller = Self::new_controller(id, controller_type);
             controller.set_controller_access(self.controller_access.clone());
+        }
+    }
+
+    pub fn update_luminance_for_zappers(&mut self, emulation_frame: &crate::nes::EmulationFrame) {
+        for controller in [&mut self.controller_1, &mut self.controller_2] {
+            if let ControllerEnum::Zapper(zapper) = controller {
+                zapper.update_luminance(emulation_frame);
+            }
         }
     }
 
@@ -143,7 +155,6 @@ impl Controllers {
             ControllerType::Zapper => ControllerEnum::Zapper(Zapper::new(id)),
         }
     }
-
 }
 
 impl ReadInputRegisters for Controllers {

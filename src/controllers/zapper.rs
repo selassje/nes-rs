@@ -4,6 +4,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use super::ControllerId;
 use crate::io::ControllerAccess;
+use crate::nes::EmulationFrame;
 
 #[derive(Serialize, Deserialize)]
 pub struct Zapper {
@@ -15,6 +16,7 @@ pub struct Zapper {
     x: RefCell<usize>,
     y: RefCell<usize>,
     right_button_pressed: RefCell<bool>,
+    luminance: f32,
 }
 
 impl Zapper {
@@ -27,6 +29,7 @@ impl Zapper {
             x: RefCell::new(0),
             y: RefCell::new(0),
             right_button_pressed: RefCell::new(false),
+            luminance: 0.0,
         }
     }
 
@@ -54,11 +57,7 @@ impl super::Controller for Zapper {
         if self.frames_since_last_click(current_frame) >= 2 && *trigger_state {
             *trigger_state = false;
         }
-        let lum = self
-            .controller_access
-            .borrow()
-            .get_luminance(*self.x.borrow(), *self.y.borrow());
-        let mut light_bit = if lum > 0.7 { 0b0000_0000 } else { 0b0000_1000 };
+        let mut light_bit = if self.luminance > 0.7 { 0b0000_0000 } else { 0b0000_1000 };
         if self.frames_since_last_click(current_frame) <= 4 || *self.right_button_pressed.borrow() {
             light_bit = 0b0000_1000;
         }
@@ -74,5 +73,18 @@ impl super::Controller for Zapper {
 
     fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>) {
         self.controller_access = controller_access;
+    }
+}
+
+impl Zapper {
+    pub fn update_luminance(&mut self, emulation_frame: &EmulationFrame) {
+        let x = *self.x.borrow();
+        let y = *self.y.borrow();
+        let idx = (y * crate::common::FRAME_WIDTH + x) * 3;
+        let pixels = emulation_frame.video.as_ref();
+        let r = pixels[idx] as f32 / 255.0;
+        let g = pixels[idx + 1] as f32 / 255.0;
+        let b = pixels[idx + 2] as f32 / 255.0;
+        self.luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
     }
 }
