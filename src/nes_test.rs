@@ -1,5 +1,5 @@
 use crate::common::{FRAME_HEIGHT, FRAME_WIDTH, PIXEL_SIZE};
-use crate::{controllers::ControllerId, io::io_test, nes::Nes, read_nes_file};
+use crate::{nes::ControllerId, io::io_test, nes::Nes, read_nes_file};
 use fs::File;
 use sdl2::{
     pixels::{self, PixelFormatEnum},
@@ -92,14 +92,14 @@ impl NesTest {
 
     pub fn press_player_1_start(&mut self) {
         self.io_test.borrow_mut().set_button_state(
-            crate::io::Button::Start,
+            crate::nes::StdNesControllerButton::Start,
             ControllerId::Controller1,
             true,
         );
     }
     pub fn release_player_1_start(&mut self) {
         self.io_test.borrow_mut().set_button_state(
-            crate::io::Button::Start,
+            crate::nes::StdNesControllerButton::Start,
             ControllerId::Controller1,
             false,
         );
@@ -107,7 +107,7 @@ impl NesTest {
 
     pub fn press_player_1_select(&mut self) {
         self.io_test.borrow_mut().set_button_state(
-            crate::io::Button::Select,
+            crate::nes::StdNesControllerButton::Select,
             ControllerId::Controller1,
             true,
         );
@@ -115,7 +115,7 @@ impl NesTest {
 
     pub fn release_player_1_select(&mut self) {
         self.io_test.borrow_mut().set_button_state(
-            crate::io::Button::Select,
+            crate::nes::StdNesControllerButton::Select,
             ControllerId::Controller1,
             false,
         );

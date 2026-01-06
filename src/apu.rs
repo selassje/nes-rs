@@ -4,11 +4,11 @@ use crate::nes::ApuBus;
 use crate::nes::ConfigImpl;
 use crate::nes::EmulationFrame;
 use crate::nes::Ram;
-use crate::{io::AudioAccess, memory::DmcMemory, ram_apu::*};
+use crate::{memory::DmcMemory, ram_apu::*};
 use StatusRegisterFlag::*;
 
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, default::Default, rc::Rc};
+use std::default::Default;
 pub trait ApuState {
     fn is_irq_pending(&self) -> bool;
 }
@@ -661,12 +661,9 @@ impl Dmc {
     }
 }
 
-fn default_audio_access() -> Rc<RefCell<dyn AudioAccess>> {
-    Rc::new(RefCell::new(crate::io::DummyAudioAccessImpl::new()))
-}
 
-const SAMPLING_RATE: usize = 44100;
 use crate::nes::AUDIO_FRAME_SIZE;
+use crate::nes::SAMPLING_RATE;
 
 #[derive(Serialize, Deserialize)]
 struct AudioBuffer {

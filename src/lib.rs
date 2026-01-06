@@ -82,7 +82,7 @@ impl Emulation {
             target_fps: common::DEFAULT_FPS,
             current_fps: 0,
             title: initial_title,
-            controller_type: [controllers::ControllerType::NullController; 2],
+            controller_type: [nes::ControllerType::NullController; 2],
         };
         let is_audio_available = io.borrow().is_audio_available();
         Self {
@@ -113,10 +113,10 @@ impl emscripten_main_loop::MainLoop for Emulation {
         self.io_control.controller_type = [
             self.nes
                 .config()
-                .get_controller_type(controllers::ControllerId::Controller1),
+                .get_controller_type(nes::ControllerId::Controller1),
             self.nes
                 .config()
-                .get_controller_type(controllers::ControllerId::Controller2),
+                .get_controller_type(nes::ControllerId::Controller2),
         ];
 
         self.io_state = self
@@ -233,7 +233,7 @@ fn handle_io_state(nes: &mut nes::Nes, io_state: &io::IOState, io_control: &mut 
 
     for (i, controller_type) in io_state.switch_controller_type.iter().enumerate() {
         if let Some(controller_type) = controller_type {
-            if let Some(id) = controllers::ControllerId::from_index(i) {
+            if let Some(id) = nes::ControllerId::from_index(i) {
                 nes.config().set_controller(id, *controller_type);
             }
         }

@@ -3,7 +3,7 @@ use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
 
 use super::ControllerId;
-use crate::io::ControllerAccess;
+use crate::nes::ControllerAccess;
 use crate::nes::EmulationFrame;
 
 #[derive(Serialize, Deserialize)]

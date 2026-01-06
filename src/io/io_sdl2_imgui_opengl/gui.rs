@@ -1,11 +1,12 @@
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
     common::{self, FRAME_HEIGHT, FRAME_WIDTH},
-    controllers::{self, ControllerId},
+    controllers::{self},
+    nes::{ControllerId,ControllerType},
     io::{IOControl},
 };
 
-use crate::io::MouseClick;
+use crate::nes::MouseClick;
 
 use imgui::ImString;
 
@@ -91,7 +92,7 @@ impl ButtonMapping {
 }
 #[derive(Clone, Copy, Default)]
 pub struct ControllerConfig {
-    pub mapping: [ButtonMapping; crate::io::Button::Right as usize + 1],
+    pub mapping: [ButtonMapping; crate::io::StdNesControllerButton::Right as usize + 1],
     pub pending_key_select: Option<u8>,
 }
 
@@ -144,7 +145,7 @@ pub(super) struct Gui {
     pub audio_volume: u8,
     pub controllers_setup: bool,
     pub controller_configs: [ControllerConfig; 2],
-    pub controller_switch: [Option<controllers::ControllerType>; 2],
+    pub controller_switch: [Option<ControllerType>; 2],
     pub pause: bool,
     pub mouse_click: MouseClick,
     pub crosshair: bool,
@@ -225,7 +226,7 @@ impl Gui {
     pub fn get_controller_switch(
         &mut self,
         player: ControllerId,
-    ) -> Option<controllers::ControllerType> {
+    ) -> Option<ControllerType> {
         self.controller_switch[player as usize].take()
     }
 
@@ -463,7 +464,7 @@ impl Gui {
                 self.mouse_click.left_button = false;
                 self.mouse_click.right_button = false;
                 let zapper_active =
-                    self.io_control.controller_type[1] == controllers::ControllerType::Zapper;
+                    self.io_control.controller_type[1] == ControllerType::Zapper;
                 if ui.is_window_hovered() && zapper_active {
                     self.crosshair = true;
                     let io = ui.io();
@@ -655,13 +656,13 @@ impl Gui {
             ui.combo_simple_string("Controller", &mut new_selection, &items);
             if new_selection != current_selection {
                 self.controller_switch[player_index] =
-                    Some(controllers::ControllerType::from_index(new_selection + 1).unwrap());
+                    Some(ControllerType::from_index(new_selection + 1).unwrap());
             }
         }
-        if controller_type == controllers::ControllerType::StdNesController {
+        if controller_type == ControllerType::StdNesController {
             ui.separator();
             for i in 0..8u8 {
-                let button = crate::io::Button::from(i);
+                let button = crate::io::StdNesControllerButton::from(i);
                 let caption = imgui::ImString::from(button.to_string());
                 let key = controller_config.mapping[i as usize].key;
                 let mut text = key.to_string();

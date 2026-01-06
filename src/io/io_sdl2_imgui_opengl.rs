@@ -1,4 +1,3 @@
-mod audio_sample_buffer;
 mod gui;
 mod keyboard_shortcuts;
 
@@ -7,11 +6,12 @@ use std::{borrow::BorrowMut, collections::HashMap};
 
 use self::gui::VideoSizeControl;
 
-use super::io_internal;
 use crate::common::FRAME_HEIGHT;
 use crate::common::FRAME_WIDTH;
-use crate::nes::EmulationFrame;
-use crate::{controllers, io};
+use crate::nes::{self, EmulationFrame};
+use crate::io;
+
+use nes::ControllerId;
 
 use gl::types::*;
 use sdl2::image::ImageRWops;
@@ -47,8 +47,6 @@ pub enum MenuBarItem {
 }
 
 pub struct IOSdl2ImGuiOpenGl {
-    io_internal: io_internal::IOInternal,
-    sample_buffer: audio_sample_buffer::AudioSampleBuffer,
     maybe_audio_queue: Option<sdl2::audio::AudioQueue<io::AudioSampleFormat>>,
     events: sdl2::EventPump,
     keyboard_state: HashMap<sdl2::keyboard::Scancode, bool>,
@@ -71,9 +69,9 @@ impl IOSdl2ImGuiOpenGl {
         let mut maybe_audio_queue = None;
         if let Ok(sdl_audio) = sdl2_context.audio() {
             let desired_spec = sdl2::audio::AudioSpecDesired {
-                freq: Some(audio_sample_buffer::SAMPLING_RATE as i32),
+                freq: Some(nes::SAMPLING_RATE as i32),
                 channels: Some(1),
-                samples: Some(audio_sample_buffer::BUFFER_SIZE as u16),
+                samples: None,
             };
             let audio_queue = sdl_audio.open_queue(None, &desired_spec).unwrap();
             audio_queue.resume();
@@ -150,8 +148,6 @@ impl IOSdl2ImGuiOpenGl {
         let gui_builder = gui::Gui::new(imgui::TextureId::from(emulation_texture as usize), fonts);
 
         IOSdl2ImGuiOpenGl {
-            io_internal: io_internal::IOInternal::new(),
-            sample_buffer: audio_sample_buffer::AudioSampleBuffer::new(),
             maybe_audio_queue,
             events,
             keyboard_state: HashMap::new(),
@@ -177,9 +173,9 @@ impl IOSdl2ImGuiOpenGl {
         io_state.load_state = self.gui.get_load_state_path();
         io_state.switch_controller_type = [
             self.gui
-                .get_controller_switch(controllers::ControllerId::Controller1),
+                .get_controller_switch(ControllerId::Controller1),
             self.gui
-                .get_controller_switch(controllers::ControllerId::Controller2),
+                .get_controller_switch(ControllerId::Controller2),
         ];
 
         io_state.speed = None;
@@ -400,23 +396,15 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 let audio_saturation_threshold = emulation_frame.audio_size as u32
                     * std::mem::size_of::<f32>() as u32
                     * audio_frames_reserve;
-                //let audio_saturation_threshold = self.sample_buffer.get_byte_size() as u32 * 10;
-                //  println!(
-                //     "Audio len {} org {}",
-                //     emulation_frame.audio_size,
-                //    self.sample_buffer.get_byte_size() / 4
-                // );
                 #[cfg(not(target_os = "emscripten"))]
                 {
                     while audio_queue.size() > audio_saturation_threshold {}
                     let _ = audio_queue.queue_audio(emulation_frame.get_audio_samples());
-                    //let _ = audio_queue.queue_audio(self.sample_buffer.get_samples());
                 }
                 #[cfg(target_os = "emscripten")]
                 if audio_queue.size() < audio_saturation_threshold {
                     let _ = audio_queue.queue_audio(self.sample_buffer.get_samples());
                 }
-
                 let volume = if self
                     .gui
                     .is_menu_bar_item_selected(MenuBarItem::AudioEnabled)
@@ -425,8 +413,6 @@ impl io::IO for IOSdl2ImGuiOpenGl {
                 } else {
                     0.0
                 };
-
-                self.sample_buffer.reset(control.target_fps, volume);
                 io_state.audio_volume = volume;
             }
         }
@@ -471,23 +457,11 @@ impl io::IO for IOSdl2ImGuiOpenGl {
     }
 }
 
-impl io::VideoAccess for IOSdl2ImGuiOpenGl {
-    fn set_pixel(&mut self, x: usize, y: usize, color: io::RgbColor) {
-        self.io_internal.set_pixel(x, y, color);
-    }
-}
-
-impl io::AudioAccess for IOSdl2ImGuiOpenGl {
-    fn add_sample(&mut self, sample: io::AudioSampleFormat) {
-        self.sample_buffer.add(sample);
-    }
-}
-
 impl io::ControllerAccess for IOSdl2ImGuiOpenGl {
     fn is_button_pressed(
         &self,
-        controller_id: controllers::ControllerId,
-        button: io::Button,
+        controller_id: ControllerId,
+        button: io::StdNesControllerButton,
     ) -> bool {
         let sdl2_scancode =
             self.gui.controller_configs[controller_id as usize].mapping[button as usize].key;
@@ -500,14 +474,5 @@ impl io::ControllerAccess for IOSdl2ImGuiOpenGl {
     }
     fn get_current_frame(&self) -> u128 {
         self.frame
-    }
-    fn get_luminance(&self, x: usize, y: usize) -> f32 {
-        let idx = (y * FRAME_WIDTH + x) * 3;
-        let pixels = self.io_internal.get_pixels_slice_const();
-        let r = pixels[idx] as f32 / 255.0;
-        let g = pixels[idx + 1] as f32 / 255.0;
-        let b = pixels[idx + 2] as f32 / 255.0;
-
-        0.2126 * r + 0.7152 * g + 0.0722 * b
     }
 }

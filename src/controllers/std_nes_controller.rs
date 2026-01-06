@@ -3,8 +3,8 @@ use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
 
 use super::ControllerId;
-use crate::io::Button;
-use crate::io::ControllerAccess;
+use crate::nes::StdNesControllerButton;
+use crate::nes::ControllerAccess;
 
 #[derive(Serialize, Deserialize)]
 pub struct StdNesController {
@@ -29,22 +29,22 @@ impl StdNesController {
 impl super::Controller for StdNesController {
     fn read(&self) -> u8 {
         0x40 | if *self.button.borrow() < 8 {
-            let button = Into::<Button>::into(*self.button.borrow());
+            let button = Into::<StdNesControllerButton>::into(*self.button.borrow());
             let mut val = self
                 .controller_access
                 .borrow()
                 .is_button_pressed(self.id, button);
             if val
-                && ((button == Button::Left
+                && ((button == StdNesControllerButton::Left
                     && self
                         .controller_access
                         .borrow()
-                        .is_button_pressed(self.id, Button::Right))
-                    || button == Button::Down
+                        .is_button_pressed(self.id, StdNesControllerButton::Right))
+                    || button == StdNesControllerButton::Down
                         && self
                             .controller_access
                             .borrow()
-                            .is_button_pressed(self.id, Button::Up))
+                            .is_button_pressed(self.id, StdNesControllerButton::Up))
             {
                 val = false;
             }
@@ -64,7 +64,7 @@ impl super::Controller for StdNesController {
     fn write(&mut self, byte: u8) {
         self.strobe = (1 & byte) != 0;
         if self.strobe {
-            *self.button.borrow_mut() = Button::A as u8;
+            *self.button.borrow_mut() = StdNesControllerButton::A as u8;
         }
     }
 

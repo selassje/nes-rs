@@ -1,13 +1,7 @@
 use crate::apu::Apu;
 use crate::common;
 use crate::common::*;
-use crate::controllers::ControllerId;
-use crate::controllers::ControllerType;
 use crate::controllers::Controllers;
-use crate::io::AudioAccess;
-use crate::io::ControllerAccess;
-use crate::io::VideoAccess;
-use crate::io::IO;
 use crate::mappers::Mapper;
 use crate::mappers::MapperEnum;
 use crate::mappers::MapperNull;
@@ -23,6 +17,45 @@ type Ppu = crate::ppu::Ppu;
 pub type Ram = crate::ram::Ram;
 type Cpu = crate::cpu::Cpu;
 
+#[derive(Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ControllerId {
+    Controller1,
+    Controller2,
+}
+
+#[derive(Clone, Copy, PartialEq, Default)]
+pub enum ControllerType {
+    NullController,
+    #[default]
+    StdNesController,
+    Zapper,
+}
+
+#[derive(Copy, Clone, Hash, PartialEq, Eq, Debug)]
+pub enum StdNesControllerButton {
+    A,
+    B,
+    Select,
+    Start,
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+#[derive(Clone)]
+pub struct MouseClick {
+    pub left_button: bool,
+    pub right_button: bool,
+    pub x: usize,
+    pub y: usize,
+}
+
+pub trait ControllerAccess {
+    fn is_button_pressed(&self, controller_id: crate::nes::ControllerId, button: StdNesControllerButton) -> bool;
+    fn get_mouse_click(&self) -> MouseClick;
+    fn get_current_frame(&self) -> u128;
+}
 pub struct CpuBus<'a> {
     pub ram: &'a mut Ram,
     pub ppu: &'a mut Ppu,
@@ -56,6 +89,7 @@ pub struct RamBus<'a> {
 
 pub const VIDEO_FRAME_SIZE: usize = FRAME_HEIGHT * FRAME_WIDTH * PIXEL_SIZE;
 pub const AUDIO_FRAME_SIZE: usize = 2048;
+pub const SAMPLING_RATE: usize = 44100;
 
 pub struct EmulationFrame {
     pub video: Box<[u8; VIDEO_FRAME_SIZE]>,

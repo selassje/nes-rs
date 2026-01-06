@@ -1,4 +1,7 @@
-use crate::{io::ControllerAccess, ram_controllers::*};
+use crate::{nes::ControllerAccess, ram_controllers::*};
+
+use crate::nes::ControllerType;
+use crate::nes::ControllerId;
 use serde::Deserialize;
 use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
@@ -18,13 +21,6 @@ pub trait Controller {
     fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>);
 }
 
-#[derive(Clone, Copy, PartialEq, Default)]
-pub enum ControllerType {
-    NullController,
-    #[default]
-    StdNesController,
-    Zapper,
-}
 
 impl ControllerType {
     pub fn from_index(i: usize) -> Option<Self> {
@@ -61,11 +57,6 @@ impl Default for ControllerEnum {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ControllerId {
-    Controller1,
-    Controller2,
-}
 
 impl ControllerId {
     pub fn from_index(i: usize) -> Option<Self> {

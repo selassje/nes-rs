@@ -1,7 +1,7 @@
 use crate::colors::{ColorMapper, DefaultColorMapper, RgbColor};
 use crate::nes::PpuBus;
 use crate::vram::VRam;
-use crate::{io::VideoAccess, memory::VideoMemory};
+use crate::memory::VideoMemory;
 use crate::{mappers::Mapper, mappers::MapperEnum, ram_ppu::*};
 
 use crate::common::{FRAME_WIDTH, PIXEL_SIZE};
@@ -305,9 +305,6 @@ impl Display for VRAMAddress {
     }
 }
 
-fn default_video_access() -> Rc<RefCell<dyn VideoAccess>> {
-    Rc::new(RefCell::new(crate::io::DummyVideoAccessImpl::new()))
-}
 fn default_color_mapper() -> Box<dyn ColorMapper> {
     Box::new(DefaultColorMapper::new())
 }
