@@ -16,7 +16,6 @@ use sdl2::image::ImageRWops;
 
 const MENU_BAR_HEIGHT: u32 = 18;
 const MIN_WINDOW_WIDTH: u32 = 360;
-use crate::DEFAULT_FPS;
 pub const DOUBLE_FPS: u16 = 120;
 pub const HALF_FPS: u16 = 30;
 

@@ -13,7 +13,6 @@ mod ram_controllers;
 mod ram_ppu;
 mod vram;
 
-
 use crate::apu::Apu;
 use crate::controllers::Controllers;
 use crate::mappers::Mapper;
@@ -59,13 +58,16 @@ pub enum StdNesControllerButton {
 
 pub enum ZapperTarget {
     OffScreen,
-    OnScreen(u8,u8),
+    OnScreen(u8, u8),
 }
 
-
 pub trait ControllerAccess {
-    fn is_button_pressed(&self, controller_id: ControllerId, button: StdNesControllerButton) -> bool;
-    fn is_zapper_trigger_pressed(&self) ->  Option<ZapperTarget>;
+    fn is_button_pressed(
+        &self,
+        controller_id: ControllerId,
+        button: StdNesControllerButton,
+    ) -> bool;
+    fn is_zapper_trigger_pressed(&self) -> Option<ZapperTarget>;
 }
 pub struct CpuBus<'a> {
     pub ram: &'a mut Ram,
@@ -280,7 +282,7 @@ impl Nes {
             self.run_single_cpu_cycle();
         }
         self.controllers
-            .update_zappers(&self.emulation_frame,self.ppu.get_time().frame);
+            .update_zappers(&self.emulation_frame, self.ppu.get_time().frame);
         self.apu.reset_audio_buffer();
     }
 
@@ -301,5 +303,11 @@ impl Nes {
         self.apu.run_single_cpu_cycle(&mut apu_bus);
         let mut cpu_bus = cpu_bus!(self);
         self.cpu.run_single_cycle(&mut cpu_bus);
+    }
+}
+
+impl Default for Nes {
+    fn default() -> Self {
+        Self::new()
     }
 }

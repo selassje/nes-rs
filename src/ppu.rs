@@ -504,8 +504,8 @@ impl Ppu {
                 &self.sprite_palettes,
             );
         let color = self.apply_emphasis_and_grayscale(color);
-        let index = self.scanline as usize * PIXEL_SIZE as usize * FRAME_WIDTH as usize
-            + x as usize * PIXEL_SIZE as usize;
+        let index = self.scanline as usize * PIXEL_SIZE * FRAME_WIDTH
+            + x as usize * PIXEL_SIZE;
         bus.emulation_frame.video[index] = color.0;
         bus.emulation_frame.video[index + 1] = color.1;
         bus.emulation_frame.video[index + 2] = color.2;

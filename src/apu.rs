@@ -925,7 +925,7 @@ impl Apu {
         } else {
             0.0
         };
-        (puls_out + tnd_out) as f32
+        puls_out + tnd_out
     }
 
     fn is_half_frame_reached(&self) -> bool {

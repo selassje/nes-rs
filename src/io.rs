@@ -1,4 +1,3 @@
-use std::fmt::Display;
 
 use crate::ControllerAccess;
 use crate::ControllerType;
@@ -6,7 +5,6 @@ use crate::EmulationFrame;
 use crate::StdNesControllerButton;
 
 pub mod io_sdl2_imgui_opengl;
-pub mod io_test;
 
 pub type AudioSampleFormat = f32;
 #[derive(Clone)]

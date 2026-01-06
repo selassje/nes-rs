@@ -15,14 +15,7 @@ use io::io_sdl2_imgui_opengl::DOUBLE_FPS;
 use io::io_sdl2_imgui_opengl::HALF_FPS;
 use nes_rs::*;
 
-
-pub mod nes_test;
-
 extern crate enum_tryfrom;
-
-#[macro_use]
-extern crate enum_tryfrom_derive;
-extern crate cfg_if;
 
 const FRAME_DURATION: std::time::Duration = std::time::Duration::from_nanos(
     (std::time::Duration::from_secs(1).as_nanos() / (crate::DEFAULT_FPS) as u128) as u64,
@@ -210,8 +203,8 @@ fn handle_io_state(nes: &mut Nes, io_state: &io::IOState, io_control: &mut io::I
     if let Some(ref speed) = io_state.speed {
         match speed {
             io::Speed::Half => io_control.target_fps = HALF_FPS,
-            io::Speed::Normal => io_control.target_fps = crate::DEFAULT_FPS,
-            io::Speed::Double => io_control.target_fps = crate::DOUBLE_FPS,
+            io::Speed::Normal => io_control.target_fps = DEFAULT_FPS,
+            io::Speed::Double => io_control.target_fps = DOUBLE_FPS,
             io::Speed::Increase => io_control.target_fps += 5,
             io::Speed::Decrease => {
                 io_control.target_fps = std::cmp::max(0, io_control.target_fps as i32 - 5) as u16

@@ -1,9 +1,7 @@
 use std::collections::HashMap;
 
-use crate::io::{ControllerAccess, IO};
-use crate::{ControllerId, StdNesControllerButton};
+use nes_rs::{ControllerId, StdNesControllerButton,ControllerAccess};
 
-use super::{IOControl, IOState};
 
 pub struct IOTest {
     controller_buttons_state: [HashMap<StdNesControllerButton, bool>; 2],
@@ -20,16 +18,6 @@ impl IOTest {
     }
 }
 
-impl IO for IOTest {
-    fn present_frame(&mut self, _: IOControl, _: &crate::EmulationFrame) -> IOState {
-        Default::default()
-    }
-
-    fn is_audio_available(&self) -> bool {
-        true
-    }
-}
-
 impl ControllerAccess for IOTest {
     fn is_button_pressed(&self, controller_id: ControllerId, button: StdNesControllerButton) -> bool {
         if let Some(pressed) = self.controller_buttons_state[controller_id as usize].get(&button) {
@@ -38,7 +26,7 @@ impl ControllerAccess for IOTest {
             false
         }
     }
-    fn is_zapper_trigger_pressed(&self) -> Option<crate::ZapperTarget> {
+    fn is_zapper_trigger_pressed(&self) -> Option<nes_rs::ZapperTarget> {
         None
     }
 }

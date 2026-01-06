@@ -1,5 +1,5 @@
-use crate::{FRAME_HEIGHT, FRAME_WIDTH, PIXEL_SIZE};
-use crate::{ControllerId, io::io_test, Nes, read_nes_file};
+use nes_rs::{ControllerId, Nes, StdNesControllerButton, FRAME_HEIGHT, FRAME_WIDTH, PIXEL_SIZE};
+
 use fs::File;
 use sdl2::{
     pixels::{self, PixelFormatEnum},
@@ -7,6 +7,22 @@ use sdl2::{
 };
 use std::{cell::RefCell, fs, io::Read, path::Path, path::PathBuf, rc::Rc, time::Duration};
 type TestFn = dyn Fn(&mut NesTest);
+
+#[path = "io_test.rs"]
+mod io_test;
+
+fn read_nes_file(file_name: &str) -> nes_rs::nes_file::NesFile {
+    let mut rom = Vec::new();
+    let mut file = File::open(file_name).unwrap_or_else(|_| {
+        panic!(
+            "Unable to open ROM {} current dir {}",
+            file_name,
+            std::env::current_dir().unwrap().display()
+        )
+    });
+    file.read_to_end(&mut rom).expect("Unable to read ROM");
+    nes_rs::nes_file::NesFile::new(&rom)
+}
 
 pub struct NesTest {
     nes: Nes,
@@ -80,42 +96,46 @@ impl NesTest {
         self.nes.run_for(duration)
     }
 
+    #[allow(dead_code)]
     pub fn serialize_and_reset(&mut self) -> Vec<u8> {
         let serialized = self.nes.serialize();
         self.nes.power_cycle();
         serialized
     }
 
+    #[allow(dead_code)]
     pub fn deserialize(&mut self, state: Vec<u8>) {
         self.nes.deserialize(state);
     }
 
+    #[allow(dead_code)]
     pub fn press_player_1_start(&mut self) {
         self.io_test.borrow_mut().set_button_state(
-            crate::StdNesControllerButton::Start,
+            StdNesControllerButton::Start,
             ControllerId::Controller1,
             true,
         );
     }
+    #[allow(dead_code)]
     pub fn release_player_1_start(&mut self) {
         self.io_test.borrow_mut().set_button_state(
-            crate::StdNesControllerButton::Start,
+            StdNesControllerButton::Start,
             ControllerId::Controller1,
             false,
         );
     }
-
+    #[allow(dead_code)]
     pub fn press_player_1_select(&mut self) {
         self.io_test.borrow_mut().set_button_state(
-            crate::StdNesControllerButton::Select,
+            StdNesControllerButton::Select,
             ControllerId::Controller1,
             true,
         );
     }
-
+    #[allow(dead_code)]
     pub fn release_player_1_select(&mut self) {
         self.io_test.borrow_mut().set_button_state(
-            crate::StdNesControllerButton::Select,
+            StdNesControllerButton::Select,
             ControllerId::Controller1,
             false,
         );
@@ -132,11 +152,8 @@ impl NesTest {
         for x in 0..FRAME_WIDTH {
             for y in 0..FRAME_HEIGHT {
                 let index = y * PIXEL_SIZE * FRAME_WIDTH + x * PIXEL_SIZE;
-                let pixel_color = pixels::Color::RGB(
-                    frame[index],
-                    frame[index + 1],
-                    frame[index + 2],
-                );
+                let pixel_color =
+                    pixels::Color::RGB(frame[index], frame[index + 1], frame[index + 2]);
                 let _ = bitmap.fill_rect(Rect::new(x as i32, y as i32, 1, 1), pixel_color);
             }
         }

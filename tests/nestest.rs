@@ -1,7 +1,8 @@
 #[path = "common.rs"]
 mod common;
-use crate::nes_test;
+mod nes_test;
 use std::time::Duration;
+use nes_test::NesTest;
 
 const PATH: &str = "tests/nestest/";
 

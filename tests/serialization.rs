@@ -1,7 +1,8 @@
 #[path = "common.rs"]
 mod common;
-use nes_rs::nes_test::NesTest;
+mod nes_test;
 use std::time::Duration;
+use nes_test::NesTest;
 
 #[test]
 fn serialization_test() {

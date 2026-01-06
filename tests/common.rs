@@ -1,4 +1,5 @@
-use nes_rs::NesTest;
+mod nes_test;
+use nes_test::NesTest;
 use std::time::Duration;
 
 pub fn run_simple_test(rom_path: &str, duration: Duration) {

@@ -5,7 +5,6 @@ use crate::{
     FRAME_WIDTH, FRAME_HEIGHT,DEFAULT_FPS
 };
 
-
 use crate::io::MouseClick;
 use super::DOUBLE_FPS;
 use super::HALF_FPS;
@@ -474,7 +473,7 @@ impl Gui {
                     let window_pos = ui.window_pos();
                     let rel_pos = [mouse_pos[0] - window_pos[0], mouse_pos[1] - window_pos[1]];
                     let tex_x =
-                        (rel_pos[0] / self.video_size[0] * crate::FRAME_WIDTH as f32).floor() as usize;
+                        (rel_pos[0] / self.video_size[0] * nes_rs::FRAME_WIDTH as f32).floor() as usize;
                     let tex_y =
                         (rel_pos[1] / self.video_size[1] * crate::FRAME_HEIGHT as f32).floor() as usize;
 
