@@ -1,9 +1,7 @@
 use nes_rs::{ControllerId, Nes, StdNesControllerButton, FRAME_HEIGHT, FRAME_WIDTH, PIXEL_SIZE};
 
 use fs::File;
-use std::{
-    cell::RefCell, fs, io::Read, io::Write, path::Path, path::PathBuf, rc::Rc, time::Duration,
-};
+use std::{fs, io::Read, io::Write, path::Path, path::PathBuf, rc::Rc, time::Duration};
 type TestFn = dyn Fn(&mut NesTest);
 
 fn get_bytes_from_file(file_name: &str) -> Vec<u8> {
@@ -21,7 +19,7 @@ fn get_bytes_from_file(file_name: &str) -> Vec<u8> {
 
 pub struct NesTest {
     nes: Nes,
-    io_test: Rc<RefCell<super::io_test::IOTest>>,
+    io_test: super::io_test::IOTest,
     output_frame_path: String,
     expected_frame_path: String,
     test_fn: Rc<TestFn>,
@@ -39,10 +37,9 @@ impl NesTest {
         suffix: Option<&str>,
         test_fn: impl Fn(&mut NesTest) + 'static,
     ) -> Self {
-        let io_test = Rc::new(RefCell::new(super::io_test::IOTest::new(rom_path)));
+        let io_test = super::io_test::IOTest::new(rom_path);
         let rom = get_bytes_from_file(rom_path);
         let mut nes = Nes::new();
-        nes.config().set_controller_access(io_test.clone());
         let mut dir = PathBuf::from(rom_path);
         let mut test_name = dir.file_name().unwrap().to_str().unwrap().to_owned();
         if let Some(suffix) = suffix {
@@ -88,7 +85,7 @@ impl NesTest {
     }
 
     pub fn run_for(&mut self, duration: Duration) {
-        self.nes.run_for(duration, Some(&*self.io_test.borrow()));
+        self.nes.run_for(duration, Some(&self.io_test));
     }
 
     #[allow(dead_code)]
@@ -105,7 +102,7 @@ impl NesTest {
 
     #[allow(dead_code)]
     pub fn press_player_1_start(&mut self) {
-        self.io_test.borrow_mut().set_button_state(
+        self.io_test.set_button_state(
             StdNesControllerButton::Start,
             ControllerId::Controller1,
             true,
@@ -113,7 +110,7 @@ impl NesTest {
     }
     #[allow(dead_code)]
     pub fn release_player_1_start(&mut self) {
-        self.io_test.borrow_mut().set_button_state(
+        self.io_test.set_button_state(
             StdNesControllerButton::Start,
             ControllerId::Controller1,
             false,
@@ -121,7 +118,7 @@ impl NesTest {
     }
     #[allow(dead_code)]
     pub fn press_player_1_select(&mut self) {
-        self.io_test.borrow_mut().set_button_state(
+        self.io_test.set_button_state(
             StdNesControllerButton::Select,
             ControllerId::Controller1,
             true,
@@ -129,7 +126,7 @@ impl NesTest {
     }
     #[allow(dead_code)]
     pub fn release_player_1_select(&mut self) {
-        self.io_test.borrow_mut().set_button_state(
+        self.io_test.set_button_state(
             StdNesControllerButton::Select,
             ControllerId::Controller1,
             false,

@@ -26,7 +26,7 @@ extern "C" {
 }
 pub struct Emulation {
     nes: Nes,
-    io: Rc<RefCell<IOSdl2ImGuiOpenGl>>,
+    io: IOSdl2ImGuiOpenGl,
     io_control: IOControl,
     io_state: IOState,
     fps: u16,
@@ -37,9 +37,7 @@ pub struct Emulation {
 #[allow(clippy::new_without_default)]
 impl Emulation {
     pub fn new() -> Self {
-        let io = Rc::new(RefCell::new(
-            io::io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl::new(),
-        ));
+        let io = io::io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl::new();
 
         let mut nes: Nes = crate::Nes::new();
 
@@ -64,7 +62,7 @@ impl Emulation {
             title: initial_title,
             controller_type: [crate::ControllerType::NullController; 2],
         };
-        let is_audio_available = io.borrow().is_audio_available();
+        let is_audio_available = io.is_audio_available();
         Self {
             nes,
             io,
@@ -81,7 +79,7 @@ impl Emulation {
 impl emscripten_main_loop::MainLoop for Emulation {
     fn main_loop(&mut self) -> emscripten_main_loop::MainLoopEvent {
         if !self.io_state.pause {
-            self.nes.run_single_frame(Some(&*self.io.borrow()));
+            self.nes.run_single_frame(Some(&self.io));
             if self.one_second_timer.elapsed() < std::time::Duration::from_secs(1) {
                 self.fps += 1;
             } else {
@@ -101,7 +99,6 @@ impl emscripten_main_loop::MainLoop for Emulation {
 
         self.io_state = self
             .io
-            .borrow_mut()
             .present_frame(self.io_control.clone(), self.nes.get_emulation_frame());
 
         handle_io_state(&mut self.nes, &self.io_state, &mut self.io_control);
