@@ -100,7 +100,7 @@ impl Zapper {
         self.current_frame = frame;
         let x = *self.x.borrow();
         let y = *self.y.borrow();
-        let color = emulation_frame.video.get_pixel(x as u8,y as u8);
+        let color = emulation_frame.video.get_pixel(x as u8, y as u8);
         let (r, g, b) = color;
         self.luminance = 0.2126 * r as f32 + 0.7152 * g as f32 + 0.0722 * b as f32;
     }

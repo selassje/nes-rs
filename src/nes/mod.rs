@@ -99,8 +99,8 @@ struct RamBus<'a> {
 pub const DEFAULT_FPS: u16 = 60;
 pub const PIXEL_SIZE: usize = 3;
 pub const VIDEO_FRAME_WIDTH: usize = 256;
-pub const VIDE_FRAME_HEIGHT: usize = 240;
-pub const VIDEO_FRAME_SIZE: usize = VIDE_FRAME_HEIGHT * VIDEO_FRAME_WIDTH * PIXEL_SIZE;
+pub const VIDEO_FRAME_HEIGHT: usize = 240;
+pub const VIDEO_FRAME_SIZE: usize = VIDEO_FRAME_HEIGHT * VIDEO_FRAME_WIDTH * PIXEL_SIZE;
 pub const MAX_AUDIO_FRAME_SIZE: usize = 2048;
 pub const SAMPLING_RATE: usize = 44100;
 
@@ -109,7 +109,7 @@ pub struct VideoFrame {
 }
 
 impl VideoFrame {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             pixels: Box::new([0; VIDEO_FRAME_SIZE]),
         }
@@ -135,25 +135,49 @@ impl VideoFrame {
     }
 }
 
+pub struct AudioFrame {
+    samples: Box<[f32; MAX_AUDIO_FRAME_SIZE]>,
+    size: usize,
+}
+
+impl AudioFrame {
+    pub(crate) fn new() -> Self {
+        Self {
+            samples: Box::new([0.0; MAX_AUDIO_FRAME_SIZE]),
+            size: 0,
+        }
+    }
+    pub fn get_samples(&self) -> &[f32] {
+        &self.samples[..self.size]
+    }
+
+    pub fn get_byte_size(&self) -> usize {
+        self.size * std::mem::size_of::<f32>()
+    }
+
+    pub(crate) fn reset(&mut self) {
+        self.size = 0;
+    }
+
+    pub(crate) fn add_sample(&mut self, sample: f32) {
+        if self.size < MAX_AUDIO_FRAME_SIZE {
+            self.samples[self.size] = sample;
+            self.size += 1;
+        }
+    }
+}
+
 pub struct EmulationFrame {
     pub video: VideoFrame,
-    pub audio: Box<[f32; MAX_AUDIO_FRAME_SIZE]>,
-    pub audio_size: usize,
+    pub audio: AudioFrame,
 }
 
 impl Default for EmulationFrame {
     fn default() -> Self {
         Self {
             video: VideoFrame::new(),
-            audio: Box::new([0.0; MAX_AUDIO_FRAME_SIZE]),
-            audio_size: 0,
+            audio: AudioFrame::new(),
         }
-    }
-}
-
-impl EmulationFrame {
-    pub fn get_audio_samples(&self) -> &[f32] {
-        &self.audio[..self.audio_size]
     }
 }
 
@@ -298,7 +322,7 @@ impl Nes {
     }
 
     pub fn run_single_frame(&mut self, callback: Option<&dyn ControllerCallback>) {
-        self.emulation_frame.audio_size = 0;
+        self.emulation_frame.audio.reset();
         let current_frame = self.ppu.get_time().frame;
         while self.ppu.get_time().frame == current_frame {
             self.run_single_cpu_cycle(callback);

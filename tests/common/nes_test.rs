@@ -1,4 +1,6 @@
-use nes_rs::{ControllerId, Nes, StdNesControllerButton, VIDE_FRAME_HEIGHT, VIDEO_FRAME_WIDTH, PIXEL_SIZE};
+use nes_rs::{
+    ControllerId, Nes, StdNesControllerButton, PIXEL_SIZE, VIDEO_FRAME_HEIGHT, VIDEO_FRAME_WIDTH,
+};
 
 use fs::File;
 use std::{fs, io::Read, io::Write, path::Path, path::PathBuf, rc::Rc, time::Duration};
@@ -136,7 +138,7 @@ impl NesTest {
     fn dump_frame(&self) {
         let frame = &self.nes.get_emulation_frame().video;
         let row_size = (PIXEL_SIZE * VIDEO_FRAME_WIDTH + 3) & !3;
-        let pixel_data_size = row_size * VIDE_FRAME_HEIGHT;
+        let pixel_data_size = row_size * VIDEO_FRAME_HEIGHT;
         let file_size = 54 + pixel_data_size;
         let mut file = File::create(&self.output_frame_path).unwrap();
         let mut header = [0u8; 54];
@@ -146,14 +148,14 @@ impl NesTest {
         header[10..14].copy_from_slice(&54u32.to_le_bytes());
         header[14..18].copy_from_slice(&40u32.to_le_bytes());
         header[18..22].copy_from_slice(&(VIDEO_FRAME_WIDTH as u32).to_le_bytes());
-        header[22..26].copy_from_slice(&(VIDE_FRAME_HEIGHT as u32).to_le_bytes());
+        header[22..26].copy_from_slice(&(VIDEO_FRAME_HEIGHT as u32).to_le_bytes());
         header[26..28].copy_from_slice(&1u16.to_le_bytes());
         header[28..30].copy_from_slice(&(PIXEL_SIZE as u16 * 8).to_le_bytes());
         file.write_all(&header).unwrap();
-        for y in (0..VIDE_FRAME_HEIGHT).rev() {
+        for y in (0..VIDEO_FRAME_HEIGHT).rev() {
             let mut row = vec![0u8; row_size];
             for x in 0..VIDEO_FRAME_WIDTH {
-                let (r,g,b) = frame.get_pixel(x as u8,y as u8);
+                let (r, g, b) = frame.get_pixel(x as u8, y as u8);
                 row[x * PIXEL_SIZE] = b;
                 row[x * PIXEL_SIZE + 1] = g;
                 row[x * PIXEL_SIZE + 2] = r;

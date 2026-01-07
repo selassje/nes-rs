@@ -504,7 +504,9 @@ impl Ppu {
                 &self.sprite_palettes,
             );
         let color = self.apply_emphasis_and_grayscale(color);
-        bus.emulation_frame.video.set_pixel(x as u8, self.scanline as u8, color);
+        bus.emulation_frame
+            .video
+            .set_pixel(x as u8, self.scanline as u8, color);
 
         if !self.status_reg.get_flag(StatusRegisterFlag::Sprite0Hit)
             && x < 255

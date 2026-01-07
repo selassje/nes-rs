@@ -5,7 +5,7 @@ authors = ["Przemyslaw Koziol <przemkoz85@gmail.com>"]
 edition = "2021"
 
 [features]
-default = []
+default = ["frontend"]
 frontend = [
     "sdl2",
     "imgui",

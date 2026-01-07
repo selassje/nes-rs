@@ -392,17 +392,16 @@ impl frontend::Frontend for Sdl2ImGuiOpenGlFrontend {
                 audio_queue.resume();
 
                 let audio_frames_reserve: u32 = 10;
-                let audio_saturation_threshold = emulation_frame.audio_size as u32
-                    * std::mem::size_of::<f32>() as u32
-                    * audio_frames_reserve;
+                let audio_saturation_threshold =
+                    emulation_frame.audio.get_byte_size() as u32 * audio_frames_reserve;
                 #[cfg(not(target_os = "emscripten"))]
                 {
                     while audio_queue.size() > audio_saturation_threshold {}
-                    let _ = audio_queue.queue_audio(emulation_frame.get_audio_samples());
+                    let _ = audio_queue.queue_audio(emulation_frame.audio.get_samples());
                 }
                 #[cfg(target_os = "emscripten")]
                 if audio_queue.size() < audio_saturation_threshold {
-                    let _ = audio_queue.queue_audio(emulation_frame.get_audio_samples());
+                    let _ = audio_queue.queue_audio(emulation_frame.audio.get_samples());
                 }
                 let volume = if self
                     .gui
@@ -421,7 +420,7 @@ impl frontend::Frontend for Sdl2ImGuiOpenGlFrontend {
                 0,
                 gl::RGB8 as _,
                 nes_rs::VIDEO_FRAME_WIDTH as _,
-                nes_rs::VIDE_FRAME_HEIGHT as _,
+                nes_rs::VIDEO_FRAME_HEIGHT as _,
                 0,
                 gl::RGB,
                 gl::UNSIGNED_BYTE,

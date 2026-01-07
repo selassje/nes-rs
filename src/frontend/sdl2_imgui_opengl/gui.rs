@@ -1,6 +1,7 @@
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
-    frontend::FrontendControl, ControllerId, ControllerType, DEFAULT_FPS, VIDE_FRAME_HEIGHT, VIDEO_FRAME_WIDTH,
+    frontend::FrontendControl, ControllerId, ControllerType, DEFAULT_FPS, VIDEO_FRAME_HEIGHT,
+    VIDEO_FRAME_WIDTH,
 };
 
 use super::DOUBLE_FPS;
@@ -60,7 +61,10 @@ impl From<VideoSizeControl> for [u32; 2] {
         }
 
         let scaling = val as u32;
-        [scaling * VIDEO_FRAME_WIDTH as u32, scaling * VIDE_FRAME_HEIGHT as u32]
+        [
+            scaling * VIDEO_FRAME_WIDTH as u32,
+            scaling * VIDEO_FRAME_HEIGHT as u32,
+        ]
     }
 }
 
@@ -162,7 +166,7 @@ fn create_file_dialog(
         .min_size([2.0 * VIDEO_FRAME_WIDTH as f32 - 30.0, 200.0])
         .max_size([
             2.0 * VIDEO_FRAME_WIDTH as f32,
-            (2 * VIDE_FRAME_HEIGHT - MENU_BAR_HEIGHT as usize) as _,
+            (2 * VIDEO_FRAME_HEIGHT - MENU_BAR_HEIGHT as usize) as _,
         ])
 }
 
@@ -189,7 +193,10 @@ impl Gui {
             },
             video_size_control: VideoSizeControl::Double,
             previous_video_size_control: VideoSizeControl::Double,
-            video_size: [VIDEO_FRAME_WIDTH as f32 * 2.0, VIDE_FRAME_HEIGHT as f32 * 2.0],
+            video_size: [
+                VIDEO_FRAME_WIDTH as f32 * 2.0,
+                VIDEO_FRAME_HEIGHT as f32 * 2.0,
+            ],
             build_menu_bar: Default::default(),
             fd_load_nes_file: create_file_dialog(
                 nes_file_label.as_ref(),
@@ -468,7 +475,7 @@ impl Gui {
                     let rel_pos = [mouse_pos[0] - window_pos[0], mouse_pos[1] - window_pos[1]];
                     let tex_x = (rel_pos[0] / self.video_size[0] * nes_rs::VIDEO_FRAME_WIDTH as f32)
                         .floor() as usize;
-                    let tex_y = (rel_pos[1] / self.video_size[1] * crate::VIDE_FRAME_HEIGHT as f32)
+                    let tex_y = (rel_pos[1] / self.video_size[1] * crate::VIDEO_FRAME_HEIGHT as f32)
                         .floor() as usize;
 
                     if ui.is_mouse_clicked(imgui::MouseButton::Left) {

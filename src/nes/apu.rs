@@ -3,7 +3,6 @@ use super::ApuBus;
 use super::AudioConfig;
 use super::EmulationFrame;
 use super::Ram;
-use super::MAX_AUDIO_FRAME_SIZE;
 use super::SAMPLING_RATE;
 use super::{memory::DmcMemory, ram_apu::*};
 use StatusRegisterFlag::*;
@@ -690,11 +689,8 @@ impl AudioBuffer {
         self.acc_count += 1.0;
         if self.phase >= cycels_per_sample {
             self.phase -= cycels_per_sample;
-            if emulation_frame.audio_size < MAX_AUDIO_FRAME_SIZE {
-                let averaged = self.acc / self.acc_count;
-                emulation_frame.audio[emulation_frame.audio_size] = averaged as f32;
-                emulation_frame.audio_size += 1;
-            }
+            let averaged = self.acc / self.acc_count;
+            emulation_frame.audio.add_sample(averaged as f32);
             self.acc = 0.0;
             self.acc_count = 0.0;
         }
