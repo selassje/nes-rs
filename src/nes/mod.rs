@@ -69,7 +69,7 @@ pub trait ControllerAccess {
     ) -> bool;
     fn is_zapper_trigger_pressed(&self) -> Option<ZapperTarget>;
 }
-pub struct CpuBus<'a> {
+struct CpuBus<'a> {
     pub ram: &'a mut Ram,
     pub ppu: &'a mut Ppu,
     pub apu: &'a mut Apu,
@@ -89,11 +89,11 @@ macro_rules! cpu_bus {
     }};
 }
 
-pub struct PpuBus<'a> {
+struct PpuBus<'a> {
     pub mapper: &'a mut MapperEnum,
     pub emulation_frame: &'a mut EmulationFrame,
 }
-pub struct RamBus<'a> {
+struct RamBus<'a> {
     pub apu: &'a mut Apu,
     pub ppu: &'a mut Ppu,
     pub mapper: &'a mut MapperEnum,
