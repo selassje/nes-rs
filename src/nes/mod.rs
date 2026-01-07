@@ -173,11 +173,11 @@ impl Config<'_> {
 
 }
 
-pub struct ApuBus<'a> {
+pub(crate) struct ApuBus<'a> {
     pub ram: &'a mut Ram,
     pub mapper: &'a mut MapperEnum,
     pub emulation_frame: &'a mut EmulationFrame,
-    pub(crate) config: &'a AudioConfig,
+    pub config: &'a AudioConfig,
 }
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Nes {
