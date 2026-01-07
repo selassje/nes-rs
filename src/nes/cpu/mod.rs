@@ -99,6 +99,7 @@ macro_rules! ram_bus {
             apu: $cpu_bus.apu,
             mapper: $cpu_bus.mapper,
             controllers: $cpu_bus.controllers,
+            callback: $cpu_bus.callback,
         }
     }};
 }

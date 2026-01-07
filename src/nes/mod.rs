@@ -75,16 +75,18 @@ struct CpuBus<'a> {
     pub apu: &'a mut Apu,
     pub mapper: &'a mut MapperEnum,
     pub controllers: &'a mut Controllers,
+    pub callback: Option<&'a dyn ControllerAccess>,
 }
 
 macro_rules! cpu_bus {
-    ($nes:expr) => {{
+    ($nes:expr, $callback:ident) => {{
         CpuBus {
             ram: &mut $nes.ram,
             ppu: &mut $nes.ppu,
             apu: &mut $nes.apu,
             mapper: &mut $nes.mapper,
             controllers: &mut $nes.controllers,
+            callback: $callback,
         }
     }};
 }
@@ -98,6 +100,7 @@ struct RamBus<'a> {
     pub ppu: &'a mut Ppu,
     pub mapper: &'a mut MapperEnum,
     pub controllers: &'a mut Controllers,
+    pub callback: Option<&'a dyn ControllerAccess>,
 }
 pub const DEFAULT_FPS: u16 = 60;
 pub const PIXEL_SIZE: usize = 3;
@@ -262,7 +265,7 @@ impl Nes {
         self.apu.power_cycle();
         self.ram.power_cycle();
         self.mapper.power_cycle();
-        let mut cpu_bus = cpu_bus!(self);
+        let mut cpu_bus = cpu_bus!(self, None);
         self.cpu.power_cycle(&mut cpu_bus);
         self.controllers.power_cycle();
     }
@@ -270,24 +273,24 @@ impl Nes {
     pub fn run_for(&mut self, duration: Duration) {
         let mut elapsed_frames = 0;
         while elapsed_frames < duration.as_secs() as u128 * DEFAULT_FPS as u128 {
-            self.run_single_frame();
+            self.run_single_frame(None);
             elapsed_frames += 1;
         }
     }
 
-    pub fn run_single_frame(&mut self) {
+    pub fn run_single_frame(&mut self, callback: Option<&dyn ControllerAccess>) {
         self.emulation_frame.audio_size = 0;
         let current_frame = self.ppu.get_time().frame;
         while self.ppu.get_time().frame == current_frame {
-            self.run_single_cpu_cycle();
+            self.run_single_cpu_cycle(callback);
         }
         self.controllers
             .update_zappers(&self.emulation_frame, self.ppu.get_time().frame);
         self.apu.reset_audio_buffer();
     }
 
-    fn run_single_cpu_cycle(&mut self) {
-        let mut cpu_bus = cpu_bus!(self);
+    fn run_single_cpu_cycle(&mut self, callback: Option<&dyn ControllerAccess>) {
+        let mut cpu_bus = cpu_bus!(self, callback);
         self.cpu.maybe_fetch_next_instruction(&mut cpu_bus);
         let mut ppu_bus = PpuBus {
             mapper: &mut self.mapper,
@@ -301,7 +304,7 @@ impl Nes {
             config: &self.config,
         };
         self.apu.run_single_cpu_cycle(&mut apu_bus);
-        let mut cpu_bus = cpu_bus!(self);
+        let mut cpu_bus = cpu_bus!(self, callback);
         self.cpu.run_single_cycle(&mut cpu_bus);
     }
 }

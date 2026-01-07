@@ -46,8 +46,12 @@ impl Zapper {
 }
 
 impl super::Controller for Zapper {
-    fn read(&self) -> u8 {
-        let zapper_trigger = self.controller_access.borrow().is_zapper_trigger_pressed();
+    fn read(&self, callback: Option<&dyn ControllerAccess>) -> u8 {
+        let zapper_trigger = if let Some(cb) = callback {
+            cb.is_zapper_trigger_pressed()
+        } else {
+            None
+        };
         let mut trigger_state = self.trigger_pressed.borrow_mut();
         if zapper_trigger.is_some() && !*trigger_state {
             if let Some(ZapperTarget::OnScreen(x, y)) = zapper_trigger {

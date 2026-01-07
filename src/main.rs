@@ -1,3 +1,4 @@
+use core::borrow;
 use std::{
     cell::RefCell,
     env,
@@ -82,7 +83,7 @@ impl Emulation {
 impl emscripten_main_loop::MainLoop for Emulation {
     fn main_loop(&mut self) -> emscripten_main_loop::MainLoopEvent {
         if !self.io_state.pause {
-            self.nes.run_single_frame();
+            self.nes.run_single_frame(Some(&*self.io.borrow()));
             if self.one_second_timer.elapsed() < std::time::Duration::from_secs(1) {
                 self.fps += 1;
             } else {

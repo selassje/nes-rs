@@ -14,7 +14,7 @@ impl NullController {
 }
 
 impl super::Controller for NullController {
-    fn read(&self) -> u8 {
+    fn read(&self, _callback: Option<&dyn ControllerAccess>) -> u8 {
         0
     }
     fn write(&mut self, _byte: u8) {}

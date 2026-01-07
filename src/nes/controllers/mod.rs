@@ -36,7 +36,7 @@ impl ControllerAccess for NullControllerAccess {
 
 #[enum_dispatch::enum_dispatch(ControllerEnum)]
 pub trait Controller {
-    fn read(&self) -> u8;
+    fn read(&self, callbac: Option<&dyn ControllerAccess>) -> u8;
     fn write(&mut self, byte: u8);
     fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>);
     fn power_cycle(&mut self);
@@ -170,10 +170,10 @@ impl Controllers {
 }
 
 impl ReadInputRegisters for Controllers {
-    fn read(&self, port: InputRegister) -> u8 {
+    fn read(&self, port: InputRegister, callback: Option<&dyn ControllerAccess>) -> u8 {
         match port {
-            InputRegister::Controller1 => self.controller_1.read(),
-            InputRegister::Controller2 => self.controller_2.read(),
+            InputRegister::Controller1 => self.controller_1.read(callback),
+            InputRegister::Controller2 => self.controller_2.read(callback),
         }
     }
 }

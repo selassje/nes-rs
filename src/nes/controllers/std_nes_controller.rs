@@ -63,24 +63,24 @@ impl Display for StdNesControllerButton {
     }
 }
 impl super::Controller for StdNesController {
-    fn read(&self) -> u8 {
+    fn read(&self, callback: Option<&dyn ControllerAccess>) -> u8 {
+      
+        let is_button_pressed = |id: ControllerId, button: StdNesControllerButton| {
+            if let Some(cb) = callback {
+                cb.is_button_pressed(id, button)
+            } else {
+                false
+            }
+        };
+
         0x40 | if *self.button.borrow() < 8 {
             let button = Into::<StdNesControllerButton>::into(*self.button.borrow());
-            let mut val = self
-                .controller_access
-                .borrow()
-                .is_button_pressed(self.id, button);
+            let mut val = is_button_pressed(self.id, button);
             if val
                 && ((button == StdNesControllerButton::Left
-                    && self
-                        .controller_access
-                        .borrow()
-                        .is_button_pressed(self.id, StdNesControllerButton::Right))
+                    && is_button_pressed(self.id, StdNesControllerButton::Right))
                     || button == StdNesControllerButton::Down
-                        && self
-                            .controller_access
-                            .borrow()
-                            .is_button_pressed(self.id, StdNesControllerButton::Up))
+                        && is_button_pressed(self.id, StdNesControllerButton::Up))
             {
                 val = false;
             }
