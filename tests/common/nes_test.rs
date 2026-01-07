@@ -89,12 +89,15 @@ impl NesTest {
     }
 
     pub fn run_for(&mut self, duration: Duration) {
-        self.frame = Some(
-            self.nes
-                .run_for(duration, Some(&self.io_test))
-                .video
-                .clone(),
-        );
+        let mut elapsed_frames = 0;
+        let total_frames = duration.as_secs() as u128 * 60_u128;
+        while elapsed_frames < total_frames {
+            self.nes.run_single_frame(Some(&self.io_test));
+            if elapsed_frames == total_frames - 1 {
+                self.frame = Some(self.nes.run_single_frame(Some(&self.io_test)).video.clone());
+            }
+            elapsed_frames += 1;
+        }
     }
 
     #[allow(dead_code)]

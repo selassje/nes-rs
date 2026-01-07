@@ -24,8 +24,6 @@ use ppu::Ppu;
 use ppu::PpuState;
 use ram::Ram;
 
-use std::time::Duration;
-
 const SERIALIZATION_VER: &str = "1";
 
 #[derive(Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -308,19 +306,6 @@ impl Nes {
         let mut cpu_bus = cpu_bus!(self, None);
         self.cpu.power_cycle(&mut cpu_bus);
         self.controllers.power_cycle();
-    }
-
-    pub fn run_for(
-        &mut self,
-        duration: Duration,
-        callback: Option<&dyn ControllerCallback>,
-    ) -> &EmulationFrame {
-        let mut elapsed_frames = 0;
-        while elapsed_frames < duration.as_secs() as u128 * DEFAULT_FPS as u128 {
-            self.run_single_frame(callback);
-            elapsed_frames += 1;
-        }
-        &self.emulation_frame
     }
 
     pub fn run_single_frame(
