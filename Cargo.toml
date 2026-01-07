@@ -41,10 +41,10 @@ panic = "unwind"
 
 
 [target.'cfg(not(target_os = "emscripten"))'.dependencies]
-sdl2 = {version = "0.36", default-features = false, features = ["static-link","use-vcpkg", "image"]}
+sdl2 = {version = "0.36", default-features = false, features = ["static-link","use-vcpkg"]}
 
 [target.'cfg(target_os = "emscripten")'.dependencies]
-sdl2 = {version = "0.36", default-features = false, features = ["image"]}
+sdl2 = {version = "0.36", default-features = false}
 instant = {version = "0.1", features = ["wasm-bindgen"]}
 
 [dependencies]
@@ -68,7 +68,7 @@ yazi = "0.2.1"
 
 
 [package.metadata.vcpkg]
-dependencies = ["sdl2","sdl2-image[libjpeg-turbo,tiff,libwebp]"]
+dependencies = ["sdl2"]
 git = "https://github.com/microsoft/vcpkg"
 rev = "84bab45d415d22042bd0b9081aea57f362da3f35"
 

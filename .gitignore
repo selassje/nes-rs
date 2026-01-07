@@ -6,6 +6,7 @@ Cargo.lock
 !/tests/*/*
 *.bmp
 !/tests/*/*.expected.bmp
+!/res/*
 *.log
 *.zip
 *.nesrs

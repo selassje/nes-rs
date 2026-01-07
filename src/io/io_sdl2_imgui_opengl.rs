@@ -12,7 +12,8 @@ use crate::ControllerId;
 use crate::EmulationFrame;
 
 use gl::types::*;
-use sdl2::image::ImageRWops;
+use sdl2::rwops::RWops;
+use sdl2::surface::Surface;
 
 const MENU_BAR_HEIGHT: u32 = 18;
 const MIN_WINDOW_WIDTH: u32 = 360;
@@ -98,10 +99,10 @@ impl IOSdl2ImGuiOpenGl {
             .unwrap();
 
         window.set_icon(
-            sdl2::rwops::RWops::from_bytes(include_bytes!("../../static/img/favicon.ico"))
-                .unwrap()
-                .load_png()
-                .unwrap(),
+            Surface::load_bmp_rw(
+                &mut RWops::from_bytes(include_bytes!("../../res/favicon.bmp")).unwrap(),
+            )
+            .unwrap(),
         );
 
         let _gl_context = window
