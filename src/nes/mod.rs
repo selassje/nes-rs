@@ -262,13 +262,12 @@ impl Nes {
 
     pub fn save_state(&self) -> Vec<u8> {
         let serialized = serde_json::to_vec(self).unwrap();
-        let compressed = yazi::compress(
+        yazi::compress(
             serialized.as_slice(),
             yazi::Format::Zlib,
             yazi::CompressionLevel::Default,
         )
-        .unwrap();
-        compressed
+        .unwrap()
     }
     #[cfg(test)]
     pub fn get_emulation_frame(&self) -> &EmulationFrame {

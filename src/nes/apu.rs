@@ -835,14 +835,14 @@ impl Apu {
     }
 
     pub fn run_single_cpu_cycle(&mut self, bus: &mut ApuBus) {
-        if let Some(pending_reset_cycle) = self.pending_reset_cycle {
-            if pending_reset_cycle == self.cpu_cycle {
-                self.cpu_cycle = 0;
-                self.pending_reset_cycle = None;
-                if self.frame_counter.get_sequencer_mode() == 1 {
-                    self.perform_half_frame_update();
-                    self.perform_quarter_frame_update();
-                }
+        if let Some(pending_reset_cycle) = self.pending_reset_cycle
+            && pending_reset_cycle == self.cpu_cycle
+        {
+            self.cpu_cycle = 0;
+            self.pending_reset_cycle = None;
+            if self.frame_counter.get_sequencer_mode() == 1 {
+                self.perform_half_frame_update();
+                self.perform_quarter_frame_update();
             }
         }
         if self.is_quarter_frame_reached() {
