@@ -211,10 +211,10 @@ fn handle_io_state(nes: &mut Nes, io_state: &FrontendState, io_control: &mut Fro
     }
 
     for (i, controller_type) in io_state.switch_controller_type.iter().enumerate() {
-        if let Some(controller_type) = controller_type {
-            if let Some(id) = ControllerId::from_index(i) {
-                nes.config().set_controller(id, *controller_type);
-            }
+        if let Some(controller_type) = controller_type
+            && let Some(id) = ControllerId::from_index(i)
+        {
+            nes.config().set_controller(id, *controller_type);
         }
     }
     nes.config().set_audio_volume(io_state.audio_volume);

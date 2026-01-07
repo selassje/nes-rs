@@ -269,10 +269,6 @@ impl Nes {
         )
         .unwrap()
     }
-    #[cfg(test)]
-    pub fn get_emulation_frame(&self) -> &EmulationFrame {
-        &self.emulation_frame
-    }
 
     pub fn config(&mut self) -> Config<'_> {
         Config {

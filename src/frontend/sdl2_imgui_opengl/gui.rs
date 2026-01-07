@@ -623,19 +623,15 @@ impl Gui {
         if let sdl2::event::Event::KeyDown {
             scancode, keymod, ..
         } = *event
+            && keymod & sdl2::keyboard::Mod::NOMOD == sdl2::keyboard::Mod::NOMOD
+            && let Some(scancode) = scancode
         {
-            if keymod & sdl2::keyboard::Mod::NOMOD == sdl2::keyboard::Mod::NOMOD {
-                if let Some(scancode) = scancode {
-                    if let Some(button) = self.controller_configs[0].pending_key_select.take() {
-                        self.controller_configs[0].mapping[button as usize].key = scancode;
+            if let Some(button) = self.controller_configs[0].pending_key_select.take() {
+                self.controller_configs[0].mapping[button as usize].key = scancode;
 
-                        self.controller_configs[0].pending_key_select = None;
-                    } else if let Some(button) =
-                        self.controller_configs[1].pending_key_select.take()
-                    {
-                        self.controller_configs[1].mapping[button as usize].key = scancode;
-                    }
-                }
+                self.controller_configs[0].pending_key_select = None;
+            } else if let Some(button) = self.controller_configs[1].pending_key_select.take() {
+                self.controller_configs[1].mapping[button as usize].key = scancode;
             }
         };
     }
@@ -684,17 +680,17 @@ impl Gui {
         let style = ui.push_style_var(imgui::StyleVar::WindowBorderSize(2.0));
 
         if let Some(tab_bar) = imgui::TabBar::new("Players").begin(ui) {
-            if self.controller_configs[1].pending_key_select.is_none() {
-                if let Some(player_1_tab) = imgui::TabItem::new("Player 1").begin(ui) {
-                    self.build_controller_setup_for_player(0, ui);
-                    player_1_tab.end();
-                }
+            if self.controller_configs[1].pending_key_select.is_none()
+                && let Some(player_1_tab) = imgui::TabItem::new("Player 1").begin(ui)
+            {
+                self.build_controller_setup_for_player(0, ui);
+                player_1_tab.end();
             }
-            if self.controller_configs[0].pending_key_select.is_none() {
-                if let Some(player_2_tab) = imgui::TabItem::new("Player 2").begin(ui) {
-                    self.build_controller_setup_for_player(1, ui);
-                    player_2_tab.end();
-                }
+            if self.controller_configs[0].pending_key_select.is_none()
+                && let Some(player_2_tab) = imgui::TabItem::new("Player 2").begin(ui)
+            {
+                self.build_controller_setup_for_player(1, ui);
+                player_2_tab.end();
             }
             tab_bar.end();
         }
