@@ -4,12 +4,16 @@ use std::{
     io::{Read, Write},
 };
 
-mod io;
+mod frontend;
+
+use frontend::*;
 
 use emscripten_main_loop::MainLoop;
-use io::io_sdl2_imgui_opengl::DOUBLE_FPS;
-use io::io_sdl2_imgui_opengl::HALF_FPS;
-use io::{io_sdl2_imgui_opengl::Sdl2ImGuiOpenGlFrontend, FrontendControl, FrontendState, Frontend};
+use frontend::sdl2_imgui_opengl::DOUBLE_FPS;
+use frontend::sdl2_imgui_opengl::HALF_FPS;
+use frontend::{
+    sdl2_imgui_opengl::Sdl2ImGuiOpenGlFrontend, Frontend, FrontendControl, FrontendState,
+};
 use nes_rs::*;
 
 extern crate enum_tryfrom;
@@ -35,7 +39,7 @@ pub struct Emulation {
 #[allow(clippy::new_without_default)]
 impl Emulation {
     pub fn new() -> Self {
-        let io = io::io_sdl2_imgui_opengl::Sdl2ImGuiOpenGlFrontend::new();
+        let io = frontend::sdl2_imgui_opengl::Sdl2ImGuiOpenGlFrontend::new();
 
         let mut nes: Nes = crate::Nes::new();
 
@@ -49,12 +53,12 @@ impl Emulation {
             load_demo(&mut nes);
         }
 
-        let io_state: io::FrontendState = Default::default();
+        let io_state: FrontendState = Default::default();
         let frame_start = std::time::Instant::now();
         let fps = 0;
         let one_second_timer = std::time::Instant::now();
 
-        let io_control = io::FrontendControl {
+        let io_control = FrontendControl {
             target_fps: DEFAULT_FPS,
             current_fps: 0,
             title: initial_title,
@@ -151,7 +155,7 @@ pub fn run(mut emulation: Emulation) {
     }
 }
 
-fn handle_io_state(nes: &mut Nes, io_state: &io::FrontendState, io_control: &mut io::FrontendControl) {
+fn handle_io_state(nes: &mut Nes, io_state: &FrontendState, io_control: &mut FrontendControl) {
     if io_state.power_cycle {
         nes.power_cycle();
     }
@@ -194,11 +198,11 @@ fn handle_io_state(nes: &mut Nes, io_state: &io::FrontendState, io_control: &mut
 
     if let Some(ref speed) = io_state.speed {
         match speed {
-            io::Speed::Half => io_control.target_fps = HALF_FPS,
-            io::Speed::Normal => io_control.target_fps = DEFAULT_FPS,
-            io::Speed::Double => io_control.target_fps = DOUBLE_FPS,
-            io::Speed::Increase => io_control.target_fps += 5,
-            io::Speed::Decrease => {
+            Speed::Half => io_control.target_fps = HALF_FPS,
+            Speed::Normal => io_control.target_fps = DEFAULT_FPS,
+            Speed::Double => io_control.target_fps = DOUBLE_FPS,
+            Speed::Increase => io_control.target_fps += 5,
+            Speed::Decrease => {
                 io_control.target_fps = std::cmp::max(0, io_control.target_fps as i32 - 5) as u16
             }
         }

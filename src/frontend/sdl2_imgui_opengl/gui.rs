@@ -1,9 +1,11 @@
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
-use crate::{io::FrontendControl, ControllerId, ControllerType, DEFAULT_FPS, FRAME_HEIGHT, FRAME_WIDTH};
+use crate::{
+    frontend::FrontendControl, ControllerId, ControllerType, DEFAULT_FPS, FRAME_HEIGHT, FRAME_WIDTH,
+};
 
 use super::DOUBLE_FPS;
 use super::HALF_FPS;
-use crate::io::MouseClick;
+use crate::frontend::MouseClick;
 
 use imgui::ImString;
 
@@ -89,7 +91,7 @@ impl ButtonMapping {
 }
 #[derive(Clone, Copy, Default)]
 pub struct ControllerConfig {
-    pub mapping: [ButtonMapping; crate::io::StdNesControllerButton::Right as usize + 1],
+    pub mapping: [ButtonMapping; crate::frontend::StdNesControllerButton::Right as usize + 1],
     pub pending_key_select: Option<u8>,
 }
 
@@ -655,7 +657,7 @@ impl Gui {
         if controller_type == ControllerType::StdNesController {
             ui.separator();
             for i in 0..8u8 {
-                let button = crate::io::StdNesControllerButton::from(i);
+                let button = crate::frontend::StdNesControllerButton::from(i);
                 let caption = imgui::ImString::from(button.to_string());
                 let key = controller_config.mapping[i as usize].key;
                 let mut text = key.to_string();

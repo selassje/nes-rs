@@ -6,7 +6,7 @@ use std::{borrow::BorrowMut, collections::HashMap};
 
 use self::gui::VideoSizeControl;
 
-use crate::io;
+use crate::frontend;
 
 use crate::ControllerId;
 use crate::EmulationFrame;
@@ -48,7 +48,7 @@ pub enum MenuBarItem {
 }
 
 pub struct Sdl2ImGuiOpenGlFrontend {
-    maybe_audio_queue: Option<sdl2::audio::AudioQueue<io::AudioSampleFormat>>,
+    maybe_audio_queue: Option<sdl2::audio::AudioQueue<frontend::AudioSampleFormat>>,
     events: sdl2::EventPump,
     keyboard_state: HashMap<sdl2::keyboard::Scancode, bool>,
     imgui: imgui::Context,
@@ -100,7 +100,7 @@ impl Sdl2ImGuiOpenGlFrontend {
 
         window.set_icon(
             Surface::load_bmp_rw(
-                &mut RWops::from_bytes(include_bytes!("../../res/favicon.bmp")).unwrap(),
+                &mut RWops::from_bytes(include_bytes!("../../../res/favicon.bmp")).unwrap(),
             )
             .unwrap(),
         );
@@ -166,7 +166,7 @@ impl Sdl2ImGuiOpenGlFrontend {
         }
     }
 
-    fn update_io_state(&mut self, io_state: &mut io::FrontendState) {
+    fn update_io_state(&mut self, io_state: &mut frontend::FrontendState) {
         io_state.quit |= self.is_menu_bar_item_selected(MenuBarItem::Quit);
         io_state.power_cycle = self.is_menu_bar_item_selected(MenuBarItem::PowerCycle);
         io_state.load_nes_file = self.gui.get_rom_path();
@@ -179,16 +179,16 @@ impl Sdl2ImGuiOpenGlFrontend {
 
         io_state.speed = None;
         {
-            let mut set_speed_selection = |item: MenuBarItem, speed: io::Speed| {
+            let mut set_speed_selection = |item: MenuBarItem, speed: frontend::Speed| {
                 if self.is_menu_bar_item_selected(item) {
                     io_state.speed = Some(speed)
                 }
             };
-            set_speed_selection(MenuBarItem::SpeedIncrease, io::Speed::Increase);
-            set_speed_selection(MenuBarItem::SpeedDecrease, io::Speed::Decrease);
-            set_speed_selection(MenuBarItem::SpeedNormal, io::Speed::Normal);
-            set_speed_selection(MenuBarItem::SpeedHalf, io::Speed::Half);
-            set_speed_selection(MenuBarItem::SpeedDouble, io::Speed::Double);
+            set_speed_selection(MenuBarItem::SpeedIncrease, frontend::Speed::Increase);
+            set_speed_selection(MenuBarItem::SpeedDecrease, frontend::Speed::Decrease);
+            set_speed_selection(MenuBarItem::SpeedNormal, frontend::Speed::Normal);
+            set_speed_selection(MenuBarItem::SpeedHalf, frontend::Speed::Half);
+            set_speed_selection(MenuBarItem::SpeedDouble, frontend::Speed::Double);
         }
 
         let audio_volume = self.gui.audio_volume;
@@ -297,7 +297,7 @@ impl Sdl2ImGuiOpenGlFrontend {
             || self.gui.is_menu_bar_item_selected(item)
     }
 
-    fn set_window_tile(&mut self, control: &io::FrontendControl) {
+    fn set_window_tile(&mut self, control: &frontend::FrontendControl) {
         if let Some(ref title) = control.title {
             self.window.borrow_mut().set_title(title).unwrap();
         }
@@ -329,19 +329,19 @@ impl Sdl2ImGuiOpenGlFrontend {
     }
 }
 
-impl io::Frontend for Sdl2ImGuiOpenGlFrontend {
+impl frontend::Frontend for Sdl2ImGuiOpenGlFrontend {
     fn present_frame(
         &mut self,
-        control: io::FrontendControl,
+        control: frontend::FrontendControl,
         emulation_frame: &EmulationFrame,
-    ) -> io::FrontendState {
+    ) -> frontend::FrontendState {
         if self.frame == u128::MAX {
             self.frame = 0;
         } else {
             self.frame += 1;
         }
 
-        let mut io_state: io::FrontendState = Default::default();
+        let mut io_state: frontend::FrontendState = Default::default();
         self.set_window_tile(&control);
         if self.is_video_size_change_pending {
             let video_size = self.set_window_size_and_get_video_size();
@@ -456,11 +456,11 @@ impl io::Frontend for Sdl2ImGuiOpenGlFrontend {
     }
 }
 
-impl io::ControllerCallback for Sdl2ImGuiOpenGlFrontend {
+impl frontend::ControllerCallback for Sdl2ImGuiOpenGlFrontend {
     fn is_button_pressed(
         &self,
         controller_id: ControllerId,
-        button: io::StdNesControllerButton,
+        button: frontend::StdNesControllerButton,
     ) -> bool {
         let sdl2_scancode =
             self.gui.controller_configs[controller_id as usize].mapping[button as usize].key;

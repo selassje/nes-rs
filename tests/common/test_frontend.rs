@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use nes_rs::{ControllerCallback, ControllerId, StdNesControllerButton};
 
-pub struct IOTest {
+pub struct TestFrontend {
     controller_buttons_state: [HashMap<StdNesControllerButton, bool>; 2],
 }
 
-impl IOTest {
+impl TestFrontend {
     pub fn new(_: &str) -> Self {
-        IOTest {
+        TestFrontend {
             controller_buttons_state: [HashMap::new(), HashMap::new()],
         }
     }
@@ -22,7 +22,7 @@ impl IOTest {
     }
 }
 
-impl ControllerCallback for IOTest {
+impl ControllerCallback for TestFrontend {
     fn is_button_pressed(
         &self,
         controller_id: ControllerId,
@@ -34,7 +34,7 @@ impl ControllerCallback for IOTest {
             false
         }
     }
-    fn is_zapper_trigger_pressed(&self, _ : ControllerId) -> Option<nes_rs::ZapperTarget> {
+    fn is_zapper_trigger_pressed(&self, _: ControllerId) -> Option<nes_rs::ZapperTarget> {
         None
     }
 }

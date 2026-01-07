@@ -19,7 +19,7 @@ fn get_bytes_from_file(file_name: &str) -> Vec<u8> {
 
 pub struct NesTest {
     nes: Nes,
-    io_test: super::io_test::IOTest,
+    io_test: super::test_frontend::TestFrontend,
     output_frame_path: String,
     expected_frame_path: String,
     test_fn: Rc<TestFn>,
@@ -37,7 +37,7 @@ impl NesTest {
         suffix: Option<&str>,
         test_fn: impl Fn(&mut NesTest) + 'static,
     ) -> Self {
-        let io_test = super::io_test::IOTest::new(rom_path);
+        let io_test = super::test_frontend::TestFrontend::new(rom_path);
         let rom = get_bytes_from_file(rom_path);
         let mut nes = Nes::new();
         let mut dir = PathBuf::from(rom_path);

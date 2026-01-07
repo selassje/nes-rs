@@ -1,5 +1,5 @@
-pub mod io_test;
 pub mod nes_test;
+pub mod test_frontend;
 
 use nes_test::NesTest;
 use std::time::Duration;

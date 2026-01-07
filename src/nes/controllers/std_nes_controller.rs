@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
-use std::fmt::Display;
 use std::cell::RefCell;
+use std::fmt::Display;
 
 use super::ControllerCallback;
 use super::ControllerId;
@@ -62,7 +62,6 @@ impl Display for StdNesControllerButton {
 }
 impl super::Controller for StdNesController {
     fn read(&self, callback: Option<&dyn ControllerCallback>) -> u8 {
-      
         let is_button_pressed = |id: ControllerId, button: StdNesControllerButton| {
             if let Some(cb) = callback {
                 cb.is_button_pressed(id, button)

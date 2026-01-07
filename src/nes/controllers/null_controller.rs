@@ -18,6 +18,5 @@ impl super::Controller for NullController {
     }
     fn write(&mut self, _byte: u8) {}
 
-
     fn power_cycle(&mut self) {}
 }

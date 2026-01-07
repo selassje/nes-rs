@@ -17,7 +17,7 @@ pub enum OutputRegister {
 }
 
 pub trait ReadInputRegisters {
-    fn read(&self, port: InputRegister,callback: Option<&dyn ControllerCallback>) -> u8;
+    fn read(&self, port: InputRegister, callback: Option<&dyn ControllerCallback>) -> u8;
 }
 
 pub trait WriteOutputRegisters {

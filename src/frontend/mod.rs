@@ -3,7 +3,7 @@ use crate::ControllerType;
 use crate::EmulationFrame;
 use crate::StdNesControllerButton;
 
-pub mod io_sdl2_imgui_opengl;
+pub mod sdl2_imgui_opengl;
 
 pub type AudioSampleFormat = f32;
 #[derive(Clone)]
@@ -45,6 +45,10 @@ pub struct FrontendControl {
 }
 
 pub trait Frontend: ControllerCallback {
-    fn present_frame(&mut self, control: FrontendControl, emulation_frame: &EmulationFrame) -> FrontendState;
+    fn present_frame(
+        &mut self,
+        control: FrontendControl,
+        emulation_frame: &EmulationFrame,
+    ) -> FrontendState;
     fn is_audio_available(&self) -> bool;
 }

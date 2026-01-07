@@ -113,7 +113,6 @@ impl Controllers {
         }
     }
 
-
     pub fn get_controller_type(&self, id: ControllerId) -> ControllerType {
         match id {
             ControllerId::Controller1 => self.controller_1.get_type(),

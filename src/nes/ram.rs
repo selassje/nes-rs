@@ -97,7 +97,8 @@ impl Memory for Ram {
             *self.apu_register_latch.borrow_mut() = bus.apu.read(reg);
             *self.apu_register_latch.borrow()
         } else if let Ok(input_port) = InputRegister::try_from(addr) {
-            *self.controller_register_latch.borrow_mut() = bus.controllers.read(input_port,bus.callback);
+            *self.controller_register_latch.borrow_mut() =
+                bus.controllers.read(input_port, bus.callback);
             *self.controller_register_latch.borrow()
         } else if WriteAccessRegister::try_from(addr).is_ok() {
             *self.ppu_register_latch.borrow_mut()

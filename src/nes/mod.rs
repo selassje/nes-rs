@@ -60,11 +60,7 @@ pub enum ZapperTarget {
 }
 
 pub trait ControllerCallback {
-    fn is_button_pressed(
-        &self,
-        id: ControllerId,
-        button: StdNesControllerButton,
-    ) -> bool;
+    fn is_button_pressed(&self, id: ControllerId, button: StdNesControllerButton) -> bool;
     fn is_zapper_trigger_pressed(&self, id: ControllerId) -> Option<ZapperTarget>;
 }
 struct CpuBus<'a> {
@@ -170,7 +166,6 @@ impl Config<'_> {
     pub fn get_controller_type(&self, id: ControllerId) -> ControllerType {
         self.controllers.get_controller_type(id)
     }
-
 }
 
 pub(crate) struct ApuBus<'a> {
