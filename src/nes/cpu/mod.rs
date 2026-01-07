@@ -1,13 +1,13 @@
 mod opcodes;
 
-use self::{opcodes::IRQ_OPCODE, AddressingMode::*};
-use super::apu::ApuState;
-use super::ppu::PpuState;
+use self::{AddressingMode::*, opcodes::IRQ_OPCODE};
 use super::CpuBus;
 use super::RamBus;
+use super::apu::ApuState;
+use super::ppu::PpuState;
 use super::{common::*, memory::Memory};
 use super::{mappers::Mapper, ram_ppu::DmaWriteAccessRegister::OamDma};
-use opcodes::{get_opcodes, OpCodes, NMI_OPCODE};
+use opcodes::{NMI_OPCODE, OpCodes, get_opcodes};
 use serde::{Deserialize, Serialize};
 
 use std::fmt::{Display, Formatter, Result};
@@ -322,21 +322,21 @@ impl Cpu {
 
             if false {
                 println!(
-                  "{:04X} {:02X} {:02X} {:02X} \t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CYC:{:<3} SL:{:<3} FC:{} CPU Cycle:{}",
-                  self.pc,
-                  op,
-                  operand_1,
-                  operand_2,
-                  self.a,
-                  self.x,
-                  self.y,
-                  self.ps,
-                  self.sp,
-                  ppu_time.cycle,
-                  ppu_time.scanline,
-                  ppu_time.frame,
-                  self.cycle,
-              );
+                    "{:04X} {:02X} {:02X} {:02X} \t\tA:{:02X} X:{:02X} Y:{:02X} P:{:02X} SP:{:02X} CYC:{:<3} SL:{:<3} FC:{} CPU Cycle:{}",
+                    self.pc,
+                    op,
+                    operand_1,
+                    operand_2,
+                    self.a,
+                    self.x,
+                    self.y,
+                    self.ps,
+                    self.sp,
+                    ppu_time.cycle,
+                    ppu_time.scanline,
+                    ppu_time.frame,
+                    self.cycle,
+                );
             }
             if opcode.instruction as usize == Self::rti as usize {
                 self.rti_restore_ps(bus);

@@ -1,7 +1,7 @@
+use super::Mapper;
 use super::mapper_internal::BankSize;
 use super::mapper_internal::BankSize::*;
 use super::mapper_internal::MapperInternal;
-use super::Mapper;
 use crate::nes::common::Mirroring;
 trait ControlRegister {
     fn get_prg_bank_mode(&self) -> u8;

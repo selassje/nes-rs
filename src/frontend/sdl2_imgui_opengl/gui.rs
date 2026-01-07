@@ -1,7 +1,7 @@
-use super::{MenuBarItem, MENU_BAR_HEIGHT};
+use super::{MENU_BAR_HEIGHT, MenuBarItem};
 use crate::{
-    frontend::FrontendControl, ControllerId, ControllerType, DEFAULT_FPS, VIDEO_FRAME_HEIGHT,
-    VIDEO_FRAME_WIDTH,
+    ControllerId, ControllerType, DEFAULT_FPS, VIDEO_FRAME_HEIGHT, VIDEO_FRAME_WIDTH,
+    frontend::FrontendControl,
 };
 
 use super::DOUBLE_FPS;

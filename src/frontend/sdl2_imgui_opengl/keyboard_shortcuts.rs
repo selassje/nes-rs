@@ -1,7 +1,7 @@
 use super::MenuBarItem;
+use KeyboardShortcut::*;
 use sdl2::keyboard::Mod;
 use sdl2::keyboard::Scancode;
-use KeyboardShortcut::*;
 
 enum KeyboardShortcut {
     Single(Scancode),

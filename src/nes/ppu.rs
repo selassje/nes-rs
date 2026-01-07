@@ -1,7 +1,7 @@
+use super::PpuBus;
 use super::colors::{ColorMapper, DefaultColorMapper, RgbColor};
 use super::memory::VideoMemory;
 use super::vram::VRam;
-use super::PpuBus;
 use super::{mappers::Mapper, mappers::MapperEnum, ram_ppu::*};
 
 use super::VIDEO_FRAME_WIDTH;

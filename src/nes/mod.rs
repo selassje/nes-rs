@@ -104,6 +104,7 @@ pub const VIDEO_FRAME_SIZE: usize = VIDEO_FRAME_HEIGHT * VIDEO_FRAME_WIDTH * PIX
 pub const MAX_AUDIO_FRAME_SIZE: usize = 2048;
 pub const SAMPLING_RATE: usize = 44100;
 
+#[derive(Clone)]
 pub struct VideoFrame {
     pixels: Box<[u8; VIDEO_FRAME_SIZE]>,
 }
@@ -135,11 +136,11 @@ impl VideoFrame {
     }
 }
 
+#[derive(Clone)]
 pub struct AudioFrame {
     samples: Box<[f32; MAX_AUDIO_FRAME_SIZE]>,
     size: usize,
 }
-
 impl AudioFrame {
     pub(crate) fn new() -> Self {
         Self {
@@ -167,6 +168,7 @@ impl AudioFrame {
     }
 }
 
+#[derive(Clone)]
 pub struct EmulationFrame {
     pub video: VideoFrame,
     pub audio: AudioFrame,
@@ -268,7 +270,7 @@ impl Nes {
         .unwrap();
         compressed
     }
-
+    #[cfg(test)]
     pub fn get_emulation_frame(&self) -> &EmulationFrame {
         &self.emulation_frame
     }
@@ -313,15 +315,23 @@ impl Nes {
         self.controllers.power_cycle();
     }
 
-    pub fn run_for(&mut self, duration: Duration, callback: Option<&dyn ControllerCallback>) {
+    pub fn run_for(
+        &mut self,
+        duration: Duration,
+        callback: Option<&dyn ControllerCallback>,
+    ) -> &EmulationFrame {
         let mut elapsed_frames = 0;
         while elapsed_frames < duration.as_secs() as u128 * DEFAULT_FPS as u128 {
             self.run_single_frame(callback);
             elapsed_frames += 1;
         }
+        &self.emulation_frame
     }
 
-    pub fn run_single_frame(&mut self, callback: Option<&dyn ControllerCallback>) {
+    pub fn run_single_frame(
+        &mut self,
+        callback: Option<&dyn ControllerCallback>,
+    ) -> &EmulationFrame {
         self.emulation_frame.audio.reset();
         let current_frame = self.ppu.get_time().frame;
         while self.ppu.get_time().frame == current_frame {
@@ -330,6 +340,7 @@ impl Nes {
         self.controllers
             .update_zappers(&self.emulation_frame, self.ppu.get_time().frame);
         self.apu.reset_audio_buffer();
+        &self.emulation_frame
     }
 
     fn run_single_cpu_cycle(&mut self, callback: Option<&dyn ControllerCallback>) {

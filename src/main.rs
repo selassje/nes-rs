@@ -12,7 +12,7 @@ use emscripten_main_loop::MainLoop;
 use frontend::sdl2_imgui_opengl::DOUBLE_FPS;
 use frontend::sdl2_imgui_opengl::HALF_FPS;
 use frontend::{
-    sdl2_imgui_opengl::Sdl2ImGuiOpenGlFrontend, Frontend, FrontendControl, FrontendState,
+    Frontend, FrontendControl, FrontendState, sdl2_imgui_opengl::Sdl2ImGuiOpenGlFrontend,
 };
 use nes_rs::*;
 
@@ -23,7 +23,7 @@ const FRAME_DURATION: std::time::Duration = std::time::Duration::from_nanos(
 );
 
 #[cfg(target_os = "emscripten")]
-extern "C" {
+unsafe extern "C" {
     fn emscripten_run_script(s: *const std::os::raw::c_char);
 }
 pub struct Emulation {
@@ -80,16 +80,6 @@ impl Emulation {
 
 impl emscripten_main_loop::MainLoop for Emulation {
     fn main_loop(&mut self) -> emscripten_main_loop::MainLoopEvent {
-        if !self.io_state.pause {
-            self.nes.run_single_frame(Some(&self.io));
-            if self.one_second_timer.elapsed() < std::time::Duration::from_secs(1) {
-                self.fps += 1;
-            } else {
-                self.one_second_timer = std::time::Instant::now();
-                self.io_control.current_fps = self.fps;
-                self.fps = 1;
-            }
-        }
         self.io_control.controller_type = [
             self.nes
                 .config()
@@ -98,10 +88,21 @@ impl emscripten_main_loop::MainLoop for Emulation {
                 .config()
                 .get_controller_type(crate::ControllerId::Controller2),
         ];
+        let mut emulation_frame: Option<&EmulationFrame> = None;
+        if !self.io_state.pause {
+            emulation_frame = Some(self.nes.run_single_frame(Some(&self.io)));
+            if self.one_second_timer.elapsed() < std::time::Duration::from_secs(1) {
+                self.fps += 1;
+            } else {
+                self.one_second_timer = std::time::Instant::now();
+                self.io_control.current_fps = self.fps;
+                self.fps = 1;
+            }
+        }
 
         self.io_state = self
             .io
-            .present_frame(self.io_control.clone(), self.nes.get_emulation_frame());
+            .present_frame(self.io_control.clone(), emulation_frame);
 
         handle_io_state(&mut self.nes, &self.io_state, &mut self.io_control);
 

@@ -1,10 +1,10 @@
+use super::RamBus;
 use super::mappers::MapperEnum;
 use super::ram_apu;
 use super::ram_apu::ReadAccessRegisters;
 use super::ram_apu::WriteAcessRegisters;
 use super::ram_controllers::*;
 use super::ram_ppu::*;
-use super::RamBus;
 use super::{mappers::Mapper, memory::*};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;

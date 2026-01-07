@@ -84,11 +84,7 @@ impl super::Controller for StdNesController {
             if !self.strobe {
                 *self.button.borrow_mut() += 1;
             }
-            if val {
-                1
-            } else {
-                0
-            }
+            if val { 1 } else { 0 }
         } else {
             1
         }

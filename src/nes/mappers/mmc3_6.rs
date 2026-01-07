@@ -1,9 +1,9 @@
 use std::ops::Range;
 
+use super::Mapper;
 use super::mapper_internal::BankSelect;
 use super::mapper_internal::BankSize::*;
 use super::mapper_internal::MapperInternal;
-use super::Mapper;
 use crate::nes::common::Mirroring;
 use serde::{Deserialize, Serialize};
 

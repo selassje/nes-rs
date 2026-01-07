@@ -1,5 +1,5 @@
 use nes_rs::{
-    ControllerId, Nes, StdNesControllerButton, PIXEL_SIZE, VIDEO_FRAME_HEIGHT, VIDEO_FRAME_WIDTH,
+    ControllerId, Nes, PIXEL_SIZE, StdNesControllerButton, VIDEO_FRAME_HEIGHT, VIDEO_FRAME_WIDTH,
 };
 
 use fs::File;
@@ -25,6 +25,7 @@ pub struct NesTest {
     output_frame_path: String,
     expected_frame_path: String,
     test_fn: Rc<TestFn>,
+    frame: Option<nes_rs::VideoFrame>,
 }
 
 impl NesTest {
@@ -60,6 +61,7 @@ impl NesTest {
             output_frame_path,
             expected_frame_path,
             test_fn: Rc::new(test_fn),
+            frame: None,
         }
     }
 
@@ -87,7 +89,12 @@ impl NesTest {
     }
 
     pub fn run_for(&mut self, duration: Duration) {
-        self.nes.run_for(duration, Some(&self.io_test));
+        self.frame = Some(
+            self.nes
+                .run_for(duration, Some(&self.io_test))
+                .video
+                .clone(),
+        );
     }
 
     #[allow(dead_code)]
@@ -136,7 +143,7 @@ impl NesTest {
     }
 
     fn dump_frame(&self) {
-        let frame = &self.nes.get_emulation_frame().video;
+        let frame = self.frame.as_ref().unwrap();
         let row_size = (PIXEL_SIZE * VIDEO_FRAME_WIDTH + 3) & !3;
         let pixel_data_size = row_size * VIDEO_FRAME_HEIGHT;
         let file_size = 54 + pixel_data_size;

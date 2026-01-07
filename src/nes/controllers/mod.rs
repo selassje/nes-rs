@@ -1,4 +1,4 @@
-use super::{ram_controllers::*, ControllerCallback};
+use super::{ControllerCallback, ram_controllers::*};
 
 use super::ControllerId;
 use super::ControllerType;

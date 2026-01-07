@@ -13,15 +13,15 @@ mod mmc3_6;
 
 mod mapper_internal;
 
+pub use self::mapper_null::MapperNull;
 pub use self::mapper0::Mapper0;
 pub use self::mapper1::Mapper1;
 pub use self::mapper2::Mapper2;
-pub use self::mapper227::Mapper227;
 pub use self::mapper4::Mapper4;
-pub use self::mapper66::Mapper66;
 pub use self::mapper7::Mapper7;
+pub use self::mapper66::Mapper66;
 pub use self::mapper71::Mapper71;
-pub use self::mapper_null::MapperNull;
+pub use self::mapper227::Mapper227;
 
 #[enum_dispatch::enum_dispatch(MapperEnum)]
 pub trait Mapper {

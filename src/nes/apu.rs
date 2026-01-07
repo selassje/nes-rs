@@ -1,9 +1,9 @@
-use super::common::CPU_CYCLES_PER_FRAME;
 use super::ApuBus;
 use super::AudioConfig;
 use super::EmulationFrame;
 use super::Ram;
 use super::SAMPLING_RATE;
+use super::common::CPU_CYCLES_PER_FRAME;
 use super::{memory::DmcMemory, ram_apu::*};
 use StatusRegisterFlag::*;
 

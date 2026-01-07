@@ -1,5 +1,5 @@
-use super::mappers::MapperEnum;
 use super::RamBus;
+use super::mappers::MapperEnum;
 
 use serde::{Deserialize, Serialize};
 pub trait Memory {

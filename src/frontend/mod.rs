@@ -47,7 +47,7 @@ pub trait Frontend: ControllerCallback {
     fn present_frame(
         &mut self,
         control: FrontendControl,
-        emulation_frame: &EmulationFrame,
+        emulation_frame: Option<&EmulationFrame>,
     ) -> FrontendState;
     fn is_audio_available(&self) -> bool;
 }

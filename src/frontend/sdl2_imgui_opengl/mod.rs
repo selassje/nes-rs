@@ -333,7 +333,7 @@ impl frontend::Frontend for Sdl2ImGuiOpenGlFrontend {
     fn present_frame(
         &mut self,
         control: frontend::FrontendControl,
-        emulation_frame: &EmulationFrame,
+        emulation_frame: Option<&EmulationFrame>,
     ) -> frontend::FrontendState {
         if self.frame == u128::MAX {
             self.frame = 0;
@@ -385,7 +385,9 @@ impl frontend::Frontend for Sdl2ImGuiOpenGlFrontend {
             };
         }
 
-        if let Some(ref audio_queue) = self.maybe_audio_queue {
+        if let Some(ref audio_queue) = self.maybe_audio_queue
+            && let Some(emulation_frame) = emulation_frame
+        {
             if self.gui.pause {
                 audio_queue.pause();
             } else {
@@ -415,17 +417,19 @@ impl frontend::Frontend for Sdl2ImGuiOpenGlFrontend {
             }
         }
         unsafe {
-            gl::TexImage2D(
-                gl::TEXTURE_2D,
-                0,
-                gl::RGB8 as _,
-                nes_rs::VIDEO_FRAME_WIDTH as _,
-                nes_rs::VIDEO_FRAME_HEIGHT as _,
-                0,
-                gl::RGB,
-                gl::UNSIGNED_BYTE,
-                emulation_frame.video.get_pixels().as_ptr() as *const _,
-            );
+            if let Some(emulation_frame) = emulation_frame {
+                gl::TexImage2D(
+                    gl::TEXTURE_2D,
+                    0,
+                    gl::RGB8 as _,
+                    nes_rs::VIDEO_FRAME_WIDTH as _,
+                    nes_rs::VIDEO_FRAME_HEIGHT as _,
+                    0,
+                    gl::RGB,
+                    gl::UNSIGNED_BYTE,
+                    emulation_frame.video.get_pixels().as_ptr() as *const _,
+                );
+            }
         };
         self.imgui_sdl2.prepare_frame(
             self.imgui.io_mut(),

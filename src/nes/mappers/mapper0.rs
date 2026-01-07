@@ -1,4 +1,4 @@
-use super::{mapper_internal::BankSize::*, Mapper};
+use super::{Mapper, mapper_internal::BankSize::*};
 use crate::nes::common::Mirroring;
 use crate::nes::mappers::mapper_internal::MapperInternal;
 

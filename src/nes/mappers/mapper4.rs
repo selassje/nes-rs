@@ -1,6 +1,6 @@
-use super::mmc3_6::MMC3_6Variant;
-use super::mmc3_6::MMC3_6;
 use super::Mapper;
+use super::mmc3_6::MMC3_6;
+use super::mmc3_6::MMC3_6Variant;
 use crate::nes::common::Mirroring;
 use serde::{Deserialize, Serialize};
 
