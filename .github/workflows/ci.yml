@@ -43,13 +43,13 @@ jobs:
       run: |
         rustup target add wasm32-unknown-emscripten
         source "emsdk/emsdk_env.sh"
-        cargo build --release --target=wasm32-unknown-emscripten
+        cargo build --release --features=frontend --target=wasm32-unknown-emscripten
   
     - name: Build native target
       run: | 
           cargo install cargo-vcpkg
           cargo vcpkg -v build
-          cargo build --release
+          cargo build --release --features=frontend
 
     - name: Run native tests
       run: cargo test --release
