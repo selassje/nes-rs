@@ -4,7 +4,7 @@ use super::vram::VRam;
 use super::PpuBus;
 use super::{mappers::Mapper, mappers::MapperEnum, ram_ppu::*};
 
-use super::{FRAME_WIDTH, PIXEL_SIZE};
+use super::{VIDEO_FRAME_WIDTH, PIXEL_SIZE};
 
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, default::Default, fmt::Display};
@@ -38,7 +38,7 @@ const POST_RENDER_SCANLINE: i16 = 240;
 const VBLANK_START_SCANLINE: i16 = 241;
 
 const ACTIVE_PIXELS_CYCLE_START: u16 = 1;
-const ACTIVE_PIXELS_CYCLE_END: u16 = ACTIVE_PIXELS_CYCLE_START + FRAME_WIDTH as u16 - 1;
+const ACTIVE_PIXELS_CYCLE_END: u16 = ACTIVE_PIXELS_CYCLE_START + VIDEO_FRAME_WIDTH as u16 - 1;
 
 const FETCH_NAMETABLE_DATA_CYCLE_OFFSET: u16 = ACTIVE_PIXELS_CYCLE_START;
 const FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET: u16 = FETCH_NAMETABLE_DATA_CYCLE_OFFSET + 2;
@@ -504,7 +504,7 @@ impl Ppu {
                 &self.sprite_palettes,
             );
         let color = self.apply_emphasis_and_grayscale(color);
-        let index = self.scanline as usize * PIXEL_SIZE * FRAME_WIDTH + x as usize * PIXEL_SIZE;
+        let index = self.scanline as usize * PIXEL_SIZE * VIDEO_FRAME_WIDTH + x as usize * PIXEL_SIZE;
         bus.emulation_frame.video[index] = color.0;
         bus.emulation_frame.video[index + 1] = color.1;
         bus.emulation_frame.video[index + 2] = color.2;

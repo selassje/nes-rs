@@ -100,7 +100,7 @@ impl Zapper {
         self.current_frame = frame;
         let x = *self.x.borrow();
         let y = *self.y.borrow();
-        let idx = (y * crate::nes::FRAME_WIDTH + x) * 3;
+        let idx = (y * crate::nes::VIDEO_FRAME_WIDTH + x) * 3;
         let pixels = emulation_frame.video.as_ref();
         let r = pixels[idx] as f32 / 255.0;
         let g = pixels[idx + 1] as f32 / 255.0;

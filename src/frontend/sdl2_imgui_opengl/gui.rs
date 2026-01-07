@@ -1,6 +1,6 @@
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
 use crate::{
-    frontend::FrontendControl, ControllerId, ControllerType, DEFAULT_FPS, FRAME_HEIGHT, FRAME_WIDTH,
+    frontend::FrontendControl, ControllerId, ControllerType, DEFAULT_FPS, VIDE_FRAME_HEIGHT, VIDEO_FRAME_WIDTH,
 };
 
 use super::DOUBLE_FPS;
@@ -60,7 +60,7 @@ impl From<VideoSizeControl> for [u32; 2] {
         }
 
         let scaling = val as u32;
-        [scaling * FRAME_WIDTH as u32, scaling * FRAME_HEIGHT as u32]
+        [scaling * VIDEO_FRAME_WIDTH as u32, scaling * VIDE_FRAME_HEIGHT as u32]
     }
 }
 
@@ -159,10 +159,10 @@ fn create_file_dialog(
     imgui_filedialog::FileDialog::new(name)
         .title(title)
         .filters(filters)
-        .min_size([2.0 * FRAME_WIDTH as f32 - 30.0, 200.0])
+        .min_size([2.0 * VIDEO_FRAME_WIDTH as f32 - 30.0, 200.0])
         .max_size([
-            2.0 * FRAME_WIDTH as f32,
-            (2 * FRAME_HEIGHT - MENU_BAR_HEIGHT as usize) as _,
+            2.0 * VIDEO_FRAME_WIDTH as f32,
+            (2 * VIDE_FRAME_HEIGHT - MENU_BAR_HEIGHT as usize) as _,
         ])
 }
 
@@ -189,7 +189,7 @@ impl Gui {
             },
             video_size_control: VideoSizeControl::Double,
             previous_video_size_control: VideoSizeControl::Double,
-            video_size: [FRAME_WIDTH as f32 * 2.0, FRAME_HEIGHT as f32 * 2.0],
+            video_size: [VIDEO_FRAME_WIDTH as f32 * 2.0, VIDE_FRAME_HEIGHT as f32 * 2.0],
             build_menu_bar: Default::default(),
             fd_load_nes_file: create_file_dialog(
                 nes_file_label.as_ref(),
@@ -466,9 +466,9 @@ impl Gui {
                     let mouse_pos = io.mouse_pos; // [f32;
                     let window_pos = ui.window_pos();
                     let rel_pos = [mouse_pos[0] - window_pos[0], mouse_pos[1] - window_pos[1]];
-                    let tex_x = (rel_pos[0] / self.video_size[0] * nes_rs::FRAME_WIDTH as f32)
+                    let tex_x = (rel_pos[0] / self.video_size[0] * nes_rs::VIDEO_FRAME_WIDTH as f32)
                         .floor() as usize;
-                    let tex_y = (rel_pos[1] / self.video_size[1] * crate::FRAME_HEIGHT as f32)
+                    let tex_y = (rel_pos[1] / self.video_size[1] * crate::VIDE_FRAME_HEIGHT as f32)
                         .floor() as usize;
 
                     if ui.is_mouse_clicked(imgui::MouseButton::Left) {
@@ -487,7 +487,7 @@ impl Gui {
                     let base_circle_radius = 5.0;
                     let base_circle_thickness = 1.5;
 
-                    let factor = self.video_size[0] / FRAME_WIDTH as f32;
+                    let factor = self.video_size[0] / VIDEO_FRAME_WIDTH as f32;
 
                     let line_len = base_line_len * factor;
                     let line_thickness = base_line_thickness * factor;

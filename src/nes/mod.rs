@@ -98,15 +98,15 @@ struct RamBus<'a> {
 }
 pub const DEFAULT_FPS: u16 = 60;
 pub const PIXEL_SIZE: usize = 3;
-pub const FRAME_WIDTH: usize = 256;
-pub const FRAME_HEIGHT: usize = 240;
-pub const VIDEO_FRAME_SIZE: usize = FRAME_HEIGHT * FRAME_WIDTH * PIXEL_SIZE;
-pub const AUDIO_FRAME_SIZE: usize = 2048;
+pub const VIDEO_FRAME_WIDTH: usize = 256;
+pub const VIDE_FRAME_HEIGHT: usize = 240;
+pub const VIDEO_FRAME_SIZE: usize = VIDE_FRAME_HEIGHT * VIDEO_FRAME_WIDTH * PIXEL_SIZE;
+pub const MAX_AUDIO_FRAME_SIZE: usize = 2048;
 pub const SAMPLING_RATE: usize = 44100;
 
 pub struct EmulationFrame {
     pub video: Box<[u8; VIDEO_FRAME_SIZE]>,
-    pub audio: Box<[f32; AUDIO_FRAME_SIZE]>,
+    pub audio: Box<[f32; MAX_AUDIO_FRAME_SIZE]>,
     pub audio_size: usize,
 }
 
@@ -114,7 +114,7 @@ impl Default for EmulationFrame {
     fn default() -> Self {
         Self {
             video: Box::new([0; VIDEO_FRAME_SIZE]),
-            audio: Box::new([0.0; AUDIO_FRAME_SIZE]),
+            audio: Box::new([0.0; MAX_AUDIO_FRAME_SIZE]),
             audio_size: 0,
         }
     }

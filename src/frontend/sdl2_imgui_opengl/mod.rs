@@ -141,7 +141,7 @@ impl Sdl2ImGuiOpenGlFrontend {
         unsafe {
             gl::GenTextures(1, &mut emulation_texture);
             gl::BindTexture(gl::TEXTURE_2D, emulation_texture);
-            gl::PixelStorei(gl::UNPACK_ROW_LENGTH, nes_rs::FRAME_WIDTH as _);
+            gl::PixelStorei(gl::UNPACK_ROW_LENGTH, nes_rs::VIDEO_FRAME_WIDTH as _);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::NEAREST as i32);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::NEAREST as i32);
         }
@@ -420,8 +420,8 @@ impl frontend::Frontend for Sdl2ImGuiOpenGlFrontend {
                 gl::TEXTURE_2D,
                 0,
                 gl::RGB8 as _,
-                nes_rs::FRAME_WIDTH as _,
-                nes_rs::FRAME_HEIGHT as _,
+                nes_rs::VIDEO_FRAME_WIDTH as _,
+                nes_rs::VIDE_FRAME_HEIGHT as _,
                 0,
                 gl::RGB,
                 gl::UNSIGNED_BYTE,
