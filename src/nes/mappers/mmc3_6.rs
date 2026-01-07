@@ -1,10 +1,10 @@
 use std::ops::Range;
 
+use super::mapper_internal::BankSelect;
+use super::mapper_internal::BankSize::*;
+use super::mapper_internal::MapperInternal;
 use super::Mapper;
-use crate::common::Mirroring;
-use crate::mappers::mapper_internal::BankSelect;
-use crate::mappers::mapper_internal::BankSize::*;
-use crate::mappers::mapper_internal::MapperInternal;
+use crate::nes::common::Mirroring;
 use serde::{Deserialize, Serialize};
 
 const PRG_RAM_RANGE: Range<u16> = Range {

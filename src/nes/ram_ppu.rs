@@ -1,4 +1,4 @@
-use crate::mappers::MapperEnum;
+use super::mappers::MapperEnum;
 use enum_tryfrom_derive::TryFromPrimitive;
 use std::convert::TryFrom;
 

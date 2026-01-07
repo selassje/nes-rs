@@ -1,9 +1,11 @@
-use crate::common::CPU_CYCLES_PER_FRAME;
-use crate::ApuBus;
-use crate::AudioConfig;
-use crate::EmulationFrame;
-use crate::Ram;
-use crate::{memory::DmcMemory, ram_apu::*};
+use super::common::CPU_CYCLES_PER_FRAME;
+use super::ApuBus;
+use super::AudioConfig;
+use super::EmulationFrame;
+use super::Ram;
+use super::AUDIO_FRAME_SIZE;
+use super::SAMPLING_RATE;
+use super::{memory::DmcMemory, ram_apu::*};
 use StatusRegisterFlag::*;
 
 use serde::{Deserialize, Serialize};
@@ -659,9 +661,6 @@ impl Dmc {
         self.output_value
     }
 }
-
-use crate::AUDIO_FRAME_SIZE;
-use crate::SAMPLING_RATE;
 
 #[derive(Serialize, Deserialize)]
 struct AudioBuffer {

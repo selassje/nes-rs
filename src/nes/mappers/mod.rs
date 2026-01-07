@@ -1,4 +1,4 @@
-use crate::common::Mirroring;
+use super::common::Mirroring;
 
 mod mapper0;
 mod mapper1;

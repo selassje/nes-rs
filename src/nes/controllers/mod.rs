@@ -1,8 +1,8 @@
-use crate::{ram_controllers::*, ControllerAccess};
+use super::{ram_controllers::*, ControllerAccess};
 
-use crate::ControllerId;
-use crate::ControllerType;
-use crate::StdNesControllerButton;
+use super::ControllerId;
+use super::ControllerType;
+use super::StdNesControllerButton;
 use serde::Deserialize;
 use serde::Serialize;
 use std::{cell::RefCell, rc::Rc};
@@ -29,7 +29,7 @@ impl ControllerAccess for NullControllerAccess {
     ) -> bool {
         false
     }
-    fn is_zapper_trigger_pressed(&self) -> Option<crate::ZapperTarget> {
+    fn is_zapper_trigger_pressed(&self) -> Option<super::ZapperTarget> {
         None
     }
 }
@@ -133,7 +133,7 @@ impl Controllers {
         self.controller_2.power_cycle();
     }
 
-    pub fn update_zappers(&mut self, emulation_frame: &crate::EmulationFrame, frame: u128) {
+    pub fn update_zappers(&mut self, emulation_frame: &super::EmulationFrame, frame: u128) {
         for controller in [&mut self.controller_1, &mut self.controller_2] {
             if let ControllerEnum::Zapper(zapper) = controller {
                 zapper.update(emulation_frame, frame);

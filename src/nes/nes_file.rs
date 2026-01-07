@@ -1,5 +1,5 @@
-use crate::common;
-use crate::mappers::*;
+use super::common;
+use super::mappers::*;
 
 #[derive(PartialEq, Debug)]
 enum NesFormat {

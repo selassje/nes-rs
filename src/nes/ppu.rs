@@ -1,10 +1,10 @@
-use crate::colors::{ColorMapper, DefaultColorMapper, RgbColor};
-use crate::memory::VideoMemory;
-use crate::vram::VRam;
-use crate::PpuBus;
-use crate::{mappers::Mapper, mappers::MapperEnum, ram_ppu::*};
+use super::colors::{ColorMapper, DefaultColorMapper, RgbColor};
+use super::memory::VideoMemory;
+use super::vram::VRam;
+use super::PpuBus;
+use super::{mappers::Mapper, mappers::MapperEnum, ram_ppu::*};
 
-use crate::{FRAME_WIDTH, PIXEL_SIZE};
+use super::{FRAME_WIDTH, PIXEL_SIZE};
 
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, default::Default, fmt::Display};
@@ -935,8 +935,8 @@ impl PpuState for Ppu {
         self.nmi_pending
     }
 
-    fn get_time(&self) -> crate::ppu::PpuTime {
-        crate::ppu::PpuTime {
+    fn get_time(&self) -> PpuTime {
+        PpuTime {
             scanline: self.scanline,
             cycle: self.ppu_cycle,
             frame: self.frame,

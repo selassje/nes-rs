@@ -1,8 +1,8 @@
 use self::AttributeDataQuadrantMask::*;
-use crate::common::Mirroring;
-use crate::mappers::MapperEnum;
+use super::common::Mirroring;
+use super::mappers::MapperEnum;
 
-use crate::{mappers::Mapper, memory::VideoMemory};
+use super::{mappers::Mapper, memory::VideoMemory};
 
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, ops::Range};
@@ -40,7 +40,7 @@ const ATTRIBUTE_DATA_QUADRANT_MASKS: [u8; 4] = [
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct VRam {
-    memory: crate::memory::MemoryImpl<0x0820>,
+    memory: super::memory::MemoryImpl<0x0820>,
     read_buffer: RefCell<u8>,
 }
 

@@ -1,12 +1,12 @@
 mod opcodes;
 
 use self::{opcodes::IRQ_OPCODE, AddressingMode::*};
-use crate::apu::ApuState;
-use crate::ppu::PpuState;
-use crate::CpuBus;
-use crate::RamBus;
-use crate::{common::*, memory::Memory};
-use crate::{mappers::Mapper, ram_ppu::DmaWriteAccessRegister::OamDma};
+use super::apu::ApuState;
+use super::ppu::PpuState;
+use super::CpuBus;
+use super::RamBus;
+use super::{common::*, memory::Memory};
+use super::{mappers::Mapper, ram_ppu::DmaWriteAccessRegister::OamDma};
 use opcodes::{get_opcodes, OpCodes, NMI_OPCODE};
 use serde::{Deserialize, Serialize};
 
@@ -110,7 +110,7 @@ impl CpuBus<'_> {
 
     fn get_word(&mut self, address: u16) -> u16 {
         let mut ram_bus = ram_bus!(self);
-        crate::common::convert_2u8_to_u16(
+        super::common::convert_2u8_to_u16(
             self.ram.get_byte(address, &mut ram_bus),
             self.ram.get_byte(address + 1, &mut ram_bus),
         )
