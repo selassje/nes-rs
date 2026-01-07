@@ -20,7 +20,7 @@ path = "tests/blargg_ppu_tests.rs"
 [[test]]
 name = "apu_tests"
 path = "tests/apu_tests.rs"
-  [[test]]
+[[test]]
 name = "sprite_0_hit_tests"
 path = "tests/sprite_0_hit_tests.rs"
 [[test]]
