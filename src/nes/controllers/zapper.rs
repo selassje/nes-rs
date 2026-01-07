@@ -2,7 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::cell::RefCell;
 
-use super::ControllerAccess;
+use super::ControllerCallback;
 use super::ControllerId;
 use crate::nes::EmulationFrame;
 use crate::nes::ZapperTarget;
@@ -43,9 +43,9 @@ impl Zapper {
 }
 
 impl super::Controller for Zapper {
-    fn read(&self, callback: Option<&dyn ControllerAccess>) -> u8 {
+    fn read(&self, callback: Option<&dyn ControllerCallback>) -> u8 {
         let zapper_trigger = if let Some(cb) = callback {
-            cb.is_zapper_trigger_pressed()
+            cb.is_zapper_trigger_pressed(self.id)
         } else {
             None
         };

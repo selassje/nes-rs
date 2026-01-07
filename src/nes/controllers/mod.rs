@@ -1,11 +1,10 @@
-use super::{ram_controllers::*, ControllerAccess};
+use super::{ram_controllers::*, ControllerCallback};
 
 use super::ControllerId;
 use super::ControllerType;
 use super::StdNesControllerButton;
 use serde::Deserialize;
 use serde::Serialize;
-use std::{cell::RefCell, rc::Rc};
 
 mod null_controller;
 mod std_nes_controller;
@@ -15,28 +14,9 @@ use self::null_controller::NullController;
 use self::std_nes_controller::StdNesController;
 use self::zapper::Zapper;
 
-pub struct NullControllerAccess {}
-impl NullControllerAccess {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-impl ControllerAccess for NullControllerAccess {
-    fn is_button_pressed(
-        &self,
-        _controller_id: ControllerId,
-        _button: StdNesControllerButton,
-    ) -> bool {
-        false
-    }
-    fn is_zapper_trigger_pressed(&self) -> Option<super::ZapperTarget> {
-        None
-    }
-}
-
 #[enum_dispatch::enum_dispatch(ControllerEnum)]
 pub trait Controller {
-    fn read(&self, callbac: Option<&dyn ControllerAccess>) -> u8;
+    fn read(&self, callbac: Option<&dyn ControllerCallback>) -> u8;
     fn write(&mut self, byte: u8);
     fn power_cycle(&mut self);
 }
@@ -153,7 +133,7 @@ impl Controllers {
 }
 
 impl ReadInputRegisters for Controllers {
-    fn read(&self, port: InputRegister, callback: Option<&dyn ControllerAccess>) -> u8 {
+    fn read(&self, port: InputRegister, callback: Option<&dyn ControllerCallback>) -> u8 {
         match port {
             InputRegister::Controller1 => self.controller_1.read(callback),
             InputRegister::Controller2 => self.controller_2.read(callback),

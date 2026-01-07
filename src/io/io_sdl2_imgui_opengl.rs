@@ -456,7 +456,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
     }
 }
 
-impl io::ControllerAccess for IOSdl2ImGuiOpenGl {
+impl io::ControllerCallback for IOSdl2ImGuiOpenGl {
     fn is_button_pressed(
         &self,
         controller_id: ControllerId,
@@ -467,7 +467,10 @@ impl io::ControllerAccess for IOSdl2ImGuiOpenGl {
         let key_state = self.keyboard_state.get(&sdl2_scancode);
         *key_state.unwrap_or(&false)
     }
-    fn is_zapper_trigger_pressed(&self) -> Option<crate::ZapperTarget> {
+    fn is_zapper_trigger_pressed(
+        &self,
+        _controller_id: ControllerId,
+    ) -> Option<crate::ZapperTarget> {
         if self.gui.mouse_click.left_button {
             Some(crate::ZapperTarget::OnScreen(
                 self.gui.mouse_click.x as u8,

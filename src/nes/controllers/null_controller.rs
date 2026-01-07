@@ -1,8 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
-use std::{cell::RefCell, rc::Rc};
 
-use super::ControllerAccess;
+use super::ControllerCallback;
 
 #[derive(Serialize, Deserialize)]
 pub struct NullController {}
@@ -14,7 +13,7 @@ impl NullController {
 }
 
 impl super::Controller for NullController {
-    fn read(&self, _callback: Option<&dyn ControllerAccess>) -> u8 {
+    fn read(&self, _callback: Option<&dyn ControllerCallback>) -> u8 {
         0
     }
     fn write(&mut self, _byte: u8) {}

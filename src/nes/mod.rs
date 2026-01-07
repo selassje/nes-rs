@@ -24,8 +24,6 @@ use ppu::Ppu;
 use ppu::PpuState;
 use ram::Ram;
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::time::Duration;
 
 const SERIALIZATION_VER: &str = "1";
@@ -61,13 +59,13 @@ pub enum ZapperTarget {
     OnScreen(u8, u8),
 }
 
-pub trait ControllerAccess {
+pub trait ControllerCallback {
     fn is_button_pressed(
         &self,
-        controller_id: ControllerId,
+        id: ControllerId,
         button: StdNesControllerButton,
     ) -> bool;
-    fn is_zapper_trigger_pressed(&self) -> Option<ZapperTarget>;
+    fn is_zapper_trigger_pressed(&self, id: ControllerId) -> Option<ZapperTarget>;
 }
 struct CpuBus<'a> {
     pub ram: &'a mut Ram,
@@ -75,7 +73,7 @@ struct CpuBus<'a> {
     pub apu: &'a mut Apu,
     pub mapper: &'a mut MapperEnum,
     pub controllers: &'a mut Controllers,
-    pub callback: Option<&'a dyn ControllerAccess>,
+    pub callback: Option<&'a dyn ControllerCallback>,
 }
 
 macro_rules! cpu_bus {
@@ -100,7 +98,7 @@ struct RamBus<'a> {
     pub ppu: &'a mut Ppu,
     pub mapper: &'a mut MapperEnum,
     pub controllers: &'a mut Controllers,
-    pub callback: Option<&'a dyn ControllerAccess>,
+    pub callback: Option<&'a dyn ControllerCallback>,
 }
 pub const DEFAULT_FPS: u16 = 60;
 pub const PIXEL_SIZE: usize = 3;
@@ -265,7 +263,7 @@ impl Nes {
         self.controllers.power_cycle();
     }
 
-    pub fn run_for(&mut self, duration: Duration, callback: Option<&dyn ControllerAccess>) {
+    pub fn run_for(&mut self, duration: Duration, callback: Option<&dyn ControllerCallback>) {
         let mut elapsed_frames = 0;
         while elapsed_frames < duration.as_secs() as u128 * DEFAULT_FPS as u128 {
             self.run_single_frame(callback);
@@ -273,7 +271,7 @@ impl Nes {
         }
     }
 
-    pub fn run_single_frame(&mut self, callback: Option<&dyn ControllerAccess>) {
+    pub fn run_single_frame(&mut self, callback: Option<&dyn ControllerCallback>) {
         self.emulation_frame.audio_size = 0;
         let current_frame = self.ppu.get_time().frame;
         while self.ppu.get_time().frame == current_frame {
@@ -284,7 +282,7 @@ impl Nes {
         self.apu.reset_audio_buffer();
     }
 
-    fn run_single_cpu_cycle(&mut self, callback: Option<&dyn ControllerAccess>) {
+    fn run_single_cpu_cycle(&mut self, callback: Option<&dyn ControllerCallback>) {
         let mut cpu_bus = cpu_bus!(self, callback);
         self.cpu.maybe_fetch_next_instruction(&mut cpu_bus);
         let mut ppu_bus = PpuBus {

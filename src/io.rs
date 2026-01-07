@@ -1,4 +1,4 @@
-use crate::ControllerAccess;
+use crate::ControllerCallback;
 use crate::ControllerType;
 use crate::EmulationFrame;
 use crate::StdNesControllerButton;
@@ -44,7 +44,7 @@ pub struct IOControl {
     pub controller_type: [ControllerType; 2],
 }
 
-pub trait IO: ControllerAccess {
+pub trait IO: ControllerCallback {
     fn present_frame(&mut self, control: IOControl, emulation_frame: &EmulationFrame) -> IOState;
     fn is_audio_available(&self) -> bool;
 }

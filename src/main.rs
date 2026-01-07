@@ -1,9 +1,7 @@
 use std::{
-    cell::RefCell,
     env,
     fs::File,
     io::{Read, Write},
-    rc::Rc,
 };
 
 mod io;
