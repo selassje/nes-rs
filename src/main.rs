@@ -9,7 +9,7 @@ mod io;
 use emscripten_main_loop::MainLoop;
 use io::io_sdl2_imgui_opengl::DOUBLE_FPS;
 use io::io_sdl2_imgui_opengl::HALF_FPS;
-use io::{io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl, IOControl, IOState, IO};
+use io::{io_sdl2_imgui_opengl::Sdl2ImGuiOpenGlFrontend, FrontendControl, FrontendState, Frontend};
 use nes_rs::*;
 
 extern crate enum_tryfrom;
@@ -24,9 +24,9 @@ extern "C" {
 }
 pub struct Emulation {
     nes: Nes,
-    io: IOSdl2ImGuiOpenGl,
-    io_control: IOControl,
-    io_state: IOState,
+    io: Sdl2ImGuiOpenGlFrontend,
+    io_control: FrontendControl,
+    io_state: FrontendState,
     fps: u16,
     one_second_timer: std::time::Instant,
     frame_start: std::time::Instant,
@@ -35,7 +35,7 @@ pub struct Emulation {
 #[allow(clippy::new_without_default)]
 impl Emulation {
     pub fn new() -> Self {
-        let io = io::io_sdl2_imgui_opengl::IOSdl2ImGuiOpenGl::new();
+        let io = io::io_sdl2_imgui_opengl::Sdl2ImGuiOpenGlFrontend::new();
 
         let mut nes: Nes = crate::Nes::new();
 
@@ -49,12 +49,12 @@ impl Emulation {
             load_demo(&mut nes);
         }
 
-        let io_state: io::IOState = Default::default();
+        let io_state: io::FrontendState = Default::default();
         let frame_start = std::time::Instant::now();
         let fps = 0;
         let one_second_timer = std::time::Instant::now();
 
-        let io_control = io::IOControl {
+        let io_control = io::FrontendControl {
             target_fps: DEFAULT_FPS,
             current_fps: 0,
             title: initial_title,
@@ -151,7 +151,7 @@ pub fn run(mut emulation: Emulation) {
     }
 }
 
-fn handle_io_state(nes: &mut Nes, io_state: &io::IOState, io_control: &mut io::IOControl) {
+fn handle_io_state(nes: &mut Nes, io_state: &io::FrontendState, io_control: &mut io::FrontendControl) {
     if io_state.power_cycle {
         nes.power_cycle();
     }

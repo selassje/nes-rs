@@ -1,5 +1,5 @@
 use super::{MenuBarItem, MENU_BAR_HEIGHT};
-use crate::{io::IOControl, ControllerId, ControllerType, DEFAULT_FPS, FRAME_HEIGHT, FRAME_WIDTH};
+use crate::{io::FrontendControl, ControllerId, ControllerType, DEFAULT_FPS, FRAME_HEIGHT, FRAME_WIDTH};
 
 use super::DOUBLE_FPS;
 use super::HALF_FPS;
@@ -128,7 +128,7 @@ pub(super) struct Gui {
     emulation_texture: imgui::TextureId,
     fonts: GuiFonts,
     menu_bar_item_selected: [bool; MenuBarItem::Count as usize],
-    io_control: IOControl,
+    io_control: FrontendControl,
     nes_file_path: Option<String>,
     save_state_path: Option<String>,
     load_state_path: Option<String>,
@@ -182,7 +182,7 @@ impl Gui {
             nes_file_path: None,
             save_state_path: None,
             load_state_path: None,
-            io_control: IOControl {
+            io_control: FrontendControl {
                 ..Default::default()
             },
             video_size_control: VideoSizeControl::Double,
@@ -234,7 +234,7 @@ impl Gui {
         self.load_state_path.take()
     }
 
-    pub fn prepare_for_new_frame(&mut self, io_control: IOControl) {
+    pub fn prepare_for_new_frame(&mut self, io_control: FrontendControl) {
         self.nes_file_path = None;
         self.io_control = io_control;
     }

@@ -24,7 +24,7 @@ pub enum Speed {
 }
 
 #[derive(Clone, Default)]
-pub struct IOState {
+pub struct FrontendState {
     pub quit: bool,
     pub power_cycle: bool,
     pub load_nes_file: Option<String>,
@@ -37,14 +37,14 @@ pub struct IOState {
 }
 
 #[derive(Clone, Default)]
-pub struct IOControl {
+pub struct FrontendControl {
     pub target_fps: u16,
     pub current_fps: u16,
     pub title: Option<String>,
     pub controller_type: [ControllerType; 2],
 }
 
-pub trait IO: ControllerCallback {
-    fn present_frame(&mut self, control: IOControl, emulation_frame: &EmulationFrame) -> IOState;
+pub trait Frontend: ControllerCallback {
+    fn present_frame(&mut self, control: FrontendControl, emulation_frame: &EmulationFrame) -> FrontendState;
     fn is_audio_available(&self) -> bool;
 }

@@ -47,7 +47,7 @@ pub enum MenuBarItem {
     Count,
 }
 
-pub struct IOSdl2ImGuiOpenGl {
+pub struct Sdl2ImGuiOpenGlFrontend {
     maybe_audio_queue: Option<sdl2::audio::AudioQueue<io::AudioSampleFormat>>,
     events: sdl2::EventPump,
     keyboard_state: HashMap<sdl2::keyboard::Scancode, bool>,
@@ -64,7 +64,7 @@ pub struct IOSdl2ImGuiOpenGl {
     sdl2_context: sdl2::Sdl,
 }
 
-impl IOSdl2ImGuiOpenGl {
+impl Sdl2ImGuiOpenGlFrontend {
     pub fn new() -> Self {
         let sdl2_context = sdl2::init().unwrap();
         let mut maybe_audio_queue = None;
@@ -148,7 +148,7 @@ impl IOSdl2ImGuiOpenGl {
 
         let gui_builder = gui::Gui::new(imgui::TextureId::from(emulation_texture as usize), fonts);
 
-        IOSdl2ImGuiOpenGl {
+        Sdl2ImGuiOpenGlFrontend {
             maybe_audio_queue,
             events,
             keyboard_state: HashMap::new(),
@@ -166,7 +166,7 @@ impl IOSdl2ImGuiOpenGl {
         }
     }
 
-    fn update_io_state(&mut self, io_state: &mut io::IOState) {
+    fn update_io_state(&mut self, io_state: &mut io::FrontendState) {
         io_state.quit |= self.is_menu_bar_item_selected(MenuBarItem::Quit);
         io_state.power_cycle = self.is_menu_bar_item_selected(MenuBarItem::PowerCycle);
         io_state.load_nes_file = self.gui.get_rom_path();
@@ -297,7 +297,7 @@ impl IOSdl2ImGuiOpenGl {
             || self.gui.is_menu_bar_item_selected(item)
     }
 
-    fn set_window_tile(&mut self, control: &io::IOControl) {
+    fn set_window_tile(&mut self, control: &io::FrontendControl) {
         if let Some(ref title) = control.title {
             self.window.borrow_mut().set_title(title).unwrap();
         }
@@ -329,19 +329,19 @@ impl IOSdl2ImGuiOpenGl {
     }
 }
 
-impl io::IO for IOSdl2ImGuiOpenGl {
+impl io::Frontend for Sdl2ImGuiOpenGlFrontend {
     fn present_frame(
         &mut self,
-        control: io::IOControl,
+        control: io::FrontendControl,
         emulation_frame: &EmulationFrame,
-    ) -> io::IOState {
+    ) -> io::FrontendState {
         if self.frame == u128::MAX {
             self.frame = 0;
         } else {
             self.frame += 1;
         }
 
-        let mut io_state: io::IOState = Default::default();
+        let mut io_state: io::FrontendState = Default::default();
         self.set_window_tile(&control);
         if self.is_video_size_change_pending {
             let video_size = self.set_window_size_and_get_video_size();
@@ -456,7 +456,7 @@ impl io::IO for IOSdl2ImGuiOpenGl {
     }
 }
 
-impl io::ControllerCallback for IOSdl2ImGuiOpenGl {
+impl io::ControllerCallback for Sdl2ImGuiOpenGlFrontend {
     fn is_button_pressed(
         &self,
         controller_id: ControllerId,
