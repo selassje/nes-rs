@@ -58,7 +58,7 @@
     {
       "label": "build_rel_emscripten",
       "type": "shell",
-      "command": "cargo build --release --target=wasm32-unknown-emscripten",
+      "command": "cargo build --release --features=frontend --target=wasm32-unknown-emscripten",
       "group": {
         "kind": "build"
       }

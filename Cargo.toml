@@ -75,7 +75,7 @@ enum-tryfrom = "0.2.1"
 enum-tryfrom-derive = "0.2.1"
 git-version = "0.3.9"
 
-serde = { version = "1.0", features = ["derive", "rc"] }
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.0"
 serde_arrays = "0.2.0"
 serde_stacker = "0.1.4"
@@ -96,7 +96,7 @@ sdl2 = { version = "0.36", default-features = false, features = ["static-link", 
 
 [target.'cfg(target_os = "emscripten")'.dependencies]
 sdl2 = { version = "0.36", default-features = false, optional = true }
-instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
+instant = { version = "0.1", optional = true }
 
 [package.metadata.vcpkg]
 dependencies = ["sdl2"]
