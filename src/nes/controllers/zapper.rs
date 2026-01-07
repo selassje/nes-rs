@@ -1,6 +1,6 @@
 use serde::Deserialize;
 use serde::Serialize;
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
 
 use super::ControllerAccess;
 use super::ControllerId;
@@ -11,8 +11,6 @@ use crate::nes::ZapperTarget;
 pub struct Zapper {
     id: ControllerId,
     trigger_pressed: RefCell<bool>,
-    #[serde(skip, default = "super::default_controller_access")]
-    controller_access: Rc<RefCell<dyn ControllerAccess>>,
     frame_of_last_trigger: RefCell<u128>,
     current_frame: u128,
     x: RefCell<usize>,
@@ -25,7 +23,6 @@ impl Zapper {
     pub fn new(id: ControllerId) -> Self {
         Self {
             id,
-            controller_access: super::default_controller_access(),
             trigger_pressed: RefCell::new(false),
             frame_of_last_trigger: RefCell::new(0),
             current_frame: 1,
@@ -86,10 +83,6 @@ impl super::Controller for Zapper {
     }
 
     fn write(&mut self, _byte: u8) {}
-
-    fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>) {
-        self.controller_access = controller_access;
-    }
 
     fn power_cycle(&mut self) {
         self.current_frame = 1;

@@ -38,7 +38,6 @@ impl ControllerAccess for NullControllerAccess {
 pub trait Controller {
     fn read(&self, callbac: Option<&dyn ControllerAccess>) -> u8;
     fn write(&mut self, byte: u8);
-    fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>);
     fn power_cycle(&mut self);
 }
 
@@ -86,16 +85,11 @@ impl ControllerId {
         }
     }
 }
-fn default_controller_access() -> Rc<RefCell<dyn ControllerAccess>> {
-    Rc::new(RefCell::new(NullControllerAccess::new()))
-}
 
 #[derive(Serialize, Deserialize)]
 pub struct Controllers {
     controller_1: ControllerEnum,
     controller_2: ControllerEnum,
-    #[serde(skip, default = "default_controller_access")]
-    controller_access: Rc<RefCell<dyn ControllerAccess>>,
 }
 
 impl Default for Controllers {
@@ -107,7 +101,6 @@ impl Default for Controllers {
             controller_2: ControllerEnum::StdNesController(StdNesController::new(
                 ControllerId::Controller2,
             )),
-            controller_access: default_controller_access(),
         }
     }
 }
@@ -125,7 +118,6 @@ impl Controllers {
 
         if controller.get_type() != controller_type {
             *controller = Self::new_controller(id, controller_type);
-            controller.set_controller_access(self.controller_access.clone());
         }
     }
     pub fn power_cycle(&mut self) {
@@ -141,15 +133,6 @@ impl Controllers {
         }
     }
 
-    pub fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>) {
-        self.controller_access = controller_access.clone();
-        self.controller_1
-            .set_controller_access(controller_access.clone());
-        self.controller_2.set_controller_access(controller_access);
-    }
-    pub fn get_controller_access(&self) -> Rc<RefCell<dyn ControllerAccess>> {
-        self.controller_access.clone()
-    }
 
     pub fn get_controller_type(&self, id: ControllerId) -> ControllerType {
         match id {

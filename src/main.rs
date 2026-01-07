@@ -1,4 +1,3 @@
-use core::borrow;
 use std::{
     cell::RefCell,
     env,
@@ -43,7 +42,6 @@ impl Emulation {
         ));
 
         let mut nes: Nes = crate::Nes::new();
-        nes.config().set_controller_access(io.clone());
 
         let mut initial_title: Option<String> = None;
         let args: Vec<String> = env::args().collect();

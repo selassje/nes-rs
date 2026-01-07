@@ -9,8 +9,6 @@ use super::StdNesControllerButton;
 #[derive(Serialize, Deserialize)]
 pub struct StdNesController {
     id: ControllerId,
-    #[serde(skip, default = "super::default_controller_access")]
-    controller_access: Rc<RefCell<dyn ControllerAccess>>,
     button: RefCell<u8>,
     strobe: bool,
 }
@@ -27,7 +25,6 @@ impl StdNesController {
             id,
             button: Default::default(),
             strobe: true,
-            controller_access: super::default_controller_access(),
         }
     }
 }
@@ -102,10 +99,6 @@ impl super::Controller for StdNesController {
         if self.strobe {
             *self.button.borrow_mut() = StdNesControllerButton::A as u8;
         }
-    }
-
-    fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>) {
-        self.controller_access = controller_access;
     }
 
     fn power_cycle(&mut self) {

@@ -173,9 +173,6 @@ impl Config<'_> {
         self.controllers.get_controller_type(id)
     }
 
-    pub fn set_controller_access(&mut self, controller_access: Rc<RefCell<dyn ControllerAccess>>) {
-        self.controllers.set_controller_access(controller_access);
-    }
 }
 
 pub struct ApuBus<'a> {
@@ -249,9 +246,7 @@ impl Nes {
         let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer).unwrap();
         let new_nes: Nes = serde_json::from_value(value).unwrap();
         assert!(new_nes.version.eq(SERIALIZATION_VER));
-        let controller_access = self.controllers.get_controller_access();
         *self = new_nes;
-        self.controllers.set_controller_access(controller_access);
     }
 
     pub fn load_rom(&mut self, rom: &[u8]) {
