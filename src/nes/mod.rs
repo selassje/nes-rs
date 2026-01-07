@@ -270,10 +270,10 @@ impl Nes {
         self.controllers.power_cycle();
     }
 
-    pub fn run_for(&mut self, duration: Duration) {
+    pub fn run_for(&mut self, duration: Duration, callback: Option<&dyn ControllerAccess>) {
         let mut elapsed_frames = 0;
         while elapsed_frames < duration.as_secs() as u128 * DEFAULT_FPS as u128 {
-            self.run_single_frame(None);
+            self.run_single_frame(callback);
             elapsed_frames += 1;
         }
     }

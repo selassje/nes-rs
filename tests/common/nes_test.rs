@@ -88,7 +88,7 @@ impl NesTest {
     }
 
     pub fn run_for(&mut self, duration: Duration) {
-        self.nes.run_for(duration)
+        self.nes.run_for(duration, Some(&*self.io_test.borrow()));
     }
 
     #[allow(dead_code)]
