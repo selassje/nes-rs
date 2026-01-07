@@ -48,7 +48,7 @@ pub enum MenuBarItem {
 }
 
 pub struct Sdl2ImGuiOpenGlFrontend {
-    maybe_audio_queue: Option<sdl2::audio::AudioQueue<frontend::AudioSampleFormat>>,
+    maybe_audio_queue: Option<sdl2::audio::AudioQueue<f32>>,
     events: sdl2::EventPump,
     keyboard_state: HashMap<sdl2::keyboard::Scancode, bool>,
     imgui: imgui::Context,

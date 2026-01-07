@@ -1,71 +1,102 @@
-
 [package]
 name = "nes-rs"
 version = "0.1.0"
 authors = ["Przemyslaw Koziol <przemkoz85@gmail.com>"]
 edition = "2021"
 
+[features]
+default = []
+frontend = [
+    "sdl2",
+    "imgui",
+    "imgui-sys",
+    "imgui-opengl-renderer",
+    "imgui-sdl2",
+    "imgui-filedialog",
+    "gl",
+    "emscripten_main_loop",
+    "instant",
+]
+
+[lib]
+name = "nes_rs"
+path = "src/lib.rs"
+
+[[bin]]
+name = "nes-rs"
+path = "src/main.rs"
+required-features = ["frontend"]
+
 [[test]]
 name = "branch_timing_tests"
 path = "tests/branch_timing_tests.rs"
+
 [[test]]
 name = "vbl_nmi_timing"
 path = "tests/vbl_nmi_timing.rs"
+
 [[test]]
 name = "instr_timing"
 path = "tests/instr_timing.rs"
+
 [[test]]
 name = "blargg_ppu_tests"
 path = "tests/blargg_ppu_tests.rs"
+
 [[test]]
 name = "apu_tests"
 path = "tests/apu_tests.rs"
+
 [[test]]
 name = "sprite_0_hit_tests"
 path = "tests/sprite_0_hit_tests.rs"
+
 [[test]]
 name = "mmc3_irq_tests"
 path = "tests/mmc3_irq_tests.rs"
+
 [[test]]
 name = "cpu_interrupts_v2"
 path = "tests/cpu_interrupts_v2.rs"
+
 [[test]]
 name = "serialization"
 path = "tests/serialization.rs"
 
-[profile.release] 
+[profile.release]
 debug = true
 lto = true
 opt-level = 3
 panic = "unwind"
-
-
-[target.'cfg(not(target_os = "emscripten"))'.dependencies]
-sdl2 = {version = "0.36", default-features = false, features = ["static-link","use-vcpkg"]}
-
-[target.'cfg(target_os = "emscripten")'.dependencies]
-sdl2 = {version = "0.36", default-features = false}
-instant = {version = "0.1", features = ["wasm-bindgen"]}
 
 [dependencies]
 cfg-if = "1.0.4"
 enum-tryfrom = "0.2.1"
 enum-tryfrom-derive = "0.2.1"
 git-version = "0.3.9"
-imgui = "0.11.0"
-imgui-sys = "0.11.0"
-imgui-opengl-renderer = { git = "https://github.com/selassje/rust-imgui-opengl-renderer", rev = "b048f8cc769e6eb2e081e5aa3258642f60fecfba" }
-imgui-sdl2 = "0.15.3"
-imgui-filedialog = { git = "https://github.com/selassje/imgui-filedialog-rs.git", rev = "8aa37f6090e3824a599b6b40f87050add825ae37"}
-gl = "0.14.0"
-emscripten_main_loop = "0.1"
-serde = { version = "1.0", features = ["derive","rc"] }
+
+serde = { version = "1.0", features = ["derive", "rc"] }
 serde_json = "1.0.0"
 serde_arrays = "0.2.0"
 serde_stacker = "0.1.4"
+
 enum_dispatch = "0.3.7"
 yazi = "0.2.1"
 
+imgui = { version = "0.11.0", optional = true }
+imgui-sys = { version = "0.11.0", optional = true }
+imgui-opengl-renderer = { git = "https://github.com/selassje/rust-imgui-opengl-renderer", rev = "b048f8cc769e6eb2e081e5aa3258642f60fecfba", optional = true }
+imgui-sdl2 = { version = "0.15.3", optional = true }
+imgui-filedialog = { git = "https://github.com/selassje/imgui-filedialog-rs.git", rev = "8aa37f6090e3824a599b6b40f87050add825ae37", optional = true }
+gl = { version = "0.14.0", optional = true }
+emscripten_main_loop = { version = "0.1", optional = true }
+
+[target.'cfg(not(target_os = "emscripten"))'.dependencies]
+sdl2 = { version = "0.36", default-features = false, features = ["static-link", "use-vcpkg"], optional = true }
+
+[target.'cfg(target_os = "emscripten")'.dependencies]
+sdl2 = { version = "0.36", default-features = false, optional = true }
+instant = { version = "0.1", features = ["wasm-bindgen"], optional = true }
 
 [package.metadata.vcpkg]
 dependencies = ["sdl2"]

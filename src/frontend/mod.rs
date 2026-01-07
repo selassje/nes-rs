@@ -5,7 +5,6 @@ use crate::StdNesControllerButton;
 
 pub mod sdl2_imgui_opengl;
 
-pub type AudioSampleFormat = f32;
 #[derive(Clone)]
 pub struct MouseClick {
     pub left_button: bool,
