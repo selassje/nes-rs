@@ -104,8 +104,39 @@ pub const VIDEO_FRAME_SIZE: usize = VIDE_FRAME_HEIGHT * VIDEO_FRAME_WIDTH * PIXE
 pub const MAX_AUDIO_FRAME_SIZE: usize = 2048;
 pub const SAMPLING_RATE: usize = 44100;
 
+pub struct VideoFrame {
+    pixels: Box<[u8; VIDEO_FRAME_SIZE]>,
+}
+
+impl VideoFrame {
+    pub fn new() -> Self {
+        Self {
+            pixels: Box::new([0; VIDEO_FRAME_SIZE]),
+        }
+    }
+    pub fn get_pixels(&self) -> &[u8; VIDEO_FRAME_SIZE] {
+        &self.pixels
+    }
+
+    pub fn get_pixel(&self, x: u8, y: u8) -> (u8, u8, u8) {
+        let index = (y as usize * VIDEO_FRAME_WIDTH + x as usize) * PIXEL_SIZE;
+        (
+            self.pixels[index],
+            self.pixels[index + 1],
+            self.pixels[index + 2],
+        )
+    }
+
+    pub(crate) fn set_pixel(&mut self, x: u8, y: u8, color: (u8, u8, u8)) {
+        let index = (y as usize * VIDEO_FRAME_WIDTH + x as usize) * PIXEL_SIZE;
+        self.pixels[index] = color.0;
+        self.pixels[index + 1] = color.1;
+        self.pixels[index + 2] = color.2;
+    }
+}
+
 pub struct EmulationFrame {
-    pub video: Box<[u8; VIDEO_FRAME_SIZE]>,
+    pub video: VideoFrame,
     pub audio: Box<[f32; MAX_AUDIO_FRAME_SIZE]>,
     pub audio_size: usize,
 }
@@ -113,7 +144,7 @@ pub struct EmulationFrame {
 impl Default for EmulationFrame {
     fn default() -> Self {
         Self {
-            video: Box::new([0; VIDEO_FRAME_SIZE]),
+            video: VideoFrame::new(),
             audio: Box::new([0.0; MAX_AUDIO_FRAME_SIZE]),
             audio_size: 0,
         }

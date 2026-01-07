@@ -425,7 +425,7 @@ impl frontend::Frontend for Sdl2ImGuiOpenGlFrontend {
                 0,
                 gl::RGB,
                 gl::UNSIGNED_BYTE,
-                emulation_frame.video.as_ref().as_ptr() as _,
+                emulation_frame.video.get_pixels().as_ptr() as *const _,
             );
         };
         self.imgui_sdl2.prepare_frame(

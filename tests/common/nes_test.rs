@@ -153,10 +153,10 @@ impl NesTest {
         for y in (0..VIDE_FRAME_HEIGHT).rev() {
             let mut row = vec![0u8; row_size];
             for x in 0..VIDEO_FRAME_WIDTH {
-                let index = y * VIDEO_FRAME_WIDTH * PIXEL_SIZE + x * PIXEL_SIZE;
-                row[x * PIXEL_SIZE] = frame[index + 2]; // B
-                row[x * PIXEL_SIZE + 1] = frame[index + 1]; // G
-                row[x * PIXEL_SIZE + 2] = frame[index]; // R
+                let (r,g,b) = frame.get_pixel(x as u8,y as u8);
+                row[x * PIXEL_SIZE] = b;
+                row[x * PIXEL_SIZE + 1] = g;
+                row[x * PIXEL_SIZE + 2] = r;
             }
             file.write_all(&row).unwrap();
         }

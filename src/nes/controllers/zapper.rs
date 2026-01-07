@@ -100,11 +100,8 @@ impl Zapper {
         self.current_frame = frame;
         let x = *self.x.borrow();
         let y = *self.y.borrow();
-        let idx = (y * crate::nes::VIDEO_FRAME_WIDTH + x) * 3;
-        let pixels = emulation_frame.video.as_ref();
-        let r = pixels[idx] as f32 / 255.0;
-        let g = pixels[idx + 1] as f32 / 255.0;
-        let b = pixels[idx + 2] as f32 / 255.0;
-        self.luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        let color = emulation_frame.video.get_pixel(x as u8,y as u8);
+        let (r, g, b) = color;
+        self.luminance = 0.2126 * r as f32 + 0.7152 * g as f32 + 0.0722 * b as f32;
     }
 }

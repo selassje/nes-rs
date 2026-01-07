@@ -4,7 +4,7 @@ use super::vram::VRam;
 use super::PpuBus;
 use super::{mappers::Mapper, mappers::MapperEnum, ram_ppu::*};
 
-use super::{VIDEO_FRAME_WIDTH, PIXEL_SIZE};
+use super::VIDEO_FRAME_WIDTH;
 
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, default::Default, fmt::Display};
@@ -504,10 +504,7 @@ impl Ppu {
                 &self.sprite_palettes,
             );
         let color = self.apply_emphasis_and_grayscale(color);
-        let index = self.scanline as usize * PIXEL_SIZE * VIDEO_FRAME_WIDTH + x as usize * PIXEL_SIZE;
-        bus.emulation_frame.video[index] = color.0;
-        bus.emulation_frame.video[index + 1] = color.1;
-        bus.emulation_frame.video[index + 2] = color.2;
+        bus.emulation_frame.video.set_pixel(x as u8, self.scanline as u8, color);
 
         if !self.status_reg.get_flag(StatusRegisterFlag::Sprite0Hit)
             && x < 255
