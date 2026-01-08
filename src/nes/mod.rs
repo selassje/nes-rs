@@ -12,6 +12,7 @@ mod ram_apu;
 mod ram_controllers;
 mod ram_ppu;
 mod vram;
+mod errors;
 
 use apu::Apu;
 use controllers::Controllers;
@@ -23,6 +24,8 @@ use nes_file::NesFile;
 use ppu::Ppu;
 use ppu::PpuState;
 use ram::Ram;
+
+pub use errors::*;
 
 const SERIALIZATION_VER: &str = "1";
 
@@ -309,10 +312,11 @@ impl Nes {
         *self = new_nes;
     }
 
-    pub fn load_rom(&mut self, rom: &[u8]) {
-        let nes_file = NesFile::new(rom);
+    pub fn load_rom(&mut self, rom: &[u8]) -> Result<(), Error> {
+        let nes_file = NesFile::new(rom)?;
         self.mapper = nes_file.create_mapper();
         self.power_cycle();
+        Ok(())
     }
 
     pub fn power_cycle(&mut self) {

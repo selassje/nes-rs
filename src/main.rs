@@ -38,7 +38,7 @@ pub struct Emulation {
 }
 #[allow(clippy::new_without_default)]
 impl Emulation {
-    pub fn new() -> Self {
+    pub fn new() -> Result<Self, String> {
         let io = frontend::sdl2_imgui_opengl::Sdl2ImGuiOpenGlFrontend::new();
 
         let mut nes: Nes = crate::Nes::new();
@@ -63,9 +63,10 @@ impl Emulation {
             current_fps: 0,
             title: initial_title,
             controller_type: [crate::ControllerType::NullController; 2],
+            error: None,
         };
         let is_audio_available = io.is_audio_available();
-        Self {
+        Ok(Self {
             nes,
             io,
             io_control,
@@ -74,7 +75,7 @@ impl Emulation {
             one_second_timer,
             frame_start,
             is_audio_available,
-        }
+        })
     }
 }
 
@@ -121,17 +122,21 @@ impl emscripten_main_loop::MainLoop for Emulation {
     }
 }
 
-fn get_bytes_from_file(file_name: &str) -> Vec<u8> {
+fn get_bytes_from_file(file_name: &str) -> Result<Vec<u8>, String> {
     let mut rom = Vec::new();
-    let mut file = File::open(file_name).unwrap_or_else(|_| {
-        panic!(
+    let mut file = File::open(file_name).map_err(|e| {
+        println!(
             "Unable to open ROM {} current dir {}",
             file_name,
             std::env::current_dir().unwrap().display()
-        )
-    });
-    file.read_to_end(&mut rom).expect("Unable to read ROM");
-    rom
+        );
+        e.to_string()
+    })?;
+    file.read_to_end(&mut rom).map_err(|open_err| {
+        println!("Unable to read ROM {}", file_name);
+        open_err.to_string()
+    })?;
+    Ok(rom)
 }
 
 fn read_demo() -> Vec<u8> {
@@ -220,18 +225,27 @@ fn handle_io_state(nes: &mut Nes, io_state: &FrontendState, io_control: &mut Fro
     nes.config().set_audio_volume(io_state.audio_volume);
 }
 
-fn load(nes: &mut Nes, path: &str) {
-    let rom = get_bytes_from_file(path);
-    nes.load_rom(&rom);
+fn load(nes: &mut Nes, path: &str) -> Result<(), String> {
+    let rom = get_bytes_from_file(path)?;
+    nes.load_rom(&rom).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 fn load_demo(nes: &mut Nes) {
     let demo_rom = read_demo();
-    nes.load_rom(&demo_rom);
+    nes.load_rom(&demo_rom).unwrap_err();
 }
 
 fn main() {
     let emulation = Emulation::new();
+    let emulation = match emulation {
+        Ok(emulation) => emulation,
+        Err(e) => {
+            eprintln!("Error initializing emulation: {}", e);
+            return;
+        }
+    };
+
     #[cfg(target_os = "emscripten")]
     emscripten_main_loop::run(emulation);
     #[cfg(not(target_os = "emscripten"))]

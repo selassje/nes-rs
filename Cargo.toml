@@ -5,7 +5,7 @@ authors = ["Przemyslaw Koziol <przemkoz85@gmail.com>"]
 edition = "2024"
 
 [features]
-default = []
+default = ["frontend"]
 frontend = [
     "sdl2",
     "imgui",
@@ -74,13 +74,12 @@ cfg-if = "1.0.4"
 enum-tryfrom = "0.2.1"
 enum-tryfrom-derive = "0.2.1"
 git-version = "0.3.9"
-
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.0"
 serde_arrays = "0.2.0"
 serde_stacker = "0.1.4"
-
 enum_dispatch = "0.3.7"
+thiserror = "1.0"
 yazi = "0.2.1"
 
 imgui = { version = "0.11.0", optional = true }

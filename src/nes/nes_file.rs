@@ -1,5 +1,7 @@
 use super::common;
+use super::errors::Error;
 use super::mappers::*;
+use Error::*;
 
 #[derive(PartialEq, Debug)]
 enum NesFormat {
@@ -96,7 +98,12 @@ impl NesFile {
         }
     }
 
-    fn get_format(header: &[u8]) -> NesFormat {
+    fn get_format(header: &[u8]) -> Result<NesFormat, Error> {
+        let len = header.len();
+        if len < 16 {
+            return Err(NesRomTooShort(16, len));
+        }
+
         let mut is_ines_format = false;
         let mut is_nes2_format = false;
         if header[0] == b'N' && header[1] == b'E' && header[2] == b'S' && header[3] == 0x1A {
@@ -108,16 +115,16 @@ impl NesFile {
         }
 
         if is_nes2_format {
-            NesFormat::Nes2_0
+            Ok(NesFormat::Nes2_0)
         } else if is_ines_format {
-            NesFormat::INes
+            Ok(NesFormat::INes)
         } else {
-            panic!("Unknown format file")
+            Err(UnknownNesFormat)
         }
     }
 
-    pub fn new(in_bytes: &[u8]) -> NesFile {
-        let format = Self::get_format(in_bytes);
+    pub fn new(in_bytes: &[u8]) -> Result<NesFile, Error> {
+        let format = Self::get_format(in_bytes)?;
         assert!(format == NesFormat::INes);
 
         let mut read_index = 4;
@@ -201,7 +208,7 @@ impl NesFile {
         };
 
         let mapper_number = (ho_n_mapper_number << 4) + header.lo_n_mapper_number as u32;
-        NesFile {
+        Ok(NesFile {
             _trainer: trainer,
             prg_rom,
             chr_rom,
@@ -209,6 +216,6 @@ impl NesFile {
             _prg_ram_size: prg_ram_size,
             mapper_number,
             mirroring,
-        }
+        })
     }
 }

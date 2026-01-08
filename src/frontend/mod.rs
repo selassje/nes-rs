@@ -40,6 +40,7 @@ pub struct FrontendControl {
     pub target_fps: u16,
     pub current_fps: u16,
     pub title: Option<String>,
+    pub error: Option<String>,
     pub controller_type: [ControllerType; 2],
 }
 
