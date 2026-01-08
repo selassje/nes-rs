@@ -61,6 +61,23 @@ pub trait ControllerCallback {
     fn is_button_pressed(&self, id: ControllerId, button: StdNesControllerButton) -> bool;
     fn is_zapper_trigger_pressed(&self, id: ControllerId) -> Option<ZapperTarget>;
 }
+
+trait ControllerCallbackRef {
+    fn as_option(&self) -> Option<&dyn ControllerCallback>;
+}
+
+impl<T: ControllerCallback> ControllerCallbackRef for &T {
+    fn as_option(&self) -> Option<&dyn ControllerCallback> {
+        Some(*self)
+    }
+}
+
+impl ControllerCallbackRef for Option<&dyn ControllerCallback> {
+    fn as_option(&self) -> Option<&dyn ControllerCallback> {
+        *self
+    }
+}
+
 struct CpuBus<'a> {
     pub ram: &'a mut Ram,
     pub ppu: &'a mut Ppu,
@@ -308,10 +325,12 @@ impl Nes {
         self.controllers.power_cycle();
     }
 
-    pub fn run_single_frame(
-        &mut self,
-        callback: Option<&dyn ControllerCallback>,
-    ) -> &EmulationFrame {
+    #[allow(private_bounds)]
+    pub fn run_single_frame<C>(&mut self, callback: C) -> &EmulationFrame
+    where
+        C: ControllerCallbackRef,
+    {
+        let callback = callback.as_option();
         self.emulation_frame.audio.reset();
         let current_frame = self.ppu.get_time().frame;
         while self.ppu.get_time().frame == current_frame {

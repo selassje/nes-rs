@@ -90,7 +90,7 @@ impl emscripten_main_loop::MainLoop for Emulation {
         ];
         let mut emulation_frame: Option<&EmulationFrame> = None;
         if !self.io_state.pause {
-            emulation_frame = Some(self.nes.run_single_frame(Some(&self.io)));
+            emulation_frame = Some(self.nes.run_single_frame(&self.io));
             if self.one_second_timer.elapsed() < std::time::Duration::from_secs(1) {
                 self.fps += 1;
             } else {
