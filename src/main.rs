@@ -39,19 +39,18 @@ pub struct Emulation {
 #[allow(clippy::new_without_default)]
 impl Emulation {
     pub fn new() -> Result<Self, String> {
-        let io = frontend::sdl2_imgui_opengl::Sdl2ImGuiOpenGlFrontend::new();
-
         let mut nes: Nes = crate::Nes::new();
 
         let mut initial_title: Option<String> = None;
         let args: Vec<String> = env::args().collect();
         if args.len() > 1 {
             let path = &args[1];
-            load(&mut nes, path);
+            load(&mut nes, path).map_err(|e| format!("Error loading ROM {}: {}", path, e))?;
             initial_title = Some(path.clone());
         } else {
             load_demo(&mut nes);
         }
+        let io = frontend::sdl2_imgui_opengl::Sdl2ImGuiOpenGlFrontend::new();
 
         let io_state: FrontendState = Default::default();
         let frame_start = std::time::Instant::now();
@@ -124,18 +123,8 @@ impl emscripten_main_loop::MainLoop for Emulation {
 
 fn get_bytes_from_file(file_name: &str) -> Result<Vec<u8>, String> {
     let mut rom = Vec::new();
-    let mut file = File::open(file_name).map_err(|e| {
-        println!(
-            "Unable to open ROM {} current dir {}",
-            file_name,
-            std::env::current_dir().unwrap().display()
-        );
-        e.to_string()
-    })?;
-    file.read_to_end(&mut rom).map_err(|open_err| {
-        println!("Unable to read ROM {}", file_name);
-        open_err.to_string()
-    })?;
+    let mut file = File::open(file_name).map_err(|e| e.to_string())?;
+    file.read_to_end(&mut rom).map_err(|e| e.to_string())?;
     Ok(rom)
 }
 
@@ -167,8 +156,12 @@ fn handle_io_state(nes: &mut Nes, io_state: &FrontendState, io_control: &mut Fro
     }
 
     if let Some(ref nes_file_path) = io_state.load_nes_file {
-        load(nes, nes_file_path.as_str());
-        io_control.title = Some(nes_file_path.clone());
+        let load_result = load(nes, nes_file_path.as_str());
+        if load_result.is_ok() {
+            io_control.title = Some(nes_file_path.clone());
+        } else {
+            io_control.error = Some(load_result.err().unwrap());
+        }
     }
 
     if let Some(ref save_state_path) = io_state.save_state {
@@ -233,7 +226,7 @@ fn load(nes: &mut Nes, path: &str) -> Result<(), String> {
 
 fn load_demo(nes: &mut Nes) {
     let demo_rom = read_demo();
-    nes.load_rom(&demo_rom).unwrap_err();
+    nes.load_rom(&demo_rom).expect("Error loading demo ROM");
 }
 
 fn main() {

@@ -53,7 +53,7 @@ impl NesTest {
         dir.pop();
         let output_frame_path = Self::create_frame_path(&dir, &test_name, "");
         let expected_frame_path = Self::create_frame_path(&dir, &test_name, ".expected");
-        nes.load_rom(&rom);
+        nes.load_rom(&rom).unwrap();
 
         NesTest {
             io_test,
