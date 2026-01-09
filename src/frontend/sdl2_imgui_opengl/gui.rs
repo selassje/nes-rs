@@ -135,7 +135,7 @@ pub(super) struct Gui {
     emulation_texture: imgui::TextureId,
     fonts: GuiFonts,
     menu_bar_item_selected: [bool; MenuBarItem::Count as usize],
-    io_control: FrontendControl,
+    frontend_control: FrontendControl,
     nes_file_path: Option<String>,
     save_state_path: Option<String>,
     load_state_path: Option<String>,
@@ -189,7 +189,7 @@ impl Gui {
             nes_file_path: None,
             save_state_path: None,
             load_state_path: None,
-            io_control: FrontendControl {
+            frontend_control: FrontendControl {
                 ..Default::default()
             },
             video_size_control: VideoSizeControl::Double,
@@ -246,7 +246,7 @@ impl Gui {
 
     pub fn prepare_for_new_frame(&mut self, io_control: FrontendControl) {
         self.nes_file_path = None;
-        self.io_control = io_control;
+        self.frontend_control = io_control;
     }
 
     pub fn is_menu_bar_item_selected(&self, item: MenuBarItem) -> bool {
@@ -324,7 +324,7 @@ impl Gui {
 
                 #[allow(clippy::redundant_pattern_matching)]
                 if let Some(_) = ui.begin_menu("Speed") {
-                    let target_fps = self.io_control.target_fps;
+                    let target_fps = self.frontend_control.target_fps;
                     let is_speed_selected = |fps: u16| fps == target_fps;
                     #[cfg(target_os = "emscripten")]
                     let enabled = false;
@@ -467,7 +467,8 @@ impl Gui {
                 imgui::Image::new(self.emulation_texture, self.video_size).build(ui);
                 self.mouse_click.left_button = false;
                 self.mouse_click.right_button = false;
-                let zapper_active = self.io_control.controller_type[1] == ControllerType::Zapper;
+                let zapper_active =
+                    self.frontend_control.controller_type[1] == ControllerType::Zapper;
                 if ui.is_window_hovered() && zapper_active {
                     self.crosshair = true;
                     let io = ui.io();
@@ -537,7 +538,7 @@ impl Gui {
         let text = {
             format!(
                 "FPS {}/{}",
-                self.io_control.current_fps, self.io_control.target_fps
+                self.frontend_control.current_fps, self.frontend_control.target_fps
             )
         };
 
@@ -644,7 +645,7 @@ impl Gui {
 
     fn build_controller_setup_for_player(&mut self, player_index: usize, ui: &imgui::Ui) {
         let controller_config = &mut self.controller_configs[player_index];
-        let controller_type = self.io_control.controller_type[player_index];
+        let controller_type = self.frontend_control.controller_type[player_index];
         let items = ["Standard", "Zapper"];
         if player_index == 1 {
             let mut new_selection = controller_type as usize - 1;
@@ -700,20 +701,22 @@ impl Gui {
     }
 
     fn build_error_bar(&mut self, ui: &imgui::Ui) {
-        if let Some(error) = &self.io_control.error
-           && self.video_size_control != VideoSizeControl::FullScreen
-        {
+        if self.video_size_control != VideoSizeControl::FullScreen {
             let [video_width, video_height]: [u32; 2] = self.video_size_control.into();
             let style = ui.push_style_var(imgui::StyleVar::WindowBorderSize(0.0));
             let _bg_color = [255.0, 0.0, 0.0, 200.0];
             let y_pos = video_height as f32 + MENU_BAR_HEIGHT as f32;
-         //   println!("Building error bar: y_pos {}", y_pos);
             ui.window("error_bar")
                 .position([0.0, y_pos], imgui::Condition::Always)
-                .size([video_width as f32, ERROR_BAR_HEIGHT as f32], imgui::Condition::Always)
+                .size(
+                    [video_width as f32, ERROR_BAR_HEIGHT as f32],
+                    imgui::Condition::Always,
+                )
                 .no_decoration()
                 .build(|| {
-                    ui.text_colored([255.0, 0.0, 0.0, 255.0], error);
+                    if let Some(error) = &self.frontend_control.error {
+                        ui.text_colored([255.0, 0.0, 0.0, 255.0], error);
+                    }
                 });
             style.pop();
         }

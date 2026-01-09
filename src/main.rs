@@ -33,6 +33,7 @@ pub struct Emulation {
     frontend_state: FrontendState,
     fps: u16,
     one_second_timer: std::time::Instant,
+    error_timer:std::time::Instant,
     frame_start: std::time::Instant,
     is_audio_available: bool,
 }
@@ -50,28 +51,29 @@ impl Emulation {
         } else {
             load_demo(&mut nes);
         }
-        let io = frontend::sdl2_imgui_opengl::Sdl2ImGuiOpenGlFrontend::new();
+        let frontend = frontend::sdl2_imgui_opengl::Sdl2ImGuiOpenGlFrontend::new();
 
-        let io_state: FrontendState = Default::default();
+        let frontend_state: FrontendState = Default::default();
         let frame_start = std::time::Instant::now();
         let fps = 0;
         let one_second_timer = std::time::Instant::now();
 
-        let io_control = FrontendControl {
+        let frontend_control = FrontendControl {
             target_fps: DEFAULT_FPS,
             current_fps: 0,
             title: initial_title,
             controller_type: [crate::ControllerType::NullController; 2],
-            error: Some("Sample Error Message".to_string()),
+            error: None,
         };
-        let is_audio_available = io.is_audio_available();
+        let is_audio_available = frontend.is_audio_available();
         Ok(Self {
             nes,
-            frontend: io,
-            frontend_control: io_control,
-            frontend_state: io_state,
+            frontend,
+            frontend_control,
+            frontend_state,
             fps,
             one_second_timer,
+            error_timer: std::time::Instant::now(),
             frame_start,
             is_audio_available,
         })
@@ -104,7 +106,7 @@ impl emscripten_main_loop::MainLoop for Emulation {
             .frontend
             .present_frame(self.frontend_control.clone(), emulation_frame);
 
-        handle_io_state(&mut self.nes, &self.frontend_state, &mut self.frontend_control);
+        handle_io_state(&mut self.error_timer, &mut self.nes, &self.frontend_state, &mut self.frontend_control);
 
         if !self.frontend_state.pause {
             let elapsed_time_since_frame_start = self.frame_start.elapsed();
@@ -150,7 +152,7 @@ pub fn run(mut emulation: Emulation) {
     }
 }
 
-fn handle_io_state(nes: &mut Nes, fontend_state: &FrontendState, frontend_control: &mut FrontendControl) {
+fn handle_io_state(error_timer: &mut std::time::Instant, nes: &mut Nes, fontend_state: &FrontendState, frontend_control: &mut FrontendControl) {
     if fontend_state.power_cycle {
         nes.power_cycle();
     }
@@ -161,6 +163,7 @@ fn handle_io_state(nes: &mut Nes, fontend_state: &FrontendState, frontend_contro
             frontend_control.title = Some(nes_file_path.clone());
         } else {
             frontend_control.error = Some(load_result.err().unwrap());
+            *error_timer = std::time::Instant::now();
         }
     }
 
