@@ -3,6 +3,7 @@ mod colors;
 mod common;
 mod controllers;
 mod cpu;
+mod errors;
 mod mappers;
 mod memory;
 mod nes_file;
@@ -12,7 +13,6 @@ mod ram_apu;
 mod ram_controllers;
 mod ram_ppu;
 mod vram;
-mod errors;
 
 use apu::Apu;
 use controllers::Controllers;
@@ -278,14 +278,15 @@ impl Nes {
         }
     }
 
-    pub fn save_state(&self) -> Vec<u8> {
-        let serialized = serde_json::to_vec(self).unwrap();
+    pub fn save_state(&self) -> Result<Vec<u8>, Error> {
+        let serialized =
+            serde_json::to_vec(self).map_err(|e| Error::SaveStateInternalError(e.to_string()))?;
         yazi::compress(
             serialized.as_slice(),
             yazi::Format::Zlib,
             yazi::CompressionLevel::Default,
         )
-        .unwrap()
+        .map_err(|e| Error::LoadStateCompressionError(e))
     }
 
     pub fn config(&mut self) -> Config<'_> {
@@ -295,21 +296,32 @@ impl Nes {
         }
     }
 
-    pub fn load_state(&mut self, state: Vec<u8>) {
-        let (decompressed, checksum) =
-            yazi::decompress(state.as_slice(), yazi::Format::Zlib).unwrap();
+    pub fn load_state(&mut self, state: Vec<u8>) -> Result<(), Error> {
+        let (decompressed, checksum) = yazi::decompress(state.as_slice(), yazi::Format::Zlib)
+            .map_err(|e| Error::LoadStateDecompressionError(e))?;
 
-        assert_eq!(
-            yazi::Adler32::from_buf(&decompressed).finish(),
-            checksum.unwrap()
-        );
-
+        if let Some(checksum) = checksum {
+            if checksum != yazi::Adler32::from_buf(&decompressed).finish() {
+                return Err(Error::LoadStateInternalError(
+                    "Checksum mismatch".to_string(),
+                ));
+            }
+        }
         let mut deserializer = serde_json::Deserializer::from_slice(&decompressed);
         let deserializer = serde_stacker::Deserializer::new(&mut deserializer);
-        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer).unwrap();
-        let new_nes: Nes = serde_json::from_value(value).unwrap();
-        assert!(new_nes.version.eq(SERIALIZATION_VER));
+        let value = <serde_json::Value as serde::Deserialize>::deserialize(deserializer)
+            .map_err(|e| Error::LoadStateInternalError(e.to_string()))?;
+        let new_nes: Nes = serde_json::from_value(value)
+            .map_err(|e| Error::LoadStateInternalError(e.to_string()))?;
+        if new_nes.version != SERIALIZATION_VER {
+            return Err(Error::LoadStateVersionMismatch(
+                SERIALIZATION_VER.to_string(),
+                new_nes.version,
+            ));
+        }
+
         *self = new_nes;
+        Ok(())
     }
 
     pub fn load_rom(&mut self, rom: &[u8]) -> Result<(), Error> {

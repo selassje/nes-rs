@@ -183,15 +183,26 @@ fn handle_io_state(
 
     if let Some(ref save_state_path) = fontend_state.save_state {
         let serialized = nes.save_state();
+        if serialized.is_err() {
+            frontend_control.error =
+                Some(format!("Error saving state: {}", serialized.err().unwrap()));
+            *error_timer = std::time::Instant::now();
+            return;
+        }
         let file_name = save_state_path.as_str();
-        let mut file = File::create(file_name).unwrap_or_else(|_| {
-            panic!(
-                "Unable to create save file {} current dir {}",
+        let file = File::create(file_name);
+        if file.is_err() {
+            frontend_control.error = Some(format!(
+                "Unable to create save file {}: {}",
                 file_name,
-                std::env::current_dir().unwrap().display()
-            )
-        });
-        file.write_all(serialized.as_slice()).unwrap();
+                file.err().unwrap()
+            ));
+            *error_timer = std::time::Instant::now();
+            return;
+        }
+        file.unwrap()
+            .write_all(serialized.unwrap().as_slice())
+            .unwrap();
         #[cfg(target_os = "emscripten")]
         unsafe {
             let script = std::ffi::CString::new("refreshDownloadList();").unwrap();
@@ -208,7 +219,11 @@ fn handle_io_state(
                 std::env::current_dir().unwrap().display()
             )
         });
-        nes.load_state(save);
+        let load_state_result = nes.load_state(save);
+        if let Err(e) = load_state_result {
+            frontend_control.error = Some(format!("Error loading state: {}", e));
+            *error_timer = std::time::Instant::now();
+        }
         frontend_control.title = Some(load_state_path.clone());
     }
 

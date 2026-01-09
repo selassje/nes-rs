@@ -15,4 +15,14 @@ pub enum Error {
     NesUnsupportedMapper(u8),
     #[error("Unknown NES file format detected.")]
     UnknownNesFormat,
+    #[error("Loaded state version mismatch. Expected version '{0}', but found version '{1}'.")]
+    LoadStateVersionMismatch(String, String),
+    #[error("Load state internal error {0}")]
+    LoadStateInternalError(String),
+    #[error("Save state internal error {0}")]
+    SaveStateInternalError(String),
+    #[error("Load state decompression  error {0:?}")]
+    LoadStateDecompressionError(yazi::Error),
+    #[error("Save state compression  error {0:?}")]
+    LoadStateCompressionError(yazi::Error),
 }

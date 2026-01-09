@@ -104,12 +104,12 @@ impl NesTest {
     pub fn serialize_and_reset(&mut self) -> Vec<u8> {
         let serialized = self.nes.save_state();
         self.nes.power_cycle();
-        serialized
+        serialized.unwrap()
     }
 
     #[allow(dead_code)]
     pub fn deserialize(&mut self, state: Vec<u8>) {
-        self.nes.load_state(state);
+        self.nes.load_state(state).unwrap();
     }
 
     #[allow(dead_code)]
