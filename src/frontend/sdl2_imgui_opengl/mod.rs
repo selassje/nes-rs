@@ -16,6 +16,7 @@ use sdl2::rwops::RWops;
 use sdl2::surface::Surface;
 
 const MENU_BAR_HEIGHT: u32 = 18;
+const ERROR_BAR_HEIGHT: u32 = 15;
 const MIN_WINDOW_WIDTH: u32 = 360;
 pub const DOUBLE_FPS: u16 = 120;
 pub const HALF_FPS: u16 = 30;
@@ -92,7 +93,7 @@ impl Sdl2ImGuiOpenGlFrontend {
         }
         let [video_width, video_height]: [u32; 2] = gui::VideoSizeControl::Double.into();
         let mut window = video_subsys
-            .window("NES-RS", video_width, MENU_BAR_HEIGHT + video_height)
+            .window("NES-RS", video_width, MENU_BAR_HEIGHT + video_height + ERROR_BAR_HEIGHT)
             .position_centered()
             .opengl()
             .build()
@@ -314,7 +315,7 @@ impl Sdl2ImGuiOpenGlFrontend {
                 .borrow_mut()
                 .set_size(
                     std::cmp::max(video_width, MIN_WINDOW_WIDTH),
-                    video_height + MENU_BAR_HEIGHT,
+                    video_height + MENU_BAR_HEIGHT + ERROR_BAR_HEIGHT,
                 )
                 .unwrap();
             [video_width as f32, video_height as f32]

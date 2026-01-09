@@ -1,4 +1,5 @@
 use super::{MENU_BAR_HEIGHT, MenuBarItem};
+use crate::frontend::sdl2_imgui_opengl::ERROR_BAR_HEIGHT;
 use crate::{
     ControllerId, ControllerType, DEFAULT_FPS, VIDEO_FRAME_HEIGHT, VIDEO_FRAME_WIDTH,
     frontend::FrontendControl,
@@ -698,6 +699,26 @@ impl Gui {
         font.pop();
     }
 
+    fn build_error_bar(&mut self, ui: &imgui::Ui) {
+        if let Some(error) = &self.io_control.error
+           && self.video_size_control != VideoSizeControl::FullScreen
+        {
+            let [video_width, video_height]: [u32; 2] = self.video_size_control.into();
+            let style = ui.push_style_var(imgui::StyleVar::WindowBorderSize(0.0));
+            let _bg_color = [255.0, 0.0, 0.0, 200.0];
+            let y_pos = video_height as f32 + MENU_BAR_HEIGHT as f32;
+         //   println!("Building error bar: y_pos {}", y_pos);
+            ui.window("error_bar")
+                .position([0.0, y_pos], imgui::Condition::Always)
+                .size([video_width as f32, ERROR_BAR_HEIGHT as f32], imgui::Condition::Always)
+                .no_decoration()
+                .build(|| {
+                    ui.text_colored([255.0, 0.0, 0.0, 255.0], error);
+                });
+            style.pop();
+        }
+    }
+
     pub(super) fn build(&mut self, ui: &mut imgui::Ui) {
         self.build_menu_bar = !(self.video_size_control == VideoSizeControl::FullScreen);
 
@@ -710,6 +731,7 @@ impl Gui {
         }
         self.build_emulation_window(ui);
         self.build_fps_counter(ui);
+        self.build_error_bar(ui);
         self.build_load_nes_file_explorer();
         self.build_save_state_file_explorer();
         self.build_load_state_file_explorer();

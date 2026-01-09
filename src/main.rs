@@ -28,9 +28,9 @@ unsafe extern "C" {
 }
 pub struct Emulation {
     nes: Nes,
-    io: Sdl2ImGuiOpenGlFrontend,
-    io_control: FrontendControl,
-    io_state: FrontendState,
+    frontend: Sdl2ImGuiOpenGlFrontend,
+    frontend_control: FrontendControl,
+    frontend_state: FrontendState,
     fps: u16,
     one_second_timer: std::time::Instant,
     frame_start: std::time::Instant,
@@ -62,14 +62,14 @@ impl Emulation {
             current_fps: 0,
             title: initial_title,
             controller_type: [crate::ControllerType::NullController; 2],
-            error: None,
+            error: Some("Sample Error Message".to_string()),
         };
         let is_audio_available = io.is_audio_available();
         Ok(Self {
             nes,
-            io,
-            io_control,
-            io_state,
+            frontend: io,
+            frontend_control: io_control,
+            frontend_state: io_state,
             fps,
             one_second_timer,
             frame_start,
@@ -80,7 +80,7 @@ impl Emulation {
 
 impl emscripten_main_loop::MainLoop for Emulation {
     fn main_loop(&mut self) -> emscripten_main_loop::MainLoopEvent {
-        self.io_control.controller_type = [
+        self.frontend_control.controller_type = [
             self.nes
                 .config()
                 .get_controller_type(crate::ControllerId::Controller1),
@@ -89,24 +89,24 @@ impl emscripten_main_loop::MainLoop for Emulation {
                 .get_controller_type(crate::ControllerId::Controller2),
         ];
         let mut emulation_frame: Option<&EmulationFrame> = None;
-        if !self.io_state.pause {
-            emulation_frame = Some(self.nes.run_single_frame(&self.io));
+        if !self.frontend_state.pause {
+            emulation_frame = Some(self.nes.run_single_frame(&self.frontend));
             if self.one_second_timer.elapsed() < std::time::Duration::from_secs(1) {
                 self.fps += 1;
             } else {
                 self.one_second_timer = std::time::Instant::now();
-                self.io_control.current_fps = self.fps;
+                self.frontend_control.current_fps = self.fps;
                 self.fps = 1;
             }
         }
 
-        self.io_state = self
-            .io
-            .present_frame(self.io_control.clone(), emulation_frame);
+        self.frontend_state = self
+            .frontend
+            .present_frame(self.frontend_control.clone(), emulation_frame);
 
-        handle_io_state(&mut self.nes, &self.io_state, &mut self.io_control);
+        handle_io_state(&mut self.nes, &self.frontend_state, &mut self.frontend_control);
 
-        if !self.io_state.pause {
+        if !self.frontend_state.pause {
             let elapsed_time_since_frame_start = self.frame_start.elapsed();
             if !self.is_audio_available && elapsed_time_since_frame_start < FRAME_DURATION {
                 #[cfg(not(target_os = "emscripten"))]
@@ -145,26 +145,26 @@ fn read_demo() -> Vec<u8> {
 }
 
 pub fn run(mut emulation: Emulation) {
-    while !emulation.io_state.quit {
+    while !emulation.frontend_state.quit {
         emulation.main_loop();
     }
 }
 
-fn handle_io_state(nes: &mut Nes, io_state: &FrontendState, io_control: &mut FrontendControl) {
-    if io_state.power_cycle {
+fn handle_io_state(nes: &mut Nes, fontend_state: &FrontendState, frontend_control: &mut FrontendControl) {
+    if fontend_state.power_cycle {
         nes.power_cycle();
     }
 
-    if let Some(ref nes_file_path) = io_state.load_nes_file {
+    if let Some(ref nes_file_path) = fontend_state.load_nes_file {
         let load_result = load(nes, nes_file_path.as_str());
         if load_result.is_ok() {
-            io_control.title = Some(nes_file_path.clone());
+            frontend_control.title = Some(nes_file_path.clone());
         } else {
-            io_control.error = Some(load_result.err().unwrap());
+            frontend_control.error = Some(load_result.err().unwrap());
         }
     }
 
-    if let Some(ref save_state_path) = io_state.save_state {
+    if let Some(ref save_state_path) = fontend_state.save_state {
         let serialized = nes.save_state();
         let file_name = save_state_path.as_str();
         let mut file = File::create(file_name).unwrap_or_else(|_| {
@@ -182,7 +182,7 @@ fn handle_io_state(nes: &mut Nes, io_state: &FrontendState, io_control: &mut Fro
         };
     }
 
-    if let Some(ref load_state_path) = io_state.load_state {
+    if let Some(ref load_state_path) = fontend_state.load_state {
         let file_name = load_state_path.as_str();
         let save = std::fs::read(file_name).unwrap_or_else(|_| {
             panic!(
@@ -192,30 +192,30 @@ fn handle_io_state(nes: &mut Nes, io_state: &FrontendState, io_control: &mut Fro
             )
         });
         nes.load_state(save);
-        io_control.title = Some(load_state_path.clone());
+        frontend_control.title = Some(load_state_path.clone());
     }
 
-    if let Some(ref speed) = io_state.speed {
+    if let Some(ref speed) = fontend_state.speed {
         match speed {
-            Speed::Half => io_control.target_fps = HALF_FPS,
-            Speed::Normal => io_control.target_fps = DEFAULT_FPS,
-            Speed::Double => io_control.target_fps = DOUBLE_FPS,
-            Speed::Increase => io_control.target_fps += 5,
+            Speed::Half => frontend_control.target_fps = HALF_FPS,
+            Speed::Normal => frontend_control.target_fps = DEFAULT_FPS,
+            Speed::Double => frontend_control.target_fps = DOUBLE_FPS,
+            Speed::Increase => frontend_control.target_fps += 5,
             Speed::Decrease => {
-                io_control.target_fps = std::cmp::max(0, io_control.target_fps as i32 - 5) as u16
+                frontend_control.target_fps = std::cmp::max(0, frontend_control.target_fps as i32 - 5) as u16
             }
         }
-        nes.config().set_target_fps(io_control.target_fps);
+        nes.config().set_target_fps(frontend_control.target_fps);
     }
 
-    for (i, controller_type) in io_state.switch_controller_type.iter().enumerate() {
+    for (i, controller_type) in fontend_state.switch_controller_type.iter().enumerate() {
         if let Some(controller_type) = controller_type
             && let Some(id) = ControllerId::from_index(i)
         {
             nes.config().set_controller(id, *controller_type);
         }
     }
-    nes.config().set_audio_volume(io_state.audio_volume);
+    nes.config().set_audio_volume(fontend_state.audio_volume);
 }
 
 fn load(nes: &mut Nes, path: &str) -> Result<(), String> {
