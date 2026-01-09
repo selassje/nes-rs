@@ -33,7 +33,7 @@ pub struct Emulation {
     frontend_state: FrontendState,
     fps: u16,
     one_second_timer: std::time::Instant,
-    error_timer:std::time::Instant,
+    error_timer: std::time::Instant,
     frame_start: std::time::Instant,
     is_audio_available: bool,
 }
@@ -106,7 +106,12 @@ impl emscripten_main_loop::MainLoop for Emulation {
             .frontend
             .present_frame(self.frontend_control.clone(), emulation_frame);
 
-        handle_io_state(&mut self.error_timer, &mut self.nes, &self.frontend_state, &mut self.frontend_control);
+        handle_io_state(
+            &mut self.error_timer,
+            &mut self.nes,
+            &self.frontend_state,
+            &mut self.frontend_control,
+        );
 
         if !self.frontend_state.pause {
             let elapsed_time_since_frame_start = self.frame_start.elapsed();
@@ -152,7 +157,12 @@ pub fn run(mut emulation: Emulation) {
     }
 }
 
-fn handle_io_state(error_timer: &mut std::time::Instant, nes: &mut Nes, fontend_state: &FrontendState, frontend_control: &mut FrontendControl) {
+fn handle_io_state(
+    error_timer: &mut std::time::Instant,
+    nes: &mut Nes,
+    fontend_state: &FrontendState,
+    frontend_control: &mut FrontendControl,
+) {
     if fontend_state.power_cycle {
         nes.power_cycle();
     }
@@ -165,6 +175,10 @@ fn handle_io_state(error_timer: &mut std::time::Instant, nes: &mut Nes, fontend_
             frontend_control.error = Some(load_result.err().unwrap());
             *error_timer = std::time::Instant::now();
         }
+    }
+    if frontend_control.error.is_some() && error_timer.elapsed() > std::time::Duration::from_secs(5)
+    {
+        frontend_control.error = None;
     }
 
     if let Some(ref save_state_path) = fontend_state.save_state {
@@ -205,7 +219,8 @@ fn handle_io_state(error_timer: &mut std::time::Instant, nes: &mut Nes, fontend_
             Speed::Double => frontend_control.target_fps = DOUBLE_FPS,
             Speed::Increase => frontend_control.target_fps += 5,
             Speed::Decrease => {
-                frontend_control.target_fps = std::cmp::max(0, frontend_control.target_fps as i32 - 5) as u16
+                frontend_control.target_fps =
+                    std::cmp::max(0, frontend_control.target_fps as i32 - 5) as u16
             }
         }
         nes.config().set_target_fps(frontend_control.target_fps);
