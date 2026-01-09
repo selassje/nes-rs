@@ -1,32 +1,16 @@
 use thiserror::Error;
-/* 
-pub struct NesRomTooShort {
-    pub expected_size: usize,
-    pub actual_size: usize,
-}
-
-impl Display for NesRomTooShort {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "NES ROM is too short. Expected at least {} bytes, but got {} bytes.",
-            self.expected_size, self.actual_size
-        )
-    }
-}
-
-pub struct UnknownNesFormat {}
-
-impl Display for UnknownNesFormat {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Unknown NES file format detected.")
-    }
-}
-*/
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("NES ROM is too short. Expected at least {0} bytes, but got {1} bytes.")]
-    NesRomTooShort(usize,usize),
+    #[error("NES ROM is too short. Expected at least 16 bytes, but got {0} bytes.")]
+    NesRomHeaderTooShort(usize),
+    #[error("NES ROM Trainer too short. Expected at least 512 bytes, but got {0} bytes.")]
+    NesRomTrainerTooShort(usize),
+    #[error("NES PRG ROM unit {0} too short. Expected at least 16384 bytes, but got {1} bytes.")]
+    NesPrgRomTooShort(u8, usize),
+    #[error("NES CHR ROM unit {0} too short. Expected at least 8192 bytes, but got {1} bytes.")]
+    NesChrRomTooShort(u8, usize),
+    #[error("Unsupported Mapper {0}.")]
+    NesUnsupportedMapper(u8),
     #[error("Unknown NES file format detected.")]
     UnknownNesFormat,
 }

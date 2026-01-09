@@ -74,7 +74,7 @@ fn read_to_array(array: &mut [u8], in_bytes: &[u8]) -> usize {
 }
 
 impl NesFile {
-    pub fn create_mapper(&self) -> MapperEnum {
+    pub fn create_mapper(&self) -> Result<MapperEnum, Error> {
         let mut prg_rom = Vec::<u8>::new();
         for prg_rom_chunk in &self.prg_rom {
             prg_rom.extend_from_slice(prg_rom_chunk);
@@ -86,22 +86,22 @@ impl NesFile {
         }
 
         match self.mapper_number {
-            0 => MapperEnum::Mapper0(Mapper0::new(prg_rom, chr_rom, self.mirroring)),
-            1 => MapperEnum::Mapper1(Mapper1::new(prg_rom, chr_rom)),
-            2 => MapperEnum::Mapper2(Mapper2::new(prg_rom, chr_rom, self.mirroring)),
-            4 => MapperEnum::Mapper4(Mapper4::new(prg_rom, chr_rom)),
-            7 => MapperEnum::Mapper7(Mapper7::new(prg_rom, chr_rom)),
-            66 => MapperEnum::Mapper66(Mapper66::new(prg_rom, chr_rom, self.mirroring)),
-            71 => MapperEnum::Mapper71(Mapper71::new(prg_rom, self.mirroring)),
-            227 => MapperEnum::Mapper227(Mapper227::new(prg_rom, chr_rom)),
-            _ => panic!("Unsupported mapper {}", self.mapper_number),
+            0 => Ok(MapperEnum::Mapper0(Mapper0::new(prg_rom, chr_rom, self.mirroring))),
+            1 => Ok(MapperEnum::Mapper1(Mapper1::new(prg_rom, chr_rom))),
+            2 => Ok(MapperEnum::Mapper2(Mapper2::new(prg_rom, chr_rom, self.mirroring))),
+            4 => Ok(MapperEnum::Mapper4(Mapper4::new(prg_rom, chr_rom))),
+            7 => Ok(MapperEnum::Mapper7(Mapper7::new(prg_rom, chr_rom))),
+            66 => Ok(MapperEnum::Mapper66(Mapper66::new(prg_rom, chr_rom, self.mirroring))),
+            71 => Ok(MapperEnum::Mapper71(Mapper71::new(prg_rom, self.mirroring))),
+            227 => Ok(MapperEnum::Mapper227(Mapper227::new(prg_rom, chr_rom))),
+            _ => Err(NesUnsupportedMapper(self.mapper_number as u8)),
         }
     }
 
     fn get_format(header: &[u8]) -> Result<NesFormat, Error> {
         let len = header.len();
         if len < 16 {
-            return Err(NesRomTooShort(16, len));
+            return Err(NesRomHeaderTooShort(len));
         }
 
         let mut is_ines_format = false;
@@ -150,21 +150,33 @@ impl NesFile {
         let mut trainer = Option::None;
         if header.flag_6 & (HeaderFlag6::TrainerPresent as u8) == 1 {
             let mut trainer_data: Trainer = [0; 512];
-            read_index += read_to_array(&mut trainer_data, &in_bytes[read_index..]);
+            let trainer_slice = &in_bytes[read_index..];
+            if trainer_slice.len() < 512 {
+                return Err(NesRomTrainerTooShort(trainer_slice.len()));
+            }
+            read_index += read_to_array(&mut trainer_data, trainer_slice);
             trainer = Option::Some(trainer_data);
         }
 
         let mut prg_rom = Vec::<PrgRomUnit>::new();
-        for _ in 0..header.prg_rom_units {
+        for unit in 0..header.prg_rom_units {
             let mut prg_rom_unit: PrgRomUnit = [0; 16384];
-            read_index += read_to_array(&mut prg_rom_unit, &in_bytes[read_index..]);
+            let prg_rom_slice = &in_bytes[read_index..];
+            if prg_rom_slice.len() < common::PRG_ROM_UNIT_SIZE {
+                return Err(NesPrgRomTooShort(unit, prg_rom_slice.len()));
+            }
+            read_index += read_to_array(&mut prg_rom_unit, prg_rom_slice);
             prg_rom.push(prg_rom_unit);
         }
 
         let mut chr_rom = Vec::<ChrRomUnit>::new();
 
-        for _ in 0..header.chr_rom_units {
+        for unit in 0..header.chr_rom_units {
             let mut chr_rom_unit: ChrRomUnit = [0; common::CHR_ROM_UNIT_SIZE];
+            let chr_rom_slice = &in_bytes[read_index..];
+            if chr_rom_slice.len() < common::CHR_ROM_UNIT_SIZE {
+                return Err(NesChrRomTooShort(unit, chr_rom_slice.len()));
+            }
             read_index += read_to_array(&mut chr_rom_unit, &in_bytes[read_index..]);
             chr_rom.push(chr_rom_unit);
         }
@@ -207,7 +219,8 @@ impl NesFile {
             header.ho_n_mapper_number as u32
         };
 
-        let mapper_number = (ho_n_mapper_number << 4) + header.lo_n_mapper_number as u32;
+        let mapper_number = (ho_n_mapper_number << 4) + header.lo_n_mapper_number as u32;        
+
         Ok(NesFile {
             _trainer: trainer,
             prg_rom,

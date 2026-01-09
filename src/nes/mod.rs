@@ -314,7 +314,7 @@ impl Nes {
 
     pub fn load_rom(&mut self, rom: &[u8]) -> Result<(), Error> {
         let nes_file = NesFile::new(rom)?;
-        self.mapper = nes_file.create_mapper();
+        self.mapper = nes_file.create_mapper()?;
         self.power_cycle();
         Ok(())
     }
