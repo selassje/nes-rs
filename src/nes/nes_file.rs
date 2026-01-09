@@ -184,7 +184,11 @@ impl NesFile {
         let mut play_choice_rom = Option::None;
 
         if header.flag_7 & (HeaderFlag7::PlayChoice10 as u8) == 1 {
+            if in_bytes[read_index..].len() < 8224 {
+                return Err(NesPlayChoiceRomTooShort(in_bytes[read_index..].len()));
+            }
             let mut inst_rom: PlayChoiceInstRom = [0; 8192];
+
             read_index += read_to_array(&mut inst_rom, &in_bytes[read_index..]);
 
             let mut data_output: PlayChoiceDecryptData = [0; 16];
