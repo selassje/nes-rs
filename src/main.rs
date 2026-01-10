@@ -18,10 +18,6 @@ use nes_rs::*;
 
 extern crate enum_tryfrom;
 
-const FRAME_DURATION: std::time::Duration = std::time::Duration::from_nanos(
-    (std::time::Duration::from_secs(1).as_nanos() / (crate::DEFAULT_FPS) as u128) as u64,
-);
-
 #[cfg(target_os = "emscripten")]
 unsafe extern "C" {
     fn emscripten_run_script(s: *const std::os::raw::c_char);
@@ -128,10 +124,13 @@ impl emscripten_main_loop::MainLoop for Emulation {
 
         if !self.frontend_state.pause {
             let elapsed_time_since_frame_start = self.frame_start.elapsed();
-            //   let frame_duration =  std::time::Duration::from_nanos( FRAME_DURATION.as_nanos() as f32 * (DEFAULT_FPS as f32 / self.frontend_control.target_fps as f32));
-            if !self.is_audio_available && elapsed_time_since_frame_start < FRAME_DURATION {
+            let frame_duration: std::time::Duration = std::time::Duration::from_nanos(
+                (std::time::Duration::from_secs(1).as_nanos()
+                    / (self.frontend_control.target_fps) as u128) as u64,
+            );
+            if !self.is_audio_available && elapsed_time_since_frame_start < frame_duration {
                 #[cfg(not(target_os = "emscripten"))]
-                std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);
+                std::thread::sleep(frame_duration - elapsed_time_since_frame_start);
             }
             self.frame_start = std::time::Instant::now();
         } else {
