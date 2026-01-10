@@ -128,6 +128,7 @@ impl emscripten_main_loop::MainLoop for Emulation {
 
         if !self.frontend_state.pause {
             let elapsed_time_since_frame_start = self.frame_start.elapsed();
+            //   let frame_duration =  std::time::Duration::from_nanos( FRAME_DURATION.as_nanos() as f32 * (DEFAULT_FPS as f32 / self.frontend_control.target_fps as f32));
             if !self.is_audio_available && elapsed_time_since_frame_start < FRAME_DURATION {
                 #[cfg(not(target_os = "emscripten"))]
                 std::thread::sleep(FRAME_DURATION - elapsed_time_since_frame_start);
@@ -251,6 +252,7 @@ fn handle_io_state(
                     std::cmp::max(0, frontend_control.target_fps as i32 - 5) as u16
             }
         }
+        #[cfg(not(target_os = "emscripten"))]
         nes.config()
             .set_target_fps(frontend_control.target_fps as f32);
     }
