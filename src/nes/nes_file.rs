@@ -86,12 +86,24 @@ impl NesFile {
         }
 
         match self.mapper_number {
-            0 => Ok(MapperEnum::Mapper0(Mapper0::new(prg_rom, chr_rom, self.mirroring))),
+            0 => Ok(MapperEnum::Mapper0(Mapper0::new(
+                prg_rom,
+                chr_rom,
+                self.mirroring,
+            ))),
             1 => Ok(MapperEnum::Mapper1(Mapper1::new(prg_rom, chr_rom))),
-            2 => Ok(MapperEnum::Mapper2(Mapper2::new(prg_rom, chr_rom, self.mirroring))),
+            2 => Ok(MapperEnum::Mapper2(Mapper2::new(
+                prg_rom,
+                chr_rom,
+                self.mirroring,
+            ))),
             4 => Ok(MapperEnum::Mapper4(Mapper4::new(prg_rom, chr_rom))),
             7 => Ok(MapperEnum::Mapper7(Mapper7::new(prg_rom, chr_rom))),
-            66 => Ok(MapperEnum::Mapper66(Mapper66::new(prg_rom, chr_rom, self.mirroring))),
+            66 => Ok(MapperEnum::Mapper66(Mapper66::new(
+                prg_rom,
+                chr_rom,
+                self.mirroring,
+            ))),
             71 => Ok(MapperEnum::Mapper71(Mapper71::new(prg_rom, self.mirroring))),
             227 => Ok(MapperEnum::Mapper227(Mapper227::new(prg_rom, chr_rom))),
             _ => Err(NesUnsupportedMapper(self.mapper_number as u8)),
@@ -223,7 +235,7 @@ impl NesFile {
             header.ho_n_mapper_number as u32
         };
 
-        let mapper_number = (ho_n_mapper_number << 4) + header.lo_n_mapper_number as u32;        
+        let mapper_number = (ho_n_mapper_number << 4) + header.lo_n_mapper_number as u32;
 
         Ok(NesFile {
             _trainer: trainer,

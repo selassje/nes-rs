@@ -76,11 +76,10 @@ impl Sdl2ImGuiOpenGlFrontend {
                 samples: None,
             };
             let audio_queue = sdl_audio.open_queue(None, &desired_spec);
-            if audio_queue.is_err() {
-                eprintln!("Warning: Unable to open audio device. Audio will be disabled.");
-            } else {
-                let audio_queue = audio_queue.unwrap();
+            if let Ok(audio_queue) = audio_queue {
                 maybe_audio_queue = Some(audio_queue);
+            } else {
+                eprintln!("Warning: Unable to open audio device. Audio will be disabled.");
             }
         }
 

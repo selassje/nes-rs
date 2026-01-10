@@ -5,7 +5,6 @@ use crate::nes::mappers::mapper_internal::MapperInternal;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
-//#[serde(rename(deserialize = "concretemapper"))]
 pub struct Mapper2 {
     mapper_internal: MapperInternal,
     mirroring: Mirroring,

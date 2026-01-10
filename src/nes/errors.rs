@@ -9,7 +9,9 @@ pub enum Error {
     NesPrgRomTooShort(u8, usize),
     #[error("NES CHR ROM unit {0} too short. Expected at least 8192 bytes, but got {1} bytes.")]
     NesChrRomTooShort(u8, usize),
-    #[error("NES ROM PlayChoice size is too short. Expected at least 8224 bytes, but got {0} bytes.")]
+    #[error(
+        "NES ROM PlayChoice size is too short. Expected at least 8224 bytes, but got {0} bytes."
+    )]
     NesPlayChoiceRomTooShort(usize),
     #[error("Unsupported Mapper {0}.")]
     NesUnsupportedMapper(u8),

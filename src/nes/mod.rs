@@ -286,7 +286,7 @@ impl Nes {
             yazi::Format::Zlib,
             yazi::CompressionLevel::Default,
         )
-        .map_err(|e| Error::LoadStateCompressionError(e))
+        .map_err(Error::LoadStateCompressionError)
     }
 
     pub fn config(&mut self) -> Config<'_> {
@@ -298,14 +298,14 @@ impl Nes {
 
     pub fn load_state(&mut self, state: Vec<u8>) -> Result<(), Error> {
         let (decompressed, checksum) = yazi::decompress(state.as_slice(), yazi::Format::Zlib)
-            .map_err(|e| Error::LoadStateDecompressionError(e))?;
+            .map_err(Error::LoadStateDecompressionError)?;
 
-        if let Some(checksum) = checksum {
-            if checksum != yazi::Adler32::from_buf(&decompressed).finish() {
-                return Err(Error::LoadStateInternalError(
-                    "Checksum mismatch".to_string(),
-                ));
-            }
+        if let Some(checksum) = checksum
+            && checksum != yazi::Adler32::from_buf(&decompressed).finish()
+        {
+            return Err(Error::LoadStateInternalError(
+                "Checksum mismatch".to_string(),
+            ));
         }
         let mut deserializer = serde_json::Deserializer::from_slice(&decompressed);
         let deserializer = serde_stacker::Deserializer::new(&mut deserializer);
