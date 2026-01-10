@@ -42,7 +42,7 @@ impl Emulation {
     pub fn new() -> Result<Self, String> {
         let mut nes: Nes = crate::Nes::new();
         #[cfg(target_os = "emscripten")]
-        nes.config().set_target_fps(59.98);
+        nes.config().set_target_fps(59.95);
 
         let mut initial_title: Option<String> = None;
         let args: Vec<String> = env::args().collect();
