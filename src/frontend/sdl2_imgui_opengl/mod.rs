@@ -75,9 +75,13 @@ impl Sdl2ImGuiOpenGlFrontend {
                 channels: Some(1),
                 samples: None,
             };
-            let audio_queue = sdl_audio.open_queue(None, &desired_spec).unwrap();
-            audio_queue.resume();
-            maybe_audio_queue = Some(audio_queue);
+            let audio_queue = sdl_audio.open_queue(None, &desired_spec);
+            if audio_queue.is_err() {
+                eprintln!("Warning: Unable to open audio device. Audio will be disabled.");
+            } else {
+                let audio_queue = audio_queue.unwrap();
+                maybe_audio_queue = Some(audio_queue);
+            }
         }
 
         let video_subsys = sdl2_context.video().unwrap();
@@ -93,7 +97,11 @@ impl Sdl2ImGuiOpenGlFrontend {
         }
         let [video_width, video_height]: [u32; 2] = gui::VideoSizeControl::Double.into();
         let mut window = video_subsys
-            .window("NES-RS", video_width, MENU_BAR_HEIGHT + video_height + ERROR_BAR_HEIGHT)
+            .window(
+                "NES-RS",
+                video_width,
+                MENU_BAR_HEIGHT + video_height + ERROR_BAR_HEIGHT,
+            )
             .position_centered()
             .opengl()
             .build()
