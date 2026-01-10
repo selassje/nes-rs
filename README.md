@@ -19,6 +19,7 @@ https://selassje.github.io/nes-rs/
 * fullscreen mode support
 * currently supported mappers:
   * 1, 2, 4, 7, 66, 71, 227
+* zapper light gun emulation 
 
 # default key bindings
 
@@ -33,7 +34,7 @@ Down | S | Down Arrow
 Left | A | Left Arrow
 Right | D | Right Arrow
 
-# building
+# building the forntend
 
 The CI tested targets are **x86_64-pc-windows-msvc** and **x86_64-unknown-linux-gnu** 
 
@@ -41,17 +42,14 @@ Before running cargo build for those targets you will need to build the SDL2 lib
 
 * `cargo install cargo-vcpkg`
 * `cargo vcpkg build`
-* `cargo build --release`
+* `cargo build --release --features=frontend`
 
 
 Target **wasm32-unknown-emscripten** is also supported.
 In that case, instead of building SDL2, [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) 
 is required which provides SDL2 as well as OpenGL ports.
-The Emscripten SDK version known to work with this project is **2.0.9**.
+The Emscripten SDK version known to work with this project is **4.0.22**.
 
-I recommend using [cargo-web](https://github.com/koute/cargo-web) to build and run the emscripten target
-
-* `cargo web start --release`
 
 # testing
 
