@@ -211,7 +211,7 @@ impl Default for AudioConfig {
     fn default() -> Self {
         AudioConfig {
             audio_volume: 1.0,
-            target_fps: DEFAULT_FPS as  f32,
+            target_fps: DEFAULT_FPS as f32,
         }
     }
 }
