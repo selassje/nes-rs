@@ -92,7 +92,18 @@ impl emscripten_main_loop::MainLoop for Emulation {
         ];
         let mut emulation_frame: Option<&EmulationFrame> = None;
         if !self.frontend_state.pause {
-            emulation_frame = Some(self.nes.run_single_frame(&self.frontend));
+            let emulation_result = self.nes.run_single_frame(&self.frontend);
+            match emulation_result {
+                Ok(frame) => {
+                    emulation_frame = Some(frame);
+                }
+                Err(e) => {
+                    self.frontend_control.error = Some(format!("Emulation error: {}", e));
+                    self.frontend_state.pause = true;
+                    self.error_timer = std::time::Instant::now();
+                }
+            }
+
             if self.one_second_timer.elapsed() < std::time::Duration::from_secs(1) {
                 self.fps += 1;
             } else {

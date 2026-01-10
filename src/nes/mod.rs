@@ -342,7 +342,7 @@ impl Nes {
     }
 
     #[allow(private_bounds)]
-    pub fn run_single_frame<C>(&mut self, callback: C) -> &EmulationFrame
+    pub fn run_single_frame<C>(&mut self, callback: C) -> Result<&EmulationFrame, Error>
     where
         C: ControllerCallbackRef,
     {
@@ -350,17 +350,20 @@ impl Nes {
         self.emulation_frame.audio.reset();
         let current_frame = self.ppu.get_time().frame;
         while self.ppu.get_time().frame == current_frame {
-            self.run_single_cpu_cycle(callback);
+            self.run_single_cpu_cycle(callback)?;
         }
         self.controllers
             .update_zappers(&self.emulation_frame, self.ppu.get_time().frame);
         self.apu.reset_audio_buffer();
-        &self.emulation_frame
+        Ok(&self.emulation_frame)
     }
 
-    fn run_single_cpu_cycle(&mut self, callback: Option<&dyn ControllerCallback>) {
+    fn run_single_cpu_cycle(
+        &mut self,
+        callback: Option<&dyn ControllerCallback>,
+    ) -> Result<(), Error> {
         let mut cpu_bus = cpu_bus!(self, callback);
-        self.cpu.maybe_fetch_next_instruction(&mut cpu_bus);
+        self.cpu.maybe_fetch_next_instruction(&mut cpu_bus)?;
         let mut ppu_bus = PpuBus {
             mapper: &mut self.mapper,
             emulation_frame: &mut self.emulation_frame,
@@ -375,6 +378,7 @@ impl Nes {
         self.apu.run_single_cpu_cycle(&mut apu_bus);
         let mut cpu_bus = cpu_bus!(self, callback);
         self.cpu.run_single_cycle(&mut cpu_bus);
+        Ok(())
     }
 }
 

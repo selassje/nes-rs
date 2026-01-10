@@ -27,4 +27,6 @@ pub enum Error {
     LoadStateDecompressionError(yazi::Error),
     #[error("Save state compression  error {0:?}")]
     LoadStateCompressionError(yazi::Error),
+    #[error("Invalid opcode {0} at address {1:#06X}")]
+    NesCpuInvalidOpcode(u8, u16),
 }

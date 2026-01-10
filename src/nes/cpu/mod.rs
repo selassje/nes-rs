@@ -11,6 +11,7 @@ use opcodes::{NMI_OPCODE, OpCodes, get_opcodes};
 use serde::{Deserialize, Serialize};
 
 use std::fmt::{Display, Formatter, Result};
+use std::result;
 
 const STACK_PAGE: u16 = 0x0100;
 
@@ -247,10 +248,14 @@ impl Cpu {
         let high_byte = self.pop_byte(bus);
         convert_2u8_to_u16(low_byte, high_byte)
     }
-    pub fn maybe_fetch_next_instruction(&mut self, bus: &mut CpuBus) {
+    pub fn maybe_fetch_next_instruction(
+        &mut self,
+        bus: &mut CpuBus,
+    ) -> result::Result<(), crate::nes::errors::Error> {
         if self.instruction.is_none() {
-            self.fetch_next_instruction(bus);
+            self.fetch_next_instruction(bus)?;
         }
+        Ok(())
     }
 
     fn check_for_interrupts(&mut self, bus: &mut CpuBus) {
@@ -264,7 +269,10 @@ impl Cpu {
         }
     }
 
-    fn fetch_next_instruction(&mut self, bus: &mut CpuBus) {
+    fn fetch_next_instruction(
+        &mut self,
+        bus: &mut CpuBus,
+    ) -> result::Result<(), crate::nes::errors::Error> {
         let ppu_time = bus.ppu.get_time();
         let op = if let Some(op) = self.interrupt.take() {
             op
@@ -341,8 +349,9 @@ impl Cpu {
             if opcode.instruction as usize == Self::rti as usize {
                 self.rti_restore_ps(bus);
             }
+            Ok(())
         } else {
-            panic!("Unknown instruction {:#04x} at {:#X} ", op, self.pc);
+            Err(crate::nes::errors::Error::NesCpuInvalidOpcode(op, self.pc))
         }
     }
 
