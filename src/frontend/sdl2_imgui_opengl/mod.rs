@@ -401,16 +401,16 @@ impl frontend::Frontend for Sdl2ImGuiOpenGlFrontend {
             } else {
                 audio_queue.resume();
 
-                let audio_frames_reserve: u32 = 10;
-                let audio_saturation_threshold =
-                    emulation_frame.audio.get_byte_size() as u32 * audio_frames_reserve;
                 #[cfg(not(target_os = "emscripten"))]
                 {
+                    let audio_frames_reserve: u32 = 10;
+                    let audio_saturation_threshold =
+                        emulation_frame.audio.get_byte_size() as u32 * audio_frames_reserve;
                     while audio_queue.size() > audio_saturation_threshold {}
                     let _ = audio_queue.queue_audio(emulation_frame.audio.get_samples());
                 }
                 #[cfg(target_os = "emscripten")]
-                if audio_queue.size() < audio_saturation_threshold {
+                {
                     let _ = audio_queue.queue_audio(emulation_frame.audio.get_samples());
                 }
                 let volume = if self

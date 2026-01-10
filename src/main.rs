@@ -41,6 +41,8 @@ pub struct Emulation {
 impl Emulation {
     pub fn new() -> Result<Self, String> {
         let mut nes: Nes = crate::Nes::new();
+        #[cfg(target_os = "emscripten")]
+        nes.config().set_target_fps(59.98);
 
         let mut initial_title: Option<String> = None;
         let args: Vec<String> = env::args().collect();
@@ -249,7 +251,8 @@ fn handle_io_state(
                     std::cmp::max(0, frontend_control.target_fps as i32 - 5) as u16
             }
         }
-        nes.config().set_target_fps(frontend_control.target_fps);
+        nes.config()
+            .set_target_fps(frontend_control.target_fps as f32);
     }
 
     for (i, controller_type) in fontend_state.switch_controller_type.iter().enumerate() {

@@ -204,14 +204,14 @@ impl Default for EmulationFrame {
 #[derive(serde::Serialize, serde::Deserialize)]
 pub(crate) struct AudioConfig {
     pub audio_volume: f32,
-    pub target_fps: u16,
+    pub target_fps: f32,
 }
 
 impl Default for AudioConfig {
     fn default() -> Self {
         AudioConfig {
             audio_volume: 1.0,
-            target_fps: DEFAULT_FPS,
+            target_fps: DEFAULT_FPS as  f32,
         }
     }
 }
@@ -228,10 +228,10 @@ impl Config<'_> {
     pub fn get_audio_volume(&self) -> f32 {
         self.config.audio_volume
     }
-    pub fn set_target_fps(&mut self, fps: u16) {
+    pub fn set_target_fps(&mut self, fps: f32) {
         self.config.target_fps = fps;
     }
-    pub fn get_target_fps(&self) -> u16 {
+    pub fn get_target_fps(&self) -> f32 {
         self.config.target_fps
     }
     pub fn set_controller(&mut self, id: ControllerId, controller_type: ControllerType) {
