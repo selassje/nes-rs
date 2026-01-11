@@ -253,7 +253,7 @@ fn handle_io_state(
         }
         #[cfg(not(target_os = "emscripten"))]
         nes.config()
-            .set_target_fps(frontend_control.target_fps as f32);
+            .audio_target_fps(frontend_control.target_fps as f32);
     }
 
     for (i, controller_type) in fontend_state.switch_controller_type.iter().enumerate() {

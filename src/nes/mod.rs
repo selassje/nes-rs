@@ -201,7 +201,7 @@ impl Default for EmulationFrame {
     }
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Clone)]
 pub(crate) struct AudioConfig {
     pub audio_volume: f32,
     pub target_fps: f32,
@@ -217,22 +217,22 @@ impl Default for AudioConfig {
 }
 
 pub struct Config<'a> {
-    config: &'a mut AudioConfig,
+    audio_config: &'a mut AudioConfig,
     controllers: &'a mut Controllers,
 }
 
 impl Config<'_> {
     pub fn set_audio_volume(&mut self, volume: f32) {
-        self.config.audio_volume = volume;
+        self.audio_config.audio_volume = volume;
     }
     pub fn get_audio_volume(&self) -> f32 {
-        self.config.audio_volume
+        self.audio_config.audio_volume
     }
-    pub fn set_target_fps(&mut self, fps: f32) {
-        self.config.target_fps = fps;
+    pub fn audio_target_fps(&mut self, fps: f32) {
+        self.audio_config.target_fps = fps;
     }
-    pub fn get_target_fps(&self) -> f32 {
-        self.config.target_fps
+    pub fn get_audio_target_fps(&self) -> f32 {
+        self.audio_config.target_fps
     }
     pub fn set_controller(&mut self, id: ControllerId, controller_type: ControllerType) {
         self.controllers.set_controller(id, controller_type);
@@ -258,7 +258,8 @@ pub struct Nes {
     apu: Apu,
     controllers: Controllers,
     mapper: MapperEnum,
-    config: AudioConfig,
+    #[serde(skip, default)]
+    audio_config: AudioConfig,
     #[serde(skip, default)]
     emulation_frame: EmulationFrame,
 }
@@ -273,7 +274,7 @@ impl Nes {
             apu: Apu::new(),
             controllers: Controllers::new(),
             mapper: MapperEnum::MapperNull(MapperNull::new()),
-            config: AudioConfig::default(),
+            audio_config: AudioConfig::default(),
             emulation_frame: EmulationFrame::default(),
         }
     }
@@ -291,7 +292,7 @@ impl Nes {
 
     pub fn config(&mut self) -> Config<'_> {
         Config {
-            config: &mut self.config,
+            audio_config: &mut self.audio_config,
             controllers: &mut self.controllers,
         }
     }
@@ -319,8 +320,9 @@ impl Nes {
                 new_nes.version,
             ));
         }
-
+        let old_audio_config = self.audio_config.clone();
         *self = new_nes;
+        self.audio_config = old_audio_config;
         Ok(())
     }
 
@@ -348,13 +350,13 @@ impl Nes {
     {
         let callback = callback.as_option();
         self.emulation_frame.audio.reset();
+        self.apu.reset_audio_buffer();
         let current_frame = self.ppu.get_time().frame;
         while self.ppu.get_time().frame == current_frame {
             self.run_single_cpu_cycle(callback)?;
         }
         self.controllers
             .update_zappers(&self.emulation_frame, self.ppu.get_time().frame);
-        self.apu.reset_audio_buffer();
         Ok(&self.emulation_frame)
     }
 
@@ -373,7 +375,7 @@ impl Nes {
             ram: &mut self.ram,
             mapper: &mut self.mapper,
             emulation_frame: &mut self.emulation_frame,
-            config: &self.config,
+            config: &self.audio_config,
         };
         self.apu.run_single_cpu_cycle(&mut apu_bus);
         let mut cpu_bus = cpu_bus!(self, callback);

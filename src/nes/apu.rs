@@ -661,14 +661,13 @@ impl Dmc {
     }
 }
 
-#[derive(Serialize, Deserialize)]
-struct AudioBuffer {
+struct SampleProcessor {
     phase: f64,
     acc: f64,
     acc_count: f64,
 }
 
-impl AudioBuffer {
+impl SampleProcessor {
     pub fn new() -> Self {
         Self {
             phase: 0.0,
@@ -676,7 +675,7 @@ impl AudioBuffer {
             acc_count: 0.0,
         }
     }
-    pub fn add_sample(
+    pub fn process_sample(
         &mut self,
         sample: f32,
         emulation_frame: &mut EmulationFrame,
@@ -701,7 +700,7 @@ impl AudioBuffer {
         self.acc_count = 0.0;
     }
 }
-impl Default for AudioBuffer {
+impl Default for SampleProcessor {
     fn default() -> Self {
         Self::new()
     }
@@ -722,7 +721,8 @@ pub struct Apu {
     frame: u128,
     pending_reset_cycle: Option<u16>,
     irq_flag_setting_in_progress: bool,
-    audio_buffer: AudioBuffer,
+    #[serde(skip)]
+    audio_buffer: SampleProcessor,
 }
 
 impl Default for Apu {
@@ -741,7 +741,7 @@ impl Default for Apu {
             frame: 1,
             pending_reset_cycle: None,
             irq_flag_setting_in_progress: false,
-            audio_buffer: AudioBuffer::new(),
+            audio_buffer: SampleProcessor::new(),
         }
     }
 }
@@ -762,7 +762,7 @@ impl Apu {
             frame: 1,
             pending_reset_cycle: None,
             irq_flag_setting_in_progress: false,
-            audio_buffer: AudioBuffer::new(),
+            audio_buffer: SampleProcessor::new(),
         }
     }
 
@@ -898,7 +898,7 @@ impl Apu {
             self.dmc.get_sample(),
         );
         self.audio_buffer
-            .add_sample(sample, bus.emulation_frame, bus.config);
+            .process_sample(sample, bus.emulation_frame, bus.config);
     }
 
     fn get_mixer_output(pulse_1: u8, pulse_2: u8, triangle: u8, noise: u8, dmc: u8) -> f32 {
