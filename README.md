@@ -34,7 +34,7 @@ Down | S | Down Arrow
 Left | A | Left Arrow
 Right | D | Right Arrow
 
-# building the forntend
+# building the frontend
 
 The CI tested targets are **x86_64-pc-windows-msvc** and **x86_64-unknown-linux-gnu** 
 
