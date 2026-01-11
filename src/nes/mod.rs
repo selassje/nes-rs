@@ -228,7 +228,7 @@ impl Config<'_> {
     pub fn get_audio_volume(&self) -> f32 {
         self.audio_config.audio_volume
     }
-    pub fn audio_target_fps(&mut self, fps: f32) {
+    pub fn set_audio_target_fps(&mut self, fps: f32) {
         self.audio_config.target_fps = fps;
     }
     pub fn get_audio_target_fps(&self) -> f32 {
