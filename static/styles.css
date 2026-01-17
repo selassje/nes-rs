@@ -79,29 +79,37 @@ input[type="file"] {
   display: none;
 }
 
-/* Save files */
-#download_save_files h3 {
+/* File lists (ROMs and Saves) */
+#download_save_files h3,
+#download_rom_files h3 {
   margin: 12px 0 6px;
   color: var(--accent);
   font-size: 10px;
 }
 
-#download_list {
+#download_list,
+#rom_list {
   list-style: none;
   padding: 0;
   margin: 0;
 }
 
-#download_list li {
+#download_list li,
+#rom_list li {
   margin-bottom: 6px;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-#download_list a {
+#download_list a,
+#download_list span,
+#rom_list span {
   color: #00ff66;
   text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Action buttons for save states (play, delete) */

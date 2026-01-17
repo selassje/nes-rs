@@ -235,10 +235,20 @@ impl Gui {
     }
 
     pub fn get_rom_path(&mut self) -> Option<String> {
+        #[cfg(target_os = "emscripten")]
+        {
+            let load_request_path = std::path::Path::new("roms/.load_request");
+            if load_request_path.exists() {
+                if let Ok(filename) = std::fs::read_to_string(load_request_path) {
+                    let _ = std::fs::remove_file(load_request_path);
+                    let full_path = format!("roms/{}", filename.trim());
+                    return Some(full_path);
+                }
+            }
+        }
         self.nes_file_path.take()
     }
     pub fn get_save_state_path(&mut self) -> Option<String> {
-        // Check for web save request file (from save button in browser)
         #[cfg(target_os = "emscripten")]
         {
             let save_request_path = std::path::Path::new("saves/.save_request");
@@ -253,7 +263,6 @@ impl Gui {
         self.save_state_path.take()
     }
     pub fn get_load_state_path(&mut self) -> Option<String> {
-        // Check for web load request file (from play button in browser)
         #[cfg(target_os = "emscripten")]
         {
             let load_request_path = std::path::Path::new("saves/.load_request");
