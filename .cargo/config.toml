@@ -5,4 +5,5 @@ rustflags = [
     "-C", "link-arg=-sMAX_WEBGL_VERSION=2",
     "-C", "link-arg=-sSTACK_SIZE=4194304",
     "-C", "link-arg=-sINITIAL_HEAP=128mb",
+    "-C", "link-arg=-lidbfs.js",
 ]

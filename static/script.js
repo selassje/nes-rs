@@ -12,6 +12,7 @@ function upload_file(file, dir, refreshFn) {
         var buf = new Uint8Array(evt.target.result);
         FS.writeFile(dir + "/" + file.name, buf);
         refreshFn();
+        syncToStorage();
     }
 }
 
@@ -40,6 +41,7 @@ function deleteSaveState(filename) {
         try {
             FS.unlink(`saves/${filename}`);
             refreshSaveFilesList();
+            syncToStorage();
         } catch (e) {
             console.error("Failed to delete file:", e);
         }
@@ -57,6 +59,7 @@ function deleteRom(filename) {
         try {
             FS.unlink(`roms/${filename}`);
             refreshRomFilesList();
+            syncToStorage();
         } catch (e) {
             console.error("Failed to delete file:", e);
         }
@@ -190,18 +193,46 @@ function refreshRomFilesList() {
   alignElements();
 }
 
-FS.rmdir("home/web_user");
-FS.rmdir("home");
-FS.rmdir("tmp");
-FS.mkdir("roms");
-FS.mkdir("saves");
+// Function to save to IndexedDB (call after file changes)
+function syncToStorage() {
+    FS.syncfs(false, function (err) {
+        if (err) {
+            console.error("Error saving to persistent storage:", err);
+        }
+    });
+}
 
-document.querySelector("#upload_nes_file").addEventListener("change", upload_nes_file, false);
-document.querySelector("#upload_save_file").addEventListener("change", upload_save_file, false);
+// Initialize filesystem after Emscripten runtime is ready
+Module.onRuntimeInitialized = function() {
+    FS.rmdir("home/web_user");
+    FS.rmdir("home");
+    FS.rmdir("tmp");
+    FS.mkdir("roms");
+    FS.mkdir("saves");
 
-alignElements();
-refreshRomFilesList();
-refreshSaveFilesList();
+    // Mount IDBFS for persistent storage
+    FS.mount(IDBFS, {}, "/roms");
+    FS.mount(IDBFS, {}, "/saves");
+
+    // Sync from IndexedDB to memory (populate=true means load from DB)
+    FS.syncfs(true, function (err) {
+        if (err) {
+            console.error("Error loading persistent storage:", err);
+        } else {
+            console.log("Persistent storage loaded");
+            refreshRomFilesList();
+            refreshSaveFilesList();
+        }
+    });
+
+    // Periodic sync to catch saves done by the emulator (Rust side)
+    setInterval(syncToStorage, 5000);
+
+    document.querySelector("#upload_nes_file").addEventListener("change", upload_nes_file, false);
+    document.querySelector("#upload_save_file").addEventListener("change", upload_save_file, false);
+
+    alignElements();
+};
 
 document.addEventListener("contextmenu", (e) => {
   if (e.target.tagName === "CANVAS") {
