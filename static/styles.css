@@ -94,11 +94,43 @@ input[type="file"] {
 
 #download_list li {
   margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 #download_list a {
   color: #00ff66;
   text-decoration: none;
+}
+
+/* Play button for save states */
+.play-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 4px;
+  background: var(--panel-light);
+  border: 2px solid var(--border);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.play-btn:hover {
+  background: #3a3a3a;
+  border-color: var(--accent);
+}
+
+.play-btn:active {
+  transform: translate(1px, 1px);
+}
+
+.play-btn img {
+  width: 10px;
+  height: 10px;
+  filter: invert(1);
 }
 
 /* Main content */

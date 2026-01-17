@@ -23,6 +23,12 @@ function upload_save_file() {
     upload_file(this.files[0], "saves");
 }
 
+function loadSaveState(filename) {
+    // Write the filename to a special file that the emulator will check
+    const encoder = new TextEncoder();
+    FS.writeFile("saves/.load_request", encoder.encode(filename));
+}
+
 function alignElements() {
     var bodyWidth = document.querySelector('body').clientWidth;
     var sideWidth = document.querySelector('#sidenav').clientWidth;
@@ -52,16 +58,27 @@ function refreshDownloadList() {
 
   save_files.forEach(file => {
       const li = document.createElement("li");
-      const link = document.createElement("a");
 
+      // Play button
+      const playBtn = document.createElement("button");
+      playBtn.className = "play-btn";
+      playBtn.title = "Load this save state";
+      playBtn.onclick = () => loadSaveState(file);
+
+      const playIcon = document.createElement("img");
+      playIcon.src = "img/play-svgrepo-com.svg";
+      playBtn.appendChild(playIcon);
+
+      // Download link
+      const link = document.createElement("a");
       const fileContent = FS.readFile(`saves/${file}`);
       link.href = URL.createObjectURL(
           new Blob([fileContent], { type: "application/octet-stream" })
       );
-
       link.download = file;
       link.textContent = file;
 
+      li.appendChild(playBtn);
       li.appendChild(link);
       ul.appendChild(li);
   });
