@@ -29,6 +29,23 @@ function loadSaveState(filename) {
     FS.writeFile("saves/.load_request", encoder.encode(filename));
 }
 
+function saveState(filename) {
+    // Write the filename to a special file that the emulator will check to trigger a save
+    const encoder = new TextEncoder();
+    FS.writeFile("saves/.save_request", encoder.encode(filename));
+}
+
+function deleteSaveState(filename) {
+    if (confirm(`Delete save file "${filename}"?`)) {
+        try {
+            FS.unlink(`saves/${filename}`);
+            refreshDownloadList();
+        } catch (e) {
+            console.error("Failed to delete file:", e);
+        }
+    }
+}
+
 function alignElements() {
     var bodyWidth = document.querySelector('body').clientWidth;
     var sideWidth = document.querySelector('#sidenav').clientWidth;
@@ -61,13 +78,33 @@ function refreshDownloadList() {
 
       // Play button
       const playBtn = document.createElement("button");
-      playBtn.className = "play-btn";
+      playBtn.className = "save-action-btn play-btn";
       playBtn.title = "Load this save state";
       playBtn.onclick = () => loadSaveState(file);
 
       const playIcon = document.createElement("img");
       playIcon.src = "img/play-svgrepo-com.svg";
       playBtn.appendChild(playIcon);
+
+      // Save button
+      const saveBtn = document.createElement("button");
+      saveBtn.className = "save-action-btn save-btn";
+      saveBtn.title = "Overwrite this save state";
+      saveBtn.onclick = () => saveState(file);
+
+      const saveIcon = document.createElement("img");
+      saveIcon.src = "img/save-svgrepo-com.svg";
+      saveBtn.appendChild(saveIcon);
+
+      // Delete button
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "save-action-btn delete-btn";
+      deleteBtn.title = "Delete this save state";
+      deleteBtn.onclick = () => deleteSaveState(file);
+
+      const deleteIcon = document.createElement("img");
+      deleteIcon.src = "img/delete-svgrepo-com.svg";
+      deleteBtn.appendChild(deleteIcon);
 
       // Download link
       const link = document.createElement("a");
@@ -79,6 +116,8 @@ function refreshDownloadList() {
       link.textContent = file;
 
       li.appendChild(playBtn);
+      li.appendChild(saveBtn);
+      li.appendChild(deleteBtn);
       li.appendChild(link);
       ul.appendChild(li);
   });

@@ -104,8 +104,8 @@ input[type="file"] {
   text-decoration: none;
 }
 
-/* Play button for save states */
-.play-btn {
+/* Action buttons for save states (play, delete) */
+.save-action-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -118,19 +118,34 @@ input[type="file"] {
   flex-shrink: 0;
 }
 
-.play-btn:hover {
+.save-action-btn:hover {
   background: #3a3a3a;
-  border-color: var(--accent);
 }
 
-.play-btn:active {
+.save-action-btn:active {
   transform: translate(1px, 1px);
 }
 
-.play-btn img {
+.save-action-btn img {
   width: 10px;
   height: 10px;
   filter: invert(1);
+}
+
+.play-btn:hover {
+  border-color: #00ff66;
+}
+
+.save-btn:hover {
+  border-color: #ffcc00;
+}
+
+.delete-btn:hover {
+  border-color: var(--accent);
+}
+
+.delete-btn:hover img {
+  filter: invert(48%) sepia(79%) saturate(2476%) hue-rotate(336deg) brightness(100%) contrast(119%);
 }
 
 /* Main content */

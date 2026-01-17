@@ -238,6 +238,18 @@ impl Gui {
         self.nes_file_path.take()
     }
     pub fn get_save_state_path(&mut self) -> Option<String> {
+        // Check for web save request file (from save button in browser)
+        #[cfg(target_os = "emscripten")]
+        {
+            let save_request_path = std::path::Path::new("saves/.save_request");
+            if save_request_path.exists() {
+                if let Ok(filename) = std::fs::read_to_string(save_request_path) {
+                    let _ = std::fs::remove_file(save_request_path);
+                    let full_path = format!("saves/{}", filename.trim());
+                    return Some(full_path);
+                }
+            }
+        }
         self.save_state_path.take()
     }
     pub fn get_load_state_path(&mut self) -> Option<String> {
