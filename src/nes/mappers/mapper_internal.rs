@@ -42,6 +42,8 @@ pub(super) struct MapperInternal {
 
 impl MapperInternal {
     pub fn new(_prg_rom: Vec<u8>, _chr_rom: Vec<u8>) -> Self {
+        assert!(_prg_rom.len() <= PRG_ROM_DATA_SIZE);
+        assert!(_chr_rom.len() <= CHR_ROM_DATA_SIZE);
         let mut prg_rom = vec![0u8; PRG_ROM_DATA_SIZE];
         let mut chr_rom = vec![0u8; CHR_ROM_DATA_SIZE];
 
@@ -63,7 +65,9 @@ impl MapperInternal {
     }
 
     pub fn get_prg_rom_byte(&self, address: u16, bank: usize, prg_bank_size: BankSize) -> u8 {
-        let index = Self::get_address_index(address, bank, prg_bank_size);
+        let bank_count = self.prg_rom_size / prg_bank_size as usize;
+        let masked_bank = if bank_count > 0 { bank % bank_count } else { 0 };
+        let index = Self::get_address_index(address, masked_bank, prg_bank_size);
         self.prg_rom[index]
     }
 
