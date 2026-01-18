@@ -92,8 +92,7 @@ impl MapperInternal {
         self.prg_rom_size / prg_bank_size as usize
     }
 
-    pub fn reset(&mut self) {
+    pub fn power_cycle(&mut self) {
         self.chr_ram.iter_mut().for_each(|m| *m = 0);
-        self.prg_ram.iter_mut().for_each(|m| *m = 0);
     }
 }

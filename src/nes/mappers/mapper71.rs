@@ -45,7 +45,7 @@ impl Mapper for Mapper71 {
 
     fn power_cycle(&mut self) {
         self.switchable_prg_rom_bank = 0;
-        self.mapper_internal.reset();
+        self.mapper_internal.power_cycle();
     }
 
     fn store_chr_byte(&mut self, address: u16, byte: u8) {

@@ -41,7 +41,7 @@ impl Mapper for Mapper66 {
     fn power_cycle(&mut self) {
         self.prg_bank = 0;
         self.chr_bank = 0;
-        self.mapper_internal.reset();
+        self.mapper_internal.power_cycle();
     }
 
     fn store_chr_byte(&mut self, address: u16, byte: u8) {

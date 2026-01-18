@@ -1,4 +1,5 @@
 use super::Mapper;
+use super::PRG_RAM_RANGE;
 use super::mapper_internal::BankSize;
 use super::mapper_internal::BankSize::*;
 use super::mapper_internal::MapperInternal;
@@ -82,6 +83,9 @@ impl Mapper for Mapper1 {
     }
 
     fn get_prg_byte(&self, address: u16) -> u8 {
+        if PRG_RAM_RANGE.contains(&address) {
+            return self.mapper_internal.get_prg_ram_byte(address, 0, _8KB);
+        }
         let bank_mode = self.control.get_prg_bank_mode();
         if bank_mode < 2 {
             self.mapper_internal.get_prg_rom_byte(
@@ -112,6 +116,12 @@ impl Mapper for Mapper1 {
     }
 
     fn store_prg_byte(&mut self, address: u16, byte: u8) {
+        if PRG_RAM_RANGE.contains(&address) {
+            self.mapper_internal
+                .store_prg_ram_byte(address, 0, _8KB, byte);
+            return;
+        }
+
         if byte & 0b1000_0000 != 0 {
             self.shift_register = Default::default();
             self.control |= 0x0C;
@@ -139,7 +149,7 @@ impl Mapper for Mapper1 {
     }
 
     fn power_cycle(&mut self) {
-        self.mapper_internal.reset();
+        self.mapper_internal.power_cycle();
         self.control = 0x0C;
         self.chr_bank_0 = 0;
         self.chr_bank_1 = 0;

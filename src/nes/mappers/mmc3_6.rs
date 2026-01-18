@@ -1,16 +1,11 @@
-use std::ops::Range;
-
 use super::Mapper;
+use super::PRG_RAM_RANGE;
 use super::mapper_internal::BankSelect;
 use super::mapper_internal::BankSize::*;
 use super::mapper_internal::MapperInternal;
 use crate::nes::common::Mirroring;
-use serde::{Deserialize, Serialize};
 
-const PRG_RAM_RANGE: Range<u16> = Range {
-    start: 0x6000,
-    end: 0x8000,
-};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub(super) enum MMC3_6Variant {
@@ -246,7 +241,7 @@ impl Mapper for MMC3_6 {
     }
 
     fn power_cycle(&mut self) {
-        self.mapper_internal.reset();
+        self.mapper_internal.power_cycle();
         self.init_bank_mapping();
         self.bank_select = 0;
         self.bank_data = 0;

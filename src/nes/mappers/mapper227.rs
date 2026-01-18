@@ -126,6 +126,6 @@ impl Mapper for Mapper227 {
 
     fn power_cycle(&mut self) {
         self.register = 0;
-        self.mapper_internal.reset();
+        self.mapper_internal.power_cycle();
     }
 }
