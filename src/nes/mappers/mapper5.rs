@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 
 const PRG_MODE_SELECTION_REGISTER: u16 = 0x5100;
 const CHR_MODE_SELECTION_REGISTER: u16 = 0x5101;
+const PRG_RAM_PROTECT_REGISTER_1: u16 = 0x5102;
+const PRG_RAM_PROTECT_REGISTER_2: u16 = 0x5103;
 
 #[derive(Serialize, Deserialize)]
 pub struct Mapper5 {
@@ -13,6 +15,8 @@ pub struct Mapper5 {
     mirroring: Mirroring,
     prg_selection_mode: u8,
     chr_selection_mode: u8,
+    prg_ram_protect_1: u8,
+    prg_ram_protect_2: u8,
 }
 
 impl Mapper5 {
@@ -23,14 +27,20 @@ impl Mapper5 {
             mirroring,
             prg_selection_mode: 3,
             chr_selection_mode: 3,
+            prg_ram_protect_1: 0,
+            prg_ram_protect_2: 0,
         }
+    }
+
+    fn is_prg_ram_writable(&self) -> bool {
+        (self.prg_ram_protect_1 & 0b11) == 0b10 && (self.prg_ram_protect_2 & 0b11) == 0b01
     }
 }
 
 impl Mapper for Mapper5 {
     fn get_chr_byte(&self, address: u16) -> u8 {
         self.mapper_internal
-           .get_chr_byte(address, 0, super::mapper_internal::BankSize::_8KB)
+            .get_chr_byte(address, 0, super::mapper_internal::BankSize::_8KB)
     }
 
     fn store_prg_byte(&mut self, address: u16, byte: u8) {
@@ -40,6 +50,12 @@ impl Mapper for Mapper5 {
             }
             CHR_MODE_SELECTION_REGISTER => {
                 self.chr_selection_mode = byte & 0b11;
+            }
+            PRG_RAM_PROTECT_REGISTER_1 => {
+                self.prg_ram_protect_1 = byte;
+            }
+            PRG_RAM_PROTECT_REGISTER_2 => {
+                self.prg_ram_protect_2 = byte;
             }
             _ => {}
         }
