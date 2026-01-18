@@ -29,6 +29,9 @@ const PRG_RAM_RANGE: std::ops::Range<u16> = std::ops::Range {
     start: 0x6000,
     end: 0x8000,
 };
+
+const PRG_RANGE: std::ops::RangeInclusive<u16> = 0x6000..=0xFFFF;
+
 #[enum_dispatch::enum_dispatch(MapperEnum)]
 pub trait Mapper {
     fn get_chr_byte(&self, address: u16) -> u8;

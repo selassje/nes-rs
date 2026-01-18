@@ -1,6 +1,10 @@
 use super::Mapper;
+use super::mapper_internal::BankSize;
 use super::mapper_internal::MapperInternal;
 use crate::nes::common::Mirroring;
+use crate::nes::mappers::PRG_RAM_RANGE;
+use crate::nes::mappers::PRG_RANGE;
+use BankSize::*;
 
 use serde::{Deserialize, Serialize};
 
@@ -25,34 +29,25 @@ pub struct Mapper5 {
     bank_registers: [u8; 5],
 }
 
-enum PrgBankType {
+enum PrgBankRegisterType {
     Rom,
     Ram,
     RomRam,
 }
 
-struct BankRegister {
+const PRG_BANK_REGISTER_TYPES: [PrgBankRegisterType; 5] = [
+    PrgBankRegisterType::Ram,
+    PrgBankRegisterType::RomRam,
+    PrgBankRegisterType::RomRam,
+    PrgBankRegisterType::RomRam,
+    PrgBankRegisterType::Rom,
+];
+
+#[derive(Debug)]
+struct PrgBankRegister {
     bank: u8,
     ce: bool,
     rom: bool,
-}
-
-fn decode_bank_register(byte: u8, address: u16, mode: u8) -> BankRegister {
-    assert!(address >= PRG_BANK_REGISTER_1 && address <= PRG_BANK_REGISTER_5);
-    let mut bank_register = BankRegister {
-        bank: byte & 0b0011_1111,
-        ce: (byte & 0b0000_0100) != 0,
-        rom: (byte & 0b1000_0000) != 0,
-    };
-    if address == PRG_BANK_REGISTER_1 {
-        bank_register.bank &= 0b0000_1111;
-        bank_register.rom =  false;
-    }
-
-
-
-
-    bank_register
 }
 
 impl Mapper5 {
@@ -65,8 +60,47 @@ impl Mapper5 {
             chr_selection_mode: 3,
             prg_ram_protect_1: 0,
             prg_ram_protect_2: 0,
-            bank_registers: [0; 5],
+            bank_registers: [0xFF; 5],
         }
+    }
+
+    fn get_prg_bank_register_index_and_size(&self, address: u16) -> (usize, BankSize) {
+        let index_8_kb = (address - PRG_RAM_RANGE.start) / _8KB as u16;
+        const INDEX_AND_MODE_TO_REGISTER_AND_SIZE: [[(usize, BankSize); 5]; 4] = [
+            [(0, _8KB), (4, _32KB), (4, _32KB), (4, _32KB), (4, _32KB)],
+            [(0, _8KB), (2, _16KB), (2, _16KB), (4, _16KB), (4, _16KB)],
+            [(0, _8KB), (2, _16KB), (2, _16KB), (3, _8KB), (4, _8KB)],
+            [(0, _8KB), (1, _8KB), (2, _8KB), (3, _8KB), (4, _8KB)],
+        ];
+        INDEX_AND_MODE_TO_REGISTER_AND_SIZE[self.prg_selection_mode as usize][index_8_kb as usize]
+    }
+
+    fn decode_prg_bank_register(
+        &self,
+        index: u8,
+        bank_size: BankSize,
+        address: u16,
+    ) -> PrgBankRegister {
+        let byte = self.bank_registers[index as usize];
+        let mut bank_register = PrgBankRegister {
+            bank: byte & 0b0011_1111,
+            ce: (byte & 0b0000_0100) != 0,
+            rom: (byte & 0b1000_0000) != 0,
+        };
+        if index == 0 {
+            bank_register.bank &= 0b0000_1111;
+            bank_register.rom = false;
+        }
+        if bank_size == _16KB {
+            bank_register.bank &= 0b0001_1110;
+            bank_register.bank |= address as u8 & 0b0000_0001;
+        }
+        if bank_size == _32KB {
+            bank_register.bank &= 0b0001_1100;
+            bank_register.bank |= address as u8 & 0b0000_0011;
+        }
+
+        bank_register
     }
 
     fn is_prg_ram_writable(&self) -> bool {
@@ -98,25 +132,61 @@ impl Mapper for Mapper5 {
                 let index = (address - PRG_BANK_REGISTER_1) as usize;
                 self.bank_registers[index] = byte;
             }
+            address if PRG_RANGE.contains(&address) => {
+                let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
+                let bank_register = self.decode_prg_bank_register(index as u8, bank_size, address);
+                let can_be_ram = matches!(
+                    PRG_BANK_REGISTER_TYPES[index],
+                    PrgBankRegisterType::Ram | PrgBankRegisterType::RomRam
+                );
+                if can_be_ram && self.is_prg_ram_writable() && !bank_register.rom && !bank_register.ce {
+                    self.mapper_internal.store_prg_ram_byte(
+                        address,
+                        bank_register.bank as usize,
+                        bank_size,
+                        byte,
+                    );
+                } else {
+                    println!(
+                        "Mapper5: Ignored write to PRG address {:04X} with bank register {:?}, index={} Type={} RAMProtected={} ",
+                        address,
+                        bank_register,
+                        index,
+                        match PRG_BANK_REGISTER_TYPES[index] {
+                            PrgBankRegisterType::Rom => "ROM",
+                            PrgBankRegisterType::Ram => "RAM",
+                            PrgBankRegisterType::RomRam => "ROM/RAM",
+                        },
+                        self.is_prg_ram_writable()
+                    );
+                }
+            }
             _ => {}
         }
     }
     fn store_chr_byte(&mut self, _address: u16, _byte: u8) {}
 
     fn get_prg_byte(&self, address: u16) -> u8 {
-        let bank = match self.prg_selection_mode {
-            0 => 0,
-            1 => 1,
-            2 => 2,
-            3 => {
-                self.mapper_internal
-                    .get_prg_rom_bank_count(super::mapper_internal::BankSize::_8KB)
-                    - 1
+        match address {
+            address if PRG_RANGE.contains(&address) => {
+                let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
+                let bank_register = self.decode_prg_bank_register(index as u8, bank_size, address);
+                if bank_register.rom {
+                    self.mapper_internal.get_prg_rom_byte(
+                        address,
+                        bank_register.bank as usize,
+                        bank_size,
+                    )
+                } else {
+                    self.mapper_internal.get_prg_ram_byte(
+                        address,
+                        bank_register.bank as usize,
+                        bank_size,
+                    )
+                }
             }
-            _ => panic!("Unsupported PRG selection mode {}", self.prg_selection_mode),
-        };
-        self.mapper_internal
-            .get_prg_rom_byte(address, bank, super::mapper_internal::BankSize::_8KB)
+            _ => 0,
+        }
     }
     fn get_mirroring(&self) -> crate::nes::common::Mirroring {
         self.mirroring
