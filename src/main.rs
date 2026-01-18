@@ -218,7 +218,7 @@ fn handle_io_state(
             .unwrap();
         #[cfg(target_os = "emscripten")]
         unsafe {
-            let script = std::ffi::CString::new("refreshDownloadList();").unwrap();
+            let script = std::ffi::CString::new("refreshSaveFilesList();").unwrap();
             emscripten_run_script(script.as_ptr());
         };
     }
