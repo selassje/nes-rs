@@ -37,7 +37,7 @@
     {
       "label": "build_dev",
       "type": "shell",
-      "command": "cargo build",
+      "command": "cargo build --features=frontend",
       "group": {
         "kind": "build"
       }

@@ -4,11 +4,15 @@ use crate::nes::common::Mirroring;
 
 use serde::{Deserialize, Serialize};
 
+const PRG_MODE_SELECTION_REGISTER: u16 = 0x5100;
+const CHR_MODE_SELECTION_REGISTER: u16 = 0x5101;
+
 #[derive(Serialize, Deserialize)]
 pub struct Mapper5 {
     mapper_internal: MapperInternal,
     mirroring: Mirroring,
     prg_selection_mode: u8,
+    chr_selection_mode: u8,
 }
 
 impl Mapper5 {
@@ -18,6 +22,7 @@ impl Mapper5 {
             mapper_internal,
             mirroring,
             prg_selection_mode: 3,
+            chr_selection_mode: 3,
         }
     }
 }
@@ -25,13 +30,20 @@ impl Mapper5 {
 impl Mapper for Mapper5 {
     fn get_chr_byte(&self, address: u16) -> u8 {
         self.mapper_internal
-            .get_chr_byte(address, 0, super::mapper_internal::BankSize::_8KB)
+           .get_chr_byte(address, 0, super::mapper_internal::BankSize::_8KB)
     }
 
-    fn store_prg_byte(&mut self, _: u16, byte: u8) {
-        self.prg_selection_mode = byte & 0b11;
+    fn store_prg_byte(&mut self, address: u16, byte: u8) {
+        match address {
+            PRG_MODE_SELECTION_REGISTER => {
+                self.prg_selection_mode = byte & 0b11;
+            }
+            CHR_MODE_SELECTION_REGISTER => {
+                self.chr_selection_mode = byte & 0b11;
+            }
+            _ => {}
+        }
     }
-
     fn store_chr_byte(&mut self, _address: u16, _byte: u8) {}
 
     fn get_prg_byte(&self, address: u16) -> u8 {

@@ -1,0 +1,13 @@
+{
+  "configurations": [
+    {
+      "name": "Debug NES-RS",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/target/debug/nes-rs",
+      "args": ["..\\nes-games\\Castlevania III - Dracula's Curse (USA)\\Castlevania III - Dracula's Curse (USA).nes"],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "build_dev",
+    }
+  ]
+}
