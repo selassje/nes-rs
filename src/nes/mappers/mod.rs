@@ -5,6 +5,7 @@ mod mapper1;
 mod mapper2;
 mod mapper227;
 mod mapper4;
+mod mapper5;
 mod mapper66;
 mod mapper7;
 mod mapper71;
@@ -18,6 +19,7 @@ pub use self::mapper0::Mapper0;
 pub use self::mapper1::Mapper1;
 pub use self::mapper2::Mapper2;
 pub use self::mapper4::Mapper4;
+pub use self::mapper5::Mapper5;
 pub use self::mapper7::Mapper7;
 pub use self::mapper66::Mapper66;
 pub use self::mapper71::Mapper71;
@@ -53,6 +55,7 @@ pub enum MapperEnum {
     Mapper1(self::mapper1::Mapper1),
     Mapper2(self::mapper2::Mapper2),
     Mapper4(self::mapper4::Mapper4),
+    Mapper5(self::mapper5::Mapper5),
     Mapper7(self::mapper7::Mapper7),
     Mapper66(self::mapper66::Mapper66),
     Mapper71(self::mapper71::Mapper71),
