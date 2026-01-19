@@ -27,7 +27,10 @@ pub struct Mapper5 {
     prg_ram_protect_2: u8,
     bank_registers: [u8; 5],
     scanline_compare_value: u8,
+    scanline_counter: u8,
     scanline_irq_enabled: bool,
+    scanline_irq_pending: bool,
+    in_frame: bool,
 }
 
 #[derive(PartialEq)]
@@ -63,7 +66,10 @@ impl Mapper5 {
             prg_ram_protect_2: 0,
             bank_registers: [0xFF; 5],
             scanline_compare_value: 0,
-            scanline_irq_enabled : false,
+            scanline_counter: 0,
+            scanline_irq_enabled: false,
+            scanline_irq_pending: false,
+            in_frame: false,
         }
     }
 
@@ -175,6 +181,17 @@ impl Mapper for Mapper5 {
 
     fn get_prg_byte(&mut self, address: u16) -> u8 {
         match address {
+            IRQ_SCANLINE_STATUS_REGISTER => {
+                let mut byte: u8 = 0;
+                if self.scanline_irq_pending {
+                    byte |= 0b1000_0000;
+                }
+                if self.in_frame {
+                    byte |= 0b0100_0000
+                }
+                self.scanline_irq_pending = false;
+                byte
+            }
             address if PRG_RANGE.contains(&address) => {
                 let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
                 let bank_register = self.decode_prg_bank_register(index as u8, bank_size, address);
@@ -206,9 +223,28 @@ impl Mapper for Mapper5 {
         self.prg_ram_protect_2 = 0;
         self.bank_registers = [0xFF; 5];
         self.scanline_compare_value = 0;
+        self.scanline_counter = 0;
         self.scanline_irq_enabled = false;
+        self.scanline_irq_pending = false;
+        self.in_frame = false;
         self.mapper_internal.power_cycle();
     }
 
-    fn notify_scanline(&mut self) {}
+    fn notify_scanline(&mut self) {
+        if !self.in_frame {
+            self.in_frame = true;
+            self.scanline_counter = 0;
+        } else {
+            self.scanline_counter += 1;
+            if self.scanline_compare_value != 0
+                && self.scanline_counter == self.scanline_compare_value
+            {
+                self.scanline_irq_pending = true;
+            }
+        }
+    }
+
+    fn is_irq_pending(&self) -> bool {
+        self.scanline_irq_enabled && self.scanline_irq_pending
+    }
 }
