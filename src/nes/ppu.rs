@@ -804,9 +804,11 @@ impl Ppu {
     }
 
     fn update_vblank_flag_and_nmi(&mut self) {
+    //    println!("update_vblank: suppressed={}", self.vbl_flag_supressed);
         if !self.vbl_flag_supressed {
             self.status_reg
                 .set_flag(StatusRegisterFlag::VerticalBlankStarted, true);
+          //  println!("VBLANK FLAG SET!");
             if self.control_reg.is_generate_nmi_enabled() {
                 self.vbl_flag_supressed = true;
                 self.nmi_pending = true;
@@ -914,6 +916,13 @@ impl ReadPpuRegisters for Ppu {
                 }
                 self.write_toggle = false;
                 let current_status = self.status_reg.value;
+            /*
+                println!(
+                    "$2002 read: value={:02X} vblank={}",
+                    current_status,
+                    (current_status & 0x80) != 0
+                );
+                */
                 self.status_reg
                     .set_flag(StatusRegisterFlag::VerticalBlankStarted, false);
                 current_status

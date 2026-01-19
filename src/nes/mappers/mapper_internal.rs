@@ -79,17 +79,18 @@ impl MapperInternal {
         self.prg_ram[Self::get_address_index(address, bank, bank_size)] = byte
     }
 
-    pub fn get_chr_byte(&self, address: u16, bank: usize, chr_bank_size: BankSize) -> u8 {
+    pub fn get_chr_byte(&self, address: u16, bank: usize, bank_size: BankSize) -> u8 {
+        let index = Self::get_address_index(address, bank, bank_size);
         if self.chr_rom_size == 0 {
-            self.chr_ram[address as usize]
+            self.chr_ram[index]
         } else {
-            let index = Self::get_address_index(address, bank, chr_bank_size);
             self.chr_rom[index]
         }
     }
 
-    pub fn store_chr_byte(&mut self, address: u16, _: usize, _: BankSize, byte: u8) {
-        self.chr_ram[address as usize] = byte;
+    pub fn store_chr_byte(&mut self, address: u16, bank: usize,  bank_size: BankSize, byte: u8) {
+        let index = Self::get_address_index(address, bank, bank_size);
+        self.chr_ram[index] = byte;
     }
 
     pub fn get_prg_rom_bank_count(&self, prg_bank_size: BankSize) -> usize {
