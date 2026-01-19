@@ -173,7 +173,7 @@ impl Mapper for Mapper5 {
                 }
             }
             _ => {
-                println!("Unknown adress {:04X}", address)
+                println!("Store prg byte: Unknown address ${:04X}", address)
             }
         }
     }
@@ -209,7 +209,10 @@ impl Mapper for Mapper5 {
                     )
                 }
             }
-            _ => 0,
+            _ => {
+                println!("Get prg byte : Unknown address ${:04X}", address);
+                0
+            }
         }
     }
     fn get_mirroring(&self) -> crate::nes::common::Mirroring {
