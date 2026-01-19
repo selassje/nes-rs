@@ -592,6 +592,7 @@ impl Ppu {
                 ACTIVE_PIXELS_CYCLE_START..=ACTIVE_PIXELS_CYCLE_END => {
                     self.render_pixel(bus);
                     if self.is_rendering_enabled() {
+                        bus.mapper.notify_scanline();
                         self.fetch_next_tile_data(bus);
                     }
                 }

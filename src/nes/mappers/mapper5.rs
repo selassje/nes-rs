@@ -14,6 +14,7 @@ const PRG_RAM_PROTECT_REGISTER_1: u16 = 0x5102;
 const PRG_RAM_PROTECT_REGISTER_2: u16 = 0x5103;
 const PRG_BANK_REGISTER_1: u16 = 0x5113;
 const PRG_BANK_REGISTER_5: u16 = 0x5117;
+const IRQ_SCANLINE_COMPARE_REGISTER: u16 = 0x5203;
 
 #[derive(Serialize, Deserialize)]
 pub struct Mapper5 {
@@ -24,6 +25,7 @@ pub struct Mapper5 {
     prg_ram_protect_1: u8,
     prg_ram_protect_2: u8,
     bank_registers: [u8; 5],
+    scanline_compare_value: u8,
 }
 
 #[derive(PartialEq)]
@@ -58,6 +60,7 @@ impl Mapper5 {
             prg_ram_protect_1: 0,
             prg_ram_protect_2: 0,
             bank_registers: [0xFF; 5],
+            scanline_compare_value: 0,
         }
     }
 
@@ -89,7 +92,7 @@ impl Mapper5 {
         }
         if bank_size == _16KB {
             bank_register.bank &= 0b0111_1110;
-            bank_register.bank |= ((address >> 13) & 0b0000_0001) as usize; 
+            bank_register.bank |= ((address >> 13) & 0b0000_0001) as usize;
         }
         if bank_size == _32KB {
             bank_register.bank &= 0b0111_1100;
@@ -127,11 +130,16 @@ impl Mapper for Mapper5 {
                 let index = (address - PRG_BANK_REGISTER_1) as usize;
                 self.bank_registers[index] = byte;
             }
+
+            IRQ_SCANLINE_COMPARE_REGISTER => {
+                self.scanline_compare_value = byte;
+            }
+
             address if PRG_RANGE.contains(&address) => {
                 let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
                 let bank_register = self.decode_prg_bank_register(index as u8, bank_size, address);
-                let can_be_ram = PRG_BANK_REGISTER_TYPES[index] !=  PrgBankRegisterType::Rom;
-                if can_be_ram && self.is_prg_ram_writable() && !bank_register.rom  {
+                let can_be_ram = PRG_BANK_REGISTER_TYPES[index] != PrgBankRegisterType::Rom;
+                if can_be_ram && self.is_prg_ram_writable() && !bank_register.rom {
                     self.mapper_internal.store_prg_ram_byte(
                         address,
                         bank_register.bank as usize,
@@ -153,7 +161,9 @@ impl Mapper for Mapper5 {
                     );
                 }
             }
-            _ => {}
+            _ => {
+                println!("Unknown adress {:04X}", address)
+            }
         }
     }
     fn store_chr_byte(&mut self, _address: u16, _byte: u8) {}
@@ -187,7 +197,12 @@ impl Mapper for Mapper5 {
     fn power_cycle(&mut self) {
         self.prg_selection_mode = 3;
         self.chr_selection_mode = 3;
+        self.prg_ram_protect_1 = 0;
+        self.prg_ram_protect_2 = 0;
         self.bank_registers = [0xFF; 5];
+        self.scanline_compare_value = 0;
         self.mapper_internal.power_cycle();
     }
+
+    fn notify_scanline(&mut self) {}
 }

@@ -47,6 +47,8 @@ pub trait Mapper {
         false
     }
 
+    fn notify_scanline(&mut self) {}
+
     fn ppu_a12_rising_edge_triggered(&mut self) {}
 }
 
