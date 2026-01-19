@@ -29,7 +29,7 @@ impl Mapper for Mapper0 {
         self.mapper_internal.get_chr_byte(address, 0, _8KB)
     }
 
-    fn get_prg_byte(&self, address: u16) -> u8 {
+    fn get_prg_byte(&mut self, address: u16) -> u8 {
         if address < 0xC000 {
             self.mapper_internal.get_prg_rom_byte(address, 0, _16KB)
         } else {

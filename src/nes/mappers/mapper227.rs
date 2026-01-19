@@ -92,7 +92,7 @@ impl Mapper227 {
     }
 }
 impl Mapper for Mapper227 {
-    fn get_prg_byte(&self, address: u16) -> u8 {
+    fn get_prg_byte(&mut self, address: u16) -> u8 {
         let bank = if (self.register.get_prg_bank_size() == _32KB
             && self.register.is_mode_1_enabled())
             || address < 0xC000

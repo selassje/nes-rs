@@ -82,7 +82,7 @@ impl Mapper for Mapper1 {
         self.mapper_internal.get_chr_byte(address, bank, bank_size)
     }
 
-    fn get_prg_byte(&self, address: u16) -> u8 {
+    fn get_prg_byte(&mut self, address: u16) -> u8 {
         if PRG_RAM_RANGE.contains(&address) {
             return self.mapper_internal.get_prg_ram_byte(address, 0, _8KB);
         }

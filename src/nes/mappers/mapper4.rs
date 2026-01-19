@@ -26,7 +26,7 @@ impl Mapper for Mapper4 {
     fn get_mirroring(&self) -> Mirroring {
         self.mmc3.get_mirroring()
     }
-    fn get_prg_byte(&self, address: u16) -> u8 {
+    fn get_prg_byte(&mut self, address: u16) -> u8 {
         self.mmc3.get_prg_byte(address)
     }
 

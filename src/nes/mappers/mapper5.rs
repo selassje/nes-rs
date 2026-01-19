@@ -15,6 +15,7 @@ const PRG_RAM_PROTECT_REGISTER_2: u16 = 0x5103;
 const PRG_BANK_REGISTER_1: u16 = 0x5113;
 const PRG_BANK_REGISTER_5: u16 = 0x5117;
 const IRQ_SCANLINE_COMPARE_REGISTER: u16 = 0x5203;
+const IRQ_SCANLINE_STATUS_REGISTER: u16 = 0x5204;
 
 #[derive(Serialize, Deserialize)]
 pub struct Mapper5 {
@@ -26,6 +27,7 @@ pub struct Mapper5 {
     prg_ram_protect_2: u8,
     bank_registers: [u8; 5],
     scanline_compare_value: u8,
+    scanline_irq_enabled: bool,
 }
 
 #[derive(PartialEq)]
@@ -61,6 +63,7 @@ impl Mapper5 {
             prg_ram_protect_2: 0,
             bank_registers: [0xFF; 5],
             scanline_compare_value: 0,
+            scanline_irq_enabled : false,
         }
     }
 
@@ -130,9 +133,11 @@ impl Mapper for Mapper5 {
                 let index = (address - PRG_BANK_REGISTER_1) as usize;
                 self.bank_registers[index] = byte;
             }
-
             IRQ_SCANLINE_COMPARE_REGISTER => {
                 self.scanline_compare_value = byte;
+            }
+            IRQ_SCANLINE_STATUS_REGISTER => {
+                self.scanline_irq_enabled = byte & 0b1000_0000 != 0;
             }
 
             address if PRG_RANGE.contains(&address) => {
@@ -168,7 +173,7 @@ impl Mapper for Mapper5 {
     }
     fn store_chr_byte(&mut self, _address: u16, _byte: u8) {}
 
-    fn get_prg_byte(&self, address: u16) -> u8 {
+    fn get_prg_byte(&mut self, address: u16) -> u8 {
         match address {
             address if PRG_RANGE.contains(&address) => {
                 let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
@@ -201,6 +206,7 @@ impl Mapper for Mapper5 {
         self.prg_ram_protect_2 = 0;
         self.bank_registers = [0xFF; 5];
         self.scanline_compare_value = 0;
+        self.scanline_irq_enabled = false;
         self.mapper_internal.power_cycle();
     }
 

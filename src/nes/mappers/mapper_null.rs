@@ -15,7 +15,7 @@ impl super::Mapper for MapperNull {
         0
     }
 
-    fn get_prg_byte(&self, _address: u16) -> u8 {
+    fn get_prg_byte(&mut self, _address: u16) -> u8 {
         0
     }
 
