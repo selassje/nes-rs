@@ -247,4 +247,10 @@ impl Mapper for Mapper5 {
     fn is_irq_pending(&self) -> bool {
         self.scanline_irq_enabled && self.scanline_irq_pending
     }
+
+    fn notify_vblank(&mut self) {
+        self.in_frame = false;
+        self.scanline_counter = 0;
+        self.scanline_irq_pending = false;
+    }
 }

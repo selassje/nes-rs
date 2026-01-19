@@ -592,7 +592,9 @@ impl Ppu {
                 ACTIVE_PIXELS_CYCLE_START..=ACTIVE_PIXELS_CYCLE_END => {
                     self.render_pixel(bus);
                     if self.is_rendering_enabled() {
-                        bus.mapper.notify_scanline();
+                        if self.ppu_cycle == VBLANK_START_CYCLE {
+                            bus.mapper.notify_scanline();
+                        }
                         self.fetch_next_tile_data(bus);
                     }
                 }
@@ -607,6 +609,7 @@ impl Ppu {
             },
             VBLANK_START_SCANLINE => {
                 if self.ppu_cycle == VBLANK_START_CYCLE {
+                    bus.mapper.notify_vblank();
                     self.update_vblank_flag_and_nmi()
                 }
             }

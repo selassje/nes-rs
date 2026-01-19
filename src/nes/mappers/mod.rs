@@ -48,6 +48,7 @@ pub trait Mapper {
     }
 
     fn notify_scanline(&mut self) {}
+    fn notify_vblank(&mut self) {}
 
     fn ppu_a12_rising_edge_triggered(&mut self) {}
 }
