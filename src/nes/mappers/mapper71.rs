@@ -56,9 +56,9 @@ impl Mapper for Mapper71 {
         match address {
             0x9000..=0x9FFF => {
                 self.mirroring = if byte & 0x10 != 0 {
-                    Mirroring::SingleScreenUpperBank
+                    Mirroring::SINGLE_SCREEN_1
                 } else {
-                    Mirroring::SingleScreenLowerBank
+                    Mirroring::SINGLE_SCREEN_0
                 }
             }
             0xC000..=0xFFFF => {

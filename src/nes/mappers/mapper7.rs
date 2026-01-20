@@ -27,9 +27,9 @@ impl Mapper for Mapper7 {
 
     fn get_mirroring(&self) -> Mirroring {
         if self.register & 0x10 != 0 {
-            Mirroring::SingleScreenUpperBank
+            Mirroring::SINGLE_SCREEN_1
         } else {
-            Mirroring::SingleScreenLowerBank
+            Mirroring::SINGLE_SCREEN_0
         }
     }
 

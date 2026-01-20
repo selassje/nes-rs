@@ -217,9 +217,9 @@ impl Mapper for MMC3_6 {
 
     fn get_mirroring(&self) -> Mirroring {
         if self.mirroring & 1 == 1 {
-            Mirroring::Horizontal
+            Mirroring::HORIZONTAL
         } else {
-            Mirroring::Vertical
+            Mirroring::VERTICAL
         }
     }
 

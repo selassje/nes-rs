@@ -24,7 +24,7 @@ impl super::Mapper for MapperNull {
     fn store_prg_byte(&mut self, _: u16, _: u8) {}
 
     fn get_mirroring(&self) -> Mirroring {
-        Mirroring::Vertical
+        Mirroring::VERTICAL
     }
 
     fn power_cycle(&mut self) {}

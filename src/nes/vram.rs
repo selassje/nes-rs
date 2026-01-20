@@ -1,5 +1,6 @@
 use self::AttributeDataQuadrantMask::*;
 use super::common::Mirroring;
+use super::common::NametableSource;
 use super::mappers::MapperEnum;
 
 use super::{mappers::Mapper, memory::VideoMemory};
@@ -57,41 +58,29 @@ impl VRam {
 
     fn get_target_address(&self, address: u16, mapper: &MapperEnum) -> u16 {
         if NAMETABLES_RANGE.contains(&address) {
-            let nametable_mirror_offset = address % NAMETABLE_MIRROR_SIZE;
-            (address % NAMETABLE_SIZE)
-                + match mapper.get_mirroring() {
-                    Mirroring::Vertical => match nametable_mirror_offset {
-                        0x0000..=0x03FF => 0x0000,
-                        0x0400..=0x07FF => 0x0400,
-                        0x0800..=0x0BFF => 0x0000,
-                        0x0C00..=0x0FFF => 0x0400,
-                        _ => panic!("Unexpected nametable offset {:X}", nametable_mirror_offset),
-                    },
-                    Mirroring::Horizontal => match nametable_mirror_offset {
-                        0x0000..=0x03FF => 0x0000,
-                        0x0400..=0x07FF => 0x0000,
-                        0x0800..=0x0BFF => 0x0400,
-                        0x0C00..=0x0FFF => 0x0400,
-                        _ => panic!("Unexpected nametable offset {:X}", nametable_mirror_offset),
-                    },
-                    Mirroring::SingleScreenLowerBank => 0x0000,
-                    Mirroring::SingleScreenUpperBank => 0x0400,
-                }
-        } else if PALETTES_RANGE.contains(&address) {
-            let palettes_mirror_offset = address % 0x20;
-            let maybe_internal_mirror = match palettes_mirror_offset {
-                0x10 => Some(0x00),
-                0x14 => Some(0x04),
-                0x18 => Some(0x08),
-                0x1C => Some(0x0C),
-                _ => None,
+            let offset = address & 0x0FFF;
+            let table = offset / 0x0400;
+            let inner = offset & 0x03FF;
+
+            let vram_page = match mapper.get_mirroring() {
+                Mirroring { tables } => match tables[table as usize] {
+                    NametableSource::Vram0 => 0,
+                    NametableSource::Vram1 => 1,
+                    _ => panic!("Fill/ExRam not supported yet"),
+                },
             };
-            0x0800
-                + if let Some(mirror) = maybe_internal_mirror {
-                    mirror
-                } else {
-                    palettes_mirror_offset
-                }
+
+            vram_page * 0x0400 + inner
+        } else if PALETTES_RANGE.contains(&address) {
+            let offset = address & 0x1F;
+            let mirrored = match offset {
+                0x10 => 0x00,
+                0x14 => 0x04,
+                0x18 => 0x08,
+                0x1C => 0x0C,
+                _ => offset,
+            };
+            0x0800 + mirrored
         } else {
             panic!("Incorrect address! {:X}", address)
         }

@@ -30,9 +30,9 @@ impl Register for u16 {
 
     fn get_mirroring(&self) -> Mirroring {
         if self & 0b0000_0000_0000_0010 != 0 {
-            Mirroring::Horizontal
+            Mirroring::HORIZONTAL
         } else {
-            Mirroring::Vertical
+            Mirroring::VERTICAL
         }
     }
 
