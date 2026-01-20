@@ -263,12 +263,12 @@ impl Mapper for Mapper5 {
                         bank_size,
                     )
                 };
-                /*
-                println!(
-                    "PRG read ${:04X} -> bank {} (rom={}), byte=${:02X}",
-                    address, bank_register.bank, bank_register.rom, byte
-                );
-                */
+                if false {
+                    println!(
+                        "PRG read ${:04X} -> bank {} (rom={}), byte=${:02X}",
+                        address, bank_register.bank, bank_register.rom, byte
+                    );
+                }
                 byte
             }
             _ => {
