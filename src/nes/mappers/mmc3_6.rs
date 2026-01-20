@@ -171,7 +171,9 @@ impl Mapper for MMC3_6 {
     }
 
     fn store_chr_byte(&mut self, address: u16, byte: u8) {
-        self.mapper_internal.store_chr_byte(address, 0, _1KB, byte);
+        let bank_select = self.chr_rom_banks[address as usize / _1KB as usize];
+        self.mapper_internal
+            .store_chr_byte(address, bank_select.bank, bank_select.size, byte);
     }
 
     fn store_prg_byte(&mut self, address: u16, byte: u8) {
