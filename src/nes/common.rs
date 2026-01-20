@@ -14,6 +14,20 @@ pub enum NametableSource {
     Fill,
 }
 
+impl TryFrom<u8> for NametableSource {
+    type Error = &'static str;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(NametableSource::Vram0),
+            1 => Ok(NametableSource::Vram1),
+            2 => Ok(NametableSource::ExRam),
+            3 => Ok(NametableSource::Fill),
+            _ => Err("Invalid nametable source value"),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Mirroring {
     pub tables: [NametableSource; 4],

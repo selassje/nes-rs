@@ -32,6 +32,8 @@ const PRG_RAM_RANGE: std::ops::Range<u16> = std::ops::Range {
 
 const PRG_RANGE: std::ops::RangeInclusive<u16> = 0x6000..=0xFFFF;
 
+use super::common::NametableSource;
+
 #[enum_dispatch::enum_dispatch(MapperEnum)]
 pub trait Mapper {
     fn get_chr_byte(&self, address: u16) -> u8;
@@ -51,6 +53,10 @@ pub trait Mapper {
     fn notify_vblank(&mut self) {}
 
     fn ppu_a12_rising_edge_triggered(&mut self) {}
+
+    fn get_nametable_byte(&self, _source: NametableSource, _offset: u16) -> Option<u8> {
+        None
+    }
 }
 
 #[enum_dispatch::enum_dispatch]
