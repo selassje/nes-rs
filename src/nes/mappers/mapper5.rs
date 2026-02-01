@@ -91,7 +91,7 @@ impl Mapper5 {
             prg_ram_protect_2: 0,
             extended_ram_mode: 0,
             prg_bank_registers: [0x00, 0xFF, 0xFF, 0xFF, 0xFF],
-            chr_bank_registers: [0xFF; 12],
+            chr_bank_registers: [0x00; 12],
             chr_bank_upper_bits: 0,
             fill_mode_tile: 0,
             fill_mode_color: 0,
@@ -163,10 +163,12 @@ impl Mapper5 {
         }
         if bank_size == _16KB {
             bank_register.bank &= 0b0111_1110;
+            //bank_register.bank = bank_register.bank >> 1;
             bank_register.bank |= ((address >> 13) & 0b0000_0001) as usize;
         }
         if bank_size == _32KB {
             bank_register.bank &= 0b0111_1100;
+            //bank_register.bank = bank_register.bank >> 2;
             bank_register.bank |= ((address >> 13) & 0b0000_0011) as usize
         }
         bank_register
@@ -182,19 +184,10 @@ impl Mapper for Mapper5 {
         let (register, _bank_size) = self.get_chr_bank_register_index_and_size(address, false);
         let bank =
             ((self.chr_bank_upper_bits as usize) << 8) | self.chr_bank_registers[register] as usize;
-        let byte = self.mapper_internal.get_chr_byte(address, bank, _1KB);
-        static mut COUNT: u32 = 0;
-        unsafe {
-            COUNT += 1;
-            if COUNT < 100 {
-                println!("CHR read ${:04X} reg={} bank={} -> ${:02X}", address, register, bank, byte);
-            }
-        }
-        byte
+        self.mapper_internal.get_chr_byte(address, bank, _1KB)
     }
 
     fn store_prg_byte(&mut self, address: u16, byte: u8) {
-        //    println!("PRG write: ${:04X} = ${:02X}", address, byte);
         match address {
             PCM_MODE_REGISTER => {
                 // PCM mode - audio related, stub for now
@@ -266,7 +259,7 @@ impl Mapper for Mapper5 {
                     self.mapper_internal.store_prg_ram_byte(
                         address,
                         bank_register.bank as usize,
-                        bank_size,
+                        _8KB,
                         byte,
                     );
                 } else {
@@ -298,8 +291,7 @@ impl Mapper for Mapper5 {
     }
 
     fn get_prg_byte(&mut self, address: u16) -> u8 {
-        //     println!("PRG read: ${:04X}", address);
-        match address {
+        let byte = match address {
             IRQ_SCANLINE_STATUS_REGISTER => {
                 let mut byte: u8 = 0;
                 if self.scanline_irq_pending {
@@ -327,41 +319,33 @@ impl Mapper for Mapper5 {
                 0
             }
             // Handle reads from $4020-$4FFF (shouldn't normally reach mapper)
-            0x4020..=0x4FFF => {
-                0
-            }
+            0x4020..=0x4FFF => 0,
             address if PRG_RANGE.contains(&address) => {
-                if address == 0x9F31 {
-                    //        println!("9F31");
-                }
                 let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
                 let bank_register = self.decode_prg_bank_register(index as u8, bank_size, address);
-                let byte = if bank_register.rom {
+                if bank_register.rom {
                     self.mapper_internal.get_prg_rom_byte(
                         address,
                         bank_register.bank as usize,
-                        bank_size,
+                        _8KB,
                     )
                 } else {
                     self.mapper_internal.get_prg_ram_byte(
                         address,
                         bank_register.bank as usize,
-                        bank_size,
+                        _8KB,
                     )
-                };
-                if false && address >= 0xE000 && address < 0xE100 {
-                    println!(
-                        "PRG read ${:04X} -> byte=${:02X}",
-                        address, byte
-                    );
                 }
-                byte
             }
             _ => {
                 println!("Get prg byte : Unknown address ${:04X}", address);
                 0
             }
+        };
+        if true {
+           // println!("PRG read: ${:04X}", address);
         }
+        byte
     }
 
     fn get_mirroring(&self) -> Mirroring {
@@ -399,26 +383,17 @@ impl Mapper for Mapper5 {
     }
 
     fn notify_scanline(&mut self) {
-        if false {
-            println!(
-                "notify_scanline: counter={} compare={} enabled={} pending={}",
-                self.scanline_counter,
-                self.scanline_compare_value,
-                self.scanline_irq_enabled,
-                self.scanline_irq_pending
-            );
-        }
-
         if !self.in_frame {
             self.in_frame = true;
             self.scanline_counter = 0;
         } else {
             self.scanline_counter += 1;
-            if self.scanline_compare_value != 0
-                && self.scanline_counter == self.scanline_compare_value
-            {
-                self.scanline_irq_pending = true;
-            }
+        }
+
+        // Check for IRQ match after updating counter
+        // Include compare=0 matching scanline 0 - games may use this for frame start detection
+        if self.scanline_counter == self.scanline_compare_value {
+            self.scanline_irq_pending = true;
         }
     }
 
@@ -432,8 +407,43 @@ impl Mapper for Mapper5 {
         self.scanline_irq_pending = false;
     }
 
-    fn get_nametable_byte(&self,_source:NametableSource,_offset:u16) -> Option<u8> {
-        None
+    fn get_nametable_byte(&self, source: NametableSource, offset: u16) -> Option<u8> {
+        match source {
+            NametableSource::ExRam => {
+                // ExRAM used as nametable (modes 0 and 1)
+                let index = (offset & 0x3FF) as usize;
+                Some(self.expansion_ram[index])
+            }
+            NametableSource::Fill => {
+                // Fill mode: tile data from $5106, attribute from $5107
+                if offset & 0x3FF < 0x3C0 {
+                    // Nametable area - return fill tile
+                    Some(self.fill_mode_tile)
+                } else {
+                    // Attribute area - return fill color (replicated to all quadrants)
+                    let color = self.fill_mode_color & 0x03;
+                    Some(color | (color << 2) | (color << 4) | (color << 6))
+                }
+            }
+            _ => None, // Vram0/Vram1 handled by vram.rs
+        }
     }
 
+    fn store_nametable_byte(&mut self, source: NametableSource, offset: u16, byte: u8) -> bool {
+        match source {
+            NametableSource::ExRam => {
+                // ExRAM can be written when used as nametable (modes 0 and 1)
+                if self.extended_ram_mode <= 1 {
+                    let index = (offset & 0x3FF) as usize;
+                    self.expansion_ram[index] = byte;
+                }
+                true
+            }
+            NametableSource::Fill => {
+                // Fill mode is read-only
+                true
+            }
+            _ => false, // Vram0/Vram1 handled by vram.rs
+        }
+    }
 }

@@ -57,6 +57,10 @@ pub trait Mapper {
     fn get_nametable_byte(&self, _source: NametableSource, _offset: u16) -> Option<u8> {
         None
     }
+
+    fn store_nametable_byte(&mut self, _source: NametableSource, _offset: u16, _byte: u8) -> bool {
+        false // Return true if handled by mapper
+    }
 }
 
 #[enum_dispatch::enum_dispatch]

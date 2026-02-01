@@ -1,5 +1,4 @@
 use self::AttributeDataQuadrantMask::*;
-use super::common::Mirroring;
 use super::common::NametableSource;
 use super::mappers::MapperEnum;
 
@@ -56,18 +55,21 @@ impl VRam {
         self.memory.clear()
     }
 
+    fn get_nametable_source_and_offset(&self, address: u16, mapper: &MapperEnum) -> (NametableSource, u16) {
+        let offset = address & 0x0FFF;
+        let table = offset / 0x0400;
+        let inner = offset & 0x03FF;
+        let source = mapper.get_mirroring().tables[table as usize];
+        (source, inner)
+    }
+
     fn get_target_address(&self, address: u16, mapper: &MapperEnum) -> u16 {
         if NAMETABLES_RANGE.contains(&address) {
-            let offset = address & 0x0FFF;
-            let table = offset / 0x0400;
-            let inner = offset & 0x03FF;
-
-            let vram_page = match mapper.get_mirroring() {
-                Mirroring { tables } => match tables[table as usize] {
-                    NametableSource::Vram0 => 0,
-                    NametableSource::Vram1 => 1,
-                    _ => panic!("Fill/ExRam not supported yet"),
-                },
+            let (source, inner) = self.get_nametable_source_and_offset(address, mapper);
+            let vram_page = match source {
+                NametableSource::Vram0 => 0,
+                NametableSource::Vram1 => 1,
+                _ => 0,
             };
 
             vram_page * 0x0400 + inner
@@ -89,6 +91,13 @@ impl VRam {
     fn get_byte_internal(&self, address: u16, mapper: &MapperEnum) -> u8 {
         if address < NAMETABLES_START {
             mapper.get_chr_byte(address)
+        } else if NAMETABLES_RANGE.contains(&address) {
+            let (source, inner) = self.get_nametable_source_and_offset(address, mapper);
+            if let Some(byte) = mapper.get_nametable_byte(source, inner) {
+                byte
+            } else {
+                self.memory.get_byte(self.get_target_address(address, mapper))
+            }
         } else {
             self.memory
                 .get_byte(self.get_target_address(address, mapper))
@@ -123,6 +132,13 @@ impl VideoMemory for VRam {
         let address = address & 0x3FFF;
         if address < NAMETABLES_START {
             mapper.store_chr_byte(address, byte);
+        } else if NAMETABLES_RANGE.contains(&address) {
+            let (source, inner) = self.get_nametable_source_and_offset(address, mapper);
+            // Check if mapper handles this source (ExRam/Fill)
+            if !mapper.store_nametable_byte(source, inner, byte) {
+                // Vram0/Vram1 - use internal VRAM
+                self.memory.store_byte(self.get_target_address(address, mapper), byte);
+            }
         } else {
             self.memory
                 .store_byte(self.get_target_address(address, mapper), byte);
@@ -172,14 +188,9 @@ impl VideoMemory for VRam {
         color_tile_y: u8,
         mapper: &MapperEnum,
     ) -> u8 {
-        let attrib_table_addr = self.get_target_address(
-            NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE + 960,
-            mapper,
-        );
+        let attrib_addr = NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE + 960;
         let attribute_index = (color_tile_y / 2) * 8 + color_tile_x / 2;
-        let attribute_data = self
-            .memory
-            .get_byte(attrib_table_addr + attribute_index as u16);
+        let attribute_data = self.get_byte_internal(attrib_addr + attribute_index as u16, mapper);
         let quadrant: u8 = (color_tile_y % 2) * 2 + (color_tile_x % 2);
         (attribute_data & ATTRIBUTE_DATA_QUADRANT_MASKS[quadrant as usize]) >> (2 * quadrant)
     }
