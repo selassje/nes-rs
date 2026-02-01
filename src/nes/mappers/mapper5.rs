@@ -59,21 +59,6 @@ pub struct Mapper5 {
     expansion_ram: [u8; 1024],
 }
 
-#[derive(PartialEq)]
-enum PrgBankRegisterType {
-    Rom,
-    Ram,
-    RomRam,
-}
-
-const PRG_BANK_REGISTER_TYPES: [PrgBankRegisterType; 5] = [
-    PrgBankRegisterType::Ram,
-    PrgBankRegisterType::RomRam,
-    PrgBankRegisterType::RomRam,
-    PrgBankRegisterType::RomRam,
-    PrgBankRegisterType::Rom,
-];
-
 #[derive(Debug)]
 struct PrgBankRegister {
     bank: usize,
@@ -161,6 +146,11 @@ impl Mapper5 {
             bank_register.bank &= 0b0000_1111;
             bank_register.rom = false;
         }
+
+        if index == 4 {
+            bank_register.rom = true;
+        }
+
         if bank_size == _16KB {
             bank_register.bank &= 0b0111_1110;
             bank_register.bank |= ((address >> 13) & 0b0000_0001) as usize;
@@ -187,8 +177,7 @@ impl Mapper for Mapper5 {
 
     fn store_prg_byte(&mut self, address: u16, byte: u8) {
         match address {
-            PCM_MODE_REGISTER => {
-            }
+            PCM_MODE_REGISTER => {}
             PRG_MODE_SELECTION_REGISTER => {
                 self.prg_selection_mode = byte & 0b11;
             }
@@ -248,8 +237,7 @@ impl Mapper for Mapper5 {
             address if PRG_RANGE.contains(&address) => {
                 let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
                 let bank_register = self.decode_prg_bank_register(index as u8, bank_size, address);
-                let can_be_ram = PRG_BANK_REGISTER_TYPES[index] != PrgBankRegisterType::Rom;
-                if can_be_ram && self.is_prg_ram_writable() && !bank_register.rom {
+                if self.is_prg_ram_writable() && !bank_register.rom {
                     self.mapper_internal.store_prg_ram_byte(
                         address,
                         bank_register.bank as usize,
@@ -258,15 +246,10 @@ impl Mapper for Mapper5 {
                     );
                 } else {
                     println!(
-                        "Mapper5: Ignored write to PRG address {:04X} with bank register {:?}, index={} Type={} RAMProtected={} ",
+                        "Mapper5: Ignored write to PRG address {:04X} with bank register {:?}, index={} RAMProtected={} ",
                         address,
                         bank_register,
                         index,
-                        match PRG_BANK_REGISTER_TYPES[index] {
-                            PrgBankRegisterType::Rom => "ROM",
-                            PrgBankRegisterType::Ram => "RAM",
-                            PrgBankRegisterType::RomRam => "ROM/RAM",
-                        },
                         self.is_prg_ram_writable()
                     );
                 }
@@ -305,13 +288,12 @@ impl Mapper for Mapper5 {
                     0
                 }
             }
-            0x5000..=0x5BFF => {
-                0
-            }
+            0x5000..=0x5BFF => 0,
             0x4020..=0x4FFF => 0,
             address if PRG_RANGE.contains(&address) => {
                 let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
-                let bank_register = self.decode_prg_bank_register(index as u8, bank_size, address);
+                let bank_register: PrgBankRegister =
+                    self.decode_prg_bank_register(index as u8, bank_size, address);
                 if bank_register.rom {
                     self.mapper_internal.get_prg_rom_byte(
                         address,
@@ -417,10 +399,8 @@ impl Mapper for Mapper5 {
                 }
                 true
             }
-            NametableSource::Fill => {
-                true
-            }
-            _ => false
+            NametableSource::Fill => true,
+            _ => false,
         }
     }
 }
