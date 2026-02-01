@@ -163,12 +163,10 @@ impl Mapper5 {
         }
         if bank_size == _16KB {
             bank_register.bank &= 0b0111_1110;
-            //bank_register.bank = bank_register.bank >> 1;
             bank_register.bank |= ((address >> 13) & 0b0000_0001) as usize;
         }
         if bank_size == _32KB {
             bank_register.bank &= 0b0111_1100;
-            //bank_register.bank = bank_register.bank >> 2;
             bank_register.bank |= ((address >> 13) & 0b0000_0011) as usize
         }
         bank_register
@@ -190,7 +188,6 @@ impl Mapper for Mapper5 {
     fn store_prg_byte(&mut self, address: u16, byte: u8) {
         match address {
             PCM_MODE_REGISTER => {
-                // PCM mode - audio related, stub for now
             }
             PRG_MODE_SELECTION_REGISTER => {
                 self.prg_selection_mode = byte & 0b11;
@@ -243,9 +240,6 @@ impl Mapper for Mapper5 {
                 self.scanline_irq_enabled = byte & 0b1000_0000 != 0;
             }
             EXPANSION_RAM_START..=EXPANSION_RAM_END => {
-                // Extended RAM mode 0-1: can write as nametable data
-                // Extended RAM mode 2: can write as CPU RAM
-                // Extended RAM mode 3: read-only
                 if self.extended_ram_mode != 3 {
                     let index = (address - EXPANSION_RAM_START) as usize;
                     self.expansion_ram[index] = byte;
@@ -283,7 +277,7 @@ impl Mapper for Mapper5 {
         }
     }
     fn store_chr_byte(&mut self, address: u16, byte: u8) {
-        let (register, bank_size) = self.get_chr_bank_register_index_and_size(address, false);
+        let (register, _) = self.get_chr_bank_register_index_and_size(address, false);
         let bank =
             ((self.chr_bank_upper_bits as usize) << 8) | self.chr_bank_registers[register] as usize;
         self.mapper_internal
@@ -304,8 +298,6 @@ impl Mapper for Mapper5 {
                 byte
             }
             EXPANSION_RAM_START..=EXPANSION_RAM_END => {
-                // Extended RAM mode 2-3: readable as CPU RAM
-                // Extended RAM mode 0-1: returns open bus (0)
                 if self.extended_ram_mode >= 2 {
                     let index = (address - EXPANSION_RAM_START) as usize;
                     self.expansion_ram[index]
@@ -313,12 +305,9 @@ impl Mapper for Mapper5 {
                     0
                 }
             }
-            // Handle reads from $5000-$5BFF that aren't specific registers
             0x5000..=0x5BFF => {
-                // Return 0 for unhandled MMC5 register reads
                 0
             }
-            // Handle reads from $4020-$4FFF (shouldn't normally reach mapper)
             0x4020..=0x4FFF => 0,
             address if PRG_RANGE.contains(&address) => {
                 let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
@@ -342,9 +331,6 @@ impl Mapper for Mapper5 {
                 0
             }
         };
-        if true {
-           // println!("PRG read: ${:04X}", address);
-        }
         byte
     }
 
@@ -389,9 +375,6 @@ impl Mapper for Mapper5 {
         } else {
             self.scanline_counter += 1;
         }
-
-        // Check for IRQ match after updating counter
-        // Include compare=0 matching scanline 0 - games may use this for frame start detection
         if self.scanline_counter == self.scanline_compare_value {
             self.scanline_irq_pending = true;
         }
@@ -410,29 +393,24 @@ impl Mapper for Mapper5 {
     fn get_nametable_byte(&self, source: NametableSource, offset: u16) -> Option<u8> {
         match source {
             NametableSource::ExRam => {
-                // ExRAM used as nametable (modes 0 and 1)
                 let index = (offset & 0x3FF) as usize;
                 Some(self.expansion_ram[index])
             }
             NametableSource::Fill => {
-                // Fill mode: tile data from $5106, attribute from $5107
                 if offset & 0x3FF < 0x3C0 {
-                    // Nametable area - return fill tile
                     Some(self.fill_mode_tile)
                 } else {
-                    // Attribute area - return fill color (replicated to all quadrants)
                     let color = self.fill_mode_color & 0x03;
                     Some(color | (color << 2) | (color << 4) | (color << 6))
                 }
             }
-            _ => None, // Vram0/Vram1 handled by vram.rs
+            _ => None,
         }
     }
 
     fn store_nametable_byte(&mut self, source: NametableSource, offset: u16, byte: u8) -> bool {
         match source {
             NametableSource::ExRam => {
-                // ExRAM can be written when used as nametable (modes 0 and 1)
                 if self.extended_ram_mode <= 1 {
                     let index = (offset & 0x3FF) as usize;
                     self.expansion_ram[index] = byte;
@@ -440,10 +418,9 @@ impl Mapper for Mapper5 {
                 true
             }
             NametableSource::Fill => {
-                // Fill mode is read-only
                 true
             }
-            _ => false, // Vram0/Vram1 handled by vram.rs
+            _ => false
         }
     }
 }
