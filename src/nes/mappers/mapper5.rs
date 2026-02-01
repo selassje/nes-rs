@@ -59,12 +59,6 @@ pub struct Mapper5 {
     expansion_ram: [u8; 1024],
 }
 
-#[derive(Debug)]
-struct PrgBankRegister {
-    bank: usize,
-    rom: bool,
-}
-
 impl Mapper5 {
     pub fn new(prg_rom: Vec<u8>, chr_rom: Vec<u8>) -> Self {
         let mapper_internal = MapperInternal::new(prg_rom, chr_rom);
@@ -131,28 +125,27 @@ impl Mapper5 {
         (register_index, MODE_TO_SIZE[mode])
     }
 
-    fn decode_prg_bank_register(&self, index: u8, bank_size: BankSize) -> PrgBankRegister {
+    fn decode_prg_bank_register(&self, index: u8, bank_size: BankSize) -> (usize, bool) {
         let byte = self.prg_bank_registers[index as usize];
-        let mut bank_register = PrgBankRegister {
-            bank: (byte & 0b0111_1111) as usize,
-            rom: (byte & 0b1000_0000) != 0,
-        };
+        let mut is_rom = (byte & 0b1000_0000) != 0;
+        let mut bank = (byte & 0b0111_1111) as usize;
+
         if index == 0 {
-            bank_register.bank &= 0b0000_1111;
-            bank_register.rom = false;
+            bank &= 0b0000_1111;
+            is_rom = false;
         }
 
         if index == 4 {
-            bank_register.rom = true;
+            is_rom = true;
         }
 
         if bank_size == _16KB {
-            bank_register.bank = ((byte & 0b0111_1110) >> 1) as usize;
+            bank = ((byte & 0b0111_1110) >> 1) as usize;
         }
         if bank_size == _32KB {
-            bank_register.bank = ((byte & 0b0111_1100) >> 2) as usize;
+            bank = ((byte & 0b0111_1100) >> 2) as usize;
         }
-        bank_register
+        (bank, is_rom)
     }
 
     fn is_prg_ram_writable(&self) -> bool {
@@ -229,19 +222,15 @@ impl Mapper for Mapper5 {
             }
             address if PRG_RANGE.contains(&address) => {
                 let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
-                let bank_register = self.decode_prg_bank_register(index as u8, bank_size);
-                if self.is_prg_ram_writable() && !bank_register.rom {
-                    self.mapper_internal.store_prg_ram_byte(
-                        address,
-                        bank_register.bank as usize,
-                        bank_size,
-                        byte,
-                    );
+                let (bank, is_rom) = self.decode_prg_bank_register(index as u8, bank_size);
+                if self.is_prg_ram_writable() && !is_rom {
+                    self.mapper_internal
+                        .store_prg_ram_byte(address, bank, bank_size, byte);
                 } else {
                     println!(
                         "Mapper5: Ignored write to PRG address {:04X} with bank register {:?}, index={} RAMProtected={} ",
                         address,
-                        bank_register,
+                        bank,
                         index,
                         self.is_prg_ram_writable()
                     );
@@ -285,20 +274,13 @@ impl Mapper for Mapper5 {
             0x4020..=0x4FFF => 0,
             address if PRG_RANGE.contains(&address) => {
                 let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
-                let bank_register: PrgBankRegister =
-                    self.decode_prg_bank_register(index as u8, bank_size);
-                if bank_register.rom {
-                    self.mapper_internal.get_prg_rom_byte(
-                        address,
-                        bank_register.bank as usize,
-                        bank_size,
-                    )
+                let (bank, is_rom) = self.decode_prg_bank_register(index as u8, bank_size);
+                if is_rom {
+                    self.mapper_internal
+                        .get_prg_rom_byte(address, bank, bank_size)
                 } else {
-                    self.mapper_internal.get_prg_ram_byte(
-                        address,
-                        bank_register.bank as usize,
-                        bank_size,
-                    )
+                    self.mapper_internal
+                        .get_prg_ram_byte(address, bank, bank_size)
                 }
             }
             _ => {
