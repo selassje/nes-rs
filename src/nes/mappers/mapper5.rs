@@ -155,20 +155,20 @@ impl Mapper5 {
 
 impl Mapper for Mapper5 {
     fn get_chr_byte(&self, address: u16) -> u8 {
-        let (register, _bank_size) = self.get_chr_bank_register_index_and_size(address, false);
+        let (register, bank_size) = self.get_chr_bank_register_index_and_size(address, false);
         let bank =
             ((self.chr_bank_upper_bits as usize) << 8) | self.chr_bank_registers[register] as usize;
-        self.mapper_internal.get_chr_byte(address, bank, _1KB)
+        self.mapper_internal.get_chr_byte(address, bank, bank_size)
     }
 
     fn store_chr_byte(&mut self, address: u16, byte: u8) {
-        let (register, _) = self.get_chr_bank_register_index_and_size(address, false);
+        let (register, bank_size) = self.get_chr_bank_register_index_and_size(address, false);
         let bank =
             ((self.chr_bank_upper_bits as usize) << 8) | self.chr_bank_registers[register] as usize;
         self.mapper_internal
-            .store_chr_byte(address, bank, _1KB, byte);
+            .store_chr_byte(address, bank, bank_size, byte);
     }
-    
+
     fn get_prg_byte(&mut self, address: u16) -> u8 {
         let byte = match address {
             IRQ_SCANLINE_STATUS_REGISTER => {
