@@ -161,6 +161,56 @@ impl Mapper for Mapper5 {
         self.mapper_internal.get_chr_byte(address, bank, _1KB)
     }
 
+    fn store_chr_byte(&mut self, address: u16, byte: u8) {
+        let (register, _) = self.get_chr_bank_register_index_and_size(address, false);
+        let bank =
+            ((self.chr_bank_upper_bits as usize) << 8) | self.chr_bank_registers[register] as usize;
+        self.mapper_internal
+            .store_chr_byte(address, bank, _1KB, byte);
+    }
+    
+    fn get_prg_byte(&mut self, address: u16) -> u8 {
+        let byte = match address {
+            IRQ_SCANLINE_STATUS_REGISTER => {
+                let mut byte: u8 = 0;
+                if self.scanline_irq_pending {
+                    byte |= 0b1000_0000;
+                }
+                if self.in_frame {
+                    byte |= 0b0100_0000
+                }
+                self.scanline_irq_pending = false;
+                byte
+            }
+            EXPANSION_RAM_START..=EXPANSION_RAM_END => {
+                if self.extended_ram_mode >= 2 {
+                    let index = (address - EXPANSION_RAM_START) as usize;
+                    self.expansion_ram[index]
+                } else {
+                    0
+                }
+            }
+            0x5000..=0x5BFF => 0,
+            0x4020..=0x4FFF => 0,
+            address if PRG_RANGE.contains(&address) => {
+                let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
+                let (bank, is_rom) = self.decode_prg_bank_register(index as u8, bank_size);
+                if is_rom {
+                    self.mapper_internal
+                        .get_prg_rom_byte(address, bank, bank_size)
+                } else {
+                    self.mapper_internal
+                        .get_prg_ram_byte(address, bank, bank_size)
+                }
+            }
+            _ => {
+                println!("Get prg byte : Unknown address ${:04X}", address);
+                0
+            }
+        };
+        byte
+    }
+
     fn store_prg_byte(&mut self, address: u16, byte: u8) {
         match address {
             PCM_MODE_REGISTER => {}
@@ -240,55 +290,6 @@ impl Mapper for Mapper5 {
                 println!("Store prg byte: Unknown address ${:04X}", address)
             }
         }
-    }
-    fn store_chr_byte(&mut self, address: u16, byte: u8) {
-        let (register, _) = self.get_chr_bank_register_index_and_size(address, false);
-        let bank =
-            ((self.chr_bank_upper_bits as usize) << 8) | self.chr_bank_registers[register] as usize;
-        self.mapper_internal
-            .store_chr_byte(address, bank, _1KB, byte);
-    }
-
-    fn get_prg_byte(&mut self, address: u16) -> u8 {
-        let byte = match address {
-            IRQ_SCANLINE_STATUS_REGISTER => {
-                let mut byte: u8 = 0;
-                if self.scanline_irq_pending {
-                    byte |= 0b1000_0000;
-                }
-                if self.in_frame {
-                    byte |= 0b0100_0000
-                }
-                self.scanline_irq_pending = false;
-                byte
-            }
-            EXPANSION_RAM_START..=EXPANSION_RAM_END => {
-                if self.extended_ram_mode >= 2 {
-                    let index = (address - EXPANSION_RAM_START) as usize;
-                    self.expansion_ram[index]
-                } else {
-                    0
-                }
-            }
-            0x5000..=0x5BFF => 0,
-            0x4020..=0x4FFF => 0,
-            address if PRG_RANGE.contains(&address) => {
-                let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
-                let (bank, is_rom) = self.decode_prg_bank_register(index as u8, bank_size);
-                if is_rom {
-                    self.mapper_internal
-                        .get_prg_rom_byte(address, bank, bank_size)
-                } else {
-                    self.mapper_internal
-                        .get_prg_ram_byte(address, bank, bank_size)
-                }
-            }
-            _ => {
-                println!("Get prg byte : Unknown address ${:04X}", address);
-                0
-            }
-        };
-        byte
     }
 
     fn get_mirroring(&self) -> Mirroring {
