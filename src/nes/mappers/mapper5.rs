@@ -131,12 +131,7 @@ impl Mapper5 {
         (register_index, MODE_TO_SIZE[mode])
     }
 
-    fn decode_prg_bank_register(
-        &self,
-        index: u8,
-        bank_size: BankSize,
-        address: u16,
-    ) -> PrgBankRegister {
+    fn decode_prg_bank_register(&self, index: u8, bank_size: BankSize) -> PrgBankRegister {
         let byte = self.prg_bank_registers[index as usize];
         let mut bank_register = PrgBankRegister {
             bank: (byte & 0b0111_1111) as usize,
@@ -152,12 +147,10 @@ impl Mapper5 {
         }
 
         if bank_size == _16KB {
-            bank_register.bank &= 0b0111_1110;
-            bank_register.bank |= ((address >> 13) & 0b0000_0001) as usize;
+            bank_register.bank = ((byte & 0b0111_1110) >> 1) as usize;
         }
         if bank_size == _32KB {
-            bank_register.bank &= 0b0111_1100;
-            bank_register.bank |= ((address >> 13) & 0b0000_0011) as usize
+            bank_register.bank = ((byte & 0b0111_1100) >> 2) as usize;
         }
         bank_register
     }
@@ -236,12 +229,12 @@ impl Mapper for Mapper5 {
             }
             address if PRG_RANGE.contains(&address) => {
                 let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
-                let bank_register = self.decode_prg_bank_register(index as u8, bank_size, address);
+                let bank_register = self.decode_prg_bank_register(index as u8, bank_size);
                 if self.is_prg_ram_writable() && !bank_register.rom {
                     self.mapper_internal.store_prg_ram_byte(
                         address,
                         bank_register.bank as usize,
-                        _8KB,
+                        bank_size,
                         byte,
                     );
                 } else {
@@ -293,18 +286,18 @@ impl Mapper for Mapper5 {
             address if PRG_RANGE.contains(&address) => {
                 let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
                 let bank_register: PrgBankRegister =
-                    self.decode_prg_bank_register(index as u8, bank_size, address);
+                    self.decode_prg_bank_register(index as u8, bank_size);
                 if bank_register.rom {
                     self.mapper_internal.get_prg_rom_byte(
                         address,
                         bank_register.bank as usize,
-                        _8KB,
+                        bank_size,
                     )
                 } else {
                     self.mapper_internal.get_prg_ram_byte(
                         address,
                         bank_register.bank as usize,
-                        _8KB,
+                        bank_size,
                     )
                 }
             }
