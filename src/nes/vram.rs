@@ -134,9 +134,7 @@ impl VideoMemory for VRam {
             mapper.store_chr_byte(address, byte);
         } else if NAMETABLES_RANGE.contains(&address) {
             let (source, inner) = self.get_nametable_source_and_offset(address, mapper);
-            // Check if mapper handles this source (ExRam/Fill)
             if !mapper.store_nametable_byte(source, inner, byte) {
-                // Vram0/Vram1 - use internal VRAM
                 self.memory.store_byte(self.get_target_address(address, mapper), byte);
             }
         } else {

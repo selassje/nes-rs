@@ -59,7 +59,7 @@ pub trait Mapper {
     }
 
     fn store_nametable_byte(&mut self, _source: NametableSource, _offset: u16, _byte: u8) -> bool {
-        false // Return true if handled by mapper
+        false
     }
 }
 
