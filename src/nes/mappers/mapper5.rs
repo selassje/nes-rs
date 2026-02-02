@@ -35,6 +35,13 @@ const EXPANSION_RAM_START: u16 = 0x5C00;
 const EXPANSION_RAM_END: u16 = 0x5FFF;
 
 #[derive(Serialize, Deserialize)]
+enum SpriteMode8x16 {
+    Default,
+    Background,
+    Sprites,
+}
+
+#[derive(Serialize, Deserialize)]
 pub struct Mapper5 {
     mapper_internal: MapperInternal,
     prg_selection_mode: u8,
@@ -60,6 +67,8 @@ pub struct Mapper5 {
     expansion_ram: [u8; 1024],
     is_sprite_mode_8x16: bool,
     are_ext_features_enabled: bool,
+    sprite_mode_8x16: SpriteMode8x16,
+    use_ext_as_default_for_8x16_sprite_mode: bool,
 }
 
 impl Mapper5 {
@@ -89,6 +98,8 @@ impl Mapper5 {
             expansion_ram: [0; 1024],
             is_sprite_mode_8x16: false,
             are_ext_features_enabled: false,
+            sprite_mode_8x16: SpriteMode8x16::Default,
+            use_ext_as_default_for_8x16_sprite_mode: false,
         }
     }
 
@@ -158,7 +169,20 @@ impl Mapper5 {
 
 impl Mapper for Mapper5 {
     fn get_chr_byte(&self, address: u16) -> u8 {
-        let (register, bank_size) = self.get_chr_bank_register_index_and_size(address, false);
+        let mut use_ext = false;
+        let is_sprite_mode_8x16 = self.are_ext_features_enabled && self.is_sprite_mode_8x16;
+        if is_sprite_mode_8x16 {
+            match self.sprite_mode_8x16 {
+                SpriteMode8x16::Background => {
+                    use_ext = true;
+                }
+                SpriteMode8x16::Default => {
+                    use_ext = self.use_ext_as_default_for_8x16_sprite_mode;
+                }
+                _ => {}
+            }
+        }
+        let (register, bank_size) = self.get_chr_bank_register_index_and_size(address, use_ext);
         let bank =
             ((self.chr_bank_upper_bits as usize) << 8) | self.chr_bank_registers[register] as usize;
         self.mapper_internal.get_chr_byte(address, bank, bank_size)
@@ -250,6 +274,7 @@ impl Mapper for Mapper5 {
             }
             CHR_BANK_REGISTER_1..=CHR_BANK_REGISTER_12 => {
                 let index = (address - CHR_BANK_REGISTER_1) as usize;
+                self.use_ext_as_default_for_8x16_sprite_mode = index > 7;
                 self.chr_bank_registers[index] = byte;
             }
             SPLIT_MODE_CONTROL_REGISTER => {
@@ -328,6 +353,8 @@ impl Mapper for Mapper5 {
         self.expansion_ram = [0; 1024];
         self.is_sprite_mode_8x16 = false;
         self.are_ext_features_enabled = false;
+        self.sprite_mode_8x16 = SpriteMode8x16::Default;
+        self.use_ext_as_default_for_8x16_sprite_mode = false;
         self.mapper_internal.power_cycle();
     }
 
@@ -387,19 +414,30 @@ impl Mapper for Mapper5 {
 
     fn notify_oam_dma_write(&mut self) {
         self.scanline_counter = 0;
+        self.sprite_mode_8x16 = SpriteMode8x16::Sprites;
     }
 
     fn notify_ppu_register_write(&mut self, address: u16, value: u8) {
-      if let Ok(register) = WriteAccessRegister::try_from(address){
-          match register {
-            WriteAccessRegister::PpuCtrl => {
-                self.is_sprite_mode_8x16 = value & 0b0010_0000 != 0;
-            },
-            WriteAccessRegister::PpuMask => {
-                self.are_ext_features_enabled = value & 0b0001_1000 != 0;
+        if let Ok(register) = WriteAccessRegister::try_from(address) {
+            match register {
+                WriteAccessRegister::PpuCtrl => {
+                    self.is_sprite_mode_8x16 = value & 0b0010_0000 != 0;
+                }
+                WriteAccessRegister::PpuMask => {
+                    self.are_ext_features_enabled = value & 0b0001_1000 != 0;
+                }
+                WriteAccessRegister::PpuData => {
+                    self.sprite_mode_8x16 = SpriteMode8x16::Default;
+                }
+                WriteAccessRegister::OamData => {
+                    self.sprite_mode_8x16 = SpriteMode8x16::Sprites;
+                }
+                _ => {}
             }
-            _ => {} 
-          }
-      }
+        }
+    }
+
+    fn notify_background_tiles_fetch(&mut self) {
+        self.sprite_mode_8x16 = SpriteMode8x16::Background;
     }
 }

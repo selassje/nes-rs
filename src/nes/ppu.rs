@@ -438,6 +438,7 @@ impl Ppu {
                 );
             }
             FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET => {
+                bus.mapper.notify_background_tiles_fetch();
                 self.tile_data[2].low_bg_pattern_byte = self.vram.get_low_pattern_data(
                     pattern_table_index,
                     self.tile_data[2].index,

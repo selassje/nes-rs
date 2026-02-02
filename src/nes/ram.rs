@@ -123,8 +123,8 @@ impl Memory for Ram {
     fn store_byte(&mut self, address: u16, byte: u8, bus: &mut RamBus) {
         let addr = self.get_real_address(address);
         if let Ok(reg) = WriteAccessRegister::try_from(addr) {
-            bus.ppu.write(reg, byte, bus.mapper);
             bus.mapper.notify_ppu_register_write(address, byte);
+            bus.ppu.write(reg, byte, bus.mapper);
             *self.ppu_register_latch.borrow_mut() = byte;
         } else if DmaWriteAccessRegister::try_from(addr).is_ok() {
             let mut dma_data = [0; 256];
@@ -132,8 +132,8 @@ impl Memory for Ram {
                 let page_adress = (byte as u16) << 8;
                 *e = self.get_byte(page_adress + i as u16, bus);
             }
-            bus.ppu.write_oam_dma(dma_data);
             bus.mapper.notify_oam_dma_write();
+            bus.ppu.write_oam_dma(dma_data);
             *self.oam_dma_register_latch.borrow_mut() = byte;
         } else if let Ok(output_port) = OutputRegister::try_from(addr) {
             bus.controllers.write(output_port, byte);

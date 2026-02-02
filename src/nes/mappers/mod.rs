@@ -61,10 +61,15 @@ pub trait Mapper {
     fn store_nametable_byte(&mut self, _source: NametableSource, _offset: u16, _byte: u8) -> bool {
         false
     }
+    
     fn notify_ppu_register_write(&mut self, _address: u16, _value: u8) {
     }
+   
     fn notify_oam_dma_write(&mut self) {
     }
+
+    fn notify_background_tiles_fetch(&mut self) {}
+
 }
 
 #[enum_dispatch::enum_dispatch]
