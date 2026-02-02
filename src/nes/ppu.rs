@@ -430,29 +430,46 @@ impl Ppu {
                         .get_nametable_tile_index(nametable_index, tile_x, tile_y, bus.mapper)
             }
             FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET => {
-                self.tile_data[2].attribute_byte = self.vram.get_attribute_data(
-                    nametable_index,
-                    tile_x / 2,
-                    tile_y / 2,
-                    bus.mapper,
-                );
+                self.tile_data[2].attribute_byte =
+                    if let Some(byte) = bus.mapper.get_attribute_data(tile_x, tile_y) {
+                        byte
+                    } else {
+                        self.vram.get_attribute_data(
+                            nametable_index,
+                            tile_x / 2,
+                            tile_y / 2,
+                            bus.mapper,
+                        )
+                    }
             }
             FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET => {
                 bus.mapper.notify_background_tiles_fetch();
-                self.tile_data[2].low_bg_pattern_byte = self.vram.get_low_pattern_data(
-                    pattern_table_index,
-                    self.tile_data[2].index,
-                    fine_y as u8,
-                    bus.mapper,
-                );
+                let tile_index = self.tile_data[2].index;
+                self.tile_data[2].low_bg_pattern_byte =
+                    if let Some(byte) = bus.mapper.get_low_pattern_data(tile_index, fine_y as u8) {
+                        byte
+                    } else {
+                        self.vram.get_low_pattern_data(
+                            pattern_table_index,
+                            tile_index,
+                            fine_y as u8,
+                            bus.mapper,
+                        )
+                    }
             }
             FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET => {
-                self.tile_data[2].high_bg_pattern_byte = self.vram.get_high_pattern_data(
-                    pattern_table_index,
-                    self.tile_data[2].index,
-                    fine_y as u8,
-                    bus.mapper,
-                )
+                let tile_index = self.tile_data[2].index;
+                self.tile_data[2].low_bg_pattern_byte =
+                    if let Some(byte) = bus.mapper.get_high_pattern_data(tile_index, fine_y as u8) {
+                        byte
+                    } else {
+                        self.vram.get_high_pattern_data(
+                            pattern_table_index,
+                            tile_index,
+                            fine_y as u8,
+                            bus.mapper,
+                        )
+                    }
             }
             _ => {}
         }
@@ -550,7 +567,7 @@ impl Ppu {
                     self.status_reg
                         .set_flag(StatusRegisterFlag::Sprite0Hit, false);
                 }
-                280 ..=304 => {
+                280..=304 => {
                     if self.is_rendering_enabled() {
                         self.vram_address
                             .set(FINE_Y, self.t_vram_address.get(FINE_Y));

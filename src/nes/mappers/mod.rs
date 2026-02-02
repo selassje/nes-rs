@@ -69,6 +69,17 @@ pub trait Mapper {
     fn notify_background_tiles_fetch(&mut self) {}
 
     fn notify_sprite_tiles_fetch(&mut self) {}
+
+    fn get_attribute_data(&self, _tile_x: u8, _tile_y: u8) -> Option<u8> {
+        None
+    }
+
+    fn get_low_pattern_data(&self, _tile_index: u8, _y: u8) -> Option<u8> {
+        None
+    }
+    fn get_high_pattern_data(&self, _tile_index: u8, _y: u8) -> Option<u8> {
+        None
+    }
 }
 
 #[enum_dispatch::enum_dispatch]
