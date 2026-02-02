@@ -550,7 +550,7 @@ impl Ppu {
                     self.status_reg
                         .set_flag(StatusRegisterFlag::Sprite0Hit, false);
                 }
-                280 => {
+                280 ..=304 => {
                     if self.is_rendering_enabled() {
                         self.vram_address
                             .set(FINE_Y, self.t_vram_address.get(FINE_Y));
