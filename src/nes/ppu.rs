@@ -735,6 +735,7 @@ impl Ppu {
                         y = 7 - y;
                     }
 
+                    bus.mapper.notify_sprite_tiles_fetch();
                     let tile = self.get_pattern_tile(pattern_table_index, tile_index, bus);
                     let color_index = tile.get_color_index(x as usize, y as usize);
                     if color_index != 0 {

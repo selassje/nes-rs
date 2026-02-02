@@ -34,7 +34,7 @@ const IRQ_SCANLINE_STATUS_REGISTER: u16 = 0x5204;
 const EXPANSION_RAM_START: u16 = 0x5C00;
 const EXPANSION_RAM_END: u16 = 0x5FFF;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone,Debug,Serialize, Deserialize)]
 enum SpriteMode8x16 {
     Default,
     Background,
@@ -174,17 +174,24 @@ impl Mapper for Mapper5 {
         if is_sprite_mode_8x16 {
             match self.sprite_mode_8x16 {
                 SpriteMode8x16::Background => {
-                    use_ext = true;
+                    use_ext = true;  // BG always uses B set (registers 8-11)
+                }
+                SpriteMode8x16::Sprites => {
+                    use_ext = false;  // Sprites always use A set (registers 0-7)
                 }
                 SpriteMode8x16::Default => {
                     use_ext = self.use_ext_as_default_for_8x16_sprite_mode;
                 }
-                _ => {}
             }
         }
         let (register, bank_size) = self.get_chr_bank_register_index_and_size(address, use_ext);
         let bank =
             ((self.chr_bank_upper_bits as usize) << 8) | self.chr_bank_registers[register] as usize;
+    
+    /* 
+        println!("CHR {:04X}: mode={:?} use_ext={} reg={} bank={:02X}",
+            address, self.sprite_mode_8x16, use_ext, register, bank);
+       */
         self.mapper_internal.get_chr_byte(address, bank, bank_size)
     }
 
@@ -414,7 +421,6 @@ impl Mapper for Mapper5 {
 
     fn notify_oam_dma_write(&mut self) {
         self.scanline_counter = 0;
-        self.sprite_mode_8x16 = SpriteMode8x16::Sprites;
     }
 
     fn notify_ppu_register_write(&mut self, address: u16, value: u8) {
@@ -429,9 +435,6 @@ impl Mapper for Mapper5 {
                 WriteAccessRegister::PpuData => {
                     self.sprite_mode_8x16 = SpriteMode8x16::Default;
                 }
-                WriteAccessRegister::OamData => {
-                    self.sprite_mode_8x16 = SpriteMode8x16::Sprites;
-                }
                 _ => {}
             }
         }
@@ -439,5 +442,9 @@ impl Mapper for Mapper5 {
 
     fn notify_background_tiles_fetch(&mut self) {
         self.sprite_mode_8x16 = SpriteMode8x16::Background;
+    }
+
+    fn notify_sprite_tiles_fetch(&mut self) {
+        self.sprite_mode_8x16 = SpriteMode8x16::Sprites;
     }
 }

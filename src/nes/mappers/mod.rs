@@ -70,7 +70,9 @@ pub trait Mapper {
 
     fn notify_background_tiles_fetch(&mut self) {}
 
+    fn notify_sprite_tiles_fetch(&mut self) {}
 }
+
 
 #[enum_dispatch::enum_dispatch]
 #[derive(serde::Serialize, serde::Deserialize)]
