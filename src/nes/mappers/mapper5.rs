@@ -5,6 +5,7 @@ use crate::nes::common::Mirroring;
 use crate::nes::common::NametableSource;
 use crate::nes::mappers::PRG_RAM_RANGE;
 use crate::nes::mappers::PRG_RANGE;
+use crate::nes::ram_ppu::WriteAccessRegister;
 
 use BankSize::*;
 
@@ -57,6 +58,8 @@ pub struct Mapper5 {
     nametable_mapping: u8,
     #[serde(with = "serde_arrays")]
     expansion_ram: [u8; 1024],
+    is_sprite_mode_8x16: bool,
+    are_ext_features_enabled: bool,
 }
 
 impl Mapper5 {
@@ -84,6 +87,8 @@ impl Mapper5 {
             in_frame: false,
             nametable_mapping: 0,
             expansion_ram: [0; 1024],
+            is_sprite_mode_8x16: false,
+            are_ext_features_enabled: false,
         }
     }
 
@@ -134,11 +139,9 @@ impl Mapper5 {
             bank &= 0b0000_1111;
             is_rom = false;
         }
-
         if index == 4 {
             is_rom = true;
         }
-
         if bank_size == _16KB {
             bank = ((byte & 0b0111_1110) >> 1) as usize;
         }
@@ -323,6 +326,8 @@ impl Mapper for Mapper5 {
         self.in_frame = false;
         self.nametable_mapping = 0;
         self.expansion_ram = [0; 1024];
+        self.is_sprite_mode_8x16 = false;
+        self.are_ext_features_enabled = false;
         self.mapper_internal.power_cycle();
     }
 
@@ -378,5 +383,23 @@ impl Mapper for Mapper5 {
             NametableSource::Fill => true,
             _ => false,
         }
+    }
+
+    fn notify_oam_dma_write(&mut self) {
+        self.scanline_counter = 0;
+    }
+
+    fn notify_ppu_register_write(&mut self, address: u16, value: u8) {
+      if let Ok(register) = WriteAccessRegister::try_from(address){
+          match register {
+            WriteAccessRegister::PpuCtrl => {
+                self.is_sprite_mode_8x16 = value & 0b0010_0000 != 0;
+            },
+            WriteAccessRegister::PpuMask => {
+                self.are_ext_features_enabled = value & 0b0001_1000 != 0;
+            }
+            _ => {} 
+          }
+      }
     }
 }
