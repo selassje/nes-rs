@@ -459,7 +459,7 @@ impl Ppu {
             }
             FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET => {
                 let tile_index = self.tile_data[2].index;
-                self.tile_data[2].low_bg_pattern_byte =
+                self.tile_data[2].high_bg_pattern_byte =
                     if let Some(byte) = bus.mapper.get_high_pattern_data(tile_index, fine_y as u8) {
                         byte
                     } else {
