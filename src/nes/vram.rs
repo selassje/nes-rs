@@ -7,7 +7,7 @@ use super::{mappers::Mapper, memory::VideoMemory};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, ops::Range};
 
-const PATTERN_TABLE_SIZE: u16 = 0x1000;
+pub const PATTERN_TABLE_SIZE: u16 = 0x1000;
 const NAMETABLE_SIZE: u16 = 0x400;
 const NAMETABLE_MIRROR_SIZE: u16 = 0x1000;
 const NAMETABLES_START: u16 = 0x2000;

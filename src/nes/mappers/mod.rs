@@ -70,14 +70,24 @@ pub trait Mapper {
 
     fn notify_sprite_tiles_fetch(&mut self) {}
 
-    fn get_attribute_data(&self, _tile_x: u8, _tile_y: u8) -> Option<u8> {
+    fn get_attribute_data(&mut self, _tile_x: u8, _tile_y: u8) -> Option<u8> {
         None
     }
 
-    fn get_low_pattern_data(&self, _tile_index: u8, _y: u8) -> Option<u8> {
+    fn get_low_pattern_data(
+        &self,
+        _table_index: u8,
+        _pattern_tile_index: u8,
+        _y: u8,
+    ) -> Option<u8> {
         None
     }
-    fn get_high_pattern_data(&self, _tile_index: u8, _y: u8) -> Option<u8> {
+    fn get_high_pattern_data(
+        &self,
+        _table_index: u8,
+        _pattern_tile_index: u8,
+        _y: u8,
+    ) -> Option<u8> {
         None
     }
 }

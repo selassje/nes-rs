@@ -521,7 +521,8 @@ impl Cpu {
                 Address::Ram(indirect_indexed)
             }
             AddressingMode::Relative => {
-                let new_pc = (self.pc as i16 + (operand_1 as i8 as i16)) as u16;
+                let offset = operand_1 as i8 as i16;
+                let new_pc = self.pc.wrapping_add(offset as u16);
                 Address::Relative(new_pc)
             }
             AddressingMode::Indirect => {

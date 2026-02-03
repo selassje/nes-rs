@@ -6,6 +6,7 @@ use crate::nes::common::NametableSource;
 use crate::nes::mappers::PRG_RAM_RANGE;
 use crate::nes::mappers::PRG_RANGE;
 use crate::nes::ram_ppu::WriteAccessRegister;
+use crate::nes::vram::PATTERN_TABLE_SIZE;
 
 use BankSize::*;
 
@@ -34,7 +35,7 @@ const IRQ_SCANLINE_STATUS_REGISTER: u16 = 0x5204;
 const EXPANSION_RAM_START: u16 = 0x5C00;
 const EXPANSION_RAM_END: u16 = 0x5FFF;
 
-#[derive(Clone,Debug,Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 enum SpriteMode8x16 {
     Default,
     Background,
@@ -69,6 +70,7 @@ pub struct Mapper5 {
     are_ext_features_enabled: bool,
     sprite_mode_8x16: SpriteMode8x16,
     use_ext_as_default_for_8x16_sprite_mode: bool,
+    tile_index: u8,
 }
 
 impl Mapper5 {
@@ -100,6 +102,7 @@ impl Mapper5 {
             are_ext_features_enabled: false,
             sprite_mode_8x16: SpriteMode8x16::Default,
             use_ext_as_default_for_8x16_sprite_mode: false,
+            tile_index: 0,
         }
     }
 
@@ -165,6 +168,23 @@ impl Mapper5 {
     fn is_prg_ram_writable(&self) -> bool {
         (self.prg_ram_protect_1 & 0b11) == 0b10 && (self.prg_ram_protect_2 & 0b11) == 0b01
     }
+
+    fn get_ext_attr_chr_byte(
+        &self,
+        table_index: u8,
+        pattern_tile_index: u8,
+        y: u8,
+        is_high_pattern_data: bool,
+    ) -> u8 {
+        let lower_bank_index = self.expansion_ram[self.tile_index as usize] & 0b0011_1111;
+        let bank = ((self.chr_bank_upper_bits as usize) << 6) | lower_bank_index as usize;
+        let pattern_table_addr = table_index as u16 * PATTERN_TABLE_SIZE;
+        let mut address = pattern_table_addr + 16 * pattern_tile_index as u16 + y as u16;
+        if is_high_pattern_data {
+            address += 8;
+        }
+        self.mapper_internal.get_chr_byte(address, bank, _4KB)
+    }
 }
 
 impl Mapper for Mapper5 {
@@ -174,10 +194,10 @@ impl Mapper for Mapper5 {
         if is_sprite_mode_8x16 {
             match self.sprite_mode_8x16 {
                 SpriteMode8x16::Background => {
-                    use_ext = true;  // BG always uses B set (registers 8-11)
+                    use_ext = true; // BG always uses B set (registers 8-11)
                 }
                 SpriteMode8x16::Sprites => {
-                    use_ext = false;  // Sprites always use A set (registers 0-7)
+                    use_ext = false; // Sprites always use A set (registers 0-7)
                 }
                 SpriteMode8x16::Default => {
                     use_ext = self.use_ext_as_default_for_8x16_sprite_mode;
@@ -187,11 +207,11 @@ impl Mapper for Mapper5 {
         let (register, bank_size) = self.get_chr_bank_register_index_and_size(address, use_ext);
         let bank =
             ((self.chr_bank_upper_bits as usize) << 8) | self.chr_bank_registers[register] as usize;
-    
-    /* 
-        println!("CHR {:04X}: mode={:?} use_ext={} reg={} bank={:02X}",
-            address, self.sprite_mode_8x16, use_ext, register, bank);
-       */
+
+        /*
+         println!("CHR {:04X}: mode={:?} use_ext={} reg={} bank={:02X}",
+             address, self.sprite_mode_8x16, use_ext, register, bank);
+        */
         self.mapper_internal.get_chr_byte(address, bank, bank_size)
     }
 
@@ -362,6 +382,7 @@ impl Mapper for Mapper5 {
         self.are_ext_features_enabled = false;
         self.sprite_mode_8x16 = SpriteMode8x16::Default;
         self.use_ext_as_default_for_8x16_sprite_mode = false;
+        self.tile_index = 0;
         self.mapper_internal.power_cycle();
     }
 
@@ -446,5 +467,28 @@ impl Mapper for Mapper5 {
 
     fn notify_sprite_tiles_fetch(&mut self) {
         self.sprite_mode_8x16 = SpriteMode8x16::Sprites;
+    }
+
+    fn get_attribute_data(&mut self, tile_x: u8, tile_y: u8) -> Option<u8> {
+        if self.extended_ram_mode != 1 {
+            return None;
+        }
+        self.tile_index = tile_y * 32 + tile_x;
+        let exram_byte = self.expansion_ram[self.tile_index as usize];
+        let palette = (exram_byte & 0b1100_0000) >> 6;
+        Some(palette)
+    }
+
+    fn get_low_pattern_data(&self, table_index: u8, pattern_tile_index: u8, y: u8) -> Option<u8> {
+        if self.extended_ram_mode != 1 {
+            return None;
+        }
+        Some(self.get_ext_attr_chr_byte(table_index, pattern_tile_index, y, false))
+    }
+    fn get_high_pattern_data(&self, table_index: u8, pattern_tile_index: u8, y: u8) -> Option<u8> {
+        if self.extended_ram_mode != 1 {
+            return None;
+        }
+        Some(self.get_ext_attr_chr_byte(table_index, pattern_tile_index, y, true))
     }
 }
