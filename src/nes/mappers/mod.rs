@@ -50,7 +50,6 @@ pub trait Mapper {
     }
 
     fn notify_scanline(&mut self) {}
-    fn notify_vblank(&mut self) {}
 
     fn ppu_a12_rising_edge_triggered(&mut self) {}
 
@@ -63,6 +62,7 @@ pub trait Mapper {
     }
 
     fn notify_ppu_register_write(&mut self, _address: u16, _value: u8) {}
+    fn notify_ppu_register_read(&mut self, _address: u16) {}
 
     fn notify_oam_dma_write(&mut self) {}
 

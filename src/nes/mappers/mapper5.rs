@@ -5,6 +5,7 @@ use crate::nes::common::Mirroring;
 use crate::nes::common::NametableSource;
 use crate::nes::mappers::PRG_RAM_RANGE;
 use crate::nes::mappers::PRG_RANGE;
+use crate::nes::ram_ppu::ReadAccessRegister;
 use crate::nes::ram_ppu::WriteAccessRegister;
 use crate::nes::vram::PATTERN_TABLE_SIZE;
 
@@ -36,8 +37,8 @@ const EXPANSION_RAM_START: u16 = 0x5C00;
 const EXPANSION_RAM_END: u16 = 0x5FFF;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-enum SpriteMode8x16 {
-    Default,
+enum FetchMode {
+    Cpu,
     Background,
     Sprites,
 }
@@ -68,7 +69,7 @@ pub struct Mapper5 {
     expansion_ram: [u8; 1024],
     is_sprite_mode_8x16: bool,
     are_ext_features_enabled: bool,
-    sprite_mode_8x16: SpriteMode8x16,
+    sprite_mode_8x16: FetchMode,
     use_ext_as_default_for_8x16_sprite_mode: bool,
     tile_index: u8,
 }
@@ -100,7 +101,7 @@ impl Mapper5 {
             expansion_ram: [0; 1024],
             is_sprite_mode_8x16: false,
             are_ext_features_enabled: false,
-            sprite_mode_8x16: SpriteMode8x16::Default,
+            sprite_mode_8x16: FetchMode::Cpu,
             use_ext_as_default_for_8x16_sprite_mode: false,
             tile_index: 0,
         }
@@ -189,21 +190,14 @@ impl Mapper5 {
 
 impl Mapper for Mapper5 {
     fn get_chr_byte(&self, address: u16) -> u8 {
-        let mut use_ext = false;
         let is_sprite_mode_8x16 = self.are_ext_features_enabled && self.is_sprite_mode_8x16;
-        if is_sprite_mode_8x16 {
-            match self.sprite_mode_8x16 {
-                SpriteMode8x16::Background => {
-                    use_ext = true; // BG always uses B set (registers 8-11)
-                }
-                SpriteMode8x16::Sprites => {
-                    use_ext = false; // Sprites always use A set (registers 0-7)
-                }
-                SpriteMode8x16::Default => {
-                    use_ext = self.use_ext_as_default_for_8x16_sprite_mode;
-                }
-            }
-        }
+        let use_ext = is_sprite_mode_8x16
+            && match self.sprite_mode_8x16 {
+                FetchMode::Background => true,
+                FetchMode::Sprites => false,
+                FetchMode::Cpu => self.use_ext_as_default_for_8x16_sprite_mode,
+            };
+
         let (register, bank_size) = self.get_chr_bank_register_index_and_size(address, use_ext);
         let bank =
             ((self.chr_bank_upper_bits as usize) << 8) | self.chr_bank_registers[register] as usize;
@@ -375,7 +369,7 @@ impl Mapper for Mapper5 {
         self.expansion_ram = [0; 1024];
         self.is_sprite_mode_8x16 = false;
         self.are_ext_features_enabled = false;
-        self.sprite_mode_8x16 = SpriteMode8x16::Default;
+        self.sprite_mode_8x16 = FetchMode::Cpu;
         self.use_ext_as_default_for_8x16_sprite_mode = false;
         self.tile_index = 0;
         self.mapper_internal.power_cycle();
@@ -395,12 +389,6 @@ impl Mapper for Mapper5 {
 
     fn is_irq_pending(&self) -> bool {
         self.scanline_irq_enabled && self.scanline_irq_pending
-    }
-
-    fn notify_vblank(&mut self) {
-        //self.in_frame = false;
-       // self.scanline_counter = 0;
-       // self.scanline_irq_pending = false;
     }
 
     fn get_nametable_byte(&self, source: NametableSource, offset: u16) -> Option<u8> {
@@ -449,7 +437,21 @@ impl Mapper for Mapper5 {
                     self.are_ext_features_enabled = value & 0b0001_1000 != 0;
                 }
                 WriteAccessRegister::PpuData => {
-                    self.sprite_mode_8x16 = SpriteMode8x16::Default;
+                    self.sprite_mode_8x16 = FetchMode::Cpu;
+                    self.in_frame = false;
+                    self.scanline_counter = 0;
+                    self.scanline_irq_pending = false;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn notify_ppu_register_read(&mut self, address: u16) {
+        if let Ok(register) = ReadAccessRegister::try_from(address) {
+            match register {
+                ReadAccessRegister::PpuData => {
+                    self.sprite_mode_8x16 = FetchMode::Cpu;
                     self.in_frame = false;
                     self.scanline_counter = 0;
                     self.scanline_irq_pending = false;
@@ -460,11 +462,11 @@ impl Mapper for Mapper5 {
     }
 
     fn notify_background_tiles_fetch(&mut self) {
-        self.sprite_mode_8x16 = SpriteMode8x16::Background;
+        self.sprite_mode_8x16 = FetchMode::Background;
     }
 
     fn notify_sprite_tiles_fetch(&mut self) {
-        self.sprite_mode_8x16 = SpriteMode8x16::Sprites;
+        self.sprite_mode_8x16 = FetchMode::Sprites;
     }
 
     fn get_attribute_data(&mut self, tile_x: u8, tile_y: u8) -> Option<u8> {

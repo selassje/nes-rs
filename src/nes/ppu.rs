@@ -599,7 +599,6 @@ impl Ppu {
             },
             VBLANK_START_SCANLINE => {
                 if self.ppu_cycle == VBLANK_START_CYCLE {
-                    bus.mapper.notify_vblank();
                     self.update_vblank_flag_and_nmi()
                 }
             }

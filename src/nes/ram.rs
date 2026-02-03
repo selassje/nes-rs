@@ -85,6 +85,7 @@ impl Memory for Ram {
     fn get_byte(&self, address_org: u16, bus: &mut RamBus) -> u8 {
         let addr = self.get_real_address(address_org);
         if let Ok(reg) = ReadAccessRegister::try_from(addr) {
+            bus.mapper.notify_ppu_register_read(address_org);
             let mut ppu_register_value = bus.ppu.read(reg, bus.mapper);
             if reg == ReadAccessRegister::PpuStatus {
                 const LOW_5_BITS: u8 = 0b00011111;
