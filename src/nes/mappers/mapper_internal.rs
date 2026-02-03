@@ -88,7 +88,7 @@ impl MapperInternal {
         }
     }
 
-    pub fn store_chr_byte(&mut self, address: u16, bank: usize,  bank_size: BankSize, byte: u8) {
+    pub fn store_chr_byte(&mut self, address: u16, bank: usize, bank_size: BankSize, byte: u8) {
         let index = Self::get_address_index(address, bank, bank_size);
         self.chr_ram[index] = byte;
     }

@@ -4,7 +4,7 @@ on: [push]
 env:
   CARGO_TERM_COLOR: always
   EMSDK_VER: 4.0.22
-  RUST_VER: 1.92.0
+  RUST_VER: 1.93.0
 
 jobs:
   build:

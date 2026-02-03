@@ -55,7 +55,11 @@ impl VRam {
         self.memory.clear()
     }
 
-    fn get_nametable_source_and_offset(&self, address: u16, mapper: &MapperEnum) -> (NametableSource, u16) {
+    fn get_nametable_source_and_offset(
+        &self,
+        address: u16,
+        mapper: &MapperEnum,
+    ) -> (NametableSource, u16) {
         let offset = address & 0x0FFF;
         let table = offset / 0x0400;
         let inner = offset & 0x03FF;
@@ -96,7 +100,8 @@ impl VRam {
             if let Some(byte) = mapper.get_nametable_byte(source, inner) {
                 byte
             } else {
-                self.memory.get_byte(self.get_target_address(address, mapper))
+                self.memory
+                    .get_byte(self.get_target_address(address, mapper))
             }
         } else {
             self.memory
@@ -135,7 +140,8 @@ impl VideoMemory for VRam {
         } else if NAMETABLES_RANGE.contains(&address) {
             let (source, inner) = self.get_nametable_source_and_offset(address, mapper);
             if !mapper.store_nametable_byte(source, inner, byte) {
-                self.memory.store_byte(self.get_target_address(address, mapper), byte);
+                self.memory
+                    .store_byte(self.get_target_address(address, mapper), byte);
             }
         } else {
             self.memory

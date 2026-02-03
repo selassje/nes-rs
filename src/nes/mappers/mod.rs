@@ -94,6 +94,7 @@ pub trait Mapper {
 
 #[enum_dispatch::enum_dispatch]
 #[derive(serde::Serialize, serde::Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum MapperEnum {
     MapperNull(self::mapper_null::MapperNull),
     Mapper0(self::mapper0::Mapper0),

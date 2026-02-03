@@ -208,10 +208,6 @@ impl Mapper for Mapper5 {
         let bank =
             ((self.chr_bank_upper_bits as usize) << 8) | self.chr_bank_registers[register] as usize;
 
-        /*
-         println!("CHR {:04X}: mode={:?} use_ext={} reg={} bank={:02X}",
-             address, self.sprite_mode_8x16, use_ext, register, bank);
-        */
         self.mapper_internal.get_chr_byte(address, bank, bank_size)
     }
 
@@ -224,7 +220,7 @@ impl Mapper for Mapper5 {
     }
 
     fn get_prg_byte(&mut self, address: u16) -> u8 {
-        let byte = match address {
+        match address {
             IRQ_SCANLINE_STATUS_REGISTER => {
                 let mut byte: u8 = 0;
                 if self.scanline_irq_pending {
@@ -261,8 +257,7 @@ impl Mapper for Mapper5 {
                 println!("Get prg byte : Unknown address ${:04X}", address);
                 0
             }
-        };
-        byte
+        }
     }
 
     fn store_prg_byte(&mut self, address: u16, byte: u8) {
@@ -350,8 +345,8 @@ impl Mapper for Mapper5 {
     fn get_mirroring(&self) -> Mirroring {
         let mut tables = [NametableSource::Vram0; 4];
         for nametable in 0..4 {
-            let mask = 0b0000_0011 << nametable * 2;
-            let nametable_source = (self.nametable_mapping & mask) >> nametable * 2;
+            let mask = 0b0000_0011 << (nametable * 2);
+            let nametable_source = (self.nametable_mapping & mask) >> (nametable * 2);
             tables[nametable as usize] = NametableSource::try_from(nametable_source).unwrap();
         }
         Mirroring { tables }

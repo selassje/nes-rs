@@ -346,7 +346,7 @@ impl Cpu {
                     self.cycle,
                 );
             }
-            if opcode.instruction as usize == Self::rti as usize {
+            if opcode.instruction as usize == Self::rti as *const () as usize {
                 self.rti_restore_ps(bus);
             }
             Ok(())
@@ -361,9 +361,9 @@ impl Cpu {
         let ins_fun = self.opcodes[instruction.opcode as usize]
             .unwrap()
             .instruction;
-        let is_brk_or_irq_executing =
-            ins_fun as usize == Self::brk as usize || ins_fun as usize == Self::irq as usize;
-        let is_nmi_executing = ins_fun as usize == Self::nmi as usize;
+        let is_brk_or_irq_executing = ins_fun as usize == Self::brk as *const () as usize
+            || ins_fun as usize == Self::irq as *const () as usize;
+        let is_nmi_executing = ins_fun as usize == Self::nmi as *const () as usize;
         let is_branching_executing = self.is_current_instruction_branching();
         if instruction.cycle == instruction.total_cycles {
             (ins_fun)(self, bus);
@@ -409,14 +409,14 @@ impl Cpu {
         let ins = self.opcodes[self.instruction.unwrap().opcode as usize]
             .unwrap()
             .instruction as usize;
-        let bcc_fn: usize = Cpu::bcc as usize;
-        let bcs_fn: usize = Cpu::bcs as usize;
-        let bpl_fn: usize = Cpu::bpl as usize;
-        let bmi_fn: usize = Cpu::bmi as usize;
-        let bne_fn: usize = Cpu::bne as usize;
-        let beq_fn: usize = Cpu::beq as usize;
-        let bvc_fn: usize = Cpu::bvc as usize;
-        let bvs_fn: usize = Cpu::bvs as usize;
+        let bcc_fn: usize = Cpu::bcc as *const () as usize;
+        let bcs_fn: usize = Cpu::bcs as *const () as usize;
+        let bpl_fn: usize = Cpu::bpl as *const () as usize;
+        let bmi_fn: usize = Cpu::bmi as *const () as usize;
+        let bne_fn: usize = Cpu::bne as *const () as usize;
+        let beq_fn: usize = Cpu::beq as *const () as usize;
+        let bvc_fn: usize = Cpu::bvc as *const () as usize;
+        let bvs_fn: usize = Cpu::bvs as *const () as usize;
 
         ins == bcc_fn
             || ins == bcs_fn
@@ -433,14 +433,14 @@ impl Cpu {
     }
 
     fn get_extra_cycles_from_branching(&self, ins: usize) -> u16 {
-        let bcc_fn = Self::bcc as usize;
-        let bcs_fn = Self::bcs as usize;
-        let bpl_fn = Self::bpl as usize;
-        let bmi_fn = Self::bmi as usize;
-        let bne_fn = Self::bne as usize;
-        let beq_fn = Self::beq as usize;
-        let bvc_fn = Self::bvc as usize;
-        let bvs_fn = Self::bvs as usize;
+        let bcc_fn = Self::bcc as *const () as usize;
+        let bcs_fn = Self::bcs as *const () as usize;
+        let bpl_fn = Self::bpl as *const () as usize;
+        let bmi_fn = Self::bmi as *const () as usize;
+        let bne_fn = Self::bne as *const () as usize;
+        let beq_fn = Self::beq as *const () as usize;
+        let bvc_fn = Self::bvc as *const () as usize;
+        let bvs_fn = Self::bvs as *const () as usize;
 
         if (ins == bcc_fn && self.check_condition_for_bcc())
             || (ins == bcs_fn && self.check_condition_for_bcs())
