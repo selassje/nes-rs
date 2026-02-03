@@ -7,7 +7,7 @@ use super::{mappers::Mapper, mappers::MapperEnum, ram_ppu::*};
 use super::VIDEO_FRAME_WIDTH;
 
 use serde::{Deserialize, Serialize};
-use std::{cell::RefCell, default::Default, fmt::Display};
+use std::{default::Default, fmt::Display};
 pub struct PpuTime {
     pub scanline: i16,
     pub cycle: u16,
@@ -148,19 +148,6 @@ impl Tile {
         let lo_bit = (mask & self.data[y]) >> shift;
         let hi_bit = (mask & self.data[y + 8]) >> shift;
         (2 * hi_bit + lo_bit) as usize
-    }
-}
-#[derive(Serialize, Deserialize)]
-struct PatternTable {
-    #[serde(with = "serde_arrays")]
-    tiles: [Tile; 256],
-}
-
-impl Default for PatternTable {
-    fn default() -> Self {
-        PatternTable {
-            tiles: [Tile::default(); 256],
-        }
     }
 }
 
@@ -317,7 +304,6 @@ pub struct Ppu {
     oam_address: u8,
     #[serde(with = "serde_arrays")]
     oam: Oam,
-    pattern_tables: [RefCell<PatternTable>; 2],
     ppu_cycle: u16,
     scanline: i16,
     scanline_sprites: Vec<Sprite>,
@@ -344,7 +330,6 @@ impl Default for Ppu {
             status_reg: StatusRegister { value: 0 },
             oam_address: 0,
             oam: [0; 256],
-            pattern_tables: Default::default(),
             ppu_cycle: 27,
             scanline: 0,
             scanline_sprites: Vec::new(),
@@ -372,7 +357,6 @@ impl Ppu {
             status_reg: StatusRegister { value: 0 },
             oam_address: 0,
             oam: [0; 256],
-            pattern_tables: Default::default(),
             ppu_cycle: 27,
             scanline: 0,
             scanline_sprites: Vec::new(),
@@ -397,7 +381,6 @@ impl Ppu {
         self.status_reg.value = 0;
         self.oam_address = 0;
         self.oam = [0; 256];
-        self.pattern_tables = [Default::default(), Default::default()];
         self.ppu_cycle = 27;
         self.scanline = 0;
         self.scanline_sprites.clear();
@@ -687,14 +670,11 @@ impl Ppu {
     }
 
     fn get_pattern_tile(&self, table_index: u8, tile_index: u8, bus: &PpuBus) -> Tile {
-        let pattern_table = &self.pattern_tables[table_index as usize];
-        let tiles = &mut pattern_table.borrow_mut().tiles;
-        tiles[tile_index as usize] = Tile {
+        Tile {
             data: self
                 .vram
                 .get_pattern_table_tile_data(table_index, tile_index, bus.mapper),
-        };
-        tiles[tile_index as usize]
+        }
     }
     fn get_background_color_index(&mut self, x: usize) -> (u8, u8) {
         let mut bg_color_index = 0;
