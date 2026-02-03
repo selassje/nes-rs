@@ -398,9 +398,9 @@ impl Mapper for Mapper5 {
     }
 
     fn notify_vblank(&mut self) {
-        self.in_frame = false;
-        self.scanline_counter = 0;
-        self.scanline_irq_pending = false;
+        //self.in_frame = false;
+       // self.scanline_counter = 0;
+       // self.scanline_irq_pending = false;
     }
 
     fn get_nametable_byte(&self, source: NametableSource, offset: u16) -> Option<u8> {
@@ -450,6 +450,9 @@ impl Mapper for Mapper5 {
                 }
                 WriteAccessRegister::PpuData => {
                     self.sprite_mode_8x16 = SpriteMode8x16::Default;
+                    self.in_frame = false;
+                    self.scanline_counter = 0;
+                    self.scanline_irq_pending = false;
                 }
                 _ => {}
             }

@@ -427,37 +427,21 @@ impl Ppu {
             }
             FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET => {
                 bus.mapper.notify_background_tiles_fetch();
-                let tile_index = self.tile_data[2].index;
-                self.tile_data[2].low_bg_pattern_byte = if let Some(byte) = bus
-                    .mapper
-                    .get_low_pattern_data(pattern_table_index, tile_index, fine_y as u8)
-                {
-                    byte
-                } else {
-                    self.vram.get_low_pattern_data(
-                        pattern_table_index,
-                        tile_index,
-                        fine_y as u8,
-                        bus.mapper,
-                    )
-                }
+                self.tile_data[2].low_bg_pattern_byte = self.vram.get_low_pattern_data(
+                    pattern_table_index,
+                    self.tile_data[2].index,
+                    fine_y as u8,
+                    bus.mapper,
+                );
             }
             FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET => {
                 bus.mapper.notify_background_tiles_fetch();
-                let tile_index = self.tile_data[2].index;
-                self.tile_data[2].high_bg_pattern_byte = if let Some(byte) = bus
-                    .mapper
-                    .get_high_pattern_data(pattern_table_index, tile_index, fine_y as u8)
-                {
-                    byte
-                } else {
-                    self.vram.get_high_pattern_data(
-                        pattern_table_index,
-                        tile_index,
-                        fine_y as u8,
-                        bus.mapper,
-                    )
-                }
+                self.tile_data[2].high_bg_pattern_byte = self.vram.get_high_pattern_data(
+                    pattern_table_index,
+                    self.tile_data[2].index,
+                    fine_y as u8,
+                    bus.mapper,
+                );
             }
             _ => {}
         }
