@@ -460,6 +460,7 @@ impl Ppu {
                 }
             }
             FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET => {
+                bus.mapper.notify_background_tiles_fetch();
                 let tile_index = self.tile_data[2].index;
                 self.tile_data[2].high_bg_pattern_byte = if let Some(byte) = bus
                     .mapper
