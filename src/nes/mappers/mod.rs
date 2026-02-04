@@ -66,9 +66,12 @@ pub trait Mapper {
 
     fn notify_oam_dma_write(&mut self) {}
 
-    fn notify_background_tiles_fetch(&mut self) {}
+    fn notify_background_pattern_data_fetch(&mut self) {}
 
-    fn notify_sprite_tiles_fetch(&mut self) {}
+    fn notify_sprite_pattern_data_fetch(&mut self) {}
+    
+    fn notify_background_tile_data_fetch_complete(&mut self) {}
+    fn notify_background_tile_data_prefetch_start(&mut self) {}
 
     fn get_attribute_data(&mut self, _tile_x: u8, _tile_y: u8) -> Option<u8> {
         None

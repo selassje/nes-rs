@@ -228,9 +228,8 @@ impl Mapper5 {
         if self.split_mode_control & 0b1000_0000 != 0 && self.extended_ram_mode < 2 {
             let right_side = self.split_mode_control & 0b0100_0000 != 0;
             let split_threshold = self.split_mode_control & 0b0001_1111;
-            let tile_index = self.vertical_split_tile_index / 2;
-            if (right_side && tile_index >= split_threshold)
-                || (!right_side && tile_index < split_threshold)
+            if (right_side && self.vertical_split_tile_index >= split_threshold)
+                || (!right_side && self.vertical_split_tile_index < split_threshold)
             {
                 return true;
             }
@@ -440,7 +439,6 @@ impl Mapper for Mapper5 {
         if self.scanline_counter == self.scanline_compare_value {
             self.scanline_irq_pending = true;
         }
-        self.vertical_split_tile_index = 0;
     }
 
     fn is_irq_pending(&self) -> bool {
@@ -520,13 +518,19 @@ impl Mapper for Mapper5 {
             self.scanline_irq_pending = false;
         }
     }
+    fn notify_background_tile_data_prefetch_start(&mut self) {
+        self.vertical_split_tile_index = 0;
+    }
 
-    fn notify_background_tiles_fetch(&mut self) {
+    fn notify_background_tile_data_fetch_complete(&mut self) {
         self.vertical_split_tile_index += 1;
+    }
+
+    fn notify_background_pattern_data_fetch(&mut self) {
         self.fetch_mode = FetchMode::Background;
     }
 
-    fn notify_sprite_tiles_fetch(&mut self) {
+    fn notify_sprite_pattern_data_fetch(&mut self) {
         self.fetch_mode = FetchMode::Sprites;
     }
 

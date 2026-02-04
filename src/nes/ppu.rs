@@ -426,7 +426,7 @@ impl Ppu {
                     }
             }
             FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET => {
-                bus.mapper.notify_background_tiles_fetch();
+                bus.mapper.notify_background_pattern_data_fetch();
                 self.tile_data[2].low_bg_pattern_byte = self.vram.get_low_pattern_data(
                     pattern_table_index,
                     self.tile_data[2].index,
@@ -435,13 +435,14 @@ impl Ppu {
                 );
             }
             FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET => {
-                bus.mapper.notify_background_tiles_fetch();
+                bus.mapper.notify_background_pattern_data_fetch();
                 self.tile_data[2].high_bg_pattern_byte = self.vram.get_high_pattern_data(
                     pattern_table_index,
                     self.tile_data[2].index,
                     fine_y as u8,
                     bus.mapper,
                 );
+                bus.mapper.notify_background_tile_data_fetch_complete();
             }
             _ => {}
         }
@@ -552,6 +553,9 @@ impl Ppu {
 
                 321..=336 => {
                     if self.is_rendering_enabled() {
+                        if self.ppu_cycle == 321 {
+                            bus.mapper.notify_background_tile_data_prefetch_start();
+                        }
                         self.fetch_next_tile_data(bus)
                     }
                 }
@@ -591,6 +595,9 @@ impl Ppu {
 
                 321..=336 => {
                     if self.is_rendering_enabled() {
+                        if self.ppu_cycle == 321 {
+                            bus.mapper.notify_background_tile_data_prefetch_start();
+                        }
                         self.fetch_next_tile_data(bus)
                     }
                 }
@@ -720,7 +727,7 @@ impl Ppu {
                         y = 7 - y;
                     }
 
-                    bus.mapper.notify_sprite_tiles_fetch();
+                    bus.mapper.notify_sprite_pattern_data_fetch();
                     let tile = self.get_pattern_tile(pattern_table_index, tile_index, bus);
                     let color_index = tile.get_color_index(x as usize, y as usize);
                     if color_index != 0 {
