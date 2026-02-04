@@ -225,7 +225,10 @@ impl Mapper5 {
         }
     }
     fn is_in_split_region(&self) -> bool {
-        if self.split_mode_control & 0b1000_0000 != 0 && self.extended_ram_mode < 2 {
+        if self.are_ext_features_enabled
+            && self.split_mode_control & 0b1000_0000 != 0
+            && self.extended_ram_mode < 2
+        {
             let right_side = self.split_mode_control & 0b0100_0000 != 0;
             let split_threshold = self.split_mode_control & 0b0001_1111;
             if (right_side && self.vertical_split_tile_index >= split_threshold)
@@ -535,7 +538,7 @@ impl Mapper for Mapper5 {
     }
 
     fn get_attribute_data(&mut self, tile_x: u8, tile_y: u8) -> Option<u8> {
-        if self.extended_ram_mode != 1 || self.is_in_split_region() {
+        if !self.are_ext_features_enabled || self.extended_ram_mode != 1 || self.is_in_split_region() {
             return None;
         }
         self.attr_tile_index = tile_y * 32 + tile_x;
@@ -545,14 +548,13 @@ impl Mapper for Mapper5 {
     }
 
     fn get_low_pattern_data(&self, table_index: u8, pattern_tile_index: u8, y: u8) -> Option<u8> {
-        if self.extended_ram_mode != 1 && !self.is_in_split_region() {
+        if !self.are_ext_features_enabled || (self.extended_ram_mode != 1 && !self.is_in_split_region()) {
             return None;
         }
-
         Some(self.get_ext_chr_byte(table_index, pattern_tile_index, y, false))
     }
     fn get_high_pattern_data(&self, table_index: u8, pattern_tile_index: u8, y: u8) -> Option<u8> {
-        if self.extended_ram_mode != 1 && !self.is_in_split_region() {
+        if !self.are_ext_features_enabled || (self.extended_ram_mode != 1 && !self.is_in_split_region()) {
             return None;
         }
         Some(self.get_ext_chr_byte(table_index, pattern_tile_index, y, true))
