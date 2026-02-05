@@ -222,7 +222,7 @@ struct VRAMAddress {
 #[derive(Default, Copy, Clone, Debug, Serialize, Deserialize)]
 struct TileData {
     index: u8,
-    attribute_byte: u8,
+    bg_palette_index: u8,
     low_bg_pattern_byte: u8,
     high_bg_pattern_byte: u8,
 }
@@ -413,16 +413,12 @@ impl Ppu {
                         .get_nametable_tile_index(nametable_index, tile_x, tile_y, bus.mapper)
             }
             FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET => {
-                self.tile_data[2].attribute_byte =
-                    if let Some(byte) = bus.mapper.get_attribute_data(tile_x, tile_y) {
+                self.tile_data[2].bg_palette_index =
+                    if let Some(byte) = bus.mapper.get_background_palette_index(tile_x, tile_y) {
                         byte
                     } else {
-                        self.vram.get_attribute_data(
-                            nametable_index,
-                            tile_x / 2,
-                            tile_y / 2,
-                            bus.mapper,
-                        )
+                        self.vram
+                            .get_background_palette_index(nametable_index, tile_x, tile_y, bus.mapper)
                     }
             }
             FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET => {
@@ -684,7 +680,7 @@ impl Ppu {
             let color_index_lo = (tile_data.low_bg_pattern_byte & (1 << x)) >> x;
             let color_index_hi = (tile_data.high_bg_pattern_byte & (1 << x)) >> x;
             bg_color_index = 2 * color_index_hi + color_index_lo;
-            bg_palette_index = tile_data.attribute_byte;
+            bg_palette_index = tile_data.bg_palette_index;
         }
         (bg_color_index, bg_palette_index)
     }

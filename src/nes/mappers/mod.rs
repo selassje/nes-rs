@@ -73,7 +73,7 @@ pub trait Mapper {
     fn notify_background_tile_data_fetch_complete(&mut self) {}
     fn notify_background_tile_data_prefetch_start(&mut self) {}
 
-    fn get_attribute_data(&mut self, _tile_x: u8, _tile_y: u8) -> Option<u8> {
+    fn get_background_palette_index(&mut self, _tile_x: u8, _tile_y: u8) -> Option<u8> {
         None
     }
 

@@ -1,4 +1,3 @@
-use self::AttributeDataQuadrantMask::*;
 use super::common::NametableSource;
 use super::mappers::MapperEnum;
 
@@ -23,20 +22,6 @@ const PALETTES_RANGE: Range<u16> = Range {
     start: PALETTES_START,
     end: PALETTES_END,
 };
-
-enum AttributeDataQuadrantMask {
-    TopLeft = 0b00000011,
-    TopRight = 0b00001100,
-    BottomLeft = 0b00110000,
-    BottomRight = 0b11000000,
-}
-
-const ATTRIBUTE_DATA_QUADRANT_MASKS: [u8; 4] = [
-    TopLeft as u8,
-    TopRight as u8,
-    BottomLeft as u8,
-    BottomRight as u8,
-];
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct VRam {
@@ -185,18 +170,23 @@ impl VideoMemory for VRam {
         self.get_palette(0x3F01 + 4 * palette_index as u16, mapper)
     }
 
-    fn get_attribute_data(
+    fn get_background_palette_index(
         &self,
         table_index: u8,
-        color_tile_x: u8,
-        color_tile_y: u8,
-        mapper: &MapperEnum,
+        tile_x: u8,
+        tile_y: u8,
+        mapper: &mut MapperEnum,
     ) -> u8 {
+        if let Some(palette_index) = mapper.get_background_palette_index(tile_x, tile_y) {
+            return palette_index;
+        }
+        let attr_x = tile_x / 4;
+        let attr_y = tile_y / 4;
         let attrib_addr = NAMETABLES_START + table_index as u16 * NAMETABLE_SIZE + 960;
-        let attribute_index = (color_tile_y / 2) * 8 + color_tile_x / 2;
+        let attribute_index = attr_y * 8 + attr_x;
         let attribute_data = self.get_byte_internal(attrib_addr + attribute_index as u16, mapper);
-        let quadrant: u8 = (color_tile_y % 2) * 2 + (color_tile_x % 2);
-        (attribute_data & ATTRIBUTE_DATA_QUADRANT_MASKS[quadrant as usize]) >> (2 * quadrant)
+        let quadrant = ((tile_y >> 1) & 1) * 2 + ((tile_x >> 1) & 1);
+        (attribute_data >> (quadrant * 2)) & 0b11
     }
 
     fn get_low_pattern_data(

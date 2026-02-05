@@ -215,6 +215,21 @@ impl Mapper5 {
         if is_high_pattern_data {
             address += 8;
         }
+        if self.is_in_split_region() {
+          /*
+            println!(
+                "Split CHR: tile_idx={}, table={}, eff_table={}, fine_y={}, bank={}, addr={:04X}, scanline={}, prefetch={}",
+                pattern_tile_index,
+                table_index,
+                effective_table_index,
+                fine_y,
+                bank,
+                address,
+                self.scanline_counter,
+                self.in_prefetch_phase
+            );
+          */
+        }
         self.mapper_internal.get_chr_byte(address, bank, _4KB)
     }
 
@@ -248,8 +263,9 @@ impl Mapper5 {
         {
             let right_side = self.split_mode_control & 0b0100_0000 != 0;
             let split_threshold = self.split_mode_control & 0b0001_1111;
-            if (right_side && self.vertical_split_tile_index >= split_threshold)
-                || (!right_side && self.vertical_split_tile_index < split_threshold)
+            let effective_tile = self.vertical_split_tile_index % 32;
+            if (right_side && effective_tile >= split_threshold)
+                || (!right_side && effective_tile < split_threshold)
             {
                 return true;
             }
@@ -366,12 +382,15 @@ impl Mapper for Mapper5 {
             }
             SPLIT_MODE_CONTROL_REGISTER => {
                 self.split_mode_control = byte;
+                println!("Mapper5: Set split mode control to {:08b}", byte);
             }
             SPLIT_MODE_SCROLL_REGISTER => {
+                println!("Mapper5: Set split mode scroll to {}", byte);
                 self.split_mode_scroll = byte;
             }
             SPLIT_MODE_BANK_REGISTER => {
                 self.split_mode_bank = byte;
+                println!("Mapper5: Set split mode bank to {}", byte);
             }
             IRQ_SCANLINE_COMPARE_REGISTER => {
                 self.scanline_compare_value = byte;
@@ -479,6 +498,17 @@ impl Mapper for Mapper5 {
             let tile_x = self.vertical_split_tile_index;
             let index = (coarse_y as usize * 32) + tile_x as usize;
             //let index = (offset & 0x3FF) as usize;
+            /*
+               println!(
+                   "Split NT: tile_x={}, scanline_counter={}, in_prefetch={}, effective_y={}, coarse_y={}, index={}",
+                   self.vertical_split_tile_index,
+                   self.scanline_counter,
+                   self.in_prefetch_phase,
+                   effective_y,
+                   coarse_y,
+                   index
+               );
+            */
             return Some(self.expansion_ram[index]);
         }
         match source {
@@ -555,7 +585,9 @@ impl Mapper for Mapper5 {
     }
 
     fn notify_background_tile_data_fetch_complete(&mut self) {
-        self.vertical_split_tile_index += 1;
+        if !self.in_prefetch_phase {
+            self.vertical_split_tile_index += 1;
+        }
     }
 
     fn notify_background_pattern_data_fetch(&mut self) {
@@ -566,7 +598,7 @@ impl Mapper for Mapper5 {
         self.fetch_mode = FetchMode::Sprites;
     }
 
-    fn get_attribute_data(&mut self, tile_x: u8, tile_y: u8) -> Option<u8> {
+    fn get_background_palette_index(&mut self, tile_x: u8, tile_y: u8) -> Option<u8> {
         if !self.are_ext_features_enabled
             || self.extended_ram_mode != 1
             || self.is_in_split_region()
