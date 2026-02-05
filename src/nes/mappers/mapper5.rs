@@ -81,6 +81,7 @@ pub struct Mapper5 {
     use_ext_as_default_for_8x16_sprite_mode: bool,
     attr_tile_index: u8,
     vertical_split_tile_index: u8,
+    in_prefetch_phase: bool,
 }
 
 impl Mapper5 {
@@ -114,6 +115,7 @@ impl Mapper5 {
             use_ext_as_default_for_8x16_sprite_mode: false,
             attr_tile_index: 0,
             vertical_split_tile_index: 0,
+            in_prefetch_phase: false,
         }
     }
 
@@ -187,14 +189,29 @@ impl Mapper5 {
         y: u8,
         is_high_pattern_data: bool,
     ) -> u8 {
-        let lower_bank_index = if self.is_in_split_region() {
-            self.split_mode_bank
+        let bank = if self.is_in_split_region() {
+            ((self.chr_bank_upper_bits as usize) << 8) | self.split_mode_bank as usize
         } else {
-            self.expansion_ram[self.attr_tile_index as usize] & 0b0011_1111
+            ((self.chr_bank_upper_bits as usize) << 6)
+                | (self.expansion_ram[self.attr_tile_index as usize] & 0b0011_1111) as usize
         };
-        let bank = ((self.chr_bank_upper_bits as usize) << 6) | lower_bank_index as usize;
-        let pattern_table_addr = table_index as u16 * PATTERN_TABLE_SIZE;
-        let mut address = pattern_table_addr + 16 * pattern_tile_index as u16 + y as u16;
+        let effective_table_index = if self.is_in_split_region() {
+            0
+        } else {
+            table_index
+        };
+        let effective_scanline = if self.in_prefetch_phase {
+            self.scanline_counter as u16 + 1
+        } else {
+            self.scanline_counter as u16
+        };
+        let pattern_table_addr = effective_table_index as u16 * PATTERN_TABLE_SIZE;
+        let fine_y = if self.is_in_split_region() {
+            ((self.split_mode_scroll as u16 + effective_scanline) % 240 % 8) as u8
+        } else {
+            y
+        };
+        let mut address = pattern_table_addr + 16 * pattern_tile_index as u16 + fine_y as u16;
         if is_high_pattern_data {
             address += 8;
         }
@@ -387,7 +404,7 @@ impl Mapper for Mapper5 {
                 }
             }
             _ => {
-                println!("Store prg byte: Unknown address ${:04X}", address)
+                //     println!("Store prg byte: Unknown address ${:04X}", address)
             }
         }
     }
@@ -429,10 +446,12 @@ impl Mapper for Mapper5 {
         self.use_ext_as_default_for_8x16_sprite_mode = false;
         self.attr_tile_index = 0;
         self.vertical_split_tile_index = 0;
+        self.in_prefetch_phase = false;
         self.mapper_internal.power_cycle();
     }
 
     fn notify_scanline(&mut self) {
+        self.in_prefetch_phase = false;
         if !self.in_frame {
             self.in_frame = true;
             self.scanline_counter = 0;
@@ -450,7 +469,16 @@ impl Mapper for Mapper5 {
 
     fn get_nametable_byte(&self, source: NametableSource, offset: u16) -> Option<u8> {
         if self.is_in_split_region() {
-            let index = (offset & 0x3FF) as usize;
+            let effective_scanline = if self.in_prefetch_phase {
+                self.scanline_counter as u16 + 1
+            } else {
+                self.scanline_counter as u16
+            };
+            let effective_y = (self.split_mode_scroll as u16 + effective_scanline as u16) % 240;
+            let coarse_y = effective_y / 8;
+            let tile_x = self.vertical_split_tile_index;
+            let index = (coarse_y as usize * 32) + tile_x as usize;
+            //let index = (offset & 0x3FF) as usize;
             return Some(self.expansion_ram[index]);
         }
         match source {
@@ -523,6 +551,7 @@ impl Mapper for Mapper5 {
     }
     fn notify_background_tile_data_prefetch_start(&mut self) {
         self.vertical_split_tile_index = 0;
+        self.in_prefetch_phase = true;
     }
 
     fn notify_background_tile_data_fetch_complete(&mut self) {
@@ -538,7 +567,10 @@ impl Mapper for Mapper5 {
     }
 
     fn get_attribute_data(&mut self, tile_x: u8, tile_y: u8) -> Option<u8> {
-        if !self.are_ext_features_enabled || self.extended_ram_mode != 1 || self.is_in_split_region() {
+        if !self.are_ext_features_enabled
+            || self.extended_ram_mode != 1
+            || self.is_in_split_region()
+        {
             return None;
         }
         self.attr_tile_index = tile_y * 32 + tile_x;
@@ -548,13 +580,17 @@ impl Mapper for Mapper5 {
     }
 
     fn get_low_pattern_data(&self, table_index: u8, pattern_tile_index: u8, y: u8) -> Option<u8> {
-        if !self.are_ext_features_enabled || (self.extended_ram_mode != 1 && !self.is_in_split_region()) {
+        if !self.are_ext_features_enabled
+            || (self.extended_ram_mode != 1 && !self.is_in_split_region())
+        {
             return None;
         }
         Some(self.get_ext_chr_byte(table_index, pattern_tile_index, y, false))
     }
     fn get_high_pattern_data(&self, table_index: u8, pattern_tile_index: u8, y: u8) -> Option<u8> {
-        if !self.are_ext_features_enabled || (self.extended_ram_mode != 1 && !self.is_in_split_region()) {
+        if !self.are_ext_features_enabled
+            || (self.extended_ram_mode != 1 && !self.is_in_split_region())
+        {
             return None;
         }
         Some(self.get_ext_chr_byte(table_index, pattern_tile_index, y, true))
