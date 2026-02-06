@@ -413,13 +413,12 @@ impl Ppu {
                         .get_nametable_tile_index(nametable_index, tile_x, tile_y, bus.mapper)
             }
             FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET => {
-                self.tile_data[2].bg_palette_index =
-                    if let Some(byte) = bus.mapper.get_background_palette_index(tile_x, tile_y) {
-                        byte
-                    } else {
-                        self.vram
-                            .get_background_palette_index(nametable_index, tile_x, tile_y, bus.mapper)
-                    }
+                self.tile_data[2].bg_palette_index = self.vram.get_background_palette_index(
+                    nametable_index,
+                    tile_x,
+                    tile_y,
+                    bus.mapper,
+                );
             }
             FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET => {
                 bus.mapper.notify_background_pattern_data_fetch();

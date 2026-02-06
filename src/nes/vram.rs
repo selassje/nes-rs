@@ -82,12 +82,13 @@ impl VRam {
             mapper.get_chr_byte(address)
         } else if NAMETABLES_RANGE.contains(&address) {
             let (source, inner) = self.get_nametable_source_and_offset(address, mapper);
-            if let Some(byte) = mapper.get_nametable_byte(source, inner) {
-                byte
-            } else {
-                self.memory
-                    .get_byte(self.get_target_address(address, mapper))
+            if inner < 960 {
+                if let Some(byte) = mapper.get_nametable_byte(source, inner) {
+                    return byte;
+                }
             }
+            self.memory
+                .get_byte(self.get_target_address(address, mapper))
         } else {
             self.memory
                 .get_byte(self.get_target_address(address, mapper))

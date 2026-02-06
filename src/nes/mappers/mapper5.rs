@@ -201,7 +201,11 @@ impl Mapper5 {
             table_index
         };
         let effective_scanline = if self.in_prefetch_phase {
-            self.scanline_counter as u16 + 1
+            if self.in_frame {
+                self.scanline_counter as u16 + 1
+            } else {
+                0 // First scanline of new frame
+            }
         } else {
             self.scanline_counter as u16
         };
@@ -215,21 +219,6 @@ impl Mapper5 {
         if is_high_pattern_data {
             address += 8;
         }
-        if self.is_in_split_region() {
-          /*
-            println!(
-                "Split CHR: tile_idx={}, table={}, eff_table={}, fine_y={}, bank={}, addr={:04X}, scanline={}, prefetch={}",
-                pattern_tile_index,
-                table_index,
-                effective_table_index,
-                fine_y,
-                bank,
-                address,
-                self.scanline_counter,
-                self.in_prefetch_phase
-            );
-          */
-        }
         self.mapper_internal.get_chr_byte(address, bank, _4KB)
     }
 
@@ -238,8 +227,8 @@ impl Mapper5 {
     }
     fn get_cpu_ex_ram_access_mode(&self) -> CpuExRamAccess {
         const CPU_EXRAM_ACCESS_MODE_DURING_BLANKING: [CpuExRamAccess; 4] = [
-            CpuExRamAccess::None,
-            CpuExRamAccess::None,
+            CpuExRamAccess::Write,  // Mode 0: CPU writes allowed, reads return open bus
+            CpuExRamAccess::Write,  // Mode 1: CPU writes allowed, reads return open bus
             CpuExRamAccess::ReadWrite,
             CpuExRamAccess::Read,
         ];
@@ -263,7 +252,7 @@ impl Mapper5 {
         {
             let right_side = self.split_mode_control & 0b0100_0000 != 0;
             let split_threshold = self.split_mode_control & 0b0001_1111;
-            let effective_tile = self.vertical_split_tile_index % 32;
+            let effective_tile = self.vertical_split_tile_index;
             if (right_side && effective_tile >= split_threshold)
                 || (!right_side && effective_tile < split_threshold)
             {
@@ -361,6 +350,13 @@ impl Mapper for Mapper5 {
             }
             NAMETABLE_MAPPING_REGISTER => {
                 self.nametable_mapping = byte;
+                // Decode nametable sources (0=VRAM0, 1=VRAM1, 2=ExRAM, 3=Fill)
+                let nt0 = byte & 0b11;
+                let nt1 = (byte >> 2) & 0b11;
+                let nt2 = (byte >> 4) & 0b11;
+                let nt3 = (byte >> 6) & 0b11;
+                println!("Mapper5: Set nametable mapping to {:02X} (NT0={}, NT1={}, NT2={}, NT3={})",
+                    byte, nt0, nt1, nt2, nt3);
             }
             FILL_MODE_TILE_REGISTER => {
                 self.fill_mode_tile = byte;
@@ -400,10 +396,23 @@ impl Mapper for Mapper5 {
             }
             EXPANSION_RAM_START..=EXPANSION_RAM_END => {
                 let access_mode = self.get_cpu_ex_ram_access_mode();
+                let index = (address - EXPANSION_RAM_START) as usize;
                 if access_mode == CpuExRamAccess::Write || access_mode == CpuExRamAccess::ReadWrite
                 {
-                    let index = (address - EXPANSION_RAM_START) as usize;
+                    // Debug: track all CPU writes to ExRAM
+                    let row = index / 32;
+                    let col = index % 32;
+                    if col >= 20 {
+                        println!("ExRAM CPU write: row={}, col={}, index={}, value={}, mode={}", row, col, index, byte, self.extended_ram_mode);
+                    }
                     self.expansion_ram[index] = byte;
+                } else {
+                    let row = index / 32;
+                    let col = index % 32;
+                    if col >= 20 {
+                        println!("ExRAM CPU write BLOCKED: row={}, col={}, index={}, value={}, mode={}, rendering={}",
+                            row, col, index, byte, self.extended_ram_mode, self.is_rendering());
+                    }
                 }
             }
             address if PRG_RANGE.contains(&address) => {
@@ -489,7 +498,11 @@ impl Mapper for Mapper5 {
     fn get_nametable_byte(&self, source: NametableSource, offset: u16) -> Option<u8> {
         if self.is_in_split_region() {
             let effective_scanline = if self.in_prefetch_phase {
-                self.scanline_counter as u16 + 1
+                if self.in_frame {
+                    self.scanline_counter as u16 + 1
+                } else {
+                    0 // First scanline of new frame
+                }
             } else {
                 self.scanline_counter as u16
             };
@@ -497,18 +510,17 @@ impl Mapper for Mapper5 {
             let coarse_y = effective_y / 8;
             let tile_x = self.vertical_split_tile_index;
             let index = (coarse_y as usize * 32) + tile_x as usize;
-            //let index = (offset & 0x3FF) as usize;
-            /*
-               println!(
-                   "Split NT: tile_x={}, scanline_counter={}, in_prefetch={}, effective_y={}, coarse_y={}, index={}",
-                   self.vertical_split_tile_index,
-                   self.scanline_counter,
-                   self.in_prefetch_phase,
-                   effective_y,
-                   coarse_y,
-                   index
-               );
-            */
+            // Debug: print for specific scanlines to verify coarse_y calculation
+            if effective_scanline < 8 || (effective_scanline >= 24 && effective_scanline < 32)
+                || (effective_scanline >= 48 && effective_scanline < 56) {
+                let tile_value = self.expansion_ram[index];
+                let row = index / 32;
+                let col = index % 32;
+                println!(
+                    "NT read: scanline={}, scroll={}, coarse_y={}, tile_x={}, row={}, col={}, index={}, tile={}",
+                    effective_scanline, self.split_mode_scroll, coarse_y, tile_x, row, col, index, tile_value
+                );
+            }
             return Some(self.expansion_ram[index]);
         }
         match source {
@@ -534,8 +546,14 @@ impl Mapper for Mapper5 {
     fn store_nametable_byte(&mut self, source: NametableSource, offset: u16, byte: u8) -> bool {
         match source {
             NametableSource::ExRam => {
+                let index = (offset & 0x3FF) as usize;
                 if self.is_rendering() || self.extended_ram_mode <= 1 {
-                    let index = (offset & 0x3FF) as usize;
+                    // Debug: track all NT writes to ExRAM
+                    let row = index / 32;
+                    let col = index % 32;
+                    if col >= 20 {
+                        println!("ExRAM NT write: row={}, col={}, index={}, value={}, mode={}", row, col, index, byte, self.extended_ram_mode);
+                    }
                     self.expansion_ram[index] = byte;
                 }
                 true
@@ -580,14 +598,18 @@ impl Mapper for Mapper5 {
         }
     }
     fn notify_background_tile_data_prefetch_start(&mut self) {
+        // If scanline_counter is high (near end of frame), we're at the pre-render
+        // scanline prefetch (start of a new frame), so reset frame state
+        if self.in_frame && self.scanline_counter >= 239 {
+            self.in_frame = false;
+            self.scanline_counter = 0;
+        }
         self.vertical_split_tile_index = 0;
         self.in_prefetch_phase = true;
     }
 
     fn notify_background_tile_data_fetch_complete(&mut self) {
-        if !self.in_prefetch_phase {
-            self.vertical_split_tile_index += 1;
-        }
+        self.vertical_split_tile_index = (self.vertical_split_tile_index + 1) & 0x1F;
     }
 
     fn notify_background_pattern_data_fetch(&mut self) {
