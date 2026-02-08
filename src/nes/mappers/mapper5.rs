@@ -82,7 +82,6 @@ pub struct Mapper5 {
     use_ext_as_default_for_8x16_sprite_mode: bool,
     attr_tile_index: u8,
     vertical_split_tile_index: u8,
-    in_prefetch_phase: bool,
     last_split_exram_byte: std::cell::Cell<u8>,  // For split mode palette
 }
 
@@ -118,7 +117,6 @@ impl Mapper5 {
             use_ext_as_default_for_8x16_sprite_mode: false,
             attr_tile_index: 0,
             vertical_split_tile_index: 0,
-            in_prefetch_phase: false,
             last_split_exram_byte: std::cell::Cell::new(0),
         }
     }
@@ -439,13 +437,11 @@ impl Mapper for Mapper5 {
         self.use_ext_as_default_for_8x16_sprite_mode = false;
         self.attr_tile_index = 0;
         self.vertical_split_tile_index = 0;
-        self.in_prefetch_phase = false;
         self.last_split_exram_byte.set(0);
         self.mapper_internal.power_cycle();
     }
 
     fn notify_scanline(&mut self) {
-        self.in_prefetch_phase = false;
         if !self.in_frame {
             self.in_frame = true;
             self.scanline_counter = 0;
@@ -463,16 +459,7 @@ impl Mapper for Mapper5 {
 
     fn get_nametable_byte(&self, source: NametableSource, offset: u16) -> Option<u8> {
         if self.is_in_split_region() {
-            let effective_scanline = if self.in_prefetch_phase {
-                if self.in_frame {
-                    self.scanline_counter as u16 + 1
-                } else {
-                    0
-                }
-            } else {
-                self.scanline_counter as u16
-            };
-            let effective_y = (self.split_mode_scroll as u16 + effective_scanline) % 240;
+            let effective_y = (self.split_mode_scroll as u16 + self.scanline_counter as u16) % 240;
             let coarse_y = effective_y / 8;
             let tile_x = self.vertical_split_tile_index;
             let index = (coarse_y as usize * 32) + tile_x as usize;
@@ -549,7 +536,6 @@ impl Mapper for Mapper5 {
             self.split_mode_scroll_latch = self.split_mode_scroll;
         }
         self.vertical_split_tile_index = 0;
-        self.in_prefetch_phase = true;
     }
 
     fn notify_background_tile_data_fetch_complete(&mut self) {
@@ -570,16 +556,7 @@ impl Mapper for Mapper5 {
         }
 
         if self.is_in_split_region() {
-            let effective_scanline = if self.in_prefetch_phase {
-                if self.in_frame {
-                    self.scanline_counter as u16 + 1
-                } else {
-                    0
-                }
-            } else {
-                self.scanline_counter as u16
-            };
-            let effective_y = (self.split_mode_scroll as u16 + effective_scanline) % 240;
+            let effective_y = (self.split_mode_scroll as u16 + self.scanline_counter  as u16) % 240;
             let coarse_y = (effective_y / 8) as u8;
             let split_tile_x = self.vertical_split_tile_index;
             let attr_x = split_tile_x / 4;
