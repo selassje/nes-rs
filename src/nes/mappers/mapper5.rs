@@ -66,7 +66,6 @@ pub struct Mapper5 {
     fill_mode_color: u8,
     split_mode_control: u8,
     split_mode_scroll: u8,
-    split_mode_scroll_latch: u8,  // Latched at frame start
     split_mode_bank: u8,
     scanline_compare_value: u8,
     scanline_counter: u8,
@@ -102,7 +101,6 @@ impl Mapper5 {
             fill_mode_color: 0,
             split_mode_control: 0,
             split_mode_scroll: 0,
-            split_mode_scroll_latch: 0,
             split_mode_bank: 0,
             scanline_compare_value: 0,
             scanline_counter: 0,
@@ -301,7 +299,6 @@ impl Mapper for Mapper5 {
             0x5000..=0x5BFF => 0,
             0x4020..=0x4FFF => 0,
             address if PRG_RANGE.contains(&address) => {
-                // Reading NMI vector ($FFFA/$FFFB) clears in_frame, acknowledges IRQ, resets counter
                 if address == 0xFFFA || address == 0xFFFB {
                     self.in_frame = false;
                     self.scanline_irq_pending = false;
@@ -422,7 +419,6 @@ impl Mapper for Mapper5 {
         self.fill_mode_color = 0;
         self.split_mode_control = 0;
         self.split_mode_scroll = 0;
-        self.split_mode_scroll_latch = 0;
         self.split_mode_bank = 0;
         self.scanline_compare_value = 0;
         self.scanline_counter = 0;
@@ -531,9 +527,6 @@ impl Mapper for Mapper5 {
         if self.in_frame && self.scanline_counter >= 239 {
             self.in_frame = false;
             self.scanline_counter = 0;
-        }
-        if !self.in_frame {
-            self.split_mode_scroll_latch = self.split_mode_scroll;
         }
         self.vertical_split_tile_index = 0;
     }
