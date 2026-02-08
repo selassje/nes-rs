@@ -43,7 +43,7 @@ enum FetchMode {
     Sprites,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 enum CpuExRamAccess {
     None = 0,
     Read = 1,
@@ -66,6 +66,7 @@ pub struct Mapper5 {
     fill_mode_color: u8,
     split_mode_control: u8,
     split_mode_scroll: u8,
+    split_mode_scroll_latch: u8,  // Latched at frame start
     split_mode_bank: u8,
     scanline_compare_value: u8,
     scanline_counter: u8,
@@ -82,6 +83,7 @@ pub struct Mapper5 {
     attr_tile_index: u8,
     vertical_split_tile_index: u8,
     in_prefetch_phase: bool,
+    last_split_exram_byte: std::cell::Cell<u8>,  // For split mode palette
 }
 
 impl Mapper5 {
@@ -101,6 +103,7 @@ impl Mapper5 {
             fill_mode_color: 0,
             split_mode_control: 0,
             split_mode_scroll: 0,
+            split_mode_scroll_latch: 0,
             split_mode_bank: 0,
             scanline_compare_value: 0,
             scanline_counter: 0,
@@ -116,6 +119,7 @@ impl Mapper5 {
             attr_tile_index: 0,
             vertical_split_tile_index: 0,
             in_prefetch_phase: false,
+            last_split_exram_byte: std::cell::Cell::new(0),
         }
     }
 
@@ -189,32 +193,18 @@ impl Mapper5 {
         y: u8,
         is_high_pattern_data: bool,
     ) -> u8 {
-        let bank = if self.is_in_split_region() {
+        let in_split = self.is_in_split_region();
+        let bank = if in_split {
             ((self.chr_bank_upper_bits as usize) << 8) | self.split_mode_bank as usize
         } else {
             ((self.chr_bank_upper_bits as usize) << 6)
                 | (self.expansion_ram[self.attr_tile_index as usize] & 0b0011_1111) as usize
         };
-        let effective_table_index = if self.is_in_split_region() {
-            0
-        } else {
-            table_index
-        };
-        let effective_scanline = if self.in_prefetch_phase {
-            if self.in_frame {
-                self.scanline_counter as u16 + 1
-            } else {
-                0 // First scanline of new frame
-            }
-        } else {
-            self.scanline_counter as u16
-        };
+        let effective_table_index = if in_split { 0 } else { table_index };
         let pattern_table_addr = effective_table_index as u16 * PATTERN_TABLE_SIZE;
-        let fine_y = if self.is_in_split_region() {
-            ((self.split_mode_scroll as u16 + effective_scanline) % 240 % 8) as u8
-        } else {
-            y
-        };
+
+        let fine_y = y;
+
         let mut address = pattern_table_addr + 16 * pattern_tile_index as u16 + fine_y as u16;
         if is_high_pattern_data {
             address += 8;
@@ -227,8 +217,8 @@ impl Mapper5 {
     }
     fn get_cpu_ex_ram_access_mode(&self) -> CpuExRamAccess {
         const CPU_EXRAM_ACCESS_MODE_DURING_BLANKING: [CpuExRamAccess; 4] = [
-            CpuExRamAccess::Write,  // Mode 0: CPU writes allowed, reads return open bus
-            CpuExRamAccess::Write,  // Mode 1: CPU writes allowed, reads return open bus
+            CpuExRamAccess::None, 
+            CpuExRamAccess::None,
             CpuExRamAccess::ReadWrite,
             CpuExRamAccess::Read,
         ];
@@ -302,7 +292,7 @@ impl Mapper for Mapper5 {
                 byte
             }
             EXPANSION_RAM_START..=EXPANSION_RAM_END => {
-                let access_mode = self.get_cpu_ex_ram_access_mode();
+                let access_mode = CpuExRamAccess::Read;
                 if access_mode == CpuExRamAccess::Read || access_mode == CpuExRamAccess::ReadWrite {
                     let index = (address - EXPANSION_RAM_START) as usize;
                     self.expansion_ram[index]
@@ -350,13 +340,6 @@ impl Mapper for Mapper5 {
             }
             NAMETABLE_MAPPING_REGISTER => {
                 self.nametable_mapping = byte;
-                // Decode nametable sources (0=VRAM0, 1=VRAM1, 2=ExRAM, 3=Fill)
-                let nt0 = byte & 0b11;
-                let nt1 = (byte >> 2) & 0b11;
-                let nt2 = (byte >> 4) & 0b11;
-                let nt3 = (byte >> 6) & 0b11;
-                println!("Mapper5: Set nametable mapping to {:02X} (NT0={}, NT1={}, NT2={}, NT3={})",
-                    byte, nt0, nt1, nt2, nt3);
             }
             FILL_MODE_TILE_REGISTER => {
                 self.fill_mode_tile = byte;
@@ -378,15 +361,12 @@ impl Mapper for Mapper5 {
             }
             SPLIT_MODE_CONTROL_REGISTER => {
                 self.split_mode_control = byte;
-                println!("Mapper5: Set split mode control to {:08b}", byte);
             }
             SPLIT_MODE_SCROLL_REGISTER => {
-                println!("Mapper5: Set split mode scroll to {}", byte);
                 self.split_mode_scroll = byte;
             }
             SPLIT_MODE_BANK_REGISTER => {
                 self.split_mode_bank = byte;
-                println!("Mapper5: Set split mode bank to {}", byte);
             }
             IRQ_SCANLINE_COMPARE_REGISTER => {
                 self.scanline_compare_value = byte;
@@ -397,22 +377,8 @@ impl Mapper for Mapper5 {
             EXPANSION_RAM_START..=EXPANSION_RAM_END => {
                 let access_mode = self.get_cpu_ex_ram_access_mode();
                 let index = (address - EXPANSION_RAM_START) as usize;
-                if access_mode == CpuExRamAccess::Write || access_mode == CpuExRamAccess::ReadWrite
-                {
-                    // Debug: track all CPU writes to ExRAM
-                    let row = index / 32;
-                    let col = index % 32;
-                    if col >= 20 {
-                        println!("ExRAM CPU write: row={}, col={}, index={}, value={}, mode={}", row, col, index, byte, self.extended_ram_mode);
-                    }
+                if access_mode == CpuExRamAccess::Write || access_mode == CpuExRamAccess::ReadWrite {
                     self.expansion_ram[index] = byte;
-                } else {
-                    let row = index / 32;
-                    let col = index % 32;
-                    if col >= 20 {
-                        println!("ExRAM CPU write BLOCKED: row={}, col={}, index={}, value={}, mode={}, rendering={}",
-                            row, col, index, byte, self.extended_ram_mode, self.is_rendering());
-                    }
                 }
             }
             address if PRG_RANGE.contains(&address) => {
@@ -460,6 +426,7 @@ impl Mapper for Mapper5 {
         self.fill_mode_color = 0;
         self.split_mode_control = 0;
         self.split_mode_scroll = 0;
+        self.split_mode_scroll_latch = 0;
         self.split_mode_bank = 0;
         self.scanline_compare_value = 0;
         self.scanline_counter = 0;
@@ -475,6 +442,7 @@ impl Mapper for Mapper5 {
         self.attr_tile_index = 0;
         self.vertical_split_tile_index = 0;
         self.in_prefetch_phase = false;
+        self.last_split_exram_byte.set(0);
         self.mapper_internal.power_cycle();
     }
 
@@ -501,7 +469,7 @@ impl Mapper for Mapper5 {
                 if self.in_frame {
                     self.scanline_counter as u16 + 1
                 } else {
-                    0 // First scanline of new frame
+                    0
                 }
             } else {
                 self.scanline_counter as u16
@@ -510,18 +478,8 @@ impl Mapper for Mapper5 {
             let coarse_y = effective_y / 8;
             let tile_x = self.vertical_split_tile_index;
             let index = (coarse_y as usize * 32) + tile_x as usize;
-            // Debug: print for specific scanlines to verify coarse_y calculation
-            if effective_scanline < 8 || (effective_scanline >= 24 && effective_scanline < 32)
-                || (effective_scanline >= 48 && effective_scanline < 56) {
-                let tile_value = self.expansion_ram[index];
-                let row = index / 32;
-                let col = index % 32;
-                println!(
-                    "NT read: scanline={}, scroll={}, coarse_y={}, tile_x={}, row={}, col={}, index={}, tile={}",
-                    effective_scanline, self.split_mode_scroll, coarse_y, tile_x, row, col, index, tile_value
-                );
-            }
-            return Some(self.expansion_ram[index]);
+            let tile = self.expansion_ram[index];
+            return Some(tile);
         }
         match source {
             NametableSource::ExRam => {
@@ -547,19 +505,13 @@ impl Mapper for Mapper5 {
         match source {
             NametableSource::ExRam => {
                 let index = (offset & 0x3FF) as usize;
-                if self.is_rendering() || self.extended_ram_mode <= 1 {
-                    // Debug: track all NT writes to ExRAM
-                    let row = index / 32;
-                    let col = index % 32;
-                    if col >= 20 {
-                        println!("ExRAM NT write: row={}, col={}, index={}, value={}, mode={}", row, col, index, byte, self.extended_ram_mode);
-                    }
-                    self.expansion_ram[index] = byte;
-                }
+                self.expansion_ram[index] = byte;
                 true
             }
             NametableSource::Fill => true,
-            _ => false,
+            NametableSource::Vram0 | NametableSource::Vram1 => {
+                false
+            }
         }
     }
 
@@ -598,11 +550,12 @@ impl Mapper for Mapper5 {
         }
     }
     fn notify_background_tile_data_prefetch_start(&mut self) {
-        // If scanline_counter is high (near end of frame), we're at the pre-render
-        // scanline prefetch (start of a new frame), so reset frame state
         if self.in_frame && self.scanline_counter >= 239 {
             self.in_frame = false;
             self.scanline_counter = 0;
+        }
+        if !self.in_frame {
+            self.split_mode_scroll_latch = self.split_mode_scroll;
         }
         self.vertical_split_tile_index = 0;
         self.in_prefetch_phase = true;
@@ -621,10 +574,33 @@ impl Mapper for Mapper5 {
     }
 
     fn get_background_palette_index(&mut self, tile_x: u8, tile_y: u8) -> Option<u8> {
-        if !self.are_ext_features_enabled
-            || self.extended_ram_mode != 1
-            || self.is_in_split_region()
-        {
+        if !self.are_ext_features_enabled {
+            return None;
+        }
+
+        if self.is_in_split_region() {
+            let effective_scanline = if self.in_prefetch_phase {
+                if self.in_frame {
+                    self.scanline_counter as u16 + 1
+                } else {
+                    0
+                }
+            } else {
+                self.scanline_counter as u16
+            };
+            let effective_y = (self.split_mode_scroll as u16 + effective_scanline) % 240;
+            let coarse_y = (effective_y / 8) as u8;
+            let split_tile_x = self.vertical_split_tile_index;
+            let attr_x = split_tile_x / 4;
+            let attr_y = coarse_y / 4;
+            let attr_index = 960 + (attr_y as usize * 8) + attr_x as usize;
+            let attr_byte = self.expansion_ram[attr_index];
+            let quadrant = ((coarse_y >> 1) & 1) * 2 + ((split_tile_x >> 1) & 1);
+            let palette = (attr_byte >> (quadrant * 2)) & 0b11;
+            return Some(palette);
+        }
+
+        if self.extended_ram_mode != 1 {
             return None;
         }
         self.attr_tile_index = tile_y * 32 + tile_x;

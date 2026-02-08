@@ -80,10 +80,13 @@ impl MapperInternal {
     }
 
     pub fn get_chr_byte(&self, address: u16, bank: usize, bank_size: BankSize) -> u8 {
-        let index = Self::get_address_index(address, bank, bank_size);
         if self.chr_rom_size == 0 {
+            let index = Self::get_address_index(address, bank, bank_size);
             self.chr_ram[index]
         } else {
+            let bank_count = self.chr_rom_size / bank_size as usize;
+            let bank = if bank_count > 0 { bank % bank_count } else { 0 };
+            let index = Self::get_address_index(address, bank, bank_size);
             self.chr_rom[index]
         }
     }
