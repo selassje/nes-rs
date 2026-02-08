@@ -292,7 +292,7 @@ impl Mapper for Mapper5 {
                 byte
             }
             EXPANSION_RAM_START..=EXPANSION_RAM_END => {
-                let access_mode = CpuExRamAccess::Read;
+                let access_mode = self.get_cpu_ex_ram_access_mode();
                 if access_mode == CpuExRamAccess::Read || access_mode == CpuExRamAccess::ReadWrite {
                     let index = (address - EXPANSION_RAM_START) as usize;
                     self.expansion_ram[index]
@@ -303,6 +303,12 @@ impl Mapper for Mapper5 {
             0x5000..=0x5BFF => 0,
             0x4020..=0x4FFF => 0,
             address if PRG_RANGE.contains(&address) => {
+                // Reading NMI vector ($FFFA/$FFFB) clears in_frame, acknowledges IRQ, resets counter
+                if address == 0xFFFA || address == 0xFFFB {
+                    self.in_frame = false;
+                    self.scanline_irq_pending = false;
+                    self.scanline_counter = 0;
+                }
                 let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
                 let (bank, is_rom) = self.decode_prg_bank_register(index as u8, bank_size);
                 if is_rom {
@@ -387,14 +393,6 @@ impl Mapper for Mapper5 {
                 if self.is_prg_ram_writable() && !is_rom {
                     self.mapper_internal
                         .store_prg_ram_byte(address, bank, bank_size, byte);
-                } else {
-                    println!(
-                        "Mapper5: Ignored write to PRG address {:04X} with bank register {:?}, index={} RAMProtected={} ",
-                        address,
-                        bank,
-                        index,
-                        self.is_prg_ram_writable()
-                    );
                 }
             }
             _ => {
@@ -454,9 +452,9 @@ impl Mapper for Mapper5 {
         } else {
             self.scanline_counter += 1;
         }
-        if self.scanline_counter == self.scanline_compare_value {
+        if self.scanline_counter == self.scanline_compare_value && self.scanline_compare_value !=0 {
             self.scanline_irq_pending = true;
-        }
+        } 
     }
 
     fn is_irq_pending(&self) -> bool {
@@ -474,12 +472,11 @@ impl Mapper for Mapper5 {
             } else {
                 self.scanline_counter as u16
             };
-            let effective_y = (self.split_mode_scroll as u16 + effective_scanline as u16) % 240;
+            let effective_y = (self.split_mode_scroll as u16 + effective_scanline) % 240;
             let coarse_y = effective_y / 8;
             let tile_x = self.vertical_split_tile_index;
             let index = (coarse_y as usize * 32) + tile_x as usize;
-            let tile = self.expansion_ram[index];
-            return Some(tile);
+            return Some(self.expansion_ram[index]);
         }
         match source {
             NametableSource::ExRam => {
@@ -502,9 +499,9 @@ impl Mapper for Mapper5 {
     }
 
     fn store_nametable_byte(&mut self, source: NametableSource, offset: u16, byte: u8) -> bool {
+        let index = (offset & 0x3FF) as usize;
         match source {
             NametableSource::ExRam => {
-                let index = (offset & 0x3FF) as usize;
                 self.expansion_ram[index] = byte;
                 true
             }
@@ -530,9 +527,6 @@ impl Mapper for Mapper5 {
                 }
                 WriteAccessRegister::PpuData => {
                     self.fetch_mode = FetchMode::Cpu;
-                    self.in_frame = false;
-                    self.scanline_counter = 0;
-                    self.scanline_irq_pending = false;
                 }
                 _ => {}
             }
@@ -544,9 +538,6 @@ impl Mapper for Mapper5 {
             && register == ReadAccessRegister::PpuData
         {
             self.fetch_mode = FetchMode::Cpu;
-            self.in_frame = false;
-            self.scanline_counter = 0;
-            self.scanline_irq_pending = false;
         }
     }
     fn notify_background_tile_data_prefetch_start(&mut self) {
