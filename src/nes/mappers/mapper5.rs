@@ -7,6 +7,9 @@ use crate::nes::mappers::PRG_RAM_RANGE;
 use crate::nes::mappers::PRG_RANGE;
 use crate::nes::ram_ppu::ReadAccessRegister;
 use crate::nes::ram_ppu::WriteAccessRegister;
+use crate::nes::apu::DUTY_CYCLE_SEQUENCES;
+use crate::nes::apu::LengthCounterChannel;
+use crate::nes::apu::Envelope;
 
 use BankSize::*;
 
@@ -36,6 +39,116 @@ const MULTIPLIER_A_REGISTER: u16 = 0x5205;
 const MULTIPLIER_B_REGISTER: u16 = 0x5206;
 const EXPANSION_RAM_START: u16 = 0x5C00;
 const EXPANSION_RAM_END: u16 = 0x5FFF;
+#[derive(Serialize, Deserialize)]
+struct PulseWave {
+    data: [u8; 4],
+    length_counter: u8,
+    sequencer_position: u8,
+    timer_tick: u16,
+    envelope: Envelope,
+}
+
+impl PulseWave {
+    fn new() -> Self {
+        PulseWave {
+            data: [0; 4],
+            length_counter: 0,
+            timer_tick: 0,
+            sequencer_position: 0,
+            envelope: Envelope::default(),
+        }
+    }
+
+    fn power_cycle(&mut self) {
+        self.data = [0; 4];
+        self.length_counter = 0;
+        self.timer_tick = 0;
+        self.sequencer_position = 0;
+        self.envelope = Envelope::default();
+    }
+
+
+    fn reset_phase(&mut self) {
+        self.sequencer_position = 0;
+        self.envelope.start_flag = true;
+    }
+
+    fn get_duty_cycle(&self) -> u8 {
+        (self.data[0] & 0b11000000) >> 6
+    }
+
+    fn is_length_counter_halt_envelope_loop_flag_set(&self) -> bool {
+        (self.data[0] & 0b00100000) != 0
+    }
+
+    fn is_constant_volume_set(&self) -> bool {
+        (self.data[0] & 0b00010000) != 0
+    }
+
+    fn get_constant_volume_or_envelope_divider_reload_value(&self) -> u8 {
+        self.data[0] & 0x0F
+    }
+
+    fn get_raw_timer_period(&self) -> u16 {
+        let timer_hi = ((self.data[3] & 0x7) as u16) << 8;
+        self.data[2] as u16 + timer_hi
+    }
+
+    fn clock_timer(&mut self) {
+        if self.timer_tick == 0 {
+            if self.sequencer_position > 0 {
+                self.sequencer_position -= 1;
+            } else {
+                self.sequencer_position = 7;
+            }
+            self.timer_tick = ((2 * (240 as u32)) % u16::MAX as u32) as u16;
+        } else {
+            self.timer_tick -= 1;
+        }
+    }
+
+    fn get_sample(&self) -> u8 {
+        DUTY_CYCLE_SEQUENCES[self.get_duty_cycle() as usize][self.sequencer_position as usize]
+            * self.get_volume()
+    }
+
+    fn get_volume(&self) -> u8 {
+        if self.length_counter == 0 {
+            0
+        } else if self.is_constant_volume_set() {
+            self.get_constant_volume_or_envelope_divider_reload_value()
+        } else {
+            self.envelope.decay_level_counter
+        }
+    }
+
+    fn clock_envelope(&mut self) {
+        self.envelope.clock(
+            self.get_constant_volume_or_envelope_divider_reload_value(),
+            self.is_length_counter_halt_envelope_loop_flag_set(),
+        )
+    }
+
+    fn clock_length_counter(&mut self) {
+        if self.length_counter > 0 && !self.is_length_counter_halt_envelope_loop_flag_set() {
+            self.length_counter -= 1;
+        }
+    }
+}
+
+impl LengthCounterChannel for PulseWave {
+    fn get_length_counter_load(&self) -> u8 {
+        (self.data[3] & 0b11111000) >> 3
+    }
+
+    fn set_length_counter(&mut self, counter: u8) {
+        self.length_counter = counter
+    }
+
+    fn get_length_counter(&self) -> u8 {
+        self.length_counter
+    }
+}
 
 #[derive(PartialEq, Serialize, Deserialize)]
 enum FetchMode {
@@ -84,6 +197,8 @@ pub struct Mapper5 {
     vertical_split_tile_index: u8,
     multiplier_a: u8,
     multiplier_b: u8,
+    pulse_1: PulseWave,
+    pulse_2: PulseWave,
 }
 
 impl Mapper5 {
@@ -119,6 +234,9 @@ impl Mapper5 {
             vertical_split_tile_index: 0,
             multiplier_a: 0xFF,
             multiplier_b: 0xFF,
+            pulse_1: PulseWave::new(),
+            pulse_2: PulseWave::new(),
+
         }
     }
 
@@ -451,6 +569,8 @@ impl Mapper for Mapper5 {
         self.vertical_split_tile_index = 0;
         self.multiplier_a = 0xFF;
         self.multiplier_b = 0xFF;
+        self.pulse_1.power_cycle();
+        self.pulse_2.power_cycle();
         self.mapper_internal.power_cycle();
     }
 

@@ -18,7 +18,7 @@ const LENGTH_COUNTER_LOOKUP_TABLE: [u8; 32] = [
     192, 24, 72, 26, 16, 28, 32, 30,
 ];
 
-const DUTY_CYCLE_SEQUENCES: [[u8; 8]; 4] = [
+pub const DUTY_CYCLE_SEQUENCES: [[u8; 8]; 4] = [
     [0, 0, 0, 0, 0, 0, 0, 1],
     [0, 0, 0, 0, 0, 0, 1, 1],
     [0, 0, 0, 0, 1, 1, 1, 1],
@@ -38,7 +38,7 @@ const NOISE_PERIOD_NTSC: [u16; 16] = [
     4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068,
 ];
 
-trait LengthCounterChannel {
+pub trait LengthCounterChannel {
     fn get_length_counter_load(&self) -> u8;
     fn get_length_counter(&self) -> u8;
     fn set_length_counter(&mut self, value: u8);
@@ -108,14 +108,14 @@ impl StatusRegister {
 }
 
 #[derive(Default, Serialize, Deserialize)]
-struct Envelope {
-    start_flag: bool,
-    divider: u8,
-    decay_level_counter: u8,
+pub(crate) struct Envelope {
+    pub(crate) start_flag: bool,
+    pub(crate)divider: u8,
+    pub(crate)decay_level_counter: u8,
 }
 
 impl Envelope {
-    fn clock(&mut self, divider_reload_value: u8, loop_flag: bool) {
+   pub(crate) fn clock(&mut self, divider_reload_value: u8, loop_flag: bool) {
         if self.start_flag {
             self.start_flag = false;
             self.decay_level_counter = 15;
