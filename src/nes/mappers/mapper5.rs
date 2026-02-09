@@ -7,7 +7,6 @@ use crate::nes::mappers::PRG_RAM_RANGE;
 use crate::nes::mappers::PRG_RANGE;
 use crate::nes::ram_ppu::ReadAccessRegister;
 use crate::nes::ram_ppu::WriteAccessRegister;
-use crate::nes::vram::PATTERN_TABLE_SIZE;
 
 use BankSize::*;
 
@@ -33,6 +32,8 @@ const SPLIT_MODE_SCROLL_REGISTER: u16 = 0x5201;
 const SPLIT_MODE_BANK_REGISTER: u16 = 0x5202;
 const IRQ_SCANLINE_COMPARE_REGISTER: u16 = 0x5203;
 const IRQ_SCANLINE_STATUS_REGISTER: u16 = 0x5204;
+const MULTIPLIER_A_REGISTER: u16 = 0x5205;
+const MULTIPLIER_B_REGISTER: u16 = 0x5206;
 const EXPANSION_RAM_START: u16 = 0x5C00;
 const EXPANSION_RAM_END: u16 = 0x5FFF;
 
@@ -79,9 +80,10 @@ pub struct Mapper5 {
     are_ext_features_enabled: bool,
     fetch_mode: FetchMode,
     use_ext_as_default_for_8x16_sprite_mode: bool,
-    attr_tile_index: u8,
+    attr_tile_index: u16,
     vertical_split_tile_index: u8,
-    last_split_exram_byte: std::cell::Cell<u8>,  // For split mode palette
+    multiplier_a: u8,
+    multiplier_b: u8,
 }
 
 impl Mapper5 {
@@ -115,7 +117,8 @@ impl Mapper5 {
             use_ext_as_default_for_8x16_sprite_mode: false,
             attr_tile_index: 0,
             vertical_split_tile_index: 0,
-            last_split_exram_byte: std::cell::Cell::new(0),
+            multiplier_a: 0xFF,
+            multiplier_b: 0xFF,
         }
     }
 
@@ -184,24 +187,22 @@ impl Mapper5 {
 
     fn get_ext_chr_byte(
         &self,
-        table_index: u8,
+        _table_index: u8,
         pattern_tile_index: u8,
         y: u8,
         is_high_pattern_data: bool,
     ) -> u8 {
         let in_split = self.is_in_split_region();
+        let exram_byte = self.expansion_ram[self.attr_tile_index as usize];
+
         let bank = if in_split {
             ((self.chr_bank_upper_bits as usize) << 8) | self.split_mode_bank as usize
         } else {
-            ((self.chr_bank_upper_bits as usize) << 6)
-                | (self.expansion_ram[self.attr_tile_index as usize] & 0b0011_1111) as usize
+            ((self.chr_bank_upper_bits as usize & 0x03) << 6)
+                | (exram_byte & 0b0011_1111) as usize
         };
-        let effective_table_index = if in_split { 0 } else { table_index };
-        let pattern_table_addr = effective_table_index as u16 * PATTERN_TABLE_SIZE;
 
-        let fine_y = y;
-
-        let mut address = pattern_table_addr + 16 * pattern_tile_index as u16 + fine_y as u16;
+        let mut address = 16 * pattern_tile_index as u16 + y as u16;
         if is_high_pattern_data {
             address += 8;
         }
@@ -296,6 +297,14 @@ impl Mapper for Mapper5 {
                     0
                 }
             }
+            MULTIPLIER_A_REGISTER => {
+                let result = self.multiplier_a as u16 * self.multiplier_b as u16;
+                result as u8
+            }
+            MULTIPLIER_B_REGISTER => {
+                let result = self.multiplier_a as u16 * self.multiplier_b as u16;
+                (result >> 8) as u8
+            }
             0x5000..=0x5BFF => 0,
             0x4020..=0x4FFF => 0,
             address if PRG_RANGE.contains(&address) => {
@@ -375,6 +384,14 @@ impl Mapper for Mapper5 {
             IRQ_SCANLINE_STATUS_REGISTER => {
                 self.scanline_irq_enabled = byte & 0b1000_0000 != 0;
             }
+            MULTIPLIER_A_REGISTER => {
+                self.multiplier_a = byte;
+            }
+            MULTIPLIER_B_REGISTER => {
+                self.multiplier_b = byte;
+            }
+            0x5000..=0x5BFF => {
+            }
             EXPANSION_RAM_START..=EXPANSION_RAM_END => {
                 let access_mode = self.get_cpu_ex_ram_access_mode();
                 let index = (address - EXPANSION_RAM_START) as usize;
@@ -391,7 +408,7 @@ impl Mapper for Mapper5 {
                 }
             }
             _ => {
-                //     println!("Store prg byte: Unknown address ${:04X}", address)
+                   println!("Store prg byte: Unknown address ${:04X}", address)
             }
         }
     }
@@ -433,7 +450,8 @@ impl Mapper for Mapper5 {
         self.use_ext_as_default_for_8x16_sprite_mode = false;
         self.attr_tile_index = 0;
         self.vertical_split_tile_index = 0;
-        self.last_split_exram_byte.set(0);
+        self.multiplier_a = 0xFF;
+        self.multiplier_b = 0xFF;
         self.mapper_internal.power_cycle();
     }
 
@@ -564,7 +582,7 @@ impl Mapper for Mapper5 {
         if self.extended_ram_mode != 1 {
             return None;
         }
-        self.attr_tile_index = tile_y * 32 + tile_x;
+        self.attr_tile_index = tile_y as u16 * 32 + tile_x as u16;
         let exram_byte = self.expansion_ram[self.attr_tile_index as usize];
         let palette = (exram_byte & 0b1100_0000) >> 6;
         Some(palette)
