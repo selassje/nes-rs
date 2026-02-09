@@ -198,8 +198,7 @@ impl Mapper5 {
         let bank = if in_split {
             ((self.chr_bank_upper_bits as usize) << 8) | self.split_mode_bank as usize
         } else {
-            ((self.chr_bank_upper_bits as usize & 0x03) << 6)
-                | (exram_byte & 0b0011_1111) as usize
+            ((self.chr_bank_upper_bits as usize & 0x03) << 6) | (exram_byte & 0b0011_1111) as usize
         };
 
         let mut address = 16 * pattern_tile_index as u16 + y as u16;
@@ -214,7 +213,7 @@ impl Mapper5 {
     }
     fn get_cpu_ex_ram_access_mode(&self) -> CpuExRamAccess {
         const CPU_EXRAM_ACCESS_MODE_DURING_BLANKING: [CpuExRamAccess; 4] = [
-            CpuExRamAccess::None, 
+            CpuExRamAccess::None,
             CpuExRamAccess::None,
             CpuExRamAccess::ReadWrite,
             CpuExRamAccess::Read,
@@ -390,12 +389,12 @@ impl Mapper for Mapper5 {
             MULTIPLIER_B_REGISTER => {
                 self.multiplier_b = byte;
             }
-            0x5000..=0x5BFF => {
-            }
+            0x5000..=0x5BFF => {}
             EXPANSION_RAM_START..=EXPANSION_RAM_END => {
                 let access_mode = self.get_cpu_ex_ram_access_mode();
                 let index = (address - EXPANSION_RAM_START) as usize;
-                if access_mode == CpuExRamAccess::Write || access_mode == CpuExRamAccess::ReadWrite {
+                if access_mode == CpuExRamAccess::Write || access_mode == CpuExRamAccess::ReadWrite
+                {
                     self.expansion_ram[index] = byte;
                 }
             }
@@ -408,7 +407,7 @@ impl Mapper for Mapper5 {
                 }
             }
             _ => {
-                   println!("Store prg byte: Unknown address ${:04X}", address)
+                println!("Store prg byte: Unknown address ${:04X}", address)
             }
         }
     }
@@ -462,9 +461,10 @@ impl Mapper for Mapper5 {
         } else {
             self.scanline_counter += 1;
         }
-        if self.scanline_counter == self.scanline_compare_value && self.scanline_compare_value !=0 {
+        if self.scanline_counter == self.scanline_compare_value && self.scanline_compare_value != 0
+        {
             self.scanline_irq_pending = true;
-        } 
+        }
     }
 
     fn is_irq_pending(&self) -> bool {
@@ -507,9 +507,7 @@ impl Mapper for Mapper5 {
                 true
             }
             NametableSource::Fill => true,
-            NametableSource::Vram0 | NametableSource::Vram1 => {
-                false
-            }
+            NametableSource::Vram0 | NametableSource::Vram1 => false,
         }
     }
 
@@ -567,7 +565,7 @@ impl Mapper for Mapper5 {
         }
 
         if self.is_in_split_region() {
-            let effective_y = (self.split_mode_scroll as u16 + self.scanline_counter  as u16) % 240;
+            let effective_y = (self.split_mode_scroll as u16 + self.scanline_counter as u16) % 240;
             let coarse_y = (effective_y / 8) as u8;
             let split_tile_x = self.vertical_split_tile_index;
             let attr_x = split_tile_x / 4;

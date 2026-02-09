@@ -68,7 +68,11 @@ impl MapperInternal {
         let bank_count = self.prg_rom_size / prg_bank_size as usize;
         let bank = if bank_count > 0 { bank % bank_count } else { 0 };
         let index = Self::get_address_index(address, bank, prg_bank_size);
-        let index = if self.prg_rom_size > 0 { index % self.prg_rom_size } else { 0 };
+        let index = if self.prg_rom_size > 0 {
+            index % self.prg_rom_size
+        } else {
+            0
+        };
         self.prg_rom[index]
     }
 

@@ -69,7 +69,7 @@ pub trait Mapper {
     fn notify_background_pattern_data_fetch(&mut self) {}
 
     fn notify_sprite_pattern_data_fetch(&mut self) {}
-    
+
     fn notify_background_tile_data_fetch_complete(&mut self) {}
     fn notify_background_tile_data_prefetch_start(&mut self) {}
 
