@@ -483,15 +483,12 @@ impl Mapper for Mapper5 {
                     self.mapper_internal
                         .get_prg_ram_byte(address, bank, bank_size)
                 };
-                if address >= 0x8000 && address <= 0xBFFF {
-                    let read_mode = self.pcm_mode_register & 1 == 1;
-                    if read_mode {
-                        if byte == 0 {
-                            self.pcm_irq_pending = true;
-                        } else {
-                            self.pcm_irq_pending = false;
-                            self.raw_pcm = byte;
-                        }
+                if (0x8000..=0xBFFF).contains(&address) && self.pcm_mode_register & 1 == 1 {
+                    if byte == 0 {
+                        self.pcm_irq_pending = true;
+                    } else {
+                        self.pcm_irq_pending = false;
+                        self.raw_pcm = byte;
                     }
                 }
                 byte
@@ -848,8 +845,7 @@ impl Mapper for Mapper5 {
         } else {
             0.0
         };
-        const AVCC: f32 = 5.0;
-        let pcm_out = (self.raw_pcm as f32 / 255 as f32) * (0.4 * AVCC) + (0.1 * AVCC);
+        let pcm_out = self.raw_pcm as f32 / 256.0;
         self.cpu_cycle = (self.cpu_cycle + 1) % (FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES + 1);
         Some(pulse_out + pcm_out)
     }

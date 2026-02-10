@@ -88,18 +88,18 @@ pub(crate) enum StatusRegisterFlag {
 }
 
 #[derive(Default, Serialize, Deserialize)]
-pub(crate)  struct StatusRegister {
+pub(crate) struct StatusRegister {
     pub(crate) data: u8,
 }
 
 impl StatusRegister {
-   pub(crate)  fn is_flag_enabled(&self, flag: StatusRegisterFlag) -> bool {
+    pub(crate) fn is_flag_enabled(&self, flag: StatusRegisterFlag) -> bool {
         let flag = flag as u8;
         assert!(flag >= Pulse1Enabled as u8 && flag <= DMCEnabled as u8);
         self.data & flag != 0
     }
 
-   pub(crate) fn set_flag_status(&mut self, flag: StatusRegisterFlag, is_enabled: bool) {
+    pub(crate) fn set_flag_status(&mut self, flag: StatusRegisterFlag, is_enabled: bool) {
         let flag = flag as u8;
         if is_enabled {
             self.data |= flag
@@ -112,12 +112,12 @@ impl StatusRegister {
 #[derive(Default, Serialize, Deserialize)]
 pub(crate) struct Envelope {
     pub(crate) start_flag: bool,
-    pub(crate)divider: u8,
-    pub(crate)decay_level_counter: u8,
+    pub(crate) divider: u8,
+    pub(crate) decay_level_counter: u8,
 }
 
 impl Envelope {
-   pub(crate) fn clock(&mut self, divider_reload_value: u8, loop_flag: bool) {
+    pub(crate) fn clock(&mut self, divider_reload_value: u8, loop_flag: bool) {
         if self.start_flag {
             self.start_flag = false;
             self.decay_level_counter = 15;
