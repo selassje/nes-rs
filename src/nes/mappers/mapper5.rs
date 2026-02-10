@@ -1,21 +1,31 @@
 use super::Mapper;
 use super::mapper_internal::BankSize;
 use super::mapper_internal::MapperInternal;
+use crate::nes::apu::DUTY_CYCLE_SEQUENCES;
+use crate::nes::apu::Envelope;
+use crate::nes::apu::FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES;
+use crate::nes::apu::FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES;
+use crate::nes::apu::FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES;
+use crate::nes::apu::FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES;
+use crate::nes::apu::LengthCounterChannel;
+use crate::nes::apu::StatusRegister;
+use crate::nes::apu::StatusRegisterFlag::{Pulse1Enabled, Pulse2Enabled};
+
 use crate::nes::common::Mirroring;
 use crate::nes::common::NametableSource;
 use crate::nes::mappers::PRG_RAM_RANGE;
 use crate::nes::mappers::PRG_RANGE;
 use crate::nes::ram_ppu::ReadAccessRegister;
 use crate::nes::ram_ppu::WriteAccessRegister;
-use crate::nes::apu::DUTY_CYCLE_SEQUENCES;
-use crate::nes::apu::LengthCounterChannel;
-use crate::nes::apu::Envelope;
 
 use BankSize::*;
 
 use serde::{Deserialize, Serialize};
 use serde_arrays;
 
+const PULSE_REGISTER_1: u16 = 0x5000;
+const PULSE_REGISTER_8: u16 = 0x5007;
+const AUDIO_STATUS_REGISTER: u16 = 0x5015;
 const PCM_MODE_REGISTER: u16 = 0x5010;
 const PRG_MODE_SELECTION_REGISTER: u16 = 0x5100;
 const CHR_MODE_SELECTION_REGISTER: u16 = 0x5101;
@@ -46,6 +56,7 @@ struct PulseWave {
     sequencer_position: u8,
     timer_tick: u16,
     envelope: Envelope,
+    current_period: u16,
 }
 
 impl PulseWave {
@@ -56,6 +67,7 @@ impl PulseWave {
             timer_tick: 0,
             sequencer_position: 0,
             envelope: Envelope::default(),
+            current_period: 0,
         }
     }
 
@@ -64,9 +76,12 @@ impl PulseWave {
         self.length_counter = 0;
         self.timer_tick = 0;
         self.sequencer_position = 0;
+        self.current_period = 0;
         self.envelope = Envelope::default();
     }
-
+    fn update_period(&mut self) {
+        self.current_period = self.get_raw_timer_period();
+    }
 
     fn reset_phase(&mut self) {
         self.sequencer_position = 0;
@@ -101,7 +116,7 @@ impl PulseWave {
             } else {
                 self.sequencer_position = 7;
             }
-            self.timer_tick = ((2 * (240 as u32)) % u16::MAX as u32) as u16;
+            self.timer_tick = ((2 * (self.current_period as u32)) % u16::MAX as u32) as u16;
         } else {
             self.timer_tick -= 1;
         }
@@ -199,6 +214,8 @@ pub struct Mapper5 {
     multiplier_b: u8,
     pulse_1: PulseWave,
     pulse_2: PulseWave,
+    cpu_cycle: u16,
+    audio_status_register: StatusRegister,
 }
 
 impl Mapper5 {
@@ -234,9 +251,10 @@ impl Mapper5 {
             vertical_split_tile_index: 0,
             multiplier_a: 0xFF,
             multiplier_b: 0xFF,
+            cpu_cycle: 8,
             pulse_1: PulseWave::new(),
             pulse_2: PulseWave::new(),
-
+            audio_status_register : StatusRegister{data: 0},
         }
     }
 
@@ -303,13 +321,7 @@ impl Mapper5 {
         (self.prg_ram_protect_1 & 0b11) == 0b10 && (self.prg_ram_protect_2 & 0b11) == 0b01
     }
 
-    fn get_ext_chr_byte(
-        &self,
-        _table_index: u8,
-        pattern_tile_index: u8,
-        y: u8,
-        is_high_pattern_data: bool,
-    ) -> u8 {
+    fn get_ext_chr_byte(&self, pattern_tile_index: u8, y: u8, is_high_pattern_data: bool) -> u8 {
         let in_split = self.is_in_split_region();
         let exram_byte = self.expansion_ram[self.attr_tile_index as usize];
 
@@ -364,6 +376,16 @@ impl Mapper5 {
             }
         }
         false
+    }
+    fn is_half_frame_reached(&self) -> bool {
+        self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES
+            && self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
+    }
+
+    fn is_quarter_frame_reached(&self) -> bool {
+        self.is_half_frame_reached()
+            || self.cpu_cycle == FRAME_COUNTER_QUARTER_FRAME_1_CPU_CYCLES
+            || self.cpu_cycle == FRAME_COUNTER_QUARTER_FRAME_3_CPU_CYCLES
     }
 }
 
@@ -422,7 +444,13 @@ impl Mapper for Mapper5 {
                 let result = self.multiplier_a as u16 * self.multiplier_b as u16;
                 (result >> 8) as u8
             }
-            0x5000..=0x5BFF => 0,
+            AUDIO_STATUS_REGISTER => {
+                let mut out = StatusRegister { data: 0 };
+                out.set_flag_status(Pulse1Enabled, self.pulse_1.length_counter > 0);
+                out.set_flag_status(Pulse2Enabled, self.pulse_2.length_counter > 0);
+                out.data
+            }
+            0x5016..=0x5BFF => 0,
             0x4020..=0x4FFF => 0,
             address if PRG_RANGE.contains(&address) => {
                 if address == 0xFFFA || address == 0xFFFB {
@@ -507,7 +535,6 @@ impl Mapper for Mapper5 {
             MULTIPLIER_B_REGISTER => {
                 self.multiplier_b = byte;
             }
-            0x5000..=0x5BFF => {}
             EXPANSION_RAM_START..=EXPANSION_RAM_END => {
                 let access_mode = self.get_cpu_ex_ram_access_mode();
                 let index = (address - EXPANSION_RAM_START) as usize;
@@ -516,6 +543,42 @@ impl Mapper for Mapper5 {
                     self.expansion_ram[index] = byte;
                 }
             }
+            AUDIO_STATUS_REGISTER => {
+                self.audio_status_register.data = byte;
+                if !self.audio_status_register.is_flag_enabled(Pulse1Enabled) {
+                    self.pulse_1.reset_length_counter();
+                }
+                if !self.audio_status_register.is_flag_enabled(Pulse2Enabled) {
+                    self.pulse_2.reset_length_counter();
+                }
+            }
+
+            PULSE_REGISTER_1..=PULSE_REGISTER_8 => {
+                let index = (address - PULSE_REGISTER_1) as usize;
+                let (pulse, status_flag) = if index < 4 {
+                    (&mut self.pulse_1,Pulse1Enabled)
+                } else {
+                    (&mut self.pulse_2,Pulse2Enabled)
+                };
+                match index % 4 {
+                    0 => pulse.data[0] = byte,
+                    1 => pulse.data[1] = byte,
+                    2 => {
+                        pulse.data[2] = byte;
+                        pulse.update_period();
+                    }
+                    3 => {
+                        pulse.data[3] = byte;
+                        pulse.update_period();
+                        pulse.reset_phase();
+                        if self.audio_status_register.is_flag_enabled(status_flag) {
+                            pulse.reload_length_counter();
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+            }
+            0x5016..=0x5BFF => {}
             address if PRG_RANGE.contains(&address) => {
                 let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
                 let (bank, is_rom) = self.decode_prg_bank_register(index as u8, bank_size);
@@ -569,6 +632,8 @@ impl Mapper for Mapper5 {
         self.vertical_split_tile_index = 0;
         self.multiplier_a = 0xFF;
         self.multiplier_b = 0xFF;
+        self.cpu_cycle = 8;
+        self.audio_status_register.data = 0;
         self.pulse_1.power_cycle();
         self.pulse_2.power_cycle();
         self.mapper_internal.power_cycle();
@@ -706,20 +771,39 @@ impl Mapper for Mapper5 {
         Some(palette)
     }
 
-    fn get_low_pattern_data(&self, table_index: u8, pattern_tile_index: u8, y: u8) -> Option<u8> {
+    fn get_low_pattern_data(&self, pattern_tile_index: u8, y: u8) -> Option<u8> {
         if !self.are_ext_features_enabled
             || (self.extended_ram_mode != 1 && !self.is_in_split_region())
         {
             return None;
         }
-        Some(self.get_ext_chr_byte(table_index, pattern_tile_index, y, false))
+        Some(self.get_ext_chr_byte(pattern_tile_index, y, false))
     }
-    fn get_high_pattern_data(&self, table_index: u8, pattern_tile_index: u8, y: u8) -> Option<u8> {
+    fn get_high_pattern_data(&self, pattern_tile_index: u8, y: u8) -> Option<u8> {
         if !self.are_ext_features_enabled
             || (self.extended_ram_mode != 1 && !self.is_in_split_region())
         {
             return None;
         }
-        Some(self.get_ext_chr_byte(table_index, pattern_tile_index, y, true))
+        Some(self.get_ext_chr_byte(pattern_tile_index, y, true))
+    }
+
+    fn clock_audio(&mut self) -> Option<f32> {
+        self.pulse_1.clock_timer();
+        self.pulse_2.clock_timer();
+        if self.is_quarter_frame_reached() {
+            self.pulse_1.clock_length_counter();
+            self.pulse_2.clock_length_counter();
+            self.pulse_1.clock_envelope();
+            self.pulse_2.clock_envelope();
+        }
+        let n = self.pulse_1.get_sample() + self.pulse_2.get_sample();
+        let pulse_out = if n != 0 {
+            95.52 / ((8128.0 / (n as f32)) + 100.0)
+        } else {
+            0.0
+        };
+        self.cpu_cycle = (self.cpu_cycle + 1) % (FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES + 1);
+        Some(pulse_out)
     }
 }
