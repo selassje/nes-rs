@@ -27,6 +27,7 @@ const PULSE_REGISTER_1: u16 = 0x5000;
 const PULSE_REGISTER_8: u16 = 0x5007;
 const AUDIO_STATUS_REGISTER: u16 = 0x5015;
 const PCM_MODE_REGISTER: u16 = 0x5010;
+const PCM_RAW_REGISTER: u16 = 0x5011;
 const PRG_MODE_SELECTION_REGISTER: u16 = 0x5100;
 const CHR_MODE_SELECTION_REGISTER: u16 = 0x5101;
 const PRG_RAM_PROTECT_REGISTER_1: u16 = 0x5102;
@@ -216,6 +217,9 @@ pub struct Mapper5 {
     pulse_2: PulseWave,
     cpu_cycle: u16,
     audio_status_register: StatusRegister,
+    pcm_mode_register: u8,
+    raw_pcm: u8,
+    pcm_irq_pending: bool,
 }
 
 impl Mapper5 {
@@ -254,7 +258,10 @@ impl Mapper5 {
             cpu_cycle: 8,
             pulse_1: PulseWave::new(),
             pulse_2: PulseWave::new(),
-            audio_status_register : StatusRegister{data: 0},
+            audio_status_register: StatusRegister { data: 0 },
+            pcm_mode_register: 0,
+            raw_pcm: 0,
+            pcm_irq_pending: false,
         }
     }
 
@@ -450,6 +457,15 @@ impl Mapper for Mapper5 {
                 out.set_flag_status(Pulse2Enabled, self.pulse_2.length_counter > 0);
                 out.data
             }
+            PCM_MODE_REGISTER => {
+                let mut out = self.pcm_mode_register & 1;
+                let irq_enabled = self.pcm_mode_register & 0b1000_0000 != 0;
+                if irq_enabled && self.pcm_irq_pending {
+                    out |= 0b1000_0000;
+                }
+                self.pcm_irq_pending = false;
+                out
+            }
             0x5016..=0x5BFF => 0,
             0x4020..=0x4FFF => 0,
             address if PRG_RANGE.contains(&address) => {
@@ -460,13 +476,25 @@ impl Mapper for Mapper5 {
                 }
                 let (index, bank_size) = self.get_prg_bank_register_index_and_size(address);
                 let (bank, is_rom) = self.decode_prg_bank_register(index as u8, bank_size);
-                if is_rom {
+                let byte = if is_rom {
                     self.mapper_internal
                         .get_prg_rom_byte(address, bank, bank_size)
                 } else {
                     self.mapper_internal
                         .get_prg_ram_byte(address, bank, bank_size)
+                };
+                if address >= 0x8000 && address <= 0xBFFF {
+                    let read_mode = self.pcm_mode_register & 1 == 1;
+                    if read_mode {
+                        if byte == 0 {
+                            self.pcm_irq_pending = true;
+                        } else {
+                            self.pcm_irq_pending = false;
+                            self.raw_pcm = byte;
+                        }
+                    }
                 }
+                byte
             }
             _ => {
                 println!("Get prg byte : Unknown address ${:04X}", address);
@@ -477,7 +505,20 @@ impl Mapper for Mapper5 {
 
     fn store_prg_byte(&mut self, address: u16, byte: u8) {
         match address {
-            PCM_MODE_REGISTER => {}
+            PCM_MODE_REGISTER => {
+                self.pcm_mode_register = byte;
+            }
+            PCM_RAW_REGISTER => {
+                let write_mode = self.pcm_mode_register & 1 == 0;
+                if write_mode {
+                    if byte == 0 {
+                        self.pcm_irq_pending = true;
+                    } else {
+                        self.pcm_irq_pending = false;
+                        self.raw_pcm = byte;
+                    }
+                }
+            }
             PRG_MODE_SELECTION_REGISTER => {
                 self.prg_selection_mode = byte & 0b11;
             }
@@ -556,9 +597,9 @@ impl Mapper for Mapper5 {
             PULSE_REGISTER_1..=PULSE_REGISTER_8 => {
                 let index = (address - PULSE_REGISTER_1) as usize;
                 let (pulse, status_flag) = if index < 4 {
-                    (&mut self.pulse_1,Pulse1Enabled)
+                    (&mut self.pulse_1, Pulse1Enabled)
                 } else {
-                    (&mut self.pulse_2,Pulse2Enabled)
+                    (&mut self.pulse_2, Pulse2Enabled)
                 };
                 match index % 4 {
                     0 => pulse.data[0] = byte,
@@ -634,6 +675,9 @@ impl Mapper for Mapper5 {
         self.multiplier_b = 0xFF;
         self.cpu_cycle = 8;
         self.audio_status_register.data = 0;
+        self.pcm_mode_register = 0;
+        self.raw_pcm = 0;
+        self.pcm_irq_pending = false;
         self.pulse_1.power_cycle();
         self.pulse_2.power_cycle();
         self.mapper_internal.power_cycle();
@@ -653,7 +697,8 @@ impl Mapper for Mapper5 {
     }
 
     fn is_irq_pending(&self) -> bool {
-        self.scanline_irq_enabled && self.scanline_irq_pending
+        (self.scanline_irq_enabled && self.scanline_irq_pending)
+            || (self.pcm_mode_register & 0b1000_0000 != 0 && self.pcm_irq_pending)
     }
 
     fn get_nametable_byte(&self, source: NametableSource, offset: u16) -> Option<u8> {
@@ -803,7 +848,9 @@ impl Mapper for Mapper5 {
         } else {
             0.0
         };
+        const AVCC: f32 = 5.0;
+        let pcm_out = (self.raw_pcm as f32 / 255 as f32) * (0.4 * AVCC) + (0.1 * AVCC);
         self.cpu_cycle = (self.cpu_cycle + 1) % (FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES + 1);
-        Some(pulse_out)
+        Some(pulse_out + pcm_out)
     }
 }
