@@ -116,7 +116,7 @@ impl PulseWave {
             } else {
                 self.sequencer_position = 7;
             }
-            self.timer_tick = ((2 * (self.current_period as u32)) % u16::MAX as u32) as u16;
+            self.timer_tick = self.current_period;
         } else {
             self.timer_tick -= 1;
         }
@@ -379,7 +379,7 @@ impl Mapper5 {
     }
     fn is_half_frame_reached(&self) -> bool {
         self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_1_CPU_CYCLES
-            && self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
+            || self.cpu_cycle == FRAME_COUNTER_HALF_FRAME_0_MOD_0_CPU_CYCLES
     }
 
     fn is_quarter_frame_reached(&self) -> bool {
