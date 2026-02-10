@@ -63,6 +63,10 @@ path = "tests/cpu_interrupts_v2.rs"
 name = "serialization"
 path = "tests/serialization.rs"
 
+[[test]]
+name = "mmc5_tests"
+path = "tests/mmc5_tests.rs"
+
 [profile.release]
 debug = true
 lto = true
