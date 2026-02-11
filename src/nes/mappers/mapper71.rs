@@ -26,7 +26,7 @@ impl Mapper71 {
 }
 
 impl Mapper for Mapper71 {
-    fn get_chr_byte(&self, address: u16) -> u8 {
+    fn get_chr_byte(&mut self, address: u16) -> u8 {
         self.mapper_internal.get_chr_byte(address, 0, _8KB)
     }
 

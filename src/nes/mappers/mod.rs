@@ -10,6 +10,7 @@ mod mapper5;
 mod mapper66;
 mod mapper7;
 mod mapper71;
+mod mapper9;
 mod mapper_null;
 mod mmc3_6;
 
@@ -23,6 +24,7 @@ pub(crate) use self::mapper3::Mapper3;
 pub(crate) use self::mapper4::Mapper4;
 pub(crate) use self::mapper5::Mapper5;
 pub(crate) use self::mapper7::Mapper7;
+pub(crate) use self::mapper9::Mapper9;
 pub(crate) use self::mapper66::Mapper66;
 pub(crate) use self::mapper71::Mapper71;
 pub(crate) use self::mapper227::Mapper227;
@@ -38,7 +40,7 @@ use super::common::NametableSource;
 
 #[enum_dispatch::enum_dispatch(MapperEnum)]
 pub trait Mapper {
-    fn get_chr_byte(&self, address: u16) -> u8;
+    fn get_chr_byte(&mut self, address: u16) -> u8;
     fn store_chr_byte(&mut self, address: u16, byte: u8);
 
     fn get_prg_byte(&mut self, address: u16) -> u8;
@@ -102,6 +104,7 @@ pub enum MapperEnum {
     Mapper4(self::mapper4::Mapper4),
     Mapper5(self::mapper5::Mapper5),
     Mapper7(self::mapper7::Mapper7),
+    Mapper9(self::mapper9::Mapper9),
     Mapper66(self::mapper66::Mapper66),
     Mapper71(self::mapper71::Mapper71),
     Mapper227(self::mapper227::Mapper227),

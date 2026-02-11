@@ -397,7 +397,7 @@ impl Mapper5 {
 }
 
 impl Mapper for Mapper5 {
-    fn get_chr_byte(&self, address: u16) -> u8 {
+    fn get_chr_byte(&mut self, address: u16) -> u8 {
         let is_sprite_mode_8x16 = self.are_ext_features_enabled && self.is_sprite_mode_8x16_enabled;
         let use_ext = is_sprite_mode_8x16
             && match self.fetch_mode {

@@ -11,7 +11,7 @@ impl MapperNull {
 }
 
 impl super::Mapper for MapperNull {
-    fn get_chr_byte(&self, _address: u16) -> u8 {
+    fn get_chr_byte(&mut self, _address: u16) -> u8 {
         0
     }
 

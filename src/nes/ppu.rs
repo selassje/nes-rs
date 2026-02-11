@@ -654,11 +654,11 @@ impl Ppu {
         (final_color, sprite0_hit)
     }
 
-    fn get_pattern_tile(&self, table_index: u8, tile_index: u8, bus: &PpuBus) -> Tile {
+    fn get_pattern_tile(&self, table_index: u8, tile_index: u8, mapper: &mut MapperEnum) -> Tile {
         Tile {
             data: self
                 .vram
-                .get_pattern_table_tile_data(table_index, tile_index, bus.mapper),
+                .get_pattern_table_tile_data(table_index, tile_index, mapper),
         }
     }
     fn get_background_color_index(&mut self, x: usize) -> (u8, u8) {
@@ -723,7 +723,7 @@ impl Ppu {
                     }
 
                     bus.mapper.notify_sprite_pattern_data_fetch();
-                    let tile = self.get_pattern_tile(pattern_table_index, tile_index, bus);
+                    let tile = self.get_pattern_tile(pattern_table_index, tile_index, bus.mapper);
                     let color_index = tile.get_color_index(x as usize, y as usize);
                     if color_index != 0 {
                         return (color_index as u8, *sprite);

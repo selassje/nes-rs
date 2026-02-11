@@ -77,7 +77,7 @@ impl Mapper1 {
 }
 
 impl Mapper for Mapper1 {
-    fn get_chr_byte(&self, address: u16) -> u8 {
+    fn get_chr_byte(&mut self, address: u16) -> u8 {
         let (bank, bank_size) = self.get_chr_bank_info_from_address(address);
         self.mapper_internal.get_chr_byte(address, bank, bank_size)
     }

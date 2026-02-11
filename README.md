@@ -18,7 +18,7 @@ https://selassje.github.io/nes-rs/
 * customizable key mappings (currently only keyboard is supported)
 * fullscreen mode support
 * currently supported mappers:
-  * 0, 1, 2, 3, 4, 5, 7, 66, 71, 227
+  * 0, 1, 2, 3, 4, 5, 7, 9, 66, 71, 227
 * zapper light gun emulation 
 
 # default key bindings
