@@ -1,0 +1,58 @@
+use super::Mapper;
+use crate::nes::common::Mirroring;
+use crate::nes::mappers::mapper_internal::BankSize::*;
+use crate::nes::mappers::mapper_internal::MapperInternal;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+pub struct Mapper3 {
+    mapper_internal: MapperInternal,
+    mirroring: Mirroring,
+    chr_bank: usize,
+}
+
+impl Mapper3 {
+    pub fn new(prg_rom: Vec<u8>, chr_rom: Vec<u8>, mirroring: Mirroring) -> Self {
+        let mapper_internal = MapperInternal::new(prg_rom, chr_rom);
+        Self {
+            mapper_internal,
+            mirroring,
+            chr_bank: 0,
+        }
+    }
+}
+
+impl Mapper for Mapper3 {
+    fn get_chr_byte(&self, address: u16) -> u8 {
+        self.mapper_internal
+            .get_chr_byte(address, self.chr_bank, _8KB)
+    }
+
+    fn get_mirroring(&self) -> Mirroring {
+        self.mirroring
+    }
+    fn get_prg_byte(&mut self, address: u16) -> u8 {
+        if (0x6000..=0x7FFF).contains(&address) {
+            return self
+                .mapper_internal
+                .get_prg_ram_byte(address & 0x7FF, 0, _2KB);
+        }
+        self.mapper_internal.get_prg_rom_byte(address, 0, _32KB)
+    }
+
+    fn power_cycle(&mut self) {
+        self.chr_bank = 0;
+        self.mapper_internal.power_cycle();
+    }
+
+    fn store_chr_byte(&mut self, _address: u16, _byte: u8) {}
+
+    fn store_prg_byte(&mut self, address: u16, byte: u8) {
+        if (0x6000..=0x7FFF).contains(&address) {
+            self.mapper_internal
+                .store_prg_ram_byte(address & 0x7FF, 0, _2KB, byte);
+            return;
+        }
+        self.chr_bank = (byte & 0x3) as usize;
+    }
+}

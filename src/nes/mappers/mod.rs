@@ -4,6 +4,7 @@ mod mapper0;
 mod mapper1;
 mod mapper2;
 mod mapper227;
+mod mapper3;
 mod mapper4;
 mod mapper5;
 mod mapper66;
@@ -14,16 +15,17 @@ mod mmc3_6;
 
 mod mapper_internal;
 
-pub use self::mapper_null::MapperNull;
-pub use self::mapper0::Mapper0;
-pub use self::mapper1::Mapper1;
-pub use self::mapper2::Mapper2;
-pub use self::mapper4::Mapper4;
-pub use self::mapper5::Mapper5;
-pub use self::mapper7::Mapper7;
-pub use self::mapper66::Mapper66;
-pub use self::mapper71::Mapper71;
-pub use self::mapper227::Mapper227;
+pub(crate) use self::mapper_null::MapperNull;
+pub(crate) use self::mapper0::Mapper0;
+pub(crate) use self::mapper1::Mapper1;
+pub(crate) use self::mapper2::Mapper2;
+pub(crate) use self::mapper3::Mapper3;
+pub(crate) use self::mapper4::Mapper4;
+pub(crate) use self::mapper5::Mapper5;
+pub(crate) use self::mapper7::Mapper7;
+pub(crate) use self::mapper66::Mapper66;
+pub(crate) use self::mapper71::Mapper71;
+pub(crate) use self::mapper227::Mapper227;
 
 const PRG_RAM_RANGE: std::ops::Range<u16> = std::ops::Range {
     start: 0x6000,
@@ -96,6 +98,7 @@ pub enum MapperEnum {
     Mapper0(self::mapper0::Mapper0),
     Mapper1(self::mapper1::Mapper1),
     Mapper2(self::mapper2::Mapper2),
+    Mapper3(self::mapper3::Mapper3),
     Mapper4(self::mapper4::Mapper4),
     Mapper5(self::mapper5::Mapper5),
     Mapper7(self::mapper7::Mapper7),
