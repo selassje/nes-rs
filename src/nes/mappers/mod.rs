@@ -61,7 +61,12 @@ pub trait Mapper {
         None
     }
 
-    fn store_nametable_byte(&mut self, _source: NametableSource, _offset: u16, _byte: u8) -> bool {
+    fn store_nametable_or_bg_palette_index(
+        &mut self,
+        _source: NametableSource,
+        _offset: u16,
+        _byte: u8,
+    ) -> bool {
         false
     }
 

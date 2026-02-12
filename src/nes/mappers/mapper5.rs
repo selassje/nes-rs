@@ -725,7 +725,12 @@ impl Mapper for Mapper5 {
         }
     }
 
-    fn store_nametable_byte(&mut self, source: NametableSource, offset: u16, byte: u8) -> bool {
+    fn store_nametable_or_bg_palette_index(
+        &mut self,
+        source: NametableSource,
+        offset: u16,
+        byte: u8,
+    ) -> bool {
         let index = (offset & 0x3FF) as usize;
         match source {
             NametableSource::ExRam => {
