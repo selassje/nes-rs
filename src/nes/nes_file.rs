@@ -110,6 +110,11 @@ impl NesFile {
                 chr_rom,
                 self.mirroring,
             ))),
+            10 => Ok(MapperEnum::Mapper10(Mapper10::new(
+                prg_rom,
+                chr_rom,
+                self.mirroring,
+            ))),
             66 => Ok(MapperEnum::Mapper66(Mapper66::new(
                 prg_rom,
                 chr_rom,

@@ -2,6 +2,7 @@ use super::common::Mirroring;
 
 mod mapper0;
 mod mapper1;
+mod mapper10;
 mod mapper2;
 mod mapper227;
 mod mapper3;
@@ -25,6 +26,7 @@ pub(crate) use self::mapper4::Mapper4;
 pub(crate) use self::mapper5::Mapper5;
 pub(crate) use self::mapper7::Mapper7;
 pub(crate) use self::mapper9::Mapper9;
+pub(crate) use self::mapper10::Mapper10;
 pub(crate) use self::mapper66::Mapper66;
 pub(crate) use self::mapper71::Mapper71;
 pub(crate) use self::mapper227::Mapper227;
@@ -104,6 +106,7 @@ pub enum MapperEnum {
     Mapper5(self::mapper5::Mapper5),
     Mapper7(self::mapper7::Mapper7),
     Mapper9(self::mapper9::Mapper9),
+    Mapper10(self::mapper10::Mapper10),
     Mapper66(self::mapper66::Mapper66),
     Mapper71(self::mapper71::Mapper71),
     Mapper227(self::mapper227::Mapper227),
