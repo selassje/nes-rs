@@ -197,9 +197,6 @@ impl VideoMemory for VRam {
         y: u8,
         mapper: &mut MapperEnum,
     ) -> u8 {
-        if let Some(byte) = mapper.get_low_pattern_data(tile_index, y) {
-            return byte;
-        }
         let pattern_table_addr = table_index as u16 * PATTERN_TABLE_SIZE;
         self.get_byte_internal(
             pattern_table_addr + 16 * tile_index as u16 + y as u16,
@@ -214,9 +211,6 @@ impl VideoMemory for VRam {
         y: u8,
         mapper: &mut MapperEnum,
     ) -> u8 {
-        if let Some(byte) = mapper.get_high_pattern_data(tile_index, y) {
-            return byte;
-        }
         let pattern_table_addr = table_index as u16 * PATTERN_TABLE_SIZE;
         self.get_byte_internal(
             pattern_table_addr + 16 * tile_index as u16 + 8 + y as u16,

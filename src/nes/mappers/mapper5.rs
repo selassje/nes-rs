@@ -328,23 +328,6 @@ impl Mapper5 {
         (self.prg_ram_protect_1 & 0b11) == 0b10 && (self.prg_ram_protect_2 & 0b11) == 0b01
     }
 
-    fn get_ext_chr_byte(&self, pattern_tile_index: u8, y: u8, is_high_pattern_data: bool) -> u8 {
-        let in_split = self.is_in_split_region();
-        let exram_byte = self.expansion_ram[self.attr_tile_index as usize];
-
-        let bank = if in_split {
-            ((self.chr_bank_upper_bits as usize) << 8) | self.split_mode_bank as usize
-        } else {
-            ((self.chr_bank_upper_bits as usize & 0x03) << 6) | (exram_byte & 0b0011_1111) as usize
-        };
-
-        let mut address = 16 * pattern_tile_index as u16 + y as u16;
-        if is_high_pattern_data {
-            address += 8;
-        }
-        self.mapper_internal.get_chr_byte(address, bank, _4KB)
-    }
-
     fn is_rendering(&self) -> bool {
         self.fetch_mode != FetchMode::Cpu
     }
@@ -398,6 +381,22 @@ impl Mapper5 {
 
 impl Mapper for Mapper5 {
     fn get_chr_byte(&mut self, address: u16) -> u8 {
+        let is_ext_bg = self.are_ext_features_enabled
+            && self.fetch_mode == FetchMode::Background
+            && (self.extended_ram_mode == 1 || self.is_in_split_region());
+
+        if is_ext_bg {
+            let in_split = self.is_in_split_region();
+            let exram_byte = self.expansion_ram[self.attr_tile_index as usize];
+            let bank = if in_split {
+                ((self.chr_bank_upper_bits as usize) << 8) | self.split_mode_bank as usize
+            } else {
+                ((self.chr_bank_upper_bits as usize & 0x03) << 6)
+                    | (exram_byte & 0b0011_1111) as usize
+            };
+            return self.mapper_internal.get_chr_byte(address, bank, _4KB);
+        }
+
         let is_sprite_mode_8x16 = self.are_ext_features_enabled && self.is_sprite_mode_8x16_enabled;
         let use_ext = is_sprite_mode_8x16
             && match self.fetch_mode {
@@ -811,23 +810,6 @@ impl Mapper for Mapper5 {
         let exram_byte = self.expansion_ram[self.attr_tile_index as usize];
         let palette = (exram_byte & 0b1100_0000) >> 6;
         Some(palette)
-    }
-
-    fn get_low_pattern_data(&self, pattern_tile_index: u8, y: u8) -> Option<u8> {
-        if !self.are_ext_features_enabled
-            || (self.extended_ram_mode != 1 && !self.is_in_split_region())
-        {
-            return None;
-        }
-        Some(self.get_ext_chr_byte(pattern_tile_index, y, false))
-    }
-    fn get_high_pattern_data(&self, pattern_tile_index: u8, y: u8) -> Option<u8> {
-        if !self.are_ext_features_enabled
-            || (self.extended_ram_mode != 1 && !self.is_in_split_region())
-        {
-            return None;
-        }
-        Some(self.get_ext_chr_byte(pattern_tile_index, y, true))
     }
 
     fn clock_audio(&mut self) -> Option<f32> {

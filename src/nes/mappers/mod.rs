@@ -81,12 +81,6 @@ pub trait Mapper {
         None
     }
 
-    fn get_low_pattern_data(&self, _pattern_tile_index: u8, _y: u8) -> Option<u8> {
-        None
-    }
-    fn get_high_pattern_data(&self, _pattern_tile_index: u8, _y: u8) -> Option<u8> {
-        None
-    }
     fn clock_audio(&mut self) -> Option<f32> {
         None
     }
