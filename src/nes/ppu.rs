@@ -393,7 +393,7 @@ impl Ppu {
         self.vbl_flag_supressed = false;
     }
 
-    fn fetch_next_tile_data(&mut self, bus: &mut PpuBus) {
+    fn fetch_next_bg_tile_data(&mut self, bus: &mut PpuBus) {
         let nametable_index = self.vram_address.get(NM_TABLE) as u8;
         let tile_x = self.vram_address.get(COARSE_X) as u8;
         let tile_y = self.vram_address.get(COARSE_Y) as u8;
@@ -551,7 +551,7 @@ impl Ppu {
                         if self.ppu_cycle == 321 {
                             bus.mapper.notify_background_tile_data_prefetch_start();
                         }
-                        self.fetch_next_tile_data(bus)
+                        self.fetch_next_bg_tile_data(bus)
                     }
                 }
 
@@ -584,7 +584,7 @@ impl Ppu {
                         if self.ppu_cycle == VBLANK_START_CYCLE {
                             bus.mapper.notify_scanline();
                         }
-                        self.fetch_next_tile_data(bus);
+                        self.fetch_next_bg_tile_data(bus);
                     }
                 }
 
@@ -593,7 +593,7 @@ impl Ppu {
                         if self.ppu_cycle == 321 {
                             bus.mapper.notify_background_tile_data_prefetch_start();
                         }
-                        self.fetch_next_tile_data(bus)
+                        self.fetch_next_bg_tile_data(bus)
                     }
                 }
 
