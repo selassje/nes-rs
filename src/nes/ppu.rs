@@ -200,7 +200,22 @@ impl Sprite {
     }
 }
 
-type Oam = [u8; 256];
+type PrimaryOam = [u8; 256];
+
+#[derive(Serialize, Deserialize)]
+struct SecondaryOam {
+    sprites: [Sprite; 8],
+    current_sprite: usize,
+}
+
+impl Default for SecondaryOam {
+    fn default() -> Self {
+        Self {
+            sprites: [Default::default(); 8],
+            current_sprite: 0,
+        }
+    }
+}
 
 type VRAMAddressFlag = (u16, u16);
 const COARSE_X: VRAMAddressFlag = (0b0000_0000_0001_1111, 0);
@@ -303,7 +318,8 @@ pub struct Ppu {
     status_reg: StatusRegister,
     oam_address: u8,
     #[serde(with = "serde_arrays")]
-    oam: Oam,
+    primary_oam: PrimaryOam,
+    secondary_oam: SecondaryOam,
     ppu_cycle: u16,
     scanline: i16,
     scanline_sprites: Vec<Sprite>,
@@ -329,7 +345,8 @@ impl Default for Ppu {
             mask_reg: MaskRegister { value: 0 },
             status_reg: StatusRegister { value: 0 },
             oam_address: 0,
-            oam: [0; 256],
+            primary_oam: [0; 256],
+            secondary_oam: Default::default(),
             ppu_cycle: 27,
             scanline: 0,
             scanline_sprites: Vec::new(),
@@ -356,7 +373,8 @@ impl Ppu {
             mask_reg: MaskRegister { value: 0 },
             status_reg: StatusRegister { value: 0 },
             oam_address: 0,
-            oam: [0; 256],
+            primary_oam: [0; 256],
+            secondary_oam: Default::default(),
             ppu_cycle: 27,
             scanline: 0,
             scanline_sprites: Vec::new(),
@@ -380,7 +398,7 @@ impl Ppu {
         self.mask_reg.value = 0;
         self.status_reg.value = 0;
         self.oam_address = 0;
-        self.oam = [0; 256];
+        self.primary_oam = [0; 256];
         self.ppu_cycle = 27;
         self.scanline = 0;
         self.scanline_sprites.clear();
@@ -427,6 +445,45 @@ impl Ppu {
                     tile_y,
                     bus.mapper,
                 );
+            }
+            FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET => {
+                bus.mapper.notify_background_pattern_data_fetch();
+                self.tile_data[2].low_bg_pattern_byte = self.vram.get_low_pattern_data(
+                    pattern_table_index,
+                    self.tile_data[2].index,
+                    fine_y as u8,
+                    bus.mapper,
+                );
+            }
+            FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET => {
+                bus.mapper.notify_background_pattern_data_fetch();
+                self.tile_data[2].high_bg_pattern_byte = self.vram.get_high_pattern_data(
+                    pattern_table_index,
+                    self.tile_data[2].index,
+                    fine_y as u8,
+                    bus.mapper,
+                );
+                bus.mapper.notify_background_tile_data_fetch_complete();
+            }
+            _ => {}
+        }
+    }
+
+    fn fetch_next_sprite_tile_data(&mut self, bus: &mut PpuBus) {
+        let nametable_index = self.vram_address.get(NM_TABLE) as u8;
+        let tile_x = self.vram_address.get(COARSE_X) as u8;
+        let tile_y = self.vram_address.get(COARSE_Y) as u8;
+        let fine_y = self.vram_address.get(FINE_Y);
+        let pattern_table_index = self.control_reg.get_background_pattern_table_index();
+
+        match self.ppu_cycle % 8 {
+            FETCH_NAMETABLE_DATA_CYCLE_OFFSET => {
+                self.vram
+                    .get_nametable_tile_index(nametable_index, tile_x, tile_y, bus.mapper);
+            }
+            FETCH_ATTRIBUTE_DATA_CYCLE_OFFSET => {
+                self.vram
+                    .get_background_palette_index(nametable_index, tile_x, tile_y, bus.mapper);
             }
             FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET => {
                 bus.mapper.notify_background_pattern_data_fetch();
@@ -761,7 +818,7 @@ impl Ppu {
         (0, Default::default())
     }
     fn get_sprites_for_scanline_and_check_for_overflow(&self) -> (Sprites, bool) {
-        let sprites = self.oam.chunks(4).enumerate().map(|(i, s)| Sprite {
+        let sprites = self.primary_oam.chunks(4).enumerate().map(|(i, s)| Sprite {
             oam_index: i as u8,
             data: [s[0], s[1], s[2], s[3]],
         });
@@ -900,7 +957,7 @@ impl WritePpuRegisters for Ppu {
 
             WriteAccessRegister::OamAddr => self.oam_address = value,
             WriteAccessRegister::OamData => {
-                self.oam[self.oam_address as usize % 256] = value;
+                self.primary_oam[self.oam_address as usize % 256] = value;
                 self.oam_address = ((self.oam_address as u16 + 1) % 256) as u8;
             }
         }
@@ -910,7 +967,7 @@ impl WritePpuRegisters for Ppu {
 impl WriteOamDma for Ppu {
     fn write_oam_dma(&mut self, data: [u8; 256]) {
         let write_len = 256 - self.oam_address as usize;
-        self.oam[self.oam_address as usize..].copy_from_slice(&data[..write_len])
+        self.primary_oam[self.oam_address as usize..].copy_from_slice(&data[..write_len])
     }
 }
 
@@ -941,7 +998,7 @@ impl ReadPpuRegisters for Ppu {
                 self.check_for_a12_rising_toggle(old_vram_address, mapper);
                 val
             }
-            ReadAccessRegister::OamData => self.oam[self.oam_address as usize],
+            ReadAccessRegister::OamData => self.primary_oam[self.oam_address as usize],
         }
     }
 }
