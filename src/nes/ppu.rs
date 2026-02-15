@@ -189,7 +189,7 @@ struct PrimaryOam {
     #[serde(with = "serde_arrays")]
     data: [u8; 256],
     current_sprite: usize,
-    next_cycle_to_check: u8,
+    next_cycle_to_check: u16,
 }
 
 impl Default for PrimaryOam {
@@ -202,19 +202,10 @@ impl Default for PrimaryOam {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Default, Serialize, Deserialize)]
 struct SecondaryOam {
     sprites: [Sprite; 8],
     sprite_count: usize,
-}
-
-impl Default for SecondaryOam {
-    fn default() -> Self {
-        Self {
-            sprites: [Default::default(); 8],
-            sprite_count: 0,
-        }
-    }
 }
 
 type VRAMAddressFlag = (u16, u16);
@@ -333,6 +324,8 @@ pub struct Ppu {
     sprite_palettes: Palettes,
     background_palletes: Palettes,
     tile_data: [TileData; 3],
+    render_sprites: [Sprite; 8],
+    render_sprite_count: usize,
 }
 
 impl Default for Ppu {
@@ -358,6 +351,8 @@ impl Default for Ppu {
             sprite_palettes: Default::default(),
             background_palletes: Default::default(),
             tile_data: [Default::default(); 3],
+            render_sprites: [Default::default(); 8],
+            render_sprite_count: 0,
         }
     }
 }
@@ -385,6 +380,8 @@ impl Ppu {
             sprite_palettes: Default::default(),
             background_palletes: Default::default(),
             tile_data: [Default::default(); 3],
+            render_sprites: [Default::default(); 8],
+            render_sprite_count: 0,
         }
     }
 
@@ -405,6 +402,8 @@ impl Ppu {
         self.write_toggle = false;
         self.nmi_pending = false;
         self.vbl_flag_supressed = false;
+        self.render_sprites = [Default::default(); 8];
+        self.render_sprite_count = 0;
     }
 
     fn fetch_garbage_nametable_byte(&mut self, bus: &mut PpuBus) {
@@ -469,29 +468,33 @@ impl Ppu {
         let nametable_index = self.vram_address.get(NM_TABLE) as u8;
         let tile_x = self.vram_address.get(COARSE_X) as u8;
         let tile_y = self.vram_address.get(COARSE_Y) as u8;
-        let mut fine_y = self.vram_address.get(FINE_Y);
         let is_8x16_mode = self.control_reg.get_sprite_size_height() == 16;
-        let sprite_index = (self.ppu_cycle - 257) / 8;
-        let sprite = &mut self.secondary_oam.sprites[sprite_index as usize];
+        let sprite_height = self.control_reg.get_sprite_size_height();
+        let sprite_slot = ((self.ppu_cycle - 257) / 8) as usize;
+
+        let sprite = self.secondary_oam.sprites[sprite_slot];
         let pattern_table_index = if is_8x16_mode {
             sprite.get_pattern_table_index_for_8x16_mode()
         } else {
             self.control_reg
                 .get_sprite_pattern_table_index_for_8x8_mode()
         };
-        let mut tile_index = sprite.get_tile_index(is_8x16_mode);
-        if self.scanline as u8 > sprite.get_y() + 7 {
-            tile_index += 1;
-        }
-        if sprite.if_flip_vertically() {
-            fine_y = 7 - fine_y;
-        }
 
-        if is_8x16_mode && sprite.if_flip_vertically() {
-            if self.scanline as u8 <= sprite.get_y() + 7 {
+        let sprite_y_raw = sprite.data[0];
+        let row_in_sprite = (self.scanline as u8).wrapping_sub(sprite_y_raw);
+        let mut tile_index = sprite.get_tile_index(is_8x16_mode);
+        let fine_y;
+
+        if sprite.if_flip_vertically() {
+            let flipped_row = (sprite_height - 1).wrapping_sub(row_in_sprite);
+            fine_y = flipped_row % 8;
+            if is_8x16_mode && flipped_row >= 8 {
                 tile_index += 1;
-            } else {
-                tile_index -= 1;
+            }
+        } else {
+            fine_y = row_in_sprite % 8;
+            if is_8x16_mode && row_in_sprite >= 8 {
+                tile_index += 1;
             }
         }
 
@@ -506,21 +509,15 @@ impl Ppu {
             }
             FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET => {
                 bus.mapper.notify_sprite_pattern_data_fetch();
-                sprite.low_pattern_byte = self.vram.get_low_pattern_byte(
-                    pattern_table_index,
-                    tile_index,
-                    fine_y as u8,
-                    bus.mapper,
-                );
+                self.secondary_oam.sprites[sprite_slot].low_pattern_byte = self
+                    .vram
+                    .get_low_pattern_byte(pattern_table_index, tile_index, fine_y, bus.mapper);
             }
             FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET => {
                 bus.mapper.notify_sprite_pattern_data_fetch();
-                sprite.high_pattern_byte = self.vram.get_high_pattern_byte(
-                    pattern_table_index,
-                    tile_index,
-                    fine_y as u8,
-                    bus.mapper,
-                );
+                self.secondary_oam.sprites[sprite_slot].high_pattern_byte = self
+                    .vram
+                    .get_high_pattern_byte(pattern_table_index, tile_index, fine_y, bus.mapper);
             }
             _ => {}
         }
@@ -608,6 +605,17 @@ impl Ppu {
 
         match self.scanline {
             PRE_RENDER_SCANLINE => match self.ppu_cycle {
+                1 => {
+                    if self.is_rendering_enabled() {
+                        self.secondary_oam.sprite_count = 0;
+                        for s in self.secondary_oam.sprites.iter_mut() {
+                            s.data = [0xFF; 4];
+                            s.oam_index = 0xFF;
+                            s.low_pattern_byte = 0;
+                            s.high_pattern_byte = 0;
+                        }
+                    }
+                }
                 VBLANK_START_CYCLE => {
                     self.sprite_palettes = self.get_palettes(false, bus);
                     self.vbl_flag_supressed = false;
@@ -622,14 +630,12 @@ impl Ppu {
                     if self.is_rendering_enabled() {
                         self.fetch_next_sprite_tile_data(bus);
                         if (280..=304).contains(&self.ppu_cycle) {
-                            if self.is_rendering_enabled() {
-                                self.vram_address
-                                    .set(FINE_Y, self.t_vram_address.get(FINE_Y));
-                                self.vram_address
-                                    .set(COARSE_Y, self.t_vram_address.get(COARSE_Y));
-                                self.vram_address
-                                    .set(NM_TABLE_Y, self.t_vram_address.get(NM_TABLE_Y));
-                            }
+                            self.vram_address
+                                .set(FINE_Y, self.t_vram_address.get(FINE_Y));
+                            self.vram_address
+                                .set(COARSE_Y, self.t_vram_address.get(COARSE_Y));
+                            self.vram_address
+                                .set(NM_TABLE_Y, self.t_vram_address.get(NM_TABLE_Y));
                         }
                     }
                 }
@@ -661,6 +667,9 @@ impl Ppu {
             },
             FIRST_VISIBLE_SCANLINE..=LAST_VISIBLE_SCANLINE => match self.ppu_cycle {
                 0 => {
+                    self.render_sprites = self.secondary_oam.sprites;
+                    self.render_sprite_count = self.secondary_oam.sprite_count;
+
                     let is_overflow_detected =
                         self.get_sprites_for_scanline_and_check_for_overflow();
                     self.background_palletes = self.get_palettes(true, bus);
@@ -673,59 +682,57 @@ impl Ppu {
                 }
 
                 ACTIVE_PIXELS_CYCLE_START..=ACTIVE_PIXELS_CYCLE_END => {
+                    self.render_pixel(bus);
                     if self.is_rendering_enabled() {
+                        if self.ppu_cycle == 1 {
+                            self.secondary_oam.sprite_count = 0;
+                            for s in self.secondary_oam.sprites.iter_mut() {
+                                s.data = [0xFF; 4];
+                                s.oam_index = 0xFF;
+                                s.low_pattern_byte = 0;
+                                s.high_pattern_byte = 0;
+                            }
+                        }
                         if (65..=256).contains(&self.ppu_cycle) {
                             if self.ppu_cycle == 65 {
-                                self.secondary_oam.sprite_count = 0;
                                 self.primary_oam.current_sprite = 0;
                                 self.primary_oam.next_cycle_to_check = 65;
                             }
 
-                            if self.ppu_cycle == self.primary_oam.next_cycle_to_check as u16
+                            if self.ppu_cycle == self.primary_oam.next_cycle_to_check
                                 && self.primary_oam.current_sprite < 64
                             {
                                 let sprite_index = self.primary_oam.current_sprite;
                                 let sprite_y = self.primary_oam.data[sprite_index * 4];
-                                let line_in_sprite = self.scanline as i16 - sprite_y as i16;
+                                let line_in_sprite = self.scanline - sprite_y as i16;
                                 if line_in_sprite >= 0
                                     && line_in_sprite
                                         < self.control_reg.get_sprite_size_height() as i16
+                                    && self.secondary_oam.sprite_count < 8
                                 {
-                                    if self.secondary_oam.sprite_count < 8 {
-                                        let mut sprite_data = [0; 4];
-                                        sprite_data.copy_from_slice(
-                                            &self.primary_oam.data
-                                                [sprite_index * 4..sprite_index * 4 + 4],
-                                        );
-                                        self.secondary_oam.sprites
-                                            [self.secondary_oam.sprite_count] = Sprite {
+                                    let mut sprite_data = [0; 4];
+                                    sprite_data.copy_from_slice(
+                                        &self.primary_oam.data
+                                            [sprite_index * 4..sprite_index * 4 + 4],
+                                    );
+                                    self.secondary_oam.sprites[self.secondary_oam.sprite_count] =
+                                        Sprite {
                                             oam_index: sprite_index as u8,
                                             data: sprite_data,
                                             low_pattern_byte: 0,
                                             high_pattern_byte: 0,
                                         };
-                                        self.secondary_oam.sprite_count += 1;
-                                        self.primary_oam.next_cycle_to_check += 6;
-                                    }
+                                    self.secondary_oam.sprite_count += 1;
+                                    self.primary_oam.next_cycle_to_check += 6;
                                 }
                                 self.primary_oam.current_sprite += 1;
                                 self.primary_oam.next_cycle_to_check += 2;
                             }
                         }
-                        self.render_pixel(bus);
-
-                        if self.is_rendering_enabled() {
-                            if (1..=64).contains(&self.ppu_cycle) {
-                                let sprite_index = (self.ppu_cycle - 1) / 8;
-                                let sprite_data_index = (self.ppu_cycle - 1) % 4;
-                                self.secondary_oam.sprites[sprite_index as usize].data
-                                    [sprite_data_index as usize] = 0xFF;
-                            }
-                            if self.ppu_cycle == VBLANK_START_CYCLE {
-                                bus.mapper.notify_scanline();
-                            }
-                            self.fetch_next_bg_tile_data(bus);
+                        if self.ppu_cycle == VBLANK_START_CYCLE {
+                            bus.mapper.notify_scanline();
                         }
+                        self.fetch_next_bg_tile_data(bus);
                     }
                 }
                 257..=320 => {
@@ -841,17 +848,22 @@ impl Ppu {
                 .is_flag_enabled(MaskRegisterFlag::ShowSpritesdInLeftMost8Pixels)
                 || x >= 8)
         {
-            for sprite in self.secondary_oam.sprites.iter().filter(|s| s.get_y() > 0) {
+            for i in 0..self.render_sprite_count {
+                let sprite = &self.render_sprites[i];
+                if sprite.get_y() == 0 {
+                    continue;
+                }
                 if x >= sprite.get_x() && (x as u16) < sprite.get_x() as u16 + 8 {
-                    let mut x = x - sprite.get_x();
+                    let mut pixel_x = x - sprite.get_x();
                     if sprite.if_flip_horizontally() {
-                        x = 7 - x;
+                        pixel_x = 7 - pixel_x;
                     }
-                    let color_index_lo = (sprite.low_pattern_byte & (1 << x)) >> x;
-                    let color_index_hi = (sprite.high_pattern_byte & (1 << x)) >> x;
+                    let bit = 7 - pixel_x;
+                    let color_index_lo = (sprite.low_pattern_byte >> bit) & 1;
+                    let color_index_hi = (sprite.high_pattern_byte >> bit) & 1;
                     let color_index = 2 * color_index_hi + color_index_lo;
                     if color_index != 0 {
-                        return (color_index as u8, *sprite);
+                        return (color_index, *sprite);
                     }
                 }
             }
@@ -859,24 +871,17 @@ impl Ppu {
         (0, Default::default())
     }
     fn get_sprites_for_scanline_and_check_for_overflow(&self) -> bool {
-        let sprites = self
+        let sprite_height = self.control_reg.get_sprite_size_height() as i16;
+        let count = self
             .primary_oam
             .data
             .chunks(4)
-            .enumerate()
-            .map(|(i, s)| Sprite {
-                oam_index: i as u8,
-                data: [s[0], s[1], s[2], s[3]],
-                low_pattern_byte: 0,
-                high_pattern_byte: 0,
-            });
-        let sprites = sprites.filter(|sprite| {
-            (self.scanline as u8) >= sprite.get_y()
-                && (self.scanline as u8)
-                    < sprite.get_y() + self.control_reg.get_sprite_size_height()
-        });
-        let if_overflow = sprites.clone().count() > 8 && self.is_rendering_enabled();
-        if_overflow
+            .filter(|s| {
+                let line = self.scanline - s[0] as i16;
+                line >= 0 && line < sprite_height
+            })
+            .count();
+        count > 8 && self.is_rendering_enabled()
     }
 
     fn get_palettes(&self, for_background: bool, bus: &mut PpuBus) -> Palettes {
