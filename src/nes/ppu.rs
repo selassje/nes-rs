@@ -600,14 +600,19 @@ impl Ppu {
                     self.status_reg
                         .set_flag(StatusRegisterFlag::Sprite0Hit, false);
                 }
-                280..=304 => {
+                257..=320 => {
                     if self.is_rendering_enabled() {
-                        self.vram_address
-                            .set(FINE_Y, self.t_vram_address.get(FINE_Y));
-                        self.vram_address
-                            .set(COARSE_Y, self.t_vram_address.get(COARSE_Y));
-                        self.vram_address
-                            .set(NM_TABLE_Y, self.t_vram_address.get(NM_TABLE_Y));
+                        self.fetch_next_sprite_tile_data(bus);
+                        if (280..=304).contains(&self.ppu_cycle) {
+                            if self.is_rendering_enabled() {
+                                self.vram_address
+                                    .set(FINE_Y, self.t_vram_address.get(FINE_Y));
+                                self.vram_address
+                                    .set(COARSE_Y, self.t_vram_address.get(COARSE_Y));
+                                self.vram_address
+                                    .set(NM_TABLE_Y, self.t_vram_address.get(NM_TABLE_Y));
+                            }
+                        }
                     }
                 }
 
@@ -652,8 +657,17 @@ impl Ppu {
                 }
 
                 ACTIVE_PIXELS_CYCLE_START..=ACTIVE_PIXELS_CYCLE_END => {
+                    if self.is_rendering_enabled() {
+                        if (1..=256).contains(&self.ppu_cycle) {}
+                    }
                     self.render_pixel(bus);
                     if self.is_rendering_enabled() {
+                        if (1..=64).contains(&self.ppu_cycle) {
+                            let sprite_index = (self.ppu_cycle - 1) / 8;
+                            let sprite_data_index = (self.ppu_cycle - 1) % 8;
+                            self.secondary_oam.sprites[sprite_index as usize].data
+                                [sprite_data_index as usize] = 0xFF;
+                        }
                         if self.ppu_cycle == VBLANK_START_CYCLE {
                             bus.mapper.notify_scanline();
                         }
