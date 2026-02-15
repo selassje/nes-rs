@@ -146,23 +146,6 @@ impl VideoMemory for VRam {
         self.get_byte_internal(name_table_addr + tile_index, mapper)
     }
 
-    fn get_pattern_table_tile_data(
-        &self,
-        table_index: u8,
-        tile_index: u8,
-        mapper: &mut MapperEnum,
-    ) -> [u8; 16] {
-        let mut tile_data = [0; 16];
-        let pattern_table_addr = table_index as u16 * PATTERN_TABLE_SIZE;
-        for (i, tile_data) in tile_data.iter_mut().enumerate() {
-            *tile_data = self.get_byte_internal(
-                pattern_table_addr + 16 * tile_index as u16 + i as u16,
-                mapper,
-            );
-        }
-        tile_data
-    }
-
     fn get_universal_background_color(&self, mapper: &mut MapperEnum) -> u8 {
         self.get_byte_internal(PALETTES_START, mapper)
     }

@@ -51,13 +51,6 @@ pub trait VideoMemory {
         mapper: &mut MapperEnum,
     ) -> u8;
 
-    fn get_pattern_table_tile_data(
-        &self,
-        table_index: u8,
-        tile_index: u8,
-        mapper: &mut MapperEnum,
-    ) -> [u8; 16];
-
     fn get_universal_background_color(&self, mapper: &mut MapperEnum) -> u8;
 
     fn get_background_palette(&self, palette_index: u8, mapper: &mut MapperEnum) -> [u8; 3];

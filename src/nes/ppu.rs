@@ -135,22 +135,6 @@ impl StatusRegister {
     }
 }
 
-#[derive(Copy, Clone, Default, Serialize, Deserialize)]
-struct Tile {
-    data: [u8; 16],
-}
-
-impl Tile {
-    fn get_color_index(&self, x: usize, y: usize) -> usize {
-        assert!(y < 8);
-        let shift = 7 - x;
-        let mask = 1 << shift;
-        let lo_bit = (mask & self.data[y]) >> shift;
-        let hi_bit = (mask & self.data[y + 8]) >> shift;
-        (2 * hi_bit + lo_bit) as usize
-    }
-}
-
 type Palette = [RgbColor; 4];
 type Palettes = [Palette; 4];
 
@@ -161,8 +145,6 @@ struct Sprite {
     low_pattern_byte: u8,
     high_pattern_byte: u8,
 }
-
-type Sprites = Vec<Sprite>;
 
 impl Sprite {
     fn get_y(&self) -> u8 {
@@ -339,7 +321,6 @@ pub struct Ppu {
     secondary_oam: SecondaryOam,
     ppu_cycle: u16,
     scanline: i16,
-    scanline_sprites: Vec<Sprite>,
     frame: u128,
     #[serde(skip, default = "default_color_mapper")]
     color_mapper: Box<dyn ColorMapper>,
@@ -366,7 +347,6 @@ impl Default for Ppu {
             secondary_oam: Default::default(),
             ppu_cycle: 27,
             scanline: 0,
-            scanline_sprites: Vec::new(),
             frame: 1,
             color_mapper: default_color_mapper(),
             vram_address: Default::default(),
@@ -394,7 +374,6 @@ impl Ppu {
             secondary_oam: Default::default(),
             ppu_cycle: 27,
             scanline: 0,
-            scanline_sprites: Vec::new(),
             frame: 1,
             color_mapper: Box::new(DefaultColorMapper::new()),
             vram_address: Default::default(),
@@ -419,7 +398,6 @@ impl Ppu {
         self.secondary_oam = Default::default();
         self.ppu_cycle = 27;
         self.scanline = 0;
-        self.scanline_sprites.clear();
         self.frame = 1;
         self.vram_address = Default::default();
         self.t_vram_address = Default::default();
@@ -491,17 +469,31 @@ impl Ppu {
         let nametable_index = self.vram_address.get(NM_TABLE) as u8;
         let tile_x = self.vram_address.get(COARSE_X) as u8;
         let tile_y = self.vram_address.get(COARSE_Y) as u8;
-        let fine_y = self.vram_address.get(FINE_Y);
+        let mut fine_y = self.vram_address.get(FINE_Y);
         let is_8x16_mode = self.control_reg.get_sprite_size_height() == 16;
         let sprite_index = (self.ppu_cycle - 257) / 8;
-        let mut sprite = self.secondary_oam.sprites[sprite_index as usize];
+        let sprite = &mut self.secondary_oam.sprites[sprite_index as usize];
         let pattern_table_index = if is_8x16_mode {
             sprite.get_pattern_table_index_for_8x16_mode()
         } else {
             self.control_reg
                 .get_sprite_pattern_table_index_for_8x8_mode()
         };
-        let tile_index = sprite.get_tile_index(is_8x16_mode);
+        let mut tile_index = sprite.get_tile_index(is_8x16_mode);
+        if self.scanline as u8 > sprite.get_y() + 7 {
+            tile_index += 1;
+        }
+        if sprite.if_flip_vertically() {
+            fine_y = 7 - fine_y;
+        }
+
+        if is_8x16_mode && sprite.if_flip_vertically() {
+            if self.scanline as u8 <= sprite.get_y() + 7 {
+                tile_index += 1;
+            } else {
+                tile_index -= 1;
+            }
+        }
 
         match self.ppu_cycle % 8 {
             FETCH_NAMETABLE_DATA_CYCLE_OFFSET => {
@@ -570,7 +562,7 @@ impl Ppu {
     fn render_pixel(&mut self, bus: &mut PpuBus) {
         let x = self.ppu_cycle - ACTIVE_PIXELS_CYCLE_START;
         let (bg_color_index, bg_palette_index) = self.get_background_color_index(x as usize);
-        let (sprite_color_index, sprite) = self.get_sprite_color_index(x as u8, bus);
+        let (sprite_color_index, sprite) = self.get_sprite_color_index(x as u8);
 
         let (color, is_sprite0_hit_detected) = self
             .determine_pixel_color_and_check_for_sprite0_hit(
@@ -669,10 +661,8 @@ impl Ppu {
             },
             FIRST_VISIBLE_SCANLINE..=LAST_VISIBLE_SCANLINE => match self.ppu_cycle {
                 0 => {
-                    self.scanline_sprites.clear();
-                    let (sprites, is_overflow_detected) =
+                    let is_overflow_detected =
                         self.get_sprites_for_scanline_and_check_for_overflow();
-                    self.scanline_sprites = sprites;
                     self.background_palletes = self.get_palettes(true, bus);
                     if !self.status_reg.get_flag(StatusRegisterFlag::SpriteOverflow)
                         && is_overflow_detected
@@ -721,6 +711,7 @@ impl Ppu {
                             }
                         }
                         self.render_pixel(bus);
+                        
                         if self.is_rendering_enabled() {
                             if (1..=64).contains(&self.ppu_cycle) {
                                 let sprite_index = (self.ppu_cycle - 1) / 8;
@@ -818,13 +809,6 @@ impl Ppu {
         (final_color, sprite0_hit)
     }
 
-    fn get_pattern_tile(&self, table_index: u8, tile_index: u8, mapper: &mut MapperEnum) -> Tile {
-        Tile {
-            data: self
-                .vram
-                .get_pattern_table_tile_data(table_index, tile_index, mapper),
-        }
-    }
     fn get_background_color_index(&mut self, x: usize) -> (u8, u8) {
         let mut bg_color_index = 0;
         let mut bg_palette_index = 0;
@@ -848,47 +832,22 @@ impl Ppu {
         (bg_color_index, bg_palette_index)
     }
 
-    fn get_sprite_color_index(&mut self, x: u8, bus: &mut PpuBus) -> (u8, Sprite) {
+    fn get_sprite_color_index(&mut self, x: u8) -> (u8, Sprite) {
         if self.mask_reg.is_flag_enabled(MaskRegisterFlag::ShowSprites)
             && (self
                 .mask_reg
                 .is_flag_enabled(MaskRegisterFlag::ShowSpritesdInLeftMost8Pixels)
                 || x >= 8)
         {
-            let is_sprite_mode_8x16 = self.control_reg.get_sprite_size_height() == 16;
-            for sprite in self.scanline_sprites.iter().filter(|s| s.get_y() > 0) {
+            for sprite in self.secondary_oam.sprites.iter().filter(|s| s.get_y() > 0) {
                 if x >= sprite.get_x() && (x as u16) < sprite.get_x() as u16 + 8 {
-                    let pattern_table_index = if is_sprite_mode_8x16 {
-                        sprite.get_pattern_table_index_for_8x16_mode()
-                    } else {
-                        self.control_reg
-                            .get_sprite_pattern_table_index_for_8x8_mode()
-                    };
-                    let mut tile_index = sprite.get_tile_index(is_sprite_mode_8x16);
-                    if self.scanline as u8 > sprite.get_y() + 7 {
-                        tile_index += 1;
-                    }
-
-                    if is_sprite_mode_8x16 && sprite.if_flip_vertically() {
-                        if self.scanline as u8 <= sprite.get_y() + 7 {
-                            tile_index += 1;
-                        } else {
-                            tile_index -= 1;
-                        }
-                    }
-
                     let mut x = x - sprite.get_x();
-                    let mut y = (self.scanline as u8 - sprite.get_y()) % 8;
                     if sprite.if_flip_horizontally() {
                         x = 7 - x;
                     }
-                    if sprite.if_flip_vertically() {
-                        y = 7 - y;
-                    }
-
-                    bus.mapper.notify_sprite_pattern_data_fetch();
-                    let tile = self.get_pattern_tile(pattern_table_index, tile_index, bus.mapper);
-                    let color_index = tile.get_color_index(x as usize, y as usize);
+                    let color_index_lo = (sprite.low_pattern_byte & (1 << x)) >> x;
+                    let color_index_hi = (sprite.high_pattern_byte & (1 << x)) >> x;
+                    let color_index = 2 * color_index_hi + color_index_lo;
                     if color_index != 0 {
                         return (color_index as u8, *sprite);
                     }
@@ -897,7 +856,7 @@ impl Ppu {
         }
         (0, Default::default())
     }
-    fn get_sprites_for_scanline_and_check_for_overflow(&self) -> (Sprites, bool) {
+    fn get_sprites_for_scanline_and_check_for_overflow(&self) -> bool {
         let sprites = self
             .primary_oam
             .data
@@ -915,7 +874,7 @@ impl Ppu {
                     < sprite.get_y() + self.control_reg.get_sprite_size_height()
         });
         let if_overflow = sprites.clone().count() > 8 && self.is_rendering_enabled();
-        (sprites.take(8).collect(), if_overflow)
+        if_overflow
     }
 
     fn get_palettes(&self, for_background: bool, bus: &mut PpuBus) -> Palettes {
