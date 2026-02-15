@@ -200,19 +200,35 @@ impl Sprite {
     }
 }
 
-type PrimaryOam = [u8; 256];
+#[derive(Serialize, Deserialize)]
+struct PrimaryOam {
+    #[serde(with = "serde_arrays")]
+    data: [u8; 256],
+    current_sprite: usize,
+    next_cycle_to_check: u8,
+}
+
+impl Default for PrimaryOam {
+    fn default() -> Self {
+        Self {
+            data: [0; 256],
+            current_sprite: 0,
+            next_cycle_to_check: 65,
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 struct SecondaryOam {
     sprites: [Sprite; 8],
-    current_sprite: usize,
+    sprite_count: usize,
 }
 
 impl Default for SecondaryOam {
     fn default() -> Self {
         Self {
             sprites: [Default::default(); 8],
-            current_sprite: 0,
+            sprite_count: 0,
         }
     }
 }
@@ -317,7 +333,6 @@ pub struct Ppu {
     mask_reg: MaskRegister,
     status_reg: StatusRegister,
     oam_address: u8,
-    #[serde(with = "serde_arrays")]
     primary_oam: PrimaryOam,
     secondary_oam: SecondaryOam,
     ppu_cycle: u16,
@@ -345,7 +360,7 @@ impl Default for Ppu {
             mask_reg: MaskRegister { value: 0 },
             status_reg: StatusRegister { value: 0 },
             oam_address: 0,
-            primary_oam: [0; 256],
+            primary_oam: Default::default(),
             secondary_oam: Default::default(),
             ppu_cycle: 27,
             scanline: 0,
@@ -373,7 +388,7 @@ impl Ppu {
             mask_reg: MaskRegister { value: 0 },
             status_reg: StatusRegister { value: 0 },
             oam_address: 0,
-            primary_oam: [0; 256],
+            primary_oam: Default::default(),
             secondary_oam: Default::default(),
             ppu_cycle: 27,
             scanline: 0,
@@ -398,7 +413,8 @@ impl Ppu {
         self.mask_reg.value = 0;
         self.status_reg.value = 0;
         self.oam_address = 0;
-        self.primary_oam = [0; 256];
+        self.primary_oam = Default::default();
+        self.secondary_oam = Default::default();
         self.ppu_cycle = 27;
         self.scanline = 0;
         self.scanline_sprites.clear();
@@ -658,7 +674,11 @@ impl Ppu {
 
                 ACTIVE_PIXELS_CYCLE_START..=ACTIVE_PIXELS_CYCLE_END => {
                     if self.is_rendering_enabled() {
-                        if (1..=256).contains(&self.ppu_cycle) {}
+                        if (65..=256).contains(&self.ppu_cycle) {
+                            if self.ppu_cycle == 65 {
+                                self.secondary_oam.sprite_count = 0;
+                            }
+                        }
                     }
                     self.render_pixel(bus);
                     if self.is_rendering_enabled() {
@@ -832,7 +852,7 @@ impl Ppu {
         (0, Default::default())
     }
     fn get_sprites_for_scanline_and_check_for_overflow(&self) -> (Sprites, bool) {
-        let sprites = self.primary_oam.chunks(4).enumerate().map(|(i, s)| Sprite {
+        let sprites = self.primary_oam.data.chunks(4).enumerate().map(|(i, s)| Sprite {
             oam_index: i as u8,
             data: [s[0], s[1], s[2], s[3]],
         });
@@ -971,7 +991,7 @@ impl WritePpuRegisters for Ppu {
 
             WriteAccessRegister::OamAddr => self.oam_address = value,
             WriteAccessRegister::OamData => {
-                self.primary_oam[self.oam_address as usize % 256] = value;
+                self.primary_oam.data[self.oam_address as usize % 256] = value;
                 self.oam_address = ((self.oam_address as u16 + 1) % 256) as u8;
             }
         }
@@ -981,7 +1001,7 @@ impl WritePpuRegisters for Ppu {
 impl WriteOamDma for Ppu {
     fn write_oam_dma(&mut self, data: [u8; 256]) {
         let write_len = 256 - self.oam_address as usize;
-        self.primary_oam[self.oam_address as usize..].copy_from_slice(&data[..write_len])
+        self.primary_oam.data[self.oam_address as usize..].copy_from_slice(&data[..write_len])
     }
 }
 
@@ -1012,7 +1032,7 @@ impl ReadPpuRegisters for Ppu {
                 self.check_for_a12_rising_toggle(old_vram_address, mapper);
                 val
             }
-            ReadAccessRegister::OamData => self.primary_oam[self.oam_address as usize],
+            ReadAccessRegister::OamData => self.primary_oam.data[self.oam_address as usize],
         }
     }
 }
