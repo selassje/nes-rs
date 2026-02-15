@@ -677,21 +677,50 @@ impl Ppu {
                         if (65..=256).contains(&self.ppu_cycle) {
                             if self.ppu_cycle == 65 {
                                 self.secondary_oam.sprite_count = 0;
+                                self.primary_oam.current_sprite = 0;
+                                self.primary_oam.next_cycle_to_check = 65;
+                            }
+
+                            if self.ppu_cycle == self.primary_oam.next_cycle_to_check as u16 {
+                                let sprite_index = self.primary_oam.current_sprite;
+                                let sprite_y = self.primary_oam.data[sprite_index * 4];
+                                let line_in_sprite = self.scanline as i16 - sprite_y as i16;
+                                if line_in_sprite >= 0
+                                    && line_in_sprite
+                                        < self.control_reg.get_sprite_size_height() as i16
+                                {
+                                    if self.secondary_oam.sprite_count < 8 {
+                                        let mut sprite_data = [0; 4];
+                                        sprite_data.copy_from_slice(
+                                            &self.primary_oam.data
+                                                [sprite_index * 4..sprite_index * 4 + 4],
+                                        );
+                                        self.secondary_oam.sprites
+                                            [self.secondary_oam.sprite_count] = Sprite {
+                                            oam_index: sprite_index as u8,
+                                            data: sprite_data,
+                                        };
+                                        self.secondary_oam.sprite_count += 1;
+                                        self.primary_oam.next_cycle_to_check += 6;
+                                    }
+                                }
+                                self.primary_oam.current_sprite += 1;
+                                self.primary_oam.next_cycle_to_check += 2;
                             }
                         }
-                    }
-                    self.render_pixel(bus);
-                    if self.is_rendering_enabled() {
-                        if (1..=64).contains(&self.ppu_cycle) {
-                            let sprite_index = (self.ppu_cycle - 1) / 8;
-                            let sprite_data_index = (self.ppu_cycle - 1) % 8;
-                            self.secondary_oam.sprites[sprite_index as usize].data
-                                [sprite_data_index as usize] = 0xFF;
+                        self.render_pixel(bus);
+                        if self.is_rendering_enabled() {
+                            if (1..=64).contains(&self.ppu_cycle) {
+                                let sprite_index = (self.ppu_cycle - 1) / 8;
+                                let sprite_data_index = (self.ppu_cycle - 1) % 8;
+                                self.secondary_oam.sprites[sprite_index as usize].data
+                                    [sprite_data_index as usize] = 0xFF;
+                            }
+                            if self.ppu_cycle == VBLANK_START_CYCLE {
+                                bus.mapper.notify_scanline();
+                            }
+                            self.fetch_next_bg_tile_data(bus);
                         }
-                        if self.ppu_cycle == VBLANK_START_CYCLE {
-                            bus.mapper.notify_scanline();
-                        }
-                        self.fetch_next_bg_tile_data(bus);
                     }
                 }
 
@@ -852,10 +881,15 @@ impl Ppu {
         (0, Default::default())
     }
     fn get_sprites_for_scanline_and_check_for_overflow(&self) -> (Sprites, bool) {
-        let sprites = self.primary_oam.data.chunks(4).enumerate().map(|(i, s)| Sprite {
-            oam_index: i as u8,
-            data: [s[0], s[1], s[2], s[3]],
-        });
+        let sprites = self
+            .primary_oam
+            .data
+            .chunks(4)
+            .enumerate()
+            .map(|(i, s)| Sprite {
+                oam_index: i as u8,
+                data: [s[0], s[1], s[2], s[3]],
+            });
         let sprites = sprites.filter(|sprite| {
             (self.scanline as u8) >= sprite.get_y()
                 && (self.scanline as u8)
