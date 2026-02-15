@@ -190,7 +190,7 @@ impl VideoMemory for VRam {
         (attribute_data >> (quadrant * 2)) & 0b11
     }
 
-    fn get_low_pattern_data(
+    fn get_low_pattern_byte(
         &self,
         table_index: u8,
         tile_index: u8,
@@ -204,7 +204,7 @@ impl VideoMemory for VRam {
         )
     }
 
-    fn get_high_pattern_data(
+    fn get_high_pattern_byte(
         &self,
         table_index: u8,
         tile_index: u8,

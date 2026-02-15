@@ -70,7 +70,7 @@ pub trait VideoMemory {
         mapper: &mut MapperEnum,
     ) -> u8;
 
-    fn get_low_pattern_data(
+    fn get_low_pattern_byte(
         &self,
         table_index: u8,
         tile_index: u8,
@@ -78,7 +78,7 @@ pub trait VideoMemory {
         mapper: &mut MapperEnum,
     ) -> u8;
 
-    fn get_high_pattern_data(
+    fn get_high_pattern_byte(
         &self,
         table_index: u8,
         tile_index: u8,

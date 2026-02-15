@@ -158,6 +158,8 @@ type Palettes = [Palette; 4];
 struct Sprite {
     oam_index: u8,
     data: [u8; 4],
+    low_pattern_byte: u8,
+    high_pattern_byte: u8,
 }
 
 type Sprites = Vec<Sprite>;
@@ -254,8 +256,8 @@ struct VRAMAddress {
 struct TileData {
     index: u8,
     bg_palette_index: u8,
-    low_bg_pattern_byte: u8,
-    high_bg_pattern_byte: u8,
+    low_pattern_byte: u8,
+    high_pattern_byte: u8,
 }
 
 impl VRAMAddress {
@@ -464,7 +466,7 @@ impl Ppu {
             }
             FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET => {
                 bus.mapper.notify_background_pattern_data_fetch();
-                self.tile_data[2].low_bg_pattern_byte = self.vram.get_low_pattern_data(
+                self.tile_data[2].low_pattern_byte = self.vram.get_low_pattern_byte(
                     pattern_table_index,
                     self.tile_data[2].index,
                     fine_y as u8,
@@ -473,7 +475,7 @@ impl Ppu {
             }
             FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET => {
                 bus.mapper.notify_background_pattern_data_fetch();
-                self.tile_data[2].high_bg_pattern_byte = self.vram.get_high_pattern_data(
+                self.tile_data[2].high_pattern_byte = self.vram.get_high_pattern_byte(
                     pattern_table_index,
                     self.tile_data[2].index,
                     fine_y as u8,
@@ -490,7 +492,16 @@ impl Ppu {
         let tile_x = self.vram_address.get(COARSE_X) as u8;
         let tile_y = self.vram_address.get(COARSE_Y) as u8;
         let fine_y = self.vram_address.get(FINE_Y);
-        let pattern_table_index = self.control_reg.get_background_pattern_table_index();
+        let is_8x16_mode = self.control_reg.get_sprite_size_height() == 16;
+        let sprite_index = (self.ppu_cycle - 257) / 8;
+        let mut sprite = self.secondary_oam.sprites[sprite_index as usize];
+        let pattern_table_index = if is_8x16_mode {
+            sprite.get_pattern_table_index_for_8x16_mode()
+        } else {
+            self.control_reg
+                .get_sprite_pattern_table_index_for_8x8_mode()
+        };
+        let tile_index = sprite.get_tile_index(is_8x16_mode);
 
         match self.ppu_cycle % 8 {
             FETCH_NAMETABLE_DATA_CYCLE_OFFSET => {
@@ -502,23 +513,22 @@ impl Ppu {
                     .get_background_palette_index(nametable_index, tile_x, tile_y, bus.mapper);
             }
             FETCH_LOW_PATTERN_DATA_CYCLE_OFFSET => {
-                bus.mapper.notify_background_pattern_data_fetch();
-                self.tile_data[2].low_bg_pattern_byte = self.vram.get_low_pattern_data(
+                bus.mapper.notify_sprite_pattern_data_fetch();
+                sprite.low_pattern_byte = self.vram.get_low_pattern_byte(
                     pattern_table_index,
-                    self.tile_data[2].index,
+                    tile_index,
                     fine_y as u8,
                     bus.mapper,
                 );
             }
             FETCH_HIGH_PATTERN_DATA_CYCLE_OFFSET => {
-                bus.mapper.notify_background_pattern_data_fetch();
-                self.tile_data[2].high_bg_pattern_byte = self.vram.get_high_pattern_data(
+                bus.mapper.notify_sprite_pattern_data_fetch();
+                sprite.high_pattern_byte = self.vram.get_high_pattern_byte(
                     pattern_table_index,
-                    self.tile_data[2].index,
+                    tile_index,
                     fine_y as u8,
                     bus.mapper,
                 );
-                bus.mapper.notify_background_tile_data_fetch_complete();
             }
             _ => {}
         }
@@ -699,6 +709,8 @@ impl Ppu {
                                             [self.secondary_oam.sprite_count] = Sprite {
                                             oam_index: sprite_index as u8,
                                             data: sprite_data,
+                                            low_pattern_byte: 0,
+                                            high_pattern_byte: 0,
                                         };
                                         self.secondary_oam.sprite_count += 1;
                                         self.primary_oam.next_cycle_to_check += 6;
@@ -828,8 +840,8 @@ impl Ppu {
             let x = 7 - (scrolled_x % 8);
 
             let tile_data = &self.tile_data[scrolled_x as usize / 8];
-            let color_index_lo = (tile_data.low_bg_pattern_byte & (1 << x)) >> x;
-            let color_index_hi = (tile_data.high_bg_pattern_byte & (1 << x)) >> x;
+            let color_index_lo = (tile_data.low_pattern_byte & (1 << x)) >> x;
+            let color_index_hi = (tile_data.high_pattern_byte & (1 << x)) >> x;
             bg_color_index = 2 * color_index_hi + color_index_lo;
             bg_palette_index = tile_data.bg_palette_index;
         }
@@ -894,6 +906,8 @@ impl Ppu {
             .map(|(i, s)| Sprite {
                 oam_index: i as u8,
                 data: [s[0], s[1], s[2], s[3]],
+                low_pattern_byte: 0,
+                high_pattern_byte: 0,
             });
         let sprites = sprites.filter(|sprite| {
             (self.scanline as u8) >= sprite.get_y()
