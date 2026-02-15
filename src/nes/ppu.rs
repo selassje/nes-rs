@@ -723,6 +723,11 @@ impl Ppu {
                         }
                     }
                 }
+                257..=320 => {
+                    if self.is_rendering_enabled() {
+                        self.fetch_next_sprite_tile_data(bus);
+                    }
+                }
 
                 321..=336 => {
                     if self.is_rendering_enabled() {
