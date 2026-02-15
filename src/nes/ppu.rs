@@ -681,7 +681,9 @@ impl Ppu {
                                 self.primary_oam.next_cycle_to_check = 65;
                             }
 
-                            if self.ppu_cycle == self.primary_oam.next_cycle_to_check as u16 {
+                            if self.ppu_cycle == self.primary_oam.next_cycle_to_check as u16
+                                && self.primary_oam.current_sprite < 64
+                            {
                                 let sprite_index = self.primary_oam.current_sprite;
                                 let sprite_y = self.primary_oam.data[sprite_index * 4];
                                 let line_in_sprite = self.scanline as i16 - sprite_y as i16;
@@ -711,11 +713,11 @@ impl Ppu {
                             }
                         }
                         self.render_pixel(bus);
-                        
+
                         if self.is_rendering_enabled() {
                             if (1..=64).contains(&self.ppu_cycle) {
                                 let sprite_index = (self.ppu_cycle - 1) / 8;
-                                let sprite_data_index = (self.ppu_cycle - 1) % 8;
+                                let sprite_data_index = (self.ppu_cycle - 1) % 4;
                                 self.secondary_oam.sprites[sprite_index as usize].data
                                     [sprite_data_index as usize] = 0xFF;
                             }
