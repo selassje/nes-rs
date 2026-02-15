@@ -393,6 +393,14 @@ impl Ppu {
         self.vbl_flag_supressed = false;
     }
 
+    fn fetch_garbage_nametable_byte(&mut self, bus: &mut PpuBus) {
+        let nametable_index = self.vram_address.get(NM_TABLE) as u8;
+        let tile_x = self.vram_address.get(COARSE_X) as u8;
+        let tile_y = self.vram_address.get(COARSE_Y) as u8;
+        self.vram
+            .get_nametable_tile_index(nametable_index, tile_x, tile_y, bus.mapper);
+    }
+
     fn fetch_next_bg_tile_data(&mut self, bus: &mut PpuBus) {
         let nametable_index = self.vram_address.get(NM_TABLE) as u8;
         let tile_x = self.vram_address.get(COARSE_X) as u8;
@@ -554,10 +562,18 @@ impl Ppu {
                         self.fetch_next_bg_tile_data(bus)
                     }
                 }
+                337 => {
+                    if self.is_rendering_enabled() {
+                        self.fetch_garbage_nametable_byte(bus);
+                    }
+                }
 
                 339 => {
-                    if self.is_rendering_enabled() && self.frame % 2 == 1 {
-                        self.ppu_cycle += 1;
+                    if self.is_rendering_enabled() {
+                        self.fetch_garbage_nametable_byte(bus);
+                        if self.frame % 2 == 1 {
+                            self.ppu_cycle += 1;
+                        }
                     }
                 }
 
@@ -594,6 +610,17 @@ impl Ppu {
                             bus.mapper.notify_background_tile_data_prefetch_start();
                         }
                         self.fetch_next_bg_tile_data(bus)
+                    }
+                }
+
+                337 => {
+                    if self.is_rendering_enabled() {
+                        self.fetch_garbage_nametable_byte(bus);
+                    }
+                }
+                339 => {
+                    if self.is_rendering_enabled() {
+                        self.fetch_garbage_nametable_byte(bus);
                     }
                 }
 
