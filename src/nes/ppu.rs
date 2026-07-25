@@ -654,12 +654,10 @@ impl Ppu {
                     }
                 }
 
-                339 => {
-                    if self.is_rendering_enabled() {
-                        self.fetch_garbage_nametable_byte(bus);
-                        if self.frame % 2 == 1 {
-                            self.ppu_cycle += 1;
-                        }
+                339 if self.is_rendering_enabled() => {
+                    self.fetch_garbage_nametable_byte(bus);
+                    if self.frame % 2 == 1 {
+                        self.ppu_cycle += 1;
                     }
                 }
 
@@ -755,18 +753,14 @@ impl Ppu {
                         self.fetch_garbage_nametable_byte(bus);
                     }
                 }
-                339 => {
-                    if self.is_rendering_enabled() {
-                        self.fetch_garbage_nametable_byte(bus);
-                    }
+                339 if self.is_rendering_enabled() => {
+                    self.fetch_garbage_nametable_byte(bus);
                 }
 
                 _ => (),
             },
-            VBLANK_START_SCANLINE => {
-                if self.ppu_cycle == VBLANK_START_CYCLE {
-                    self.update_vblank_flag_and_nmi()
-                }
+            VBLANK_START_SCANLINE if self.ppu_cycle == VBLANK_START_CYCLE => {
+                self.update_vblank_flag_and_nmi()
             }
 
             _ => {}
