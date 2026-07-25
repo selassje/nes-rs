@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta lang="en" />
+  <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=1" name="viewport" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/x-icon" href="img/favicon.ico" />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+  <script>
+  </script>
+</head>
+
+<body>
+  <div class="layout">
+    <aside id="sidenav">
+      <h2>NES-RS</h2>
+
+      <div class="side-group">
+        <button class="icon-btn" onclick="upload_nes_file_btn_click()" title="Upload NES ROM">
+          <img src="img/upload-file-svgrepo-com.svg" />
+          <span>Upload ROM</span>
+        </button>
+        <input type="file" id="upload_nes_file" accept=".NES" />
+      </div>
+
+      <div class="side-group">
+        <button class="icon-btn" onclick="upload_save_file_btn_click()" title="Upload Save State">
+          <img src="img/upload-file-svgrepo-com.svg" />
+          <span>Upload Save</span>
+        </button>
+        <input type="file" id="upload_save_file" accept=".nesrs" />
+      </div>
+
+      <div id="download_rom_files">
+        <h3>ROM Files</h3>
+        <ul id="rom_list"></ul>
+      </div>
+
+      <div id="download_save_files">
+        <h3>Save Files</h3>
+        <ul id="download_list"></ul>
+      </div>
+    </aside>
+
+    <main id="main">
+      <canvas id="canvas"></canvas>
+      <script>
+        var Module = {
+          canvas: document.querySelector('#canvas'),
+        };
+      </script>
+      <script src="nes-rs.js"></script>
+      <script src="script.js"></script>
+
+      </br>
+      <section class="card">
+        <h3>About</h3>
+        <p>
+          Welcome to <strong>NES-RS</strong>, a Nintendo Entertainment System emulator running directly in your browser.
+        </p>
+        <p>
+          Upload a ROM or save file using the sidebar, then load it from the emulator menu.
+        </p>
+      </section>
+
+      <section class="card">
+        <h3>Controllers</h3>
+        <div class="controller-diagram">
+          <div class="controller-body">
+            <div class="dpad">
+              <span class="glyph glyph-up"></span>
+              <div class="dpad-middle">
+                <span class="glyph glyph-left"></span>
+                <span class="dpad-center"></span>
+                <span class="glyph glyph-right"></span>
+              </div>
+              <span class="glyph glyph-down"></span>
+            </div>
+
+            <div class="buttons">
+              <span class="glyph glyph-b"></span>
+              <span class="glyph glyph-a"></span>
+            </div>
+
+            <div class="center-buttons">
+              <span class="glyph glyph-select"></span>
+              <span class="glyph glyph-start"></span>
+            </div>
+          </div>
+
+          <div class="controller-labels">
+            <span>D-PAD</span>
+            <span>B</span>
+            <span>A</span>
+            <span>SELECT</span>
+            <span>START</span>
+          </div>
+        </div>
+        <div class="controller-label-centered">
+          <span>Standard Controller</span>
+        </div>
+
+        <p>Default key mapping:</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Standard Controller</th>
+              <th>Player 1</th>
+              <th>Player 2</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="glyph glyph-a"></span>A</td>
+              <td>Q</td>
+              <td>Numpad 4</td>
+            </tr>
+            <tr>
+              <td><span class="glyph glyph-b"></span>B</td>
+              <td>E</td>
+              <td>Numpad 5</td>
+            </tr>
+            <tr>
+              <td><span class="glyph glyph-select"></span>Select</td>
+              <td>C</td>
+              <td>Numpad 6</td>
+            </tr>
+            <tr>
+              <td><span class="glyph glyph-start"></span>Start</td>
+              <td>Space</td>
+              <td>Numpad +</td>
+            </tr>
+            <tr>
+              <td><span class="glyph glyph-up"></span>Up</td>
+              <td>W</td>
+              <td>↑</td>
+            </tr>
+            <tr>
+              <td><span class="glyph glyph-down"></span>Down</td>
+              <td>S</td>
+              <td>↓</td>
+            </tr>
+            <tr>
+              <td><span class="glyph glyph-left"></span>Left</td>
+              <td>A</td>
+              <td>←</td>
+            </tr>
+            <tr>
+              <td><span class="glyph glyph-right"></span>Right</td>
+              <td>D</td>
+              <td>→</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="zapper-diagram">
+          <div class="zapper-body">
+            <span class="glyph glyph-zapper"></span>
+            <div class="zapper-details">
+              <div>Shoot On Screen → Left Mouse</div>
+              <div>Shoot Off Screen → Right Mouse</div>
+            </div>
+          </div>
+          <div class="zapper-label">
+            <span>Zapper</span>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Zapper</th>
+              <th>Player 2</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="glyph glyph-zapper"></span>Shoot On Screen</td>
+              <td>Left Mouse Button</td>
+            </tr>
+            <tr>
+              <td><span class="glyph glyph-zapper"></span>Shoot Off Screen</td>
+              <td>Right Mouse Button</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <p class="hint">
+          </br>
+          Custom key mapping is available in the Emulator’s Controller menu as well as controller type selection for
+          Player 2.
+        </p>
+      </section>
+    </main>
+  </div>
+</body>
+
+</html>
