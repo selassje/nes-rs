@@ -8,8 +8,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  EMSDK_VER: 4.0.22
-  RUST_VER: 1.93.0
+  EMSDK_VER: 6.0.4
+  RUST_VER: 1.97.1
 
 jobs:
   build_and_deploy:
@@ -33,7 +33,11 @@ jobs:
          ./emsdk activate $EMSDK_VER
 
     - name: Build Emscripten target
-      shell: bash 
+      shell: bash
+      env:
+        CC_wasm32_unknown_emscripten: emcc
+        CXX_wasm32_unknown_emscripten: em++
+        AR_wasm32_unknown_emscripten: emar
       run: |
         rustup target add wasm32-unknown-emscripten
         source "emsdk/emsdk_env.sh"
